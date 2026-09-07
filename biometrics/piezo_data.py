@@ -183,6 +183,20 @@ FLOOR_PERCENTILE = 95
 _FLOOR_PERCENTILES = (50, 90, 95, 99)
 
 
+def one_value_per_second(series: pd.Series) -> pd.Series:
+    """Collapse the merge duplicates so each second contributes one sample.
+
+    The calibration frame is an inner merge of the piezo frame (one row per
+    second) with the capacitive frame (two rows per second, both genuine), so
+    every piezo value appears twice. Duplicating every value leaves the
+    percentiles where they were, but it doubles the sample count, and the
+    quality score divides that count by seconds. A window with half its
+    seconds missing therefore scored the same as a full one. Count seconds,
+    not rows.
+    """
+    return series[~series.index.duplicated(keep='first')]
+
+
 def summarize_empty_floor(p2p_values, percentile: int = FLOOR_PERCENTILE) -> dict:
     """Summarize the within-second piezo amplitude over a window believed empty.
 

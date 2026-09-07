@@ -39,7 +39,7 @@ logger = get_logger('calibrate-sensor')
 
 from data_types import *
 from load_raw_files import load_raw_files
-from piezo_data import load_piezo_df, detect_presence_piezo, identify_baseline_period, summarize_empty_floor
+from piezo_data import load_piezo_df, detect_presence_piezo, identify_baseline_period, summarize_empty_floor, one_value_per_second
 from cap_data import load_cap_df, create_cap_baseline_from_cap_df, save_baseline
 from resource_usage import get_memory_usage_unix, get_available_memory_mb
 from biometrics_helpers import validate_datetime_utc
@@ -125,7 +125,7 @@ def _record_piezo_floor(side: Side, merged_df, window_start, window_end, window_
             if column not in merged_df.columns:
                 raise KeyError(f'{column} is missing, load_piezo_df was called without with_p2p=True')
 
-            payload = summarize_empty_floor(merged_df.loc[window_start:window_end, column])
+            payload = summarize_empty_floor(one_value_per_second(merged_df.loc[window_start:window_end, column]))
             quality = calibration.compute_quality(window_seconds, payload['samples'], int(window_seconds))
             run_id = _record(
                 calibration.STATUS_SUCCESS, quality=quality, payload=payload,
@@ -250,7 +250,10 @@ def calibrate_sensor_thresholds(side: Side, start_time: datetime, end_time: date
         # not the much longer window of raw data loaded to find it.
         window_seconds = (baseline_end_time - baseline_start_time).total_seconds()
         window_df = merged_df[baseline_start_time:baseline_end_time]
-        samples_used = len(window_df)
+        # Distinct seconds, not rows: the capacitive sensor contributes two
+        # rows per second, and the quality score compares this count against
+        # seconds. Row count saturated it, so a half-empty window scored full.
+        samples_used = window_df.index.nunique()
         quality = calibration.compute_quality(window_seconds, samples_used, int(window_seconds))
 
         # Write the legacy baseline file before touching the calibration
