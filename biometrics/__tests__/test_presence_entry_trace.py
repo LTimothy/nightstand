@@ -123,5 +123,73 @@ class TestPresenceEntryTrace(unittest.TestCase):
         self.assertEqual(self._entry_lines(captured), [])
 
 
+class TestPresenceSettleTrace(unittest.TestCase):
+    """The minute after an entry, logged once, so each entry labels itself.
+
+    The run-up shows how an entry began but not whether anyone stayed. A
+    person settles far above the noise bar; an empty side that spiked over it
+    falls back to its floor within seconds, and a fresh session with no
+    signal fast-exits after 30. Logging what follows the entry separates the
+    two without keeping raw sensor files around.
+    """
+
+    def setUp(self):
+        _PresenceCoordinator._latest = {'left': 0.0, 'right': 0.0}
+        self.left = BiometricProcessor(side='left')
+        self.right = BiometricProcessor(side='right')
+        self.left._update_presence_api = lambda is_present: None
+        self.right._update_presence_api = lambda is_present: None
+
+    def _tick(self, left_signal, n=1):
+        for _ in range(n):
+            self.left.detect_presence(left_signal)
+            self.right.detect_presence(QUIET)
+
+    def _settle_lines(self, captured):
+        return [r.getMessage() for r in captured.records
+                if 'Presence settle on left side' in r.getMessage()]
+
+    def test_a_person_who_stays_is_logged_once_at_sixty_seconds(self):
+        with self.assertLogs(biometric_processor.logger, level='INFO') as captured:
+            self._tick(DOMINANT, 5)
+            self.assertTrue(self.left.present)
+            self._tick(DOMINANT, 60)
+
+        lines = self._settle_lines(captured)
+        self.assertEqual(len(lines), 1)
+        self.assertIn('60s after entry:', lines[0])
+        self.assertNotIn('exited', lines[0])
+        self.assertIn('median 300000', lines[0])
+
+    def test_an_entry_that_falls_back_is_flushed_when_presence_ends(self):
+        # The spurious case: an entry, then nothing. The fresh session exits
+        # before the minute is up, and the trace must not be lost with it.
+        with self.assertLogs(biometric_processor.logger, level='INFO') as captured:
+            self._tick(DOMINANT, 5)
+            self._tick(QUIET, 59)
+
+        self.assertFalse(self.left.present)
+        lines = self._settle_lines(captured)
+        self.assertEqual(len(lines), 1)
+        self.assertIn('(exited)', lines[0])
+        self.assertIn('median 0', lines[0])
+
+    def test_nothing_is_logged_while_the_minute_is_still_running(self):
+        with self.assertLogs(biometric_processor.logger, level='INFO') as captured:
+            self._tick(DOMINANT, 5)
+            self._tick(DOMINANT, 30)
+            biometric_processor.logger.info('marker')
+
+        self.assertTrue(self.left.present)
+        self.assertEqual(self._settle_lines(captured), [])
+
+    def test_a_long_session_does_not_log_again_after_the_first_minute(self):
+        with self.assertLogs(biometric_processor.logger, level='INFO') as captured:
+            self._tick(DOMINANT, 5)
+            self._tick(DOMINANT, 200)
+
+        self.assertEqual(len(self._settle_lines(captured)), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

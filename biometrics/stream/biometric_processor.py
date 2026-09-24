@@ -230,6 +230,7 @@ class BiometricProcessor:
         # drops because the user is actually settled on the OTHER side).
         self._presence_session_seconds = 0
         self._established_threshold = 60
+        self._SETTLE_TRACE_FRAMES = 60
         self._fast_exit_grace = 30
         # Consecutive clearly-dominant frames seen while mid-exit (not_present_for
         # > 0). A piezo permanently loaded by pillows/a topper idles close
@@ -257,6 +258,11 @@ class BiometricProcessor:
         # disturbances or something in the entry gate. Long enough to cover
         # the 5-frame entry gate with room before it.
         self._entry_trace: Deque[tuple] = deque([], maxlen=12)
+        # The range for the minute after an entry, logged once. A person
+        # settles far above the noise bar while an empty side that spiked over
+        # it falls back to its floor, so this labels each entry as it happens.
+        # None when no entry is being followed.
+        self._settle_trace = None
         # --- is_ambiguous_both exit-freeze discriminators ---
         # The `is_ambiguous_both` branch used to freeze the exit clock
         # unconditionally, which let an empty side latch "present" for hours
@@ -428,6 +434,10 @@ class BiometricProcessor:
         floor from scratch rather than measuring the next occupant against the
         last one's.
         """
+        # A fresh session can end inside its first minute. Log what there is:
+        # an entry that did not last is exactly what the trace is for.
+        if self._settle_trace is not None:
+            self._log_settle_trace(exited=True)
         self.present = False
         self.reset()
         self.present_for = 0
@@ -438,6 +448,17 @@ class BiometricProcessor:
         self._occupied_floor_est = None
         self._update_presence_api(False)
         self._presence_heartbeat_counter = 0
+
+    def _log_settle_trace(self, exited: bool):
+        trace, self._settle_trace = self._settle_trace, None
+        if not trace:
+            return
+        p10, median, p90 = np.percentile(trace, [10, 50, 90])
+        logger.info(
+            f'Presence settle on {self.side} side, {len(trace)}s after entry'
+            f'{" (exited)" if exited else ""}: median {median:.0f} '
+            f'p10 {p10:.0f} p90 {p90:.0f} max {max(trace):.0f}'
+        )
 
     def detect_presence(self, signal1: np.ndarray, signal2: Union[None, np.ndarray] = None):
         # Each side has TWO physical piezos (head + foot of that half of the
@@ -451,6 +472,11 @@ class BiometricProcessor:
         signal_range = max(r1, r2)
 
         self._recent_ranges.append(signal_range)
+
+        if self._settle_trace is not None:
+            self._settle_trace.append(signal_range)
+            if len(self._settle_trace) >= self._SETTLE_TRACE_FRAMES:
+                self._log_settle_trace(exited=False)
 
         # Cross-side arbitration: report our range to the coordinator and let
         # it tell us whether THIS side is actually occupied (vs just picking
@@ -565,6 +591,7 @@ class BiometricProcessor:
                     for rng, s, o, d, fe, pf in self._entry_trace
                 )
                 logger.info(f'Presence entry on {self.side} side, run-up: {run_up}')
+                self._settle_trace = []
         elif is_ambiguous_both:
             # Both above noise, neither dominant. We can't tell from one tick
             # whether this is real two-person occupancy or cross-transmission,
