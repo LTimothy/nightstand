@@ -240,3 +240,73 @@ describe('update.sh will not ship code onto a schema that did not migrate', () =
     assert.match(src, /systemctl restart free-sleep-stream/, 'a stopped streamer is never started again');
   });
 });
+
+describe('update.sh hands the rest of an update to the version it installs', () => {
+  // The updater that runs is the installed one, so without this a fix to it
+  // reaches a pod one release after it ships. Each test below guards one way
+  // the handoff could break an update, most of all a downgrade: an older
+  // updater handed the job would find the target request already consumed and
+  // install the latest release instead of the one asked for.
+  const src = readFileSync(path.join(repoRoot, 'scripts/update.sh'), 'utf8');
+
+  const assertOrder = (markers: string[], label: string) => {
+    let from = 0;
+    for (const marker of markers) {
+      const idx = src.indexOf(marker, from);
+      assert.notEqual(idx, -1, `${label}: "${marker}" is missing, or out of order`);
+      from = idx + marker.length;
+    }
+  };
+
+  it('carries the marker as a whole line, so the next version will hand off to it', () => {
+    assert.match(src, /^# nightstand-update-handoff: 1$/m);
+  });
+
+  it('only hands off to a copy that carries the marker', () => {
+    assertOrder([
+      'grep -Fxq "$HANDOFF_MARKER" "$STAGE/scripts/update.sh"',
+      'exec bash "$STAGE/scripts/update.sh"',
+    ], 'marker-gates-exec');
+  });
+
+  it('hands off only after the internet is blocked again and before anything is backed up', () => {
+    assertOrder([
+      'close_wan',
+      'exec bash "$STAGE/scripts/update.sh"',
+      'Backing up code + data',
+    ], 'handoff-between-download-and-backup');
+  });
+
+  it('clears the cleanup trap first, since it deletes the stage the new updater needs', () => {
+    assertOrder(['trap - EXIT', 'exec bash "$STAGE/scripts/update.sh"'], 'trap-cleared');
+  });
+
+  it('passes the two values the rest of the update depends on', () => {
+    assert.match(src, /export NIGHTSTAND_HANDOFF_TARGET="\$TARGET_VERSION"/);
+    assert.match(src, /export NIGHTSTAND_HANDOFF_IS_DOWNGRADE="\$IS_DOWNGRADE"/);
+  });
+
+  it('never re-reads the target request or downloads again once handed off', () => {
+    assertOrder([
+      'if [ "$HANDOFF" = 1 ]; then',
+      'TARGET_VERSION="${NIGHTSTAND_HANDOFF_TARGET:-}"',
+      'else',
+      'rm -f "$TARGET_FILE"',
+      'curl -fL --max-time 300 -o "$ZIP"',
+    ], 'handed-off-run-skips-fetch');
+  });
+
+  it('never hands off twice', () => {
+    assertOrder([
+      'if [ "$HANDOFF" != 1 ]; then',
+      'exec bash "$STAGE/scripts/update.sh"',
+    ], 'no-handoff-loop');
+  });
+
+  it('keeps the inline python at column 0, where an indented block would break it', () => {
+    // The download steps sit unindented inside the handoff branch for this
+    // reason; indenting them hands python an IndentationError mid-update.
+    assert.match(src, /\nimport json, sys\n/);
+    assert.match(src, /\ndef parts\(v\): return/);
+  });
+});

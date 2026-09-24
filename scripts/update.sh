@@ -63,6 +63,15 @@ trap cleanup EXIT
 
 fail() { say "FATAL: $*"; exit 1; }
 
+# The updater that runs is the one already installed, so a fix to this script
+# would otherwise reach a pod one release after it ships. Once the new version
+# is downloaded and its dependencies installed, the rest of the update is
+# handed to that version's own copy. The line below is how a copy says it
+# understands the handoff; an update only hands off to a copy that has it.
+# nightstand-update-handoff: 1
+HANDOFF_MARKER='# nightstand-update-handoff: 1'
+HANDOFF="${NIGHTSTAND_UPDATE_HANDOFF:-}"
+
 # --- preflight ---------------------------------------------------------------
 [ -d "$LIVE" ] || fail "no live install at $LIVE"
 CUR_VERSION=$(python3 -c 'import json;print(json.load(open("'"$LIVE"'/server/src/serverInfo.json"))["version"])' 2>/dev/null) \
@@ -72,6 +81,19 @@ ROOT_FREE=$(df -m / | awk 'NR==2{print $4}')
 PERS_FREE=$(df -m /persistent | awk 'NR==2{print $4}')
 [ "$ROOT_FREE" -gt 1500 ] || fail "low disk on / (${ROOT_FREE}M free)"
 [ "$PERS_FREE" -gt 2000 ] || fail "low disk on /persistent (${PERS_FREE}M free)"
+
+if [ "$HANDOFF" = 1 ]; then
+  # Handed off by the previously installed updater, which already consumed the
+  # target request, downloaded and staged this version, and installed its
+  # dependencies. Pick up from the backup.
+  TARGET_VERSION="${NIGHTSTAND_HANDOFF_TARGET:-}"
+  IS_DOWNGRADE="${NIGHTSTAND_HANDOFF_IS_DOWNGRADE:-no}"
+  unset NIGHTSTAND_UPDATE_HANDOFF NIGHTSTAND_HANDOFF_TARGET NIGHTSTAND_HANDOFF_IS_DOWNGRADE
+  [ -d "$STAGE" ] || fail "handed off without a staged tree at $STAGE"
+  say "Continuing with the new version's updater (running v$CUR_VERSION)"
+else
+# Left unindented to the matching fi: the steps below carry inline python that
+# has to stay at column 0.
 
 # --- consume the target-version request file, if any -------------------------
 TARGET_VERSION=""
@@ -162,6 +184,7 @@ STAGED_DIR=$(find "$STAGE.unzip" -mindepth 1 -maxdepth 1 -type d | head -n1)
 mv "$STAGED_DIR" "$STAGE" && rm -rf "$STAGE.unzip"
 rm -f "$ZIP"
 chown -R dac:dac "$STAGE"
+fi
 
 # the pod runs prebuilt code; refuse anything missing its build output
 [ -f "$STAGE/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"
@@ -175,14 +198,31 @@ fi
 # --- dependencies (old server still running) ---------------------------------
 LOCK_SAME=no
 cmp -s "$LIVE/server/package-lock.json" "$STAGE/server/package-lock.json" && LOCK_SAME=yes
-if [ "$LOCK_SAME" = no ]; then
-  say "package-lock.json changed: running npm install in staging"
-  sudo -u dac bash -c "cd '$STAGE/server' && '$NPM' install --no-audit --no-fund" \
-    || fail "npm install failed; live install untouched"
-else
-  say "package-lock.json unchanged: reusing existing node_modules"
+if [ "$HANDOFF" != 1 ]; then
+  if [ "$LOCK_SAME" = no ]; then
+    say "package-lock.json changed: running npm install in staging"
+    sudo -u dac bash -c "cd '$STAGE/server' && '$NPM' install --no-audit --no-fund" \
+      || fail "npm install failed; live install untouched"
+  else
+    say "package-lock.json unchanged: reusing existing node_modules"
+  fi
+  close_wan
+
+  # Only to a copy that carries the marker. An older updater would find the
+  # target request already consumed and install the latest release instead of
+  # the one asked for, so a downgrade would quietly become an upgrade. Without
+  # the marker this script finishes the update itself, as before.
+  if grep -Fxq "$HANDOFF_MARKER" "$STAGE/scripts/update.sh" 2>/dev/null; then
+    say "Handing the rest of the update to the v$STAGED_VERSION updater"
+    # exec replaces this process, so the cleanup trap would never run anyway;
+    # cleared explicitly because it deletes the stage the new updater needs.
+    trap - EXIT
+    export NIGHTSTAND_UPDATE_HANDOFF=1
+    export NIGHTSTAND_HANDOFF_TARGET="$TARGET_VERSION"
+    export NIGHTSTAND_HANDOFF_IS_DOWNGRADE="$IS_DOWNGRADE"
+    exec bash "$STAGE/scripts/update.sh"
+  fi
 fi
-close_wan
 
 # --- backup ------------------------------------------------------------------
 TS=$(date +%Y%m%d-%H%M%S)
