@@ -207,17 +207,25 @@ if [ "$LOCK_SAME" = yes ]; then
   MOVED_MODULES=yes
 fi
 
-# The server is already stopped by the swap above, but the biometrics streamer
-# writes to the same SQLite file continuously, and its lock is enough to fail
-# the schema engine outright. That is not hypothetical: it is how a release
-# once shipped with its new tables missing, because the failure was a warning
-# and the health check below cannot see a missing table.
+# Whether to migrate is decided by what the database is missing, not by
+# whether schema.prisma differs from the previous version. A file comparison
+# cannot see a database an earlier update left half-migrated, so reinstalling
+# the same version could never finish the job. migrate status exits non-zero
+# exactly when a migration in this tree is unapplied, and reads a database that
+# is ahead of this code as up to date, so it never acts on a downgrade.
+#
+# It is a read, so it works while the biometrics streamer holds the file. The
+# write is what the streamer's connection blocks: that is how a release once
+# shipped with its new tables missing, because the failure was a warning and
+# the health check below cannot see a missing table.
 STREAM_WAS_ACTIVE=$(systemctl is-active free-sleep-stream 2>/dev/null || true)
 MIGRATION_FAILED=no
+SCHEMA_CHANGED=no
+cmp -s "$PREV/server/prisma/schema.prisma" "$LIVE/server/prisma/schema.prisma" || SCHEMA_CHANGED=yes
 if [ "$IS_DOWNGRADE" = yes ]; then
   say "Downgrade: skipping prisma migrate (schema stays newer; migrations are additive by standing rule)"
-elif ! cmp -s "$PREV/server/prisma/schema.prisma" "$LIVE/server/prisma/schema.prisma"; then
-  say "Prisma schema changed: migrate deploy + generate"
+elif ! sudo -u dac bash -c "cd '$LIVE/server' && '$NPX' dotenv -e .env.pod -- npx prisma migrate status" >/dev/null 2>&1; then
+  say "Database has unapplied migrations: migrate deploy + generate"
   systemctl stop free-sleep-stream 2>/dev/null || true
   PRISMA_OK=no
   for attempt in 1 2 3; do
@@ -236,6 +244,13 @@ elif ! cmp -s "$PREV/server/prisma/schema.prisma" "$LIVE/server/prisma/schema.pr
   [ "$PRISMA_OK" = yes ] &&
     { sudo -u dac bash -c "cd '$LIVE/server' && '$NPX' dotenv -e .env.pod -- npx prisma migrate status" || PRISMA_OK=no; }
   [ "$PRISMA_OK" = yes ] || MIGRATION_FAILED=yes
+elif [ "$SCHEMA_CHANGED" = yes ]; then
+  # node_modules may have been carried over from the previous version, with
+  # its generated client, so a schema change with nothing to migrate still
+  # needs one.
+  say "Prisma schema changed with nothing to migrate: generate"
+  sudo -u dac bash -c "cd '$LIVE/server' && '$NPX' dotenv -e .env.pod -- npx prisma generate" \
+    || MIGRATION_FAILED=yes
 fi
 
 systemctl start free-sleep

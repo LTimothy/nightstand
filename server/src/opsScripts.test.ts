@@ -191,6 +191,26 @@ describe('deploy.sh will not ship code onto a schema that did not migrate', () =
     );
   });
 
+  it('decides whether to migrate from what the database is missing, not from a schema diff', () => {
+    // A schema-file comparison cannot see a database an earlier update left
+    // half-migrated, so reinstalling the same version could never finish the
+    // job. migrate status is a read, so it can be asked before the streamer is
+    // stopped, and only a pending migration should stop it.
+    assertOrder([
+      'prisma migrate status',
+      'systemctl stop free-sleep-stream',
+      'prisma migrate deploy',
+    ], 'status-gates-migrate');
+  });
+
+  it('still regenerates the client when the schema changed with nothing to migrate', () => {
+    // node_modules is carried over from the previous version when the
+    // lockfile is unchanged, generated client included, so a schema change
+    // without a migration still needs generate.
+    assert.match(src, /SCHEMA_CHANGED=yes/);
+    assert.match(src, /elif \[ "\$SCHEMA_CHANGED" = "yes" \]; then[\s\S]{0,600}prisma generate/);
+  });
+
   it('restarts the streamer it stopped, rather than leaving it down', () => {
     // try-restart is a no-op on a stopped unit, which is exactly what the
     // migration step leaves behind.
