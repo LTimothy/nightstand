@@ -6,6 +6,31 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [3.2.1] - 2026-09-24
+
+- When an update cannot apply its database changes, the Status page now says
+  so. The database entry names the changes that are missing, and the Versions
+  page offers Reinstall on the running version, which applies them. Before
+  this, the server kept running without tables it needed, and nothing reported
+  why until something that used them failed.
+
+- Updates now apply database changes whenever the database is behind, not only
+  when the new version brings changes of its own. An update that left changes
+  unapplied can now be finished by reinstalling the same version, which was
+  not possible before.
+
+- The version being installed now finishes its own update. Updates were always
+  run by the updater already on the pod, so a fix to the updater reached a pod
+  one update after the one that delivered it. From the next update on, the new
+  version's updater takes over once it has been downloaded. An update only
+  hands over to an updater that supports this, so installing an older version
+  still installs the version asked for.
+
+  This starts with the update after this one. Installing 3.2.1 is still run by
+  the updater already on the pod. Coming from 3.0 or 3.1, that updater can
+  leave database changes unapplied, and if it does, the Status page will say so
+  and one reinstall finishes them.
+
 ## [3.2.0] - 2026-09-24
 
 - Calibration now needs the whole bed to be empty, not only the side being
