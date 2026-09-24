@@ -2,9 +2,16 @@ import { ServerStatus as ServerStatusType } from './routes/serverStatus/serverSt
 import { isSystemDateValid } from './jobs/isSystemDateValid.js';
 import servicesDB from './db/services.js';
 import { prisma } from './db/prisma.js';
+import { findUnappliedMigrations, listLocalMigrations, MigrationRow } from './db/unappliedMigrations.js';
 import moment from 'moment-timezone';
+import path from 'node:path';
 
 await servicesDB.read();
+
+// src/ and dist/ sit side by side under server/, so this resolves the same
+// from either. Listed once: the tree does not change while the server runs.
+const MIGRATIONS_DIR = path.resolve(import.meta.dirname, '../prisma/migrations');
+let localMigrations: string[] | undefined;
 
 class ServerStatus {
   // eslint-disable-next-line no-use-before-define
@@ -103,9 +110,25 @@ class ServerStatus {
         Array<{ quick_check: string }>
       >(`PRAGMA quick_check;`);
       const quickCheckHealthy = quick?.[0] && Object.values(quick[0])[0] === 'ok';
+      delete this.status.database.unappliedMigrations;
       if (quickCheckHealthy) {
-        this.status.database.status = 'healthy';
-        this.status.database.message = '';
+        // An update that could not migrate leaves the server running against
+        // a database missing tables it needs, and nothing else notices until a
+        // request touches one.
+        localMigrations ??= listLocalMigrations(MIGRATIONS_DIR);
+        const rows = await prisma.$queryRaw<MigrationRow[]>`
+          SELECT migration_name, finished_at, rolled_back_at FROM _prisma_migrations`;
+        const unapplied = findUnappliedMigrations(localMigrations, rows);
+        if (unapplied.length > 0) {
+          this.status.database.status = 'failed';
+          this.status.database.message =
+            `Some database changes this version needs were never applied (${unapplied.join(', ')}). ` +
+            'To apply them, open Settings, then Versions, and choose Reinstall on the running version.';
+          this.status.database.unappliedMigrations = unapplied;
+        } else {
+          this.status.database.status = 'healthy';
+          this.status.database.message = '';
+        }
       } else {
         this.status.database.status = 'failed';
         this.status.database.message = `SQLite DB is unhealthy! - ${JSON.stringify(quick)}`;

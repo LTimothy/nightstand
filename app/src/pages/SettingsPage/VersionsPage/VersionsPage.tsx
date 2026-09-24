@@ -21,6 +21,7 @@ import { useLatestVersion } from '@api/useLatestVersion.ts';
 import { useReleases } from '@api/releases.ts';
 import { useChangelog, useRemoteChangelog, entriesNewerThan } from '@api/changelog.ts';
 import { useRollbackInfo } from '@api/update.ts';
+import { useServerStatus } from '@api/serverStatus.ts';
 import { UPDATE_CHANNELS, UpdateChannelType } from '@api/settingsSchema.ts';
 import currentServerInfo from '../../../../../server/src/serverInfo.json';
 
@@ -41,6 +42,10 @@ export default function VersionsPage() {
   const { data: localChangelog } = useChangelog();
   const { data: remoteChangelog } = useRemoteChangelog();
   const { data: rollbackInfo } = useRollbackInfo();
+  // Only the running row acts on this: it offers a reinstall to finish
+  // migrations an earlier update could not apply.
+  const { data: serverStatus } = useServerStatus();
+  const offerReinstall = !!serverStatus?.database?.unappliedMigrations?.length;
   const latestVersion = useLatestVersion();
 
   const running = deviceStatus?.freeSleep?.version;
@@ -165,6 +170,7 @@ export default function VersionsPage() {
               release={ release }
               runningVersion={ running }
               body={ bodyByVersion.get(release.version) }
+              offerReinstall={ offerReinstall }
             />
           )) }
         </Section>

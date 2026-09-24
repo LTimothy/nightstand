@@ -6,7 +6,7 @@ import {
 import semver from 'semver';
 import MarkdownBody from '@components/MarkdownBody.tsx';
 import { postUpdate } from '@api/update.ts';
-import { useUpdateProgress } from '@api/useUpdateProgress.ts';
+import { migrationsApplied, useUpdateProgress } from '@api/useUpdateProgress.ts';
 import type { Release } from '@api/releases.ts';
 import { palette } from '@design/tokens';
 
@@ -14,13 +14,19 @@ type Props = {
   release: Release;
   runningVersion: string | undefined;
   body: string | undefined;
+  // The database has migrations this version ships but never applied. A
+  // reinstall of the running version is the one thing that finishes them.
+  offerReinstall?: boolean;
 };
 
-export default function ReleaseRow({ release, runningVersion, body }: Props) {
+export default function ReleaseRow({ release, runningVersion, body, offerReinstall = false }: Props) {
   const [open, setOpen] = useState(false);
-  const { phase, start, reset } = useUpdateProgress(runningVersion);
-
   const isRunning = release.version === runningVersion;
+  const isReinstall = isRunning && offerReinstall;
+  // A reinstall never changes the running version, so it is done when the
+  // database is, not when the version moves.
+  const { phase, start, reset } = useUpdateProgress(runningVersion, isReinstall ? migrationsApplied : undefined);
+
   const isDowngrade = !!runningVersion && !!semver.valid(runningVersion) && semver.lt(release.version, runningVersion);
 
   const install = () => start(() => postUpdate({ targetVersion: release.version, allowDowngrade: isDowngrade }));
@@ -33,9 +39,9 @@ export default function ReleaseRow({ release, runningVersion, body }: Props) {
         <Chip label={ release.channel } size="small" variant="outlined"/>
         { isRunning && <Chip label="Running" size="small" color="success"/> }
         <Box sx={ { flex: 1 } }/>
-        { !isRunning && (
+        { (!isRunning || isReinstall) && (
           <Button size="small" variant="outlined" onClick={ () => setOpen(true) }>
-            { isDowngrade ? 'Install (downgrade)' : 'Install' }
+            { isReinstall ? 'Reinstall' : isDowngrade ? 'Install (downgrade)' : 'Install' }
           </Button>
         ) }
       </Box>
@@ -43,18 +49,21 @@ export default function ReleaseRow({ release, runningVersion, body }: Props) {
 
       <Dialog open={ open } onClose={ () => phase !== 'updating' && setOpen(false) }>
         <DialogTitle>
-          { phase === 'idle' && `Install v${release.version}?` }
+          { phase === 'idle' && `${isReinstall ? 'Reinstall' : 'Install'} v${release.version}?` }
           { phase === 'updating' && 'Installing...' }
           { phase === 'timed_out' && 'Still not done' }
         </DialogTitle>
         <DialogContent>
           { phase === 'idle' && (
             <DialogContentText>
-              { isDowngrade
-                ? `This downgrades from v${runningVersion} to v${release.version}. Your data is kept ` +
+              { isReinstall
+                ? `This reinstalls v${release.version} to finish database changes an earlier update left ` +
+                  'undone. Your data is kept, and the new updater applies what is missing.'
+                : isDowngrade
+                  ? `This downgrades from v${runningVersion} to v${release.version}. Your data is kept ` +
                   '(databases aren\'t rewritten). Installing any version replaces the instant-rollback slot, ' +
                   'so you won\'t be able to instantly roll back to what\'s running now afterward.'
-                : `The pod will download v${release.version}, back itself up, install, and verify its own ` +
+                  : `The pod will download v${release.version}, back itself up, install, and verify its own ` +
                   'health. It rolls back automatically if the new build fails health checks.' }
               { ' ' }Temperature control keeps running throughout; the app will be unreachable for a few
               seconds during the switch.
@@ -70,9 +79,12 @@ export default function ReleaseRow({ release, runningVersion, body }: Props) {
           ) }
           { phase === 'timed_out' && (
             <DialogContentText>
-              The pod hasn't reported the new version after 10 minutes. It may have rolled back
-              (the previous version keeps running) or the download may be slow. Check the log on
-              the pod: <code>/persistent/free-sleep-data/logs/free-sleep-update.log</code>
+              { isReinstall
+                ? 'The database changes still are not applied after 10 minutes. The reinstall may have ' +
+                  'rolled back (the running version keeps running) or the download may be slow.'
+                : 'The pod hasn\'t reported the new version after 10 minutes. It may have rolled back ' +
+                  '(the previous version keeps running) or the download may be slow.' }
+              { ' ' }Check the log on the pod: <code>/persistent/free-sleep-data/logs/free-sleep-update.log</code>
             </DialogContentText>
           ) }
         </DialogContent>
@@ -80,7 +92,7 @@ export default function ReleaseRow({ release, runningVersion, body }: Props) {
           { phase === 'idle' && (
             <>
               <Button onClick={ () => setOpen(false) }>Cancel</Button>
-              <Button variant="contained" onClick={ install }>Install now</Button>
+              <Button variant="contained" onClick={ install }>{ isReinstall ? 'Reinstall now' : 'Install now' }</Button>
             </>
           ) }
           { phase === 'timed_out' && (

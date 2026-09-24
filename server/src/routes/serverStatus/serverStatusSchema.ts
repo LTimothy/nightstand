@@ -24,6 +24,9 @@ export const StatusInfoSchema = z.object({
   description: z.string(),
   message: z.string(),
   timestamp: z.string().optional(),
+  // Set on the database entry only: migrations this version ships that the
+  // database never applied, which the Versions page offers to finish.
+  unappliedMigrations: z.array(z.string()).optional(),
 });
 
 export type StatusInfo = z.infer<typeof StatusInfoSchema>;
