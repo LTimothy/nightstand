@@ -6,6 +6,46 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [3.2.0] - 2026-09-24
+
+- Calibration now needs the whole bed to be empty, not only the side being
+  calibrated. It picked its quiet stretch by looking at its own side alone, so a
+  side could calibrate while someone lay on the other one and measure their
+  movement coming through the mattress instead of an empty bed. A stretch is now
+  skipped if either side recorded a heart rate during it. When the bed was busy
+  the whole time, calibration waits for another day rather than settling for the
+  least busy stretch.
+
+- The calibration quality score now drops when the window it learned from was
+  thin. Every second was being counted twice, so a window missing half its
+  readings scored the same as a full one. Calibration also measures each side's
+  signal level on an empty bed and keeps that with every run. It is recorded
+  only, and does not change how presence is detected yet.
+
+- An update could leave the server running without database tables it needs.
+  The database step ran while the biometrics service was still writing to the
+  same file and could not get the lock it needed. That was logged as a warning,
+  and the check after the update passed anyway, because it confirms the server
+  answers, reports the right version and reads a sensor, and none of that
+  touches the new tables. On one pod this left calibration failing every night
+  until it was fixed by hand. Updates now pause the biometrics service while the
+  database is updated, retry, confirm nothing is left pending, and roll back if
+  it still did not apply. This protects updates made from this version on. The
+  update that installs this version runs the updater already on the pod, so it
+  does not get the fix itself.
+
+- Each time presence starts, the minute that follows is now recorded along with
+  the few seconds before it. A person settles well above the level that starts a
+  session, while an empty side that briefly crossed it drops back within
+  seconds, so the log now shows which sessions were real without keeping raw
+  sensor recordings around.
+
+- `scripts/setup_watchdog.sh` turns on the pod's hardware watchdog, so a frozen
+  system restarts itself within about 30 seconds. On one pod a fault in the
+  stock Wi-Fi driver froze the system partway through its nightly restart, and
+  it stayed down, with no server and no cooling, until it was unplugged. Updates
+  do not run this script. It is run once, as root, on the pod.
+
 ## [3.1.0] - 2026-08-07
 
 - The Status page now shows when the active presence calibration profile was
