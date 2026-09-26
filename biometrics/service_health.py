@@ -138,18 +138,13 @@ _PUMP_TEC_ACTIVE_AMPS = 1.0
 # before clearing, avoids flapping on a single noisy frame in either
 # direction.
 #
-# KNOWN WRONG, do not tune these to compensate. This check was built on the
-# assumption that TEC current is the "commanded active" signal, so that a
-# side which is merely switched off would not look like a stall. Eleven days
-# of the per-frame trace say otherwise: rpm reads 0 for exactly the hours the
-# power schedule has the side off (0% of frames from 20:00 to 07:00 local,
-# ~100% from 08:00 to 19:00), while TEC current never once falls below 7.2A
-# in 96,247 frames, so the 1.0A bar never excludes anything. The rule
-# therefore reduces to "rpm below 200" and fires every day at power-off.
-# No threshold on current can separate on from off, and any dwell short
-# enough to catch a real stall is far shorter than the multi-hour normal off
-# stretches. The fix is to gate on whether the side is actually powered on;
-# see the transition trace below for the data being gathered to do that.
+# A stopped pump is only a stall on a side that is switched on, and nothing in
+# the frame says which. Eleven days of it showed rpm at 0 for exactly the hours
+# the power schedule had a side off, TEC current never below 7.2A in 96,247
+# frames (so the 1.0A bar above never excludes anything), and pump mode still
+# 'pwm' at rpm 0. So the server, which knows, is asked whether the side is on
+# before a stall is declared. Do not tune these thresholds to compensate for a
+# missing gate.
 _PUMP_STALL_DWELL_FRAMES = 6
 _PUMP_RECOVERY_DWELL_FRAMES = 3
 
@@ -167,6 +162,17 @@ def new_pump_state() -> dict:
 _pump_state = {'left': new_pump_state(), 'right': new_pump_state()}
 
 
+def _sides_commanded_on():
+    """Which sides the server says are switched on, or None if it cannot say."""
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:3000/api/deviceStatus', timeout=5) as response:
+            status = json.load(response)
+        return {side: bool((status.get(side) or {}).get('isOn')) for side in ('left', 'right')}
+    except Exception as error:
+        logger.warning(f'Could not read which sides are switched on: {error}')
+        return None
+
+
 def update_pump_health(frz_health_data: dict):
     """
     Watches frzHealth frames (pump RPM/water + TEC current per side) for a
@@ -174,6 +180,15 @@ def update_pump_health(frz_health_data: dict):
     via the same update_health() job-status mechanism as other biometrics
     jobs. Called from the stream processor for every frzHealth frame.
     """
+    # Fetched at most once per frame and only when a side needs it: every ask
+    # is a round trip to the hardware socket.
+    intent = {}
+
+    def commanded_on(side):
+        if 'sides' not in intent:
+            intent['sides'] = _sides_commanded_on()
+        return None if intent['sides'] is None else intent['sides'][side]
+
     try:
         for side in ('left', 'right'):
             side_data = frz_health_data.get(side) or {}
@@ -205,14 +220,8 @@ def update_pump_health(frz_health_data: dict):
             )
 
             # Whole-frame dump on the frames where pump_ok flips, which is
-            # where the pump starts or stops reporting rpm. Eleven days of the
-            # per-frame trace showed rpm sits at 0 for the exact hours the
-            # power schedule has the side off, and TEC current never drops
-            # below 7A even then, so `current` cannot tell a commanded-off side
-            # from a running one. What the frame carries alongside rpm at that
-            # moment (pump mode, and anything else) is the missing piece for
-            # gating this check on the side actually being on. Logged only on
-            # the transition, a few times a day, not on every frame.
+            # where the pump starts or stops reporting rpm. Logged only on the
+            # transition, a few times a day, not on every frame.
             if state.get('prev_pump_ok') != pump_ok:
                 logger.info(
                     f'pump health {side} transition: pump_ok {state.get("prev_pump_ok")} '
@@ -229,22 +238,39 @@ def update_pump_health(frz_health_data: dict):
 
             job_key = f'pump{side.capitalize()}'
 
-            if not state['is_stalled'] and state['consecutive_stall'] >= _PUMP_STALL_DWELL_FRAMES:
+            # Asked once per dwell window, not per frame: whether a side is on
+            # only changes at a schedule boundary or a manual switch.
+            at_dwell = (
+                state['consecutive_stall'] > 0
+                and state['consecutive_stall'] % _PUMP_STALL_DWELL_FRAMES == 0
+            )
+            side_on = commanded_on(side) if at_dwell else None
+
+            if not state['is_stalled'] and at_dwell and side_on:
                 state['is_stalled'] = True
                 state['reported_healthy'] = True
                 message = (
-                    f'Pump stall suspected on {side} side: TEC drawing {current:.1f}A '
-                    f'(actively heating/cooling) but pump rpm={rpm}, water={water}. '
-                    f'The hub temperature sensor may be reading stagnant water next to '
-                    f'the heating element, not actual bed temperature.'
+                    f'Pump stall suspected on {side} side: the side is switched on but the '
+                    f'pump reports rpm={rpm}, water={water}. The hub temperature sensor '
+                    f'may be reading stagnant water next to the heating element, not '
+                    f'actual bed temperature.'
                 )
                 logger.error(message)
                 update_health(job_key, 'failed', message)
+            elif state['is_stalled'] and at_dwell and side_on is False:
+                # A switched-off side never spins its pump back up, so waiting
+                # for rpm to recover would latch the stall indefinitely.
+                state['is_stalled'] = False
+                logger.info(f'Pump on {side} side is no longer checked: the side was switched off')
+                update_health(job_key, 'healthy', '')
             elif state['is_stalled'] and state['consecutive_healthy'] >= _PUMP_RECOVERY_DWELL_FRAMES:
                 state['is_stalled'] = False
                 logger.info(f'Pump on {side} side recovered: rpm={rpm}, water={water}')
                 update_health(job_key, 'healthy', '')
-            elif not state['is_stalled'] and not state['reported_healthy'] and pump_ok:
+            elif (
+                not state['is_stalled'] and not state['reported_healthy']
+                and (pump_ok or (at_dwell and side_on is False))
+            ):
                 state['reported_healthy'] = True
                 update_health(job_key, 'healthy', '')
     except Exception as error:

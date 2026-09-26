@@ -50,9 +50,22 @@ class TestPumpHealth(unittest.TestCase):
         self.calls = []
         self._orig_update_health = service_health.update_health
         service_health.update_health = lambda job_key, status, message='': self.calls.append((job_key, status, message))
+        # The tests below model a side that is switched on with a stalled
+        # pump, so the server answers "on" unless a test says otherwise. It
+        # also keeps every test off the network.
+        self.sides_on = {'left': True, 'right': True}
+        self.intent_asks = 0
+        self._orig_sides_commanded_on = service_health._sides_commanded_on
+
+        def fake_sides_commanded_on():
+            self.intent_asks += 1
+            return self.sides_on
+
+        service_health._sides_commanded_on = fake_sides_commanded_on
 
     def tearDown(self):
         service_health.update_health = self._orig_update_health
+        service_health._sides_commanded_on = self._orig_sides_commanded_on
 
     def test_healthy_pump_reports_healthy_once(self):
         for _ in range(3):
@@ -145,6 +158,74 @@ class TestPumpHealth(unittest.TestCase):
         # the whole pump dict rides along, which is the point of the line
         self.assertIn("'mode': 'pwm'", lines[1])
 
+    # A stopped pump is only a stall on a side that is meant to be running.
+    # Eleven days of frames showed rpm at 0 for exactly the hours the schedule
+    # had a side off, with TEC current never below 7A and pump mode unchanged,
+    # so nothing in the frame tells switched-off from stalled. The server does.
+    OFF_FRAME = dict(left_rpm=0, left_current=10.0, left_water=True)
+
+    def test_a_side_switched_off_does_not_raise_a_stall(self):
+        # The daily false alarm: the schedule powers the side off.
+        self.sides_on = {'left': False, 'right': True}
+        for _ in range(service_health._PUMP_STALL_DWELL_FRAMES * 10):
+            service_health.update_pump_health(_frame(**self.OFF_FRAME))
+        failed = [c for c in self.calls if c[0] == 'pumpLeft' and c[1] == 'failed']
+        self.assertEqual(failed, [])
+
+    def test_a_side_switched_off_still_reports_healthy(self):
+        # Otherwise a pod that starts while a side is off never reports that
+        # side at all, and the Status page shows it as never checked.
+        self.sides_on = {'left': False, 'right': True}
+        for _ in range(service_health._PUMP_STALL_DWELL_FRAMES):
+            service_health.update_pump_health(_frame(**self.OFF_FRAME))
+        self.assertIn(('pumpLeft', 'healthy', ''), self.calls)
+
+    def test_a_side_switched_on_with_a_stopped_pump_is_a_stall(self):
+        # The case the monitor exists for, including a pump that never spins
+        # up after the side is switched on.
+        for _ in range(service_health._PUMP_STALL_DWELL_FRAMES):
+            service_health.update_pump_health(_frame(**self.OFF_FRAME))
+        failed = [c for c in self.calls if c[0] == 'pumpLeft' and c[1] == 'failed']
+        self.assertEqual(len(failed), 1)
+
+    def test_a_stall_clears_when_the_side_is_switched_off(self):
+        # Recovery used to need the pump spinning again, which a switched-off
+        # side never does, so a stall latched just before power-off stayed.
+        for _ in range(service_health._PUMP_STALL_DWELL_FRAMES):
+            service_health.update_pump_health(_frame(**self.OFF_FRAME))
+        self.assertTrue(service_health._pump_state['left']['is_stalled'])
+        self.calls.clear()
+
+        self.sides_on = {'left': False, 'right': True}
+        for _ in range(service_health._PUMP_STALL_DWELL_FRAMES):
+            service_health.update_pump_health(_frame(**self.OFF_FRAME))
+        self.assertFalse(service_health._pump_state['left']['is_stalled'])
+        self.assertIn(('pumpLeft', 'healthy', ''), self.calls)
+
+    def test_no_stall_is_declared_when_the_server_cannot_say(self):
+        # No evidence the side is meant to be running is not evidence of a
+        # stall. If the server is unreachable there is no Status page to show
+        # one on either.
+        self.sides_on = None
+        for _ in range(service_health._PUMP_STALL_DWELL_FRAMES * 3):
+            service_health.update_pump_health(_frame(**self.OFF_FRAME))
+        failed = [c for c in self.calls if c[0] == 'pumpLeft' and c[1] == 'failed']
+        self.assertEqual(failed, [])
+
+    def test_the_server_is_asked_once_per_dwell_window_not_per_frame(self):
+        # Every ask is a round trip to the hardware socket.
+        self.sides_on = {'left': False, 'right': False}
+        windows = 5
+        for _ in range(service_health._PUMP_STALL_DWELL_FRAMES * windows):
+            service_health.update_pump_health(_frame(
+                left_rpm=0, left_current=10.0, right_rpm=0, right_current=10.0))
+        # both sides share one answer per frame that needs it
+        self.assertEqual(self.intent_asks, windows)
+
+    def test_a_running_pump_never_asks(self):
+        for _ in range(service_health._PUMP_STALL_DWELL_FRAMES * 3):
+            service_health.update_pump_health(_frame())
+        self.assertEqual(self.intent_asks, 0)
 
 if __name__ == '__main__':
     unittest.main()
