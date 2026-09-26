@@ -1,6 +1,7 @@
 // Pure helpers for the log-listing/tailing route, split out so they're
 // testable without spinning up Express/fs.watch.
 
+import fs from 'fs';
 import path from 'path';
 
 export const isLogFilename = (name: string): boolean => name.endsWith('.log');
@@ -21,3 +22,26 @@ export const isSafeLogFilename = (name: string): boolean =>
 // reads on an actively-written file, not a buffered stream.
 export const linesFromAppendedChunk = (chunk: string): string[] =>
   chunk.split('\n').filter((line, i, arr) => !(i === arr.length - 1 && line === ''));
+
+// The last maxLines whole lines of a read. A read that began partway through
+// the file almost always starts mid-line, so that first fragment is dropped.
+export const tailLines = (text: string, maxLines: number, startedMidFile: boolean): string[] => {
+  const lines = linesFromAppendedChunk(text);
+  if (startedMidFile) lines.shift();
+  return lines.slice(-maxLines);
+};
+
+// Reads at most the last maxBytes of a file by position, so the cost is the
+// same for a 15MB rotated log as for a small one.
+export async function readTail(filePath: string, maxBytes: number) {
+  const handle = await fs.promises.open(filePath, 'r');
+  try {
+    const { size } = await handle.stat();
+    const start = Math.max(0, size - maxBytes);
+    const buffer = Buffer.alloc(size - start);
+    await handle.read(buffer, 0, buffer.length, start);
+    return { text: buffer.toString('utf8'), startedMidFile: start > 0, size };
+  } finally {
+    await handle.close();
+  }
+}

@@ -1,11 +1,13 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import readline from 'readline';
 import logger from '../../logger.js';
-import { isLogFilename, isSafeLogFilename, linesFromAppendedChunk } from './logsHelpers.js';
+import { isLogFilename, isSafeLogFilename, linesFromAppendedChunk, readTail, tailLines } from './logsHelpers.js';
 const router = express.Router();
 const LOGS_DIRS = ['/persistent/free-sleep-data/logs', '/var/log'];
+const TAIL_LINES = 1000;
+// Comfortably holds TAIL_LINES of the longest lines these logs carry.
+const TAIL_BYTES = 512 * 1024;
 const { promises: fsPromises } = fs;
 // Endpoint to list all log files as clickable links
 router.get('/', async (req, res) => {
@@ -82,20 +84,18 @@ router.get('/:filename', async (req, res) => {
         return res.end();
     }
     let lastSize = 0;
-    const fileStream = fs.createReadStream(logFilePath, { encoding: 'utf8' });
-    const rl = readline.createInterface({ input: fileStream });
-    const logBuffer = [];
-    for await (const line of rl) {
-        logBuffer.push(line);
-        if (logBuffer.length > 1000)
-            logBuffer.shift(); // Keep last 1000 lines
-    }
+    // Only the tail is shown, so only the tail is read. The whole of a 15MB
+    // rotated log used to be read before anything was sent, and on a busy pod
+    // that kept the browser waiting long enough to give up.
+    let logBuffer = [];
     try {
-        lastSize = (await fsPromises.stat(logFilePath)).size;
+        const tail = await readTail(logFilePath, TAIL_BYTES);
+        logBuffer = tailLines(tail.text, TAIL_LINES, tail.startedMidFile);
+        lastSize = tail.size;
     }
     catch {
-        // File may have rotated out from under us between access() and stat();
-        // fs.watch below will still pick up the replacement.
+        // File may have rotated out from under us after access(); fs.watch below
+        // will still pick up the replacement.
     }
     res.write(`data: ${JSON.stringify({ message: logBuffer.join('\n') })}\n\n`);
     // fs.watch's `interval` option only applies to fs.watchFile, not fs.watch;

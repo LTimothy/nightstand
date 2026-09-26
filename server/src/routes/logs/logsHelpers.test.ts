@@ -1,6 +1,9 @@
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { isLogFilename, isSafeLogFilename, linesFromAppendedChunk } from './logsHelpers.js';
+import { isLogFilename, isSafeLogFilename, linesFromAppendedChunk, readTail, tailLines } from './logsHelpers.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 describe('isLogFilename', () => {
   it('accepts files ending in .log', () => {
@@ -53,5 +56,58 @@ describe('linesFromAppendedChunk', () => {
 
   it('returns a single line for a chunk with no trailing newline', () => {
     assert.deepEqual(linesFromAppendedChunk('just one line'), ['just one line']);
+  });
+});
+
+// The Logs page used to read a whole rotated log line by line before sending
+// anything, and a 15MB file took long enough that the browser gave up with no
+// response. Only the tail is ever shown, so only the tail is read.
+
+describe('tailLines', () => {
+  it('keeps the last N lines', () => {
+    assert.deepEqual(tailLines('a\nb\nc\nd\n', 2, false), ['c', 'd']);
+  });
+
+  it('drops the first line when the read began partway through the file', () => {
+    // Reading from a byte offset almost always lands mid-line.
+    assert.deepEqual(tailLines('rtial line\nwhole one\nwhole two\n', 10, true), ['whole one', 'whole two']);
+  });
+
+  it('keeps the first line when the read began at the start of the file', () => {
+    assert.deepEqual(tailLines('first\nsecond\n', 10, false), ['first', 'second']);
+  });
+
+  it('returns every line when there are fewer than N', () => {
+    assert.deepEqual(tailLines('only\n', 1000, false), ['only']);
+  });
+
+  it('returns nothing for an empty read', () => {
+    assert.deepEqual(tailLines('', 1000, false), []);
+  });
+});
+
+describe('readTail', () => {
+  let dir: string;
+  before(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-')); });
+  after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('reads no more than the tail of a large file', () => {
+    const file = path.join(dir, 'big.log');
+    const line = 'x'.repeat(99) + '\n';
+    fs.writeFileSync(file, line.repeat(20_000) + 'last line\n'); // about 2MB
+    return readTail(file, 64 * 1024).then(({ text, startedMidFile, size }) => {
+      assert.ok(text.length <= 64 * 1024, `read ${text.length} bytes, more than the tail`);
+      assert.equal(startedMidFile, true);
+      assert.equal(size, fs.statSync(file).size);
+      assert.ok(text.endsWith('last line\n'));
+    });
+  });
+
+  it('reads a small file whole and says it started at the beginning', async () => {
+    const file = path.join(dir, 'small.log');
+    fs.writeFileSync(file, 'one\ntwo\n');
+    const { text, startedMidFile } = await readTail(file, 64 * 1024);
+    assert.equal(text, 'one\ntwo\n');
+    assert.equal(startedMidFile, false);
   });
 });
