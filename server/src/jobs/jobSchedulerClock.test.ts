@@ -44,10 +44,23 @@ mock.module(new URL('../routes/deviceStatus/updateDeviceStatus.js', import.meta.
 
 let settingsDB: typeof import('../db/settings.js')['default'];
 let schedulesDB: typeof import('../db/schedules.js')['default'];
+let serverStatus: typeof import('../serverStatus.js')['default'];
 
 // Real setTimeout, captured before the fake timers below replace it, so we
 // can still yield genuine event-loop turns for lowdb's file reads.
 const realSetTimeout = globalThis.setTimeout;
+
+// Waits on real time for something asynchronous to finish, instead of for a
+// fixed number of event-loop turns. The scheduler reschedules only after
+// reading its DB files from disk, and on a loaded machine those reads outlast
+// any fixed count, which is how this suite used to fail intermittently in CI.
+async function waitFor(done: () => boolean, what: string, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!done()) {
+    if (Date.now() > deadline) assert.fail(`timed out waiting for ${what}`);
+    await new Promise((resolve) => realSetTimeout(resolve, 5));
+  }
+}
 
 async function flush() {
   for (let i = 0; i < 6; i++) {
@@ -63,6 +76,7 @@ mock.timers.enable({ apis: ['setTimeout'] });
 before(async () => {
   ({ default: settingsDB } = await import('../db/settings.js'));
   ({ default: schedulesDB } = await import('../db/schedules.js'));
+  ({ default: serverStatus } = await import('../serverStatus.js'));
 
   await settingsDB.read();
   settingsDB.data.timeZone = 'UTC';
@@ -113,10 +127,19 @@ describe('jobScheduler system-date retry', () => {
   });
 
   it('recovers when something later writes to a watched DB file', async () => {
+    // Continues from the test above, where the clock became valid.
     dateValid = true;
     assert.equal(changeHandlers.length > 0, true, 'no chokidar change handler registered');
+
+    // A reschedule still in flight makes the next one skip, so start from idle.
+    await waitFor(() => serverStatus.status.jobs.status !== 'started', 'the scheduler to go idle');
+
+    // Cancelled first, so only a reschedule this handler performs can satisfy
+    // the check below. The job left over from the test above would otherwise.
+    nodeSchedule.cancelJob(POWER_ON_JOB);
+    assert.equal(nodeSchedule.scheduledJobs[POWER_ON_JOB], undefined);
+
     changeHandlers[0]('/tmp/lowdb/schedulesDB.json');
-    await flush();
-    assert.ok(nodeSchedule.scheduledJobs[POWER_ON_JOB], 'a DB change did not reschedule jobs');
+    await waitFor(() => Boolean(nodeSchedule.scheduledJobs[POWER_ON_JOB]), 'a DB change to reschedule jobs');
   });
 });
