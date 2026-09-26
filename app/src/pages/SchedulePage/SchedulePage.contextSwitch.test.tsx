@@ -37,8 +37,10 @@ describe('side switch with unsaved edits (full page)', () => {
     useScheduleStore.getState().updateSelectedAlarm({ time: '03:33' });
     expect(useScheduleStore.getState().changesPresent).toBe(true);
 
-    // Switch to the right side.
-    await user.click(screen.getByRole('button', { name: /Right side/ }));
+    // Switch to the right side. The buttons are named by the settings query,
+    // which answers independently of the schedules one loaded() waited for, so
+    // look them up by waiting rather than assuming settings has already landed.
+    await user.click(await screen.findByRole('button', { name: /Right side/ }));
     await waitFor(() => expect(useAppStore.getState().side).toBe('right'));
     await waitFor(() =>
       expect(useScheduleStore.getState().selectedSchedule?.alarm.time).toBe(orig.right[day].alarm.time),
@@ -49,7 +51,7 @@ describe('side switch with unsaved edits (full page)', () => {
     expect(afterRight.changesPresent).toBe(false);
 
     // Switch back to the left side: the earlier edit must be gone.
-    await user.click(screen.getByRole('button', { name: /Left side/ }));
+    await user.click(await screen.findByRole('button', { name: /Left side/ }));
     await waitFor(() => expect(useAppStore.getState().side).toBe('left'));
     await waitFor(() =>
       expect(useScheduleStore.getState().selectedSchedule?.alarm.time).toBe(orig.left[day].alarm.time),
