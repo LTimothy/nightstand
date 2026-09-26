@@ -6,6 +6,21 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [3.2.2] - 2026-09-25
+
+- The pump warning on the Status page no longer goes off when a side is
+  switched off. It raised "pump stall suspected" almost every day, because a
+  side the schedule has switched off reports its pump at 0 rpm, and nothing else
+  the pump reports tells a switched-off side from a stalled one. It now checks
+  whether the side is switched on before calling a stopped pump a stall. A stall
+  warning already showing when a side switches off now clears, where before it
+  stayed until the pump ran again.
+
+- The Logs page opens large log files. It read a whole file before showing any
+  of it, and rotated logs reach 15 MB, so on a busy pod the page could wait long
+  enough for the browser to give up. It now reads only the end of the file,
+  which is all the page shows.
+
 ## [3.2.1] - 2026-09-24
 
 - When an update cannot apply its database changes, the Status page now says
