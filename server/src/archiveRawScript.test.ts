@@ -24,6 +24,24 @@ function addArchived(name: string, ageHours: number) {
   utimesSync(file, t, t);
 }
 
+function addLive(name: string, ageHours: number) {
+  const file = path.join(persist, name);
+  writeFileSync(file, 'x');
+  const t = Date.now() / 1000 - ageHours * HOUR;
+  utimesSync(file, t, t);
+}
+
+// A stand-in for df on PATH, so the floor sees a partition of a given size.
+function fakeDf(totalKb: number, availKb: number) {
+  const bin = path.join(root, 'bin');
+  mkdirSync(bin);
+  writeFileSync(path.join(bin, 'df'), `#!/bin/sh
+echo 'Filesystem 1024-blocks Used Available Capacity Mounted on'
+echo 'fake ${totalKb} ${totalKb - availKb} ${availKb} 50% /persistent'
+`, { mode: 0o755 });
+  return { PATH: `${bin}:${process.env.PATH}` };
+}
+
 function run(env: Record<string, string> = {}) {
   return execFileSync('bash', [SCRIPT], {
     encoding: 'utf8',
@@ -39,6 +57,7 @@ function run(env: Record<string, string> = {}) {
 }
 
 const archived = () => readdirSync(archive).sort();
+const live = () => readdirSync(persist).sort();
 
 describe('archive-raw.sh', () => {
   beforeEach(() => {
@@ -60,7 +79,7 @@ describe('archive-raw.sh', () => {
     const out = run();
     assert.deepEqual(archived(), ['0001.RAW']);
     assert.equal(statSync(path.join(archive, '0001.RAW')).ino, statSync(path.join(persist, '0001.RAW')).ino);
-    assert.match(out, /linked=1 pruned=0 floor_pruned=0 \(retention=336h\)/);
+    assert.match(out, /linked=1 pruned=0 live_pruned=0 floor_pruned=0 \(retention=336h\)/);
   });
 
   it('keeps 14 days by default', () => {
@@ -111,6 +130,70 @@ describe('archive-raw.sh', () => {
     assert.deepEqual(archived(), []);
     assert.match(out, /floor_pruned=2/);
     assert.match(out, /WARNING free space .* archive empty/);
+  });
+
+  it('removes the firmware\'s own RAW files once they pass the retention', () => {
+    addLive('old.RAW', 15 * 24);
+    addLive('new.RAW', 1);
+    addLive('SEQNO.RAW', 15 * 24);
+    const nested = path.join(persist, 'other');
+    mkdirSync(nested);
+    writeFileSync(path.join(nested, 'keep.RAW'), 'x');
+    const t = Date.now() / 1000 - 15 * 24 * HOUR;
+    utimesSync(path.join(nested, 'keep.RAW'), t, t);
+    const out = run();
+    assert.deepEqual(live(), ['SEQNO.RAW', 'new.RAW', 'other']);
+    assert.deepEqual(archived(), ['new.RAW']);
+    assert.equal(existsSync(path.join(nested, 'keep.RAW')), true);
+    assert.match(out, /live_pruned=1/);
+  });
+
+  it('frees space under the floor by removing the firmware\'s link too, but never the newest file', () => {
+    addLive('a.RAW', 3);
+    addLive('b.RAW', 2);
+    addLive('c.RAW', 0);
+    addLive('SEQNO.RAW', 0);
+    const out = run({ ARCHIVE_RAW_MIN_FREE_KB: '999999999999' });
+    assert.deepEqual(live(), ['SEQNO.RAW', 'c.RAW']);
+    assert.deepEqual(archived(), ['c.RAW']);
+    assert.match(out, /floor_pruned=2/);
+    assert.match(out, /WARNING free space .* only the newest RAW file left/);
+  });
+
+  it('never removes the firmware\'s sequencer file under the floor', () => {
+    mkdirSync(archive);
+    addArchived('SEQNO.RAW', 5);
+    addLive('SEQNO.RAW', 0);
+    run({ ARCHIVE_RAW_MIN_FREE_KB: '999999999999' });
+    assert.deepEqual(live(), ['SEQNO.RAW']);
+  });
+
+  it('still archives when df reports a size it cannot parse', () => {
+    addLive('a.RAW', 0);
+    const env = { ...fakeDf(1_000_000, 300_000), ARCHIVE_RAW_MIN_FREE_KB: '' };
+    writeFileSync(path.join(root, 'bin', 'df'), `#!/bin/sh
+echo 'Filesystem 1024-blocks Used Available Capacity Mounted on'
+echo 'fake 1.0G 0.7G 300000 70% /persistent'
+`, { mode: 0o755 });
+    run(env);
+    assert.deepEqual(archived(), ['a.RAW']);
+  });
+
+  it('scales the default floor down on a small partition', () => {
+    mkdirSync(archive);
+    addArchived('a.RAW', 1);
+    const env = { ...fakeDf(1_000_000, 300_000), ARCHIVE_RAW_MIN_FREE_KB: '' };
+    run(env);
+    assert.deepEqual(archived(), ['a.RAW']);
+  });
+
+  it('keeps the 2 GB floor on a large partition', () => {
+    mkdirSync(archive);
+    addArchived('a.RAW', 1);
+    const env = { ...fakeDf(14_000_000, 1_500_000), ARCHIVE_RAW_MIN_FREE_KB: '' };
+    const out = run(env);
+    assert.deepEqual(archived(), []);
+    assert.match(out, /floor_pruned=1/);
   });
 
   it('refuses to delete through a symlinked archive', () => {

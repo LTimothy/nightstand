@@ -16,6 +16,11 @@
 # sync, doesn't double the disk usage (until frank actually deletes,
 # the two paths share the same data blocks).
 #
+# Some firmware (seen on the Pod 3) only deletes a file after uploading it,
+# so with the internet blocked its files pile up. The retention and the
+# free-space floor below cover the firmware's copies as well, so they can't
+# fill the disk.
+#
 # Run this from a systemd timer every minute. With ~15 min between
 # new RAW files, a 1-min cadence has plenty of margin.
 
@@ -25,7 +30,7 @@ set -e
 PERSIST=${ARCHIVE_RAW_PERSIST:-/persistent}
 ARCHIVE=${ARCHIVE_RAW_DIR:-/persistent/free-sleep-data/raw-archive}
 CONF=${ARCHIVE_RAW_CONF:-/persistent/free-sleep-data/raw-archive.conf}
-MIN_FREE_KB=${ARCHIVE_RAW_MIN_FREE_KB:-2097152}
+MIN_FREE_KB=${ARCHIVE_RAW_MIN_FREE_KB:-}
 
 # 14 days by default. The server writes CONF from the retention setting.
 # CONF sits in a directory the server user can write and this script runs as
@@ -45,6 +50,16 @@ if [ -L "$ARCHIVE" ]; then
   exit 1
 fi
 
+# 2 GB by default, but no more than a quarter of the partition: on a ~1 GB
+# /persistent a fixed 2 GB floor would empty the archive every run.
+if [ -z "$MIN_FREE_KB" ]; then
+  MIN_FREE_KB=2097152
+  total_kb=$(df -kP "$ARCHIVE" 2>/dev/null | awk 'NR == 2 { print $2 }')
+  if [ -n "$total_kb" ] && [ "$((total_kb / 4))" -lt "$MIN_FREE_KB" ]; then
+    MIN_FREE_KB=$((total_kb / 4))
+  fi
+fi
+
 linked=0
 for src in "$PERSIST"/*.RAW; do
   [ -f "$src" ] || continue
@@ -61,6 +76,9 @@ done
 # Prune the archive to keep only the last RETENTION_HOURS of files. The
 # archive grows by roughly 0.4 GB a day.
 pruned=$(($(find "$ARCHIVE" -type f -name '*.RAW' -mmin "+$((RETENTION_HOURS * 60))" -print -delete 2>/dev/null | wc -l)))
+# Same retention for firmware files it never deleted itself. Top level only,
+# since the archive lives under /persistent too.
+live_pruned=$(($(find "$PERSIST/" -maxdepth 1 -type f -name '*.RAW' ! -name 'SEQNO.RAW' -mmin "+$((RETENTION_HOURS * 60))" -print -delete 2>/dev/null | wc -l)))
 
 free_kb() {
   df -kP "$ARCHIVE" 2>/dev/null | awk 'NR == 2 { print $4 }'
@@ -68,7 +86,10 @@ free_kb() {
 
 # Keep at least MIN_FREE_KB free on the data partition by dropping the oldest
 # archived files first. Sorted by mtime: the firmware's file names are
-# sequence numbers, not times.
+# sequence numbers, not times. A file the firmware still holds only frees
+# space once both links are gone. The newest firmware file is the one being
+# written, so it is never removed.
+newest=$(ls -1t "$PERSIST"/*.RAW 2>/dev/null | grep -v '/SEQNO\.RAW$' | head -1)
 floor_pruned=0
 avail=$(free_kb)
 while [ -n "$avail" ] && [ "$avail" -lt "$MIN_FREE_KB" ]; do
@@ -77,13 +98,19 @@ while [ -n "$avail" ] && [ "$avail" -lt "$MIN_FREE_KB" ]; do
     echo "archive-raw: WARNING free space ${avail}KB is below ${MIN_FREE_KB}KB with the archive empty; something else is filling the disk"
     break
   fi
+  base=$(basename "$oldest")
+  if [ -n "$newest" ] && [ "$base" = "$(basename "$newest")" ]; then
+    echo "archive-raw: WARNING free space ${avail}KB is below ${MIN_FREE_KB}KB with only the newest RAW file left; something else is filling the disk"
+    break
+  fi
   rm -f -- "$oldest"
+  [ "$base" = "SEQNO.RAW" ] || rm -f -- "$PERSIST/$base"
   floor_pruned=$((floor_pruned + 1))
   avail=$(free_kb)
 done
 
 # Quiet on idle, single-line summary on activity (avoids journald spam
 # but keeps the timer's output meaningful when something happens).
-if [ "$linked" -gt 0 ] || [ "$pruned" -gt 0 ] || [ "$floor_pruned" -gt 0 ]; then
-  echo "archive-raw: linked=$linked pruned=$pruned floor_pruned=$floor_pruned (retention=${RETENTION_HOURS}h)"
+if [ "$linked" -gt 0 ] || [ "$pruned" -gt 0 ] || [ "$live_pruned" -gt 0 ] || [ "$floor_pruned" -gt 0 ]; then
+  echo "archive-raw: linked=$linked pruned=$pruned live_pruned=$live_pruned floor_pruned=$floor_pruned (retention=${RETENTION_HOURS}h)"
 fi
