@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { describe, it, before } from 'node:test';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { describe, it, before, after } from 'node:test';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -35,3 +35,35 @@ describe('settingsDB defaultData merge', () => {
     }
   });
 });
+
+describe('settingsDB contributor button settings migration', () => {
+  it('removes obsolete side buttons and validates a full settings round trip', async () => {
+    const contributorSettings = {
+      ...settingsDB.data,
+      left: {
+        ...settingsDB.data.left,
+        name: 'Sleeper',
+        buttons: { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 },
+      },
+      right: {
+        ...settingsDB.data.right,
+        buttons: { invertButtons: true, stepF: 2, favoriteTemperatureF: 90 },
+      },
+      features: { ...settingsDB.data.features, coverButtons: true },
+    };
+    const settingsFile = path.join(dataFolder, 'lowdb', 'settingsDB.json');
+    writeFileSync(settingsFile, JSON.stringify(contributorSettings));
+    const migrated = await import(new URL('./settings.js?contributor-buttons', import.meta.url).href) as typeof import('./settings.js');
+    const { SettingsSchema } = await import('./settingsSchema.js');
+    const expected = {
+      ...settingsDB.data,
+      left: { ...settingsDB.data.left, name: 'Sleeper' },
+      features: { ...settingsDB.data.features, coverButtons: true },
+    };
+    assert.deepEqual(migrated.default.data, expected);
+    assert.deepEqual(JSON.parse(readFileSync(settingsFile, 'utf8')), expected);
+    assert.equal(SettingsSchema.deepPartial().safeParse(migrated.default.data).success, true);
+  });
+});
+
+after(() => { rmSync(dataFolder, { recursive: true, force: true }); });

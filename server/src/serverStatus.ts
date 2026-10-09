@@ -54,6 +54,12 @@ class ServerStatus {
         description: 'Handles gestures and monitoring the status',
         message: '',
       },
+      buttonMonitor: {
+        name: 'Cover buttons',
+        status: 'not_started',
+        description: 'Reads ignored cover clicks from the RAW files',
+        message: '',
+      },
       jobs: {
         name: 'Job scheduler',
         status: 'not_started',

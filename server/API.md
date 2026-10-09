@@ -199,7 +199,8 @@ generic message; the details go to the server log.
     "presenceAutoOff": true,
     "nightstandTheme": true,
     "rhythms": false,
-    "biometricsV2": false
+    "biometricsV2": false,
+    "coverButtons": false
   }
 }
 ```
@@ -257,6 +258,13 @@ generic message; the details go to the server log.
     Timestamp units remain unverified.
 - `features` are feature flags. `sleepScore` turns the sleep score and sleep
   stage routes on and off; the app no longer shows either.
+  `coverButtons` is Cover buttons, off by default. It is for a Pod 4 hub with
+  a Pod 5 cover, whose firmware ignores short clicks on the cover's plus and
+  minus buttons. With it on, Nightstand reads those ignored clicks from
+  `/persistent/*.RAW` and steps that side by 1 F per click, within 55 to
+  110 F. A click can take 15 to 25 s to apply, because the firmware writes
+  its log in batches. A Pod 5 hub handles its buttons itself, so the switch
+  does nothing there. While off, the server opens no RAW files for buttons.
   `nightstandTheme` is no longer read and stays so stored settings keep
   validating. `features.rhythms` is the Rhythms switch (see `/api/rhythms`
   below); it changes only through `POST /api/rhythms/enable` and
@@ -1301,6 +1309,11 @@ the biometrics service; `/api/deviceStatus` converts them.
 - `waterTank` is `healthy` while the tank sensor reads ok and `failed` once
   it has read low for about 30 seconds; its `timestamp` is when the current
   state began. It stays `not_started` until the first reading.
+- `buttonMonitor` is `healthy` with the message `Off in Settings > Features`
+  while `features.coverButtons` is off. On, it is `healthy` while the newest
+  RAW file in `/persistent` was written in the last 15 seconds and `failed`
+  with the reason otherwise: no RAW file, a file that stopped growing, or a
+  click that could not be applied.
 
 #### Response
 
@@ -1311,6 +1324,7 @@ the biometrics service; `/api/deviceStatus` converts them.
   "express": { "name": "Express", "status": "healthy", "description": "The back-end server", "message": "" },
   "franken": { "name": "Franken sock", "status": "healthy", "description": "Socket service for controlling the hardware", "message": "" },
   "frankenMonitor": { "name": "Franken monitor", "status": "healthy", "description": "Handles gestures and monitoring the status", "message": "" },
+  "buttonMonitor": { "name": "Cover buttons", "status": "healthy", "description": "Reads ignored cover clicks from the RAW files", "message": "Off in Settings > Features", "timestamp": "2026-09-20T18:04:11-07:00" },
   "jobs": { "name": "Job scheduler", "status": "healthy", "description": "Scheduling service for temperature changes, alarms, and maintenance", "message": "" },
   "logger": { "name": "Logger", "status": "healthy", "description": "Logging service", "message": "" },
   "powerSchedule": { "name": "Power schedule", "status": "healthy", "description": "Power on/off schedule", "message": "" },

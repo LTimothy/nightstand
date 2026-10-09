@@ -193,6 +193,11 @@ scheduled off timer with a new 12-hour timer.
   on System status. Cooling warning reports water warming during cooling
   demand. These Settings > Features switches are all off by default, need
   Biometrics and do not send hardware commands
+- Cover buttons, for a Pod 4 hub with a Pod 5 cover, whose firmware ignores
+  short clicks on the cover's plus and minus buttons: each ignored click
+  steps that side by 1 F, 15 to 25 s later. Off by default under
+  Settings > Features and does not need Biometrics. A Pod 5 hub handles
+  its buttons itself, so it does nothing there
 - Three themes under Settings > Bed and sides > Theme, saved on each device:
   lamp (the default), free-sleep classic and jmew. The last two
   follow the original free-sleep app by throwaway31265 and jmew's fork of it

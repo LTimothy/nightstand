@@ -182,7 +182,7 @@ it('names a starting core service and includes it in the group summary', async (
   })));
   renderWithProviders(<StatusPage/>);
   expect(await screen.findByText('Waiting for Franken monitor.')).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Core services · 9 healthy, 1 starting' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Core services · 10 healthy, 1 starting' })).toBeVisible();
 });
 
 it('warns about a core service that has not started after the server grace period', async () => {

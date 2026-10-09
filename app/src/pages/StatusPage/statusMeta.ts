@@ -138,6 +138,16 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
     blurb: 'Watches for physical taps on the Pod and keeps the hardware connection alive.',
     meaning: { healthy: 'Watching for taps and monitoring the connection.' },
   },
+  buttonMonitor: {
+    group: 'core',
+    blurb: 'For a Pod 4 hub with a Pod 5 cover. When Cover buttons is on, reads ignored plus and minus clicks '
+      + 'from RAW files and steps that side by 1 F, 15 to 25 s later, because the firmware writes its log in batches. '
+      + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
+    meaning: {
+      healthy: 'Watching for ignored button clicks, or off in Settings.',
+      failed: 'Cannot apply button clicks. The Pod is not writing RAW files, or a click could not be read or applied.',
+    },
+  },
   jobs: {
     group: 'core',
     blurb: 'The internal scheduler that runs all the timed jobs below (temperature, power, priming, reboots).',

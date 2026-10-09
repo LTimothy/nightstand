@@ -37,6 +37,7 @@ export type ServerStatus = {
   express: StatusInfo;
   franken: StatusInfo;
   frankenMonitor: StatusInfo;
+  buttonMonitor: StatusInfo;
   jobs: StatusInfo;
   logger: StatusInfo;
   powerSchedule: StatusInfo;
