@@ -165,6 +165,10 @@ is a hard fork; for the history of the projects it descends from, see
   socket framing, alarm and recovery reports, mixed hardware and conflicting
   generation thresholds. Reports from other owners remain marked as
   unverified here; detection thresholds do not change.
+- The protocol notes add a Pod 4 hub with a Pod 5 cover, reported by @2-X:
+  its record formats, `frzHealth` depending on the host firmware, and what
+  the cover buttons log. They also note that a Pod 5 hub acts on cover
+  clicks itself.
 
 ### Credits
 
