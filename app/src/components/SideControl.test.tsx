@@ -8,7 +8,7 @@ import { fahrenheitToLevel } from '@lib/temperatureConversions';
 import SideControl from './SideControl';
 
 const fixture = vi.hoisted(() => ({
-  setSide: vi.fn(), enabled: true,
+  setSide: vi.fn(), usePresence: vi.fn(), enabled: true,
   settings: {
     left: { name: 'Alex', awayMode: false, scheduleOverrides: { pause: { active: false, expiresAt: '' } } },
     right: { name: 'Sam', awayMode: false, scheduleOverrides: { pause: { active: false, expiresAt: '' } } },
@@ -26,7 +26,7 @@ vi.mock('@api/deviceStatus.ts', () => ({ useDeviceStatus: () => ({
 }) }));
 vi.mock('@api/presence.ts', async importOriginal => ({
   ...(await importOriginal<typeof import('@api/presence.ts')>()),
-  usePresence: () => ({ data: fixture.presence }),
+  usePresence: (...args: unknown[]) => { fixture.usePresence(...args); return { data: fixture.presence }; },
 }));
 vi.mock('@api/services.ts', () => ({
   useServices: () => ({ data: { biometrics: { enabled: fixture.enabled, jobs: { calibrateLeft: { status: 'healthy' } } } } }),
@@ -192,4 +192,10 @@ it('names only the side while the first status loads', () => {
   expect(line).toBeEmptyDOMElement();
   expect(line).toHaveStyle({ minHeight: '1.2em' });
   expect(screen.queryByText('Status unavailable')).not.toBeInTheDocument();
+});
+it('asks for presence only where it shows it', () => {
+  render(<SideControl compact={ true }/>);
+  expect(fixture.usePresence).toHaveBeenLastCalledWith(10_000, false);
+  render(<SideControl compact={ false }/>);
+  expect(fixture.usePresence).toHaveBeenLastCalledWith(10_000, true);
 });

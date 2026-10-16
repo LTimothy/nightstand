@@ -13,7 +13,7 @@ export type PresenceData = {
   right: PresenceSide;
 };
 
-export const usePresence = (refetchInterval: number = 10_000) => {
+export const usePresence = (refetchInterval: number = 10_000, enabled = true) => {
   return useQuery<PresenceData>({
     queryKey: ['usePresence'],
     queryFn: async ({ signal }) => {
@@ -21,6 +21,7 @@ export const usePresence = (refetchInterval: number = 10_000) => {
       return response.data;
     },
     refetchInterval,
+    enabled,
   });
 };
 

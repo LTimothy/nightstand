@@ -51,7 +51,7 @@ export default function SideControl({ compact = true, mergeAwaySides = true, bef
   const { data: settings } = useSettings();
   const { frameFor } = useDeviceFreshness();
   const { data: services } = useServices();
-  const { data: presence } = usePresence();
+  const { data: presence } = usePresence(10_000, !compact);
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30_000);
