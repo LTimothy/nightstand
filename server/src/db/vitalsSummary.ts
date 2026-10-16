@@ -128,8 +128,10 @@ export async function readVitalsSummary(client: SummaryClient, range: MetricsQue
       } };
     }
     // Overlapping records must not count the same readings twice.
-    const disjoint = saved.filter((row, index) => !saved.slice(0, index).some(previous =>
-      previous.side === row.side && previous.left_bed_at >= row.entered_bed_at));
+    const disjoint: typeof saved = [];
+    for (const row of saved) {
+      if (!disjoint.some(kept => kept.side === row.side && kept.left_bed_at > row.entered_bed_at)) disjoint.push(row);
+    }
     const stats = await collectVitalsStats(client, {
       side: range.side, timestamp: { gte: range.start, lte: range.end },
       NOT: disjoint.map(row => ({ side: row.side, timestamp: { gte: row.entered_bed_at, lte: row.left_bed_at } })),

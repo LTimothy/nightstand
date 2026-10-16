@@ -958,14 +958,16 @@ bed, and `times_exited_bed` counts trips out of bed.
   record has it. An `id` in the body is ignored.
 - Returns `400` if `left_bed_at` would be before `entered_bed_at`, for
   negative counts, reversed intervals, or times before 1970 or after 2038.
-  Returns `409` if another record on the same side already starts at the
-  new `entered_bed_at`.
+  Returns `409` if the new times overlap another record on the same side.
+  When a record moves, its retained nightly summary moves with it, in the
+  same transaction.
 
 ### DELETE `/api/metrics/sleep/:id`
 
 - Removes a sleep record, for naps or false detections that should not
   count. Returns `204 No Content`, `400` for an id that is not a positive
-  whole number, and `404` if no record has it.
+  whole number, and `404` if no record has it. The night's retained
+  summary, if any, is removed with it.
 
 ---
 
