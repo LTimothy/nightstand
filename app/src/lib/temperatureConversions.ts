@@ -11,7 +11,7 @@ export type TemperatureFormat = 'fahrenheit' | 'celsius' | 'level';
 export const MIN_TEMP_F = 55;
 export const MAX_TEMP_F = 110;
 const NEUTRAL_F = 82.5; // F at level 0
-const F_PER_LEVEL = 27.5 / 10; // 2.75°F per level step
+export const F_PER_LEVEL = 27.5 / 10; // 2.75°F per level step
 
 // Level-format bounds (Pod-app -10..+10 scale)
 export const MIN_TEMP_LEVEL = -10;
@@ -70,4 +70,15 @@ export function formatTemperature(temperature: number, format: TemperatureFormat
 // For text people read, on Bed and in the side tiles other pages share: a negative level takes a true minus sign (U+2212).
 export function displayTemperature(temperature: number, format: TemperatureFormat): string {
   return formatTemperature(temperature, format).replace(/^-/, '\u2212');
+}
+
+// A change of temperature, such as a tap's step. A step stored in degrees can be a fraction of a level.
+export function formatTemperatureChange(deltaF: number, format: TemperatureFormat): string {
+  const round = (value: number) => Math.round(value * 10) / 10;
+  if (format === 'celsius') return `${round(deltaF * 5 / 9)}°C`;
+  if (format === 'level') {
+    const levels = round(deltaF / F_PER_LEVEL);
+    return `${levels} ${levels === 1 ? 'level' : 'levels'}`;
+  }
+  return `${round(deltaF)}°F`;
 }
