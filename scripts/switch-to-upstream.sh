@@ -97,83 +97,11 @@ restore_switch_data_or_fail() {
   }
 }
 
-# While downloading, allow only HTTPS and name lookups out, above the rest of
-# the firewall. Nothing is flushed, so the inbound rules, the reset on the
-# firmware's upload port and anything Tailscale added stay in place. IPv6
-# stays blocked, with HTTPS refused rather than dropped so clients move to
-# IPv4 at once.
-WAN_RULES=("-p tcp --dport 443 -j ACCEPT" "-p udp --dport 53 -j ACCEPT" "-p tcp --dport 53 -j ACCEPT")
-WAN_RULE6="-p tcp --dport 443 -j REJECT --reject-with tcp-reset"
+# While downloading, only HTTPS and name lookups go out: open_wan and
+# close_wan in restore_helpers.sh.
 WAN_OPEN=no
 source "$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh" || exit 1
 init_update_firewall
-# Removes the given rules only while one of them is the first rule in OUTPUT,
-# where the window puts them, so the same rule further down (Tailscale's
-# HTTPS allow) is left alone. Rules are compared with whitespace and the
-# implicit -m tcp/-m udp normalized.
-strip_top() {
-  local tool=$1 first spec match removed=0
-  shift
-  while [ "$removed" -lt 10 ]; do
-    first=$("$tool" -S OUTPUT 2>/dev/null | awk '$1 == "-A" && $2 == "OUTPUT" { $1 = $2 = ""; $0 = $0; $1 = $1; print; exit }')
-    first=${first// -m tcp/}
-    first=${first// -m udp/}
-    match=
-    for spec in "$@"; do
-      [ "$first" = "$spec" ] && match=$spec
-    done
-    [ -n "$match" ] || break
-    # shellcheck disable=SC2086
-    "$tool" -D OUTPUT $match || break
-    removed=$((removed + 1))
-  done
-  echo "$removed"
-}
-open_wan() {
-  say "Allowing HTTPS and DNS out for the download (temporary)"
-  WAN_OPEN=yes
-  local rule
-  for rule in "${WAN_RULES[@]}"; do
-    # shellcheck disable=SC2086
-    fw4 -I OUTPUT 1 $rule || say "WARNING: could not allow $rule out"
-  done
-  # shellcheck disable=SC2086
-  fw6 -I OUTPUT 1 $WAN_RULE6 2>/dev/null || true
-  restore_output_policy
-}
-close_wan() {
-  [ "$WAN_OPEN" = yes ] || return 0
-  say "Closing internet access again"
-  strip_top fw4 "${WAN_RULES[@]}" >/dev/null
-  strip_top fw6 "$WAN_RULE6" >/dev/null
-  sh "$LIVE/scripts/block_internet_access.sh" >/dev/null 2>&1 \
-    || sh "$PREV/scripts/block_internet_access.sh" >/dev/null 2>&1 || true
-  restore_output_policy
-  WAN_OPEN=no
-}
-# A stalled step must not hold the window open. Busybox builds that only
-# take "timeout -t SECS" fail the probe and get the watchdog instead.
-run_limited() {
-  local seconds=$1 pid watchdog status
-  shift
-  if timeout 1 true 2>/dev/null; then
-    timeout "$seconds" "$@"
-    return
-  fi
-  "$@" &
-  pid=$!
-  (
-    i=0
-    while [ "$i" -lt "$seconds" ]; do sleep 1; i=$((i + 1)); done
-    kill -TERM "$pid" 2>/dev/null
-  ) &
-  watchdog=$!
-  wait "$pid"
-  status=$?
-  kill "$watchdog" 2>/dev/null
-  wait "$watchdog" 2>/dev/null
-  return "$status"
-}
 # Stops a service that writes the data and confirms it is not running. Kept
 # identical in the update, rollback, switch, reset and install scripts.
 # systemd refuses to stop a unit that is not installed or does not load, even

@@ -326,7 +326,7 @@ run_limited 2 sleep 30 || fail "install timed out"`)], { env: f.env, encoding: '
     }
 
     it('passes the limit to the system timeout command when it works', () => {
-      const result = spawnSync('bash', ['-c', `${between(src, 'run_limited() {', '\n}\n')}\n}
+      const result = spawnSync('bash', ['-c', `${between(read('scripts/restore_helpers.sh'), 'run_limited() {', '\n}\n')}\n}
 timeout() { echo "timeout $*"; [ "$1" = 1 ] || { shift; "$@"; }; }
 run_limited 900 echo installed`], { encoding: 'utf8' });
       assert.equal(result.status, 0, result.stderr);

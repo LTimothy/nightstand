@@ -99,3 +99,97 @@ restore_output_policy() {
     fi
   fi
 }
+
+# The download window. Only HTTPS and name lookups go out, above the rest of
+# the firewall. Nothing is flushed, so the inbound rules, the reset on the
+# firmware's upload port and anything Tailscale added stay in place. IPv6
+# stays blocked, with HTTPS refused rather than dropped so clients move to
+# IPv4 at once. Callers set LIVE, PREV and WAN_OPEN=no, define say, and run
+# init_update_firewall first.
+WAN_RULES=("-p tcp --dport 443 -j ACCEPT" "-p udp --dport 53 -j ACCEPT" "-p tcp --dport 53 -j ACCEPT")
+WAN_RULE6="-p tcp --dport 443 -j REJECT --reject-with tcp-reset"
+# Removes the given rules only while one of them is the first rule in OUTPUT,
+# where the window puts them, so the same rule further down (Tailscale's
+# HTTPS allow) is left alone. Rules are compared with whitespace and the
+# implicit -m tcp/-m udp normalized.
+strip_top() {
+  local tool=$1 first spec match removed=0
+  shift
+  while [ "$removed" -lt 10 ]; do
+    first=$("$tool" -S OUTPUT 2>/dev/null | awk '$1 == "-A" && $2 == "OUTPUT" { $1 = $2 = ""; $0 = $0; $1 = $1; print; exit }')
+    first=${first// -m tcp/}
+    first=${first// -m udp/}
+    match=
+    for spec in "$@"; do
+      [ "$first" = "$spec" ] && match=$spec
+    done
+    [ -n "$match" ] || break
+    # shellcheck disable=SC2086
+    "$tool" -D OUTPUT $match || break
+    removed=$((removed + 1))
+  done
+  echo "$removed"
+}
+open_wan() {
+  say "Allowing HTTPS and DNS out for the download (temporary)"
+  WAN_OPEN=yes
+  local rule
+  for rule in "${WAN_RULES[@]}"; do
+    # shellcheck disable=SC2086
+    fw4 -I OUTPUT 1 $rule || say "WARNING: could not allow $rule out"
+  done
+  # shellcheck disable=SC2086
+  fw6 -I OUTPUT 1 $WAN_RULE6 2>/dev/null || true
+  restore_output_policy
+}
+close_wan() {
+  [ "$WAN_OPEN" = yes ] || return 0
+  say "Closing internet access again"
+  strip_top fw4 "${WAN_RULES[@]}" >/dev/null
+  strip_top fw6 "$WAN_RULE6" >/dev/null
+  sh "$LIVE/scripts/block_internet_access.sh" >/dev/null 2>&1 \
+    || sh "$PREV/scripts/block_internet_access.sh" >/dev/null 2>&1 || true
+  restore_output_policy
+  WAN_OPEN=no
+}
+# A stalled step must not hold the window open. Busybox builds that only
+# take "timeout -t SECS" fail the probe and get the watchdog instead.
+run_limited() {
+  local seconds=$1 pid watchdog status
+  shift
+  if timeout 1 true 2>/dev/null; then
+    timeout "$seconds" "$@"
+    return
+  fi
+  "$@" &
+  pid=$!
+  (
+    i=0
+    while [ "$i" -lt "$seconds" ]; do sleep 1; i=$((i + 1)); done
+    kill -TERM "$pid" 2>/dev/null
+  ) &
+  watchdog=$!
+  wait "$pid"
+  status=$?
+  kill "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  return "$status"
+}
+
+# The lock updates, rollbacks, switches and the Biometrics install share, on
+# fd 9. The owner variable keeps it across the updater's exec handoff.
+# Returns 1 when the lock cannot be opened, 2 while another run holds it.
+take_operation_lock() {
+  [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ] || return 0
+  local lock="${NIGHTSTAND_OPERATION_LOCK:-/run/lock/free-sleep-operation.lock}"
+  if [ -z "${NIGHTSTAND_OPERATION_LOCK:-}" ] && [ ! -d /run/lock ]; then
+    lock=/tmp/free-sleep-operation.lock
+  fi
+  if [ -e "$lock" ]; then exec 9<"$lock"; else exec 9>>"$lock"; fi || return 1
+  if command -v flock >/dev/null 2>&1; then
+    flock -n 9 || return 2
+  else
+    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null || return 2
+  fi
+  export NIGHTSTAND_OPERATION_OWNER=$$
+}

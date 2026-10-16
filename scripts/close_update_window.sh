@@ -20,9 +20,6 @@ restore_closed_output_policy() {
   fi
 }
 
-WAN_RULES=("-p tcp --dport 443 -j ACCEPT" "-p udp --dport 53 -j ACCEPT" "-p tcp --dport 53 -j ACCEPT")
-WAN_RULE6="-p tcp --dport 443 -j REJECT --reject-with tcp-reset"
-
 # OUTPUT's rules, one per line, with whitespace and the implicit -m tcp or
 # -m udp normalized so they compare with the rules above.
 output_rules() {
