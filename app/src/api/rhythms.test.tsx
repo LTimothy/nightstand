@@ -9,8 +9,10 @@ import { server } from '@test/setup';
 import api, { HARDWARE_REQUEST_TIMEOUT_MS } from './api';
 import { validateResponse } from './responseValidation';
 import {
-  disableRhythms, enableRhythms, postRhythms, rhythmsSaveMessage, RhythmsUpdateSchema, useResolvedSleeps, useRhythmsState,
+  disableRhythms, enableRhythms, postNightExclude, postRhythms, postSuggestionsForget, refreshRhythms, rhythmsSaveMessage,
+  RhythmsUpdateSchema, useResolvedSleeps, useRhythmsState, useSuggestions,
 } from './rhythms';
+import type { SuggestionsResponse } from './rhythmsSchema';
 import type { ResolvedSleepResponse } from './rhythmsResponse';
 import { MAX_TEMPERATURES_PER_DAY } from './schedulesSchema';
 import { createDemoRhythms, listMockSleeps, resetMockRhythms, updateMockRhythms } from '../mocks/rhythmsMock';
@@ -182,4 +184,80 @@ it('keeps a side\'s sleeps while its window moves, never another side\'s', async
   view.rerender({ side: 'right', from: '2026-09-28T01:00:00.000Z' });
   expect(view.result.current.data).toBeUndefined();
   await act(async () => release());
+});
+
+it('reads suggestions, dropping a row, an entry or a reason this app does not know', () => {
+  const row = {
+    kind: 'step', key: 'step:down', direction: 'down', supporting: 9, firstNight: '2026-09-28', lastNight: '2026-10-10',
+    supportingDates: ['2026-09-28'], time: '23:45', temperatureF: 79, plannedF: 82,
+  };
+  const parsed = validateResponse('/rhythms/suggestions', {
+    enabled: true,
+    nights: {
+      'off-days': { counted: 14, needed: 5, changed: 9, earlier: false, reason: 'suggested' },
+      workday: { counted: 3, needed: 5, changed: 0, earlier: false, reason: 'sleepy' },
+    },
+    suggestions: [
+      { rhythmId: 'off-days', near: false, rows: [{ ...row, later: 'kept out' }, { ...row, kind: 'curve' }] },
+      { rhythmId: 'workday', near: true, rows: [{ ...row, kind: 'curve' }] },
+    ],
+    dismissed: [],
+    log: [],
+  }) as SuggestionsResponse;
+  expect(Object.keys(parsed.nights)).toEqual(['off-days']);
+  expect(parsed.suggestions).toEqual([{ rhythmId: 'off-days', near: false, rows: [row] }]);
+});
+
+it('asks for suggestions only while the flag is on', async () => {
+  let asked = 0;
+  server.use(http.get('*/rhythms/suggestions', () => {
+    asked += 1;
+    return HttpResponse.json({ enabled: true, nights: {}, suggestions: [], dismissed: [], log: [] });
+  }));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={ client }>{ children }</QueryClientProvider>;
+  const off = renderHook(() => useSuggestions('left', false), { wrapper });
+  await new Promise(resolve => setTimeout(resolve, 20));
+  expect(asked).toBe(0);
+  off.unmount();
+  const on = renderHook(() => useSuggestions('right', true), { wrapper });
+  await waitFor(() => expect(on.result.current.data?.enabled).toBe(true));
+  expect(asked).toBe(1);
+});
+
+it('posts a one-off night and a delete, and refreshRhythms invalidates suggestions', async () => {
+  const posted: Array<[string, unknown]> = [];
+  server.use(
+    http.post('*/rhythms/suggestions/exclude', async ({ request }) => {
+      posted.push(['exclude', await request.json()]);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post('*/rhythms/suggestions/forget', async ({ request }) => {
+      posted.push(['forget', await request.json()]);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  await postNightExclude({ side: 'right', rhythmId: 'off-days', date: '2026-10-10', excluded: true });
+  await postSuggestionsForget();
+  expect(posted).toEqual([
+    ['exclude', { side: 'right', rhythmId: 'off-days', date: '2026-10-10', excluded: true }], ['forget', {}],
+  ]);
+  const client = new QueryClient();
+  const invalidate = vi.spyOn(client, 'invalidateQueries');
+  await refreshRhythms(client);
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['useSuggestions'] });
+});
+
+it('reads the notes item by item, dropping a bad night or dismissed entry', () => {
+  const night = (date: string) => ({
+    date, rhythmId: 'off-days', tonight: false, excluded: false, plan: [{ offsetMin: 0, temperatureF: 82 }], endMin: 480, changes: [],
+  });
+  const dismissed = { id: '0123456789ab', rhythmId: 'off-days', key: null, time: null, scope: 'later', nightsLeft: 3 };
+  const read = validateResponse('/rhythms/suggestions', {
+    enabled: true, nights: {}, suggestions: [],
+    log: [night('2026-10-09'), { ...night('2026-10-10'), plan: [{ offsetMin: 0 }] }, { date: '2026-10-11' }, night('2026-10-12')],
+    dismissed: [dismissed, { id: 'nope' }, { ...dismissed, id: 'ba9876543210' }],
+  }) as { log: Array<{ date: string }>; dismissed: Array<{ id: string }> };
+  expect(read.log.map(item => item.date)).toEqual(['2026-10-09', '2026-10-12']);
+  expect(read.dismissed.map(item => item.id)).toEqual(['0123456789ab', 'ba9876543210']);
 });

@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { AlarmScheduleSchema, DailyScheduleSchema } from './schedulesSchema';
 import {
   ACTIVATION_REASONS, CURVE_PHASES, IsoDateSchema, OffWhenUpLiveSchema, RhythmsDBSchema, RhythmsLiveSchema,
-  RhythmsResponseSchema, RhythmsStatusSchema, SmartScheduleSchema,
+  DismissedSchema, NightLogSchema, RhythmNightsSchema, RhythmsResponseSchema, RhythmsStatusSchema, RhythmSuggestionSchema, SmartScheduleSchema,
+  SuggestionRowSchema,
+  SuggestionsResponseSchema,
 } from './rhythmsSchema';
 import { responseSchema } from './responseSchema';
 
@@ -78,3 +80,34 @@ export const HandoffReportSchema = z.object({
 export type HandoffReport = z.infer<typeof HandoffReportSchema>;
 
 export const EnableResponseSchema = z.object({ converted: z.boolean() });
+
+// A newer Pod may add row kinds and reasons. A row, an entry left with no
+// rows, or a rhythm's counts this app cannot read are left out, not the page.
+const SuggestionRowRead = responseSchema(SuggestionRowSchema);
+const RhythmSuggestionRead = responseSchema(RhythmSuggestionSchema).extend({
+  rows: z.array(z.unknown()).transform(items => items.flatMap(item => {
+    const parsed = SuggestionRowRead.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  })),
+});
+const RhythmNightsRead = responseSchema(RhythmNightsSchema);
+const NightLogRead = responseSchema(NightLogSchema);
+const DismissedRead = responseSchema(DismissedSchema);
+export const SuggestionsResponseReadSchema = responseSchema(SuggestionsResponseSchema).extend({
+  nights: z.record(z.unknown()).transform(entries => Object.fromEntries(Object.entries(entries).flatMap(([id, value]) => {
+    const parsed = RhythmNightsRead.safeParse(value);
+    return parsed.success ? [[id, parsed.data] as const] : [];
+  }))),
+  suggestions: z.array(z.unknown()).transform(items => items.flatMap(item => {
+    const parsed = RhythmSuggestionRead.safeParse(item);
+    return parsed.success && parsed.data.rows.length > 0 ? [parsed.data] : [];
+  })),
+  log: z.array(z.unknown()).transform(items => items.flatMap(item => {
+    const parsed = NightLogRead.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  })),
+  dismissed: z.array(z.unknown()).transform(items => items.flatMap(item => {
+    const parsed = DismissedRead.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  })),
+});

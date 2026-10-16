@@ -11,7 +11,9 @@ import { StorageInfoSchema } from './storageSchema';
 import { StatusInfoSchema } from './serverStatusSchema';
 import { vitalsRecordSchema } from '../../../server/src/db/vitalsRecordSchema';
 import { movementRecordSchema } from '../../../server/src/db/movementRecordSchema';
-import { ResolvedSleepsResponseSchema, RhythmsLiveReadSchema, RhythmsResponseReadSchema } from './rhythmsResponse';
+import {
+  ResolvedSleepsResponseSchema, RhythmsLiveReadSchema, RhythmsResponseReadSchema, SuggestionsResponseReadSchema,
+} from './rhythmsResponse';
 
 import { responseSchema } from './responseSchema';
 
@@ -197,6 +199,7 @@ const responseSchemas: Record<string, z.ZodTypeAny> = {
   '/rhythms': responseSchema(RhythmsResponseReadSchema),
   '/rhythms/sleeps': responseSchema(ResolvedSleepsResponseSchema),
   '/rhythms/live': responseSchema(RhythmsLiveReadSchema),
+  '/rhythms/suggestions': responseSchema(SuggestionsResponseReadSchema),
   '/metrics/sleep': rowsSchema('sleep', sleepRecordSchema.refine(record => record.sleep_period_seconds >= 0
     && Date.parse(record.left_bed_at) >= Date.parse(record.entered_bed_at), 'Invalid sleep interval')),
   // Reads accept any recorded value; charts drop empty and non-positive ones.

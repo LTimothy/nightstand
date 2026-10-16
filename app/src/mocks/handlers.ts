@@ -41,6 +41,7 @@ import {
   mockCalibration,
 } from './mockData';
 import type { RhythmsUpdate } from '@api/rhythms';
+import { getMockSuggestions } from './suggestionsMock';
 import {
   disableMockRhythms, enableMockRhythms, getMockRhythmsResponse, listMockSleeps, mockLive, scheduledSecondsRemaining, updateMockRhythms,
 } from './rhythmsMock';
@@ -149,6 +150,18 @@ export const handlers = [
     const side = new URL(request.url).searchParams.get('side') === 'right' ? 'right' : 'left';
     await delay(120);
     return HttpResponse.json(mockLive(side));
+  }),
+  http.get('/api/rhythms/suggestions', async () => {
+    await delay(120);
+    return HttpResponse.json(getMockSuggestions());
+  }),
+  http.post('/api/rhythms/suggestions/exclude', async () => {
+    await delay(120);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.post('/api/rhythms/suggestions/forget', async () => {
+    await delay(120);
+    return new HttpResponse(null, { status: 204 });
   }),
   http.get('/api/settings', async () => {
     await delay(120);

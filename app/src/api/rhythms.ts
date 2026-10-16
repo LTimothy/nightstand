@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { serverMessage } from '@lib/requestError';
 import axios, { HARDWARE_REQUEST_TIMEOUT_MS } from './api';
 import { useSettings } from './settings';
-import { IsoDateSchema, RhythmsUpdateSchema, type RhythmsUpdate } from './rhythmsSchema';
+import {
+  IsoDateSchema, NightExcludeSchema, RhythmsUpdateSchema, type NightExclude, type RhythmsUpdate, type SuggestionsResponse,
+} from './rhythmsSchema';
 import {
   EnableResponseSchema, HandoffReportSchema, type HandoffReport, type ResolvedSleepResponse, type RhythmsLive, type RhythmsResponse,
 } from './rhythmsResponse';
@@ -37,6 +39,18 @@ export const useRhythmsLive = (side: 'left' | 'right', enabled = true) => useQue
   enabled,
   refetchInterval: 30_000,
 });
+
+// Hand-change notes and suggestions for a side; mounted only while the feature is on.
+export const useSuggestions = (side: 'left' | 'right', enabled: boolean) => useQuery({
+  queryKey: ['useSuggestions', side],
+  queryFn: async ({ signal }) =>
+    (await axios.get<SuggestionsResponse>('/rhythms/suggestions', { params: { side }, signal })).data,
+  enabled,
+});
+
+export const postNightExclude = (body: NightExclude) => axios.post('/rhythms/suggestions/exclude', NightExcludeSchema.parse(body));
+
+export const postSuggestionsForget = () => axios.post('/rhythms/suggestions/forget', {});
 
 export type RhythmsState = 'unknown' | 'off' | 'loading' | 'error' | 'active' | 'inactive';
 
@@ -72,6 +86,7 @@ export async function refreshRhythms(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ['useRhythms'] }),
     queryClient.invalidateQueries({ queryKey: ['useResolvedSleeps'] }),
     queryClient.invalidateQueries({ queryKey: ['useRhythmsLive'] }),
+    queryClient.invalidateQueries({ queryKey: ['useSuggestions'] }),
     queryClient.invalidateQueries({ queryKey: ['useSettings'] }),
   ]);
 }
