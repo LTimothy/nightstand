@@ -66,6 +66,16 @@ describe('settingsDB cover button settings', () => {
     assert.equal(SettingsSchema.safeParse(loaded.default.data).success, true);
   });
 
+  it('keeps a stored tap gesture whole on load', async () => {
+    const stored = {
+      ...settingsDB.data,
+      left: { ...settingsDB.data.left, taps: { ...settingsDB.data.left.taps, quadTap: { type: 'set_temperature', temperatureF: 76 } } },
+    };
+    writeFileSync(path.join(dataFolder, 'lowdb', 'settingsDB.json'), JSON.stringify(stored));
+    const loaded = await import(new URL('./settings.js?whole-taps', import.meta.url).href) as typeof import('./settings.js');
+    assert.deepEqual(loaded.default.data.left.taps.quadTap, { type: 'set_temperature', temperatureF: 76 });
+  });
+
   it('bounds the button settings as the contributor did', async () => {
     const { SettingsSchema } = await import('./settingsSchema.js');
     const accepts = (buttons: unknown) => SettingsSchema.deepPartial().safeParse({ left: { buttons } }).success;
