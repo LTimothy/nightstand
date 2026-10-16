@@ -236,3 +236,13 @@ it('uses the newest thermostat in a batch even when an older cooling record foll
     assert.equal(store.snapshot(coolingFlags, true, 4910).cooling.left.active, false, `${order}`);
   }
 });
+
+it('keeps an incident that is still being reported a day after it began', () => {
+  const store = new FirmwareTelemetry();
+  ingestLog(store, log('sensor-reset', 1000, 1));
+  ingestLog(store, log('sensor-reset', 1000 + 23 * 3600, 2));
+  const incidents = store.snapshot(healthFeatures, true, 1000 + 25 * 3600).incidents;
+  assert.equal(incidents.length, 1);
+  assert.equal(incidents[0].count, 2);
+  assert.equal(incidents[0].firstSeen, 1000);
+});

@@ -69,7 +69,7 @@ export class HealthFeed {
   }
 
   private prune(now: number) {
-    this.incidents = this.incidents.filter(item => now - item.firstSeen <= 86400);
+    this.incidents = this.incidents.filter(item => now - item.lastSeen <= 86400);
     while (this.incidents.length > 200 || JSON.stringify(this.incidents).length * 3 > 256 * 1024) this.incidents.shift();
   }
 
