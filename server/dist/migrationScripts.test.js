@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, existsSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, existsSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,7 +86,7 @@ describe('fork-switch tool scripts', () => {
         });
         it('starts the installer detached (systemd-run, falling back to nohup)', () => {
             assert.match(src, /systemd-run --unit=free-sleep-migrate/);
-            assert.match(src, /nohup setsid bash \/home\/dac\/migrate\/pod-installer\.sh/);
+            assert.match(src, /nohup setsid bash \/usr\/local\/lib\/nightstand\/migrate\/pod-installer\.sh/);
         });
         it('the pod-generation gate matrix refuses Pod 1/2 with no override', () => {
             assert.match(src, /Pod 1\/2 have no free-sleep lineage.*no override|fail "Pod 1\/2/);
@@ -134,7 +134,7 @@ describe('fork-switch tool scripts', () => {
                 'cp "$RESTORE_SCRIPT_SRC" "$RESTORE_SCRIPT_DEST"',
                 'Stopping their service',
             ], 'pod-installer.sh');
-            assert.match(src, /RESTORE_SCRIPT_DEST=\/home\/dac\/restore-original-fork\.sh/);
+            assert.match(src, /RESTORE_SCRIPT_DEST=\/usr\/local\/lib\/nightstand\/restore-original-fork\.sh/);
         });
         it('arms the dead-man sentinel before stopping their service, and only disarms after a passed health check', () => {
             assertOrder(src, [
@@ -153,10 +153,10 @@ describe('fork-switch tool scripts', () => {
         // only after the health check, so a failed install restores their fork
         // without any of it.
         it('installs the app-control units and sudoers rules only after the health check passes', () => {
-            assert.ok(src.indexOf('bash "$LIVE/scripts/setup_services.sh"') > src.indexOf('if [ "$HEALTHY" != yes ]'), 'setup_services.sh must not run before the health check');
+            assert.ok(src.indexOf('bash "$COPY/scripts/setup_services.sh"') > src.indexOf('if [ "$HEALTHY" != yes ]'), 'setup_services.sh must not run before the health check');
             assertOrder(src, [
                 'Health check passed',
-                'bash "$LIVE/scripts/setup_services.sh" "$LIVE"',
+                'bash "$COPY/scripts/setup_services.sh" "$COPY"',
                 'block_internet_access.sh',
                 'disarm_sentinel',
             ], 'pod-installer.sh');
@@ -168,7 +168,7 @@ describe('fork-switch tool scripts', () => {
         it('turns on the hardware watchdog only after the sentinel is disarmed', () => {
             const success = src.slice(src.indexOf('Health check passed'));
             const disarm = success.indexOf('\ndisarm_sentinel\n');
-            const arm = success.indexOf('bash "$LIVE/scripts/setup_watchdog.sh"');
+            const arm = success.indexOf('bash "$COPY/scripts/setup_watchdog.sh"');
             assert.ok(disarm > 0, 'expected the sentinel to be disarmed on success');
             assert.ok(arm > disarm, 'setup_watchdog.sh must run after disarm_sentinel');
             // A reset during the trial must not leave a healthy migration recorded
@@ -177,7 +177,7 @@ describe('fork-switch tool scripts', () => {
             assert.ok(arm > success.indexOf('say "SUCCESS: migrated'), 'arm after the SUCCESS line');
             assert.ok(arm > success.indexOf('rm -f "$SWAP_MARKER"'), 'arm after the swap marker is cleared');
             assert.equal(src.split('setup_watchdog.sh').length - 1, 2, 'one guard and one call, both after the swap succeeded');
-            assert.match(success, /bash "\$LIVE\/scripts\/setup_watchdog\.sh" --auto /, 'an owner\'s --remove stays in force');
+            assert.match(success, /bash "\$COPY\/scripts\/setup_watchdog\.sh" --auto /, 'an owner\'s --remove stays in force');
         });
         it('applies this fork\'s WAN policy only after the health check succeeds', () => {
             assertOrder(src, [
@@ -213,14 +213,14 @@ describe('fork-switch tool scripts', () => {
         // aside (never rm -rf) and drop a swap marker so restore keys off "did WE
         // swap", not the bare existence of $PREV.
         it('sets the pod\'s pre-existing rollback slot aside instead of destroying it', () => {
-            assert.match(src, /mv "\$PREV" "\$PREEXISTING_PREV"/);
+            assert.match(src, /move_tree "\$PREV" "\$PREEXISTING_PREV"/);
             assert.doesNotMatch(src, /^\s*rm -rf "\$PREV"\s*$/m);
         });
         it('drops the swap marker before mutating $LIVE and clears it on success', () => {
             assertOrder(src, [
                 ': > "$SWAP_MARKER"',
-                'mv "$LIVE" "$PREV"',
-                'mv "$STAGE" "$LIVE"',
+                'move_tree "$LIVE" "$PREV"',
+                'move_tree "$STAGE" "$LIVE"',
                 'Health check passed',
                 'rm -f "$SWAP_MARKER"',
             ], 'pod-installer.sh swap marker');
@@ -277,7 +277,7 @@ echo "$STREAM_WAS_ACTIVE"`], { encoding: 'utf8' });
         it('saves the installed release\'s channel after the swap, before the server starts', () => {
             assert.match(src, /read -r TARGET_VERSION TARGET_CHANNEL <<< "\$PICK"/);
             assertOrder(src, [
-                'mv "$STAGE" "$LIVE"',
+                'move_tree "$STAGE" "$LIVE"',
                 '# A fork moving here has no update channel yet',
                 '/persistent/free-sleep-data/lowdb/settingsDB.json "$TARGET_CHANNEL"',
                 'systemctl start free-sleep ||',
@@ -352,14 +352,16 @@ cat "$LOG"; rm -f "$LOG"`], { encoding: 'utf8' });
         it('restores the pod\'s pre-existing rollback slot on both the no-op and revert paths', () => {
             // On revert the stashed slot goes back to $PREV; on the no-op path (died
             // before the swap) it is only put back when $PREV is currently free.
-            assert.match(src, /mv "\$PREEXISTING_PREV" "\$PREV"/);
+            assert.match(src, /move_tree "\$PREEXISTING_PREV" "\$PREV"/);
             assert.match(src, /if \[ ! -d "\$PREV" \] && \[ -d "\$PREEXISTING_PREV" \]/);
         });
         it('clears the swap marker on the completed revert path', () => {
             assertOrder(src, [
                 'Swap marker present',
-                'rm -f "$SWAP_MARKER"',
+                'finish_artifact_restore "auto-restored" "$RESTORE_MESSAGE"',
             ], 'restore-original-fork.sh');
+            const finish = src.slice(src.indexOf('finish_artifact_restore() {'), src.indexOf('\ncleanup_nightstand_services() {'));
+            assertOrder(finish, ['record_restore_state artifacts-pending', 'rm -f "$SWAP_MARKER"', 'restore_legacy_artifacts'], 'artifact restore');
         });
         it('never rm -rf\'s /persistent/free-sleep-data or /persistent/free-sleep-backups', () => {
             assert.doesNotMatch(src, /rm[^\n]*\/persistent\/free-sleep-data/);
@@ -434,6 +436,90 @@ describe('the fork-switch tool names the app\'s real rollback path', () => {
     it('uses labels the app shows', () => {
         assert.match(readScript('app/src/pages/SettingsPage/settingsCategories.ts'), /key: 'versions', title: 'Software'/);
         assert.match(readScript('app/src/pages/SettingsPage/VersionsPage/VersionsPage.tsx'), />Recovery<\/AccordionSummary>/);
+    });
+});
+describe('the fork switch runs root-owned copies', () => {
+    it('runs the fork switch from the root-owned folder and copies the fresh tree for root before the stage exists', () => {
+        const tool = readScript('scripts/migrate/switch-to-this-fork.sh');
+        assert.match(tool, /bash \/usr\/local\/lib\/nightstand\/migrate\/pod-installer\.sh/);
+        for (const file of ['scripts/migrate/pod-installer.sh', 'scripts/migrate/agent-bootstrap-installer.sh']) {
+            const src = readScript(file);
+            const work = src.indexOf('WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX")');
+            const publish = src.indexOf('COPY=$(python3 -B "$FRESH/scripts/system_scripts.py" publish "$FRESH")');
+            const stage = src.indexOf('move_tree "$FRESH" "$STAGE"');
+            assert.ok(work > 0 && work < publish && publish < stage && stage < src.indexOf('chown -hR dac:dac "$STAGE"'), file);
+            assert.doesNotMatch(src, /\$STAGE\/scripts\/system_scripts\.py/, file);
+            assert.match(src, /bash "\$COPY\/scripts\/setup_services\.sh" "\$COPY"/, file);
+        }
+    });
+    const stageSection = (src, start) => {
+        const chown = /chown -h?R dac:dac "\$STAGE"\n/.exec(src.slice(start));
+        assert.ok(start > 0 && chown);
+        return src.slice(start, start + chown.index + chown[0].length);
+    };
+    const moveTree = (src) => {
+        const start = src.indexOf('move_tree() {');
+        return start < 0 ? '' : src.slice(start, src.indexOf('\n}\n', start) + 3);
+    };
+    function stage(file, setup = '') {
+        const src = readScript(file);
+        const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-migrate-stage-'));
+        const release = path.join(dir, 'release/nightstand-main/scripts');
+        mkdirSync(release, { recursive: true });
+        writeFileSync(path.join(release, 'system_scripts.py'), 'import os, sys\nrecord = os.path.abspath(__file__) + " " + " ".join(sys.argv[1:])\n'
+            + 'open(os.environ["FIXTURE"] + "/published", "w").write(record)\nprint("/copy")\n');
+        execFileSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
+            path.join(dir, 'release'), path.join(dir, 'release')]);
+        const result = spawnSync('bash', ['-c', `set -uo pipefail
+SYSTEM_DIR="$FIXTURE/system"; STAGE="$FIXTURE/home/free-sleep-migrate-staging"
+TARGET_VERSION=3.7.0; MAIN_ZIP_URL=https://example.invalid/main.zip
+mkdir -p "$FIXTURE/home" "$FIXTURE/outside" "$STAGE/old"
+say() { :; }
+fail() { echo "FAIL $*"; exit 1; }
+curl() { while [ "$1" != -o ]; do shift; done; cp "$FIXTURE/release.zip" "$2"; }
+chown() { echo "chown $*" >> "$FIXTURE/chowned"; }
+${setup}
+${moveTree(src)}
+${stageSection(src, src.indexOf('say "Downloading v$TARGET_VERSION'))}
+echo "COPY=$COPY"`], { encoding: 'utf8', env: { ...process.env, FIXTURE: dir } });
+        const chowned = existsSync(path.join(dir, 'chowned')) ? readFileSync(path.join(dir, 'chowned'), 'utf8') : '';
+        return { dir, result, chowned };
+    }
+    it('downloads, unpacks and copies the release where the server user cannot reach it', () => {
+        const { dir, result, chowned } = stage('scripts/migrate/pod-installer.sh');
+        try {
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            assert.match(result.stdout, /^COPY=\/copy$/m);
+            const [tool, command, tree] = readFileSync(path.join(dir, 'published'), 'utf8').split(' ');
+            const system = path.join(dir, 'system');
+            assert.equal(command, 'publish');
+            assert.match(tree, new RegExp(`^${system}/\\.download\\.[^/]+/tree/nightstand-main$`));
+            assert.equal(tool, path.join(tree, 'scripts/system_scripts.py'));
+            assert.deepEqual(readdirSync(path.join(dir, 'home/free-sleep-migrate-staging')), ['scripts']);
+            assert.deepEqual(readdirSync(system), []);
+            assert.equal(chowned, `chown -hR dac:dac ${path.join(dir, 'home/free-sleep-migrate-staging')}\n`);
+        }
+        finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+    it('stops before any chown when the server user swaps the stage for a symlink', () => {
+        // The server user owns the folder the stage lives in, so it can put a
+        // symlink back between the rm and the move.
+        const race = 'rm() { command rm "$@"; [ "${!#}" != "$STAGE" ] || ln -s "$FIXTURE/outside" "$STAGE"; }';
+        // GNU mv -T is a rename that never follows the target; macOS mv has no -T.
+        const gnuMv = 'mv() { if [ "$1" = -T ]; then python3 -c \'import os, sys; os.rename(*sys.argv[1:])\' "$2" "$3"; else command mv "$@"; fi; }';
+        for (const emulate of ['', gnuMv]) {
+            const { dir, result, chowned } = stage('scripts/migrate/pod-installer.sh', `${race}\n${emulate}`);
+            try {
+                assert.match(result.stdout, /^FAIL could not stage/m, result.stdout + result.stderr);
+                assert.deepEqual(readdirSync(path.join(dir, 'outside')), []);
+                assert.equal(chowned, '');
+            }
+            finally {
+                rmSync(dir, { recursive: true, force: true });
+            }
+        }
     });
 });
 //# sourceMappingURL=migrationScripts.test.js.map

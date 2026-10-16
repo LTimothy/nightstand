@@ -44,6 +44,14 @@ const OneOffAlarmSchema = z.object({
     vibrationPattern: z.enum(['double', 'rise']),
     duration: z.number().int().min(0).max(180),
 });
+// The buttons on a Pod 5 cover, used by buttonMonitor.ts only for clicks the
+// firmware logged as ignored. invertButtons swaps plus and minus; the logo
+// stops an alarm or sets the side to favoriteTemperatureF.
+const ButtonsSchema = z.object({
+    invertButtons: z.boolean(),
+    stepF: z.number().min(0).max(10),
+    favoriteTemperatureF: z.number().int().min(55).max(110),
+}).strict();
 const SideSettingsSchema = z.object({
     name: z.string().min(1).max(20),
     awayMode: z.boolean(),
@@ -69,7 +77,8 @@ const SideSettingsSchema = z.object({
         doubleTap: TapConfig,
         tripleTap: TapConfig,
         quadTap: TapConfig,
-    })
+    }),
+    buttons: ButtonsSchema,
 }).strict();
 // Which release channel the update alert/version picker treats as "latest".
 // 'beta' sees every release; 'stable' only sees releases promoted to stable
@@ -89,6 +98,14 @@ export const defaultFeatures = {
     nightstandTheme: true,
     rhythms: false,
     biometricsV2: false,
+    firmwareTargetReadout: false,
+    firmwareHealth: false,
+    tapDiagnostics: false,
+    coolingWarning: false,
+    metricsRetention: false,
+    metricsLowDiskProtection: true,
+    // The buttons on a Pod 5 cover (buttonMonitor.ts). Off: no RAW file is read.
+    coverButtons: false,
 };
 const FeaturesSchema = z.object({
     sleepScore: z.boolean(),
@@ -98,6 +115,13 @@ const FeaturesSchema = z.object({
     nightstandTheme: z.boolean(),
     rhythms: z.boolean(),
     biometricsV2: z.boolean(),
+    firmwareTargetReadout: z.boolean(),
+    firmwareHealth: z.boolean(),
+    tapDiagnostics: z.boolean(),
+    coolingWarning: z.boolean(),
+    metricsRetention: z.boolean(),
+    metricsLowDiskProtection: z.boolean(),
+    coverButtons: z.boolean(),
 }).strict();
 export const SettingsSchema = z.object({
     id: z.string(),

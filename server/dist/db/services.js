@@ -97,7 +97,13 @@ let updateQueue = Promise.resolve();
 export const updateServices = (partial) => {
     const result = updateQueue.then(async () => {
         await servicesDB.read();
-        _.merge(servicesDB.data, partial);
+        if (typeof partial === 'function') {
+            if (partial(servicesDB.data) === false)
+                return servicesDB.data;
+        }
+        else {
+            _.merge(servicesDB.data, partial);
+        }
         await servicesDB.write();
         return servicesDB.data;
     });

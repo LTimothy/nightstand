@@ -112,17 +112,18 @@ beforeEach(async () => {
 afterEach(() => mock.timers.reset());
 after(() => rmSync(folder, { recursive: true, force: true }));
 describe('power-on', () => {
-    it('hands the firmware the sleep end plus five minutes', async () => {
+    it('hands the firmware the sleep end plus five minutes in one timed write', async () => {
         const sleep = sleepOn('2026-09-28');
         setNow('2026-09-28T22:00:00Z');
         await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
-        assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 8 * 3600 + 300 } }]);
+        assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80 } }]);
+        assert.deepEqual(updateOptions, [{ background: true, onUntil: at('2026-09-29T06:05:00Z') }]);
     });
-    it('measures from the moment the job actually runs', async () => {
+    it('gives the same end however late the job runs, counted when the write is sent', async () => {
         const sleep = sleepOn('2026-09-28');
         setNow('2026-09-28T22:02:00Z');
         await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
-        assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 8 * 3600 + 300 - 120 } }]);
+        assert.deepEqual(updateOptions, [{ background: true, onUntil: at('2026-09-29T06:05:00Z') }]);
     });
     it('never asks for more than twelve hours', () => {
         assert.equal(firmwareSeconds(at('2026-09-29T14:00:00Z'), at('2026-09-28T22:00:00Z')), 43200);
@@ -140,7 +141,8 @@ describe('power-on', () => {
         const sleep = sleepOn('2026-09-28');
         setNow('2026-09-28T22:00:00Z');
         await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
-        assert.deepEqual(updates, [{ left: { isOn: true, secondsRemaining: 8 * 3600 + 300 } }]);
+        assert.deepEqual(updates, [{ left: { isOn: true } }]);
+        assert.deepEqual(updateOptions[0], { background: true, onUntil: at('2026-09-29T06:05:00Z') });
     });
 });
 describe('temperature and power-off', () => {
@@ -172,7 +174,7 @@ describe('temperature and power-off', () => {
         await runRhythmEvent('left', sleep, eventOf(sleep, 'temperature'));
         setNow('2026-09-29T06:00:00Z');
         await runRhythmEvent('left', sleep, eventOf(sleep, 'power-off'));
-        assert.deepEqual(updateOptions, [{ background: true }, { background: true }, { background: true }]);
+        assert.deepEqual(updateOptions, [{ background: true, onUntil: at('2026-09-29T06:05:00Z') }, { background: true }, { background: true }]);
     });
     it('leaves on a sleep that started in the minute this one ends', async () => {
         const db = testRhythmsDB(schedulesDB.data, everyNight(testNight('06:00', '06:00')));
@@ -280,7 +282,7 @@ describe('away mode', () => {
         const sleep = sleepOn('2026-09-28');
         setNow('2026-09-28T22:00:00Z');
         await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
-        assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 8 * 3600 + 300 } }]);
+        assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80 } }]);
     });
     it('rings an alarm only on the present side', async (t) => {
         t.mock.method(globalThis, 'setTimeout', noTimers);
@@ -416,7 +418,7 @@ describe('"When I get up" sleeps', () => {
         const sleep = upSleepOn('2026-09-28');
         setNow('2026-09-28T21:30:00Z');
         await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
-        assert.equal(updates[0].left.secondsRemaining, 8.5 * 3600 + 900);
+        assert.equal(updateOptions[0].onUntil.getTime(), sleep.end.getTime() + 900_000);
     });
     it('keeps the side on at the set off while someone is in bed, and turns it off at the latest', async () => {
         const sleep = upSleepOn('2026-09-28');

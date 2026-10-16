@@ -80,8 +80,15 @@ describe('FEATURES_MANIFEST', () => {
             assert.ok(existsSync(path.join(repoRoot, file)), `${file} does not exist`);
         }
     });
-    it('points update, biometrics and alarm tap entries at files that exist', () => {
-        for (const id of ['agent', 'biometrics', 'tap-alarm']) {
+    it('describes the interrupted update outcome shown after recovery', () => {
+        const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === 'update-recovery');
+        assert.ok(entry);
+        assert.match(entry.description, /records the outcome/);
+        assert.match(entry.description, /server or Biometrics restart failures/);
+        assert.doesNotMatch(entry.description, /records no new result/);
+    });
+    it('points update, biometrics, alarm tap and cover button entries at files that exist', () => {
+        for (const id of ['agent', 'biometrics', 'tap-alarm', 'cover-buttons']) {
             const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === id);
             assert.ok(entry, `${id} has no featuresManifest entry`);
             for (const file of [...entry.touchpoints, ...entry.tests]) {

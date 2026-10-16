@@ -73,4 +73,11 @@ it('keeps the current sleep stages on whole-number movement', async () => {
     // The fixture must exercise the difference, or the check above proves nothing.
     assert.notDeepEqual(summarizeStages(vitals.map(toStageVitals), stored, NIGHT_START, NIGHT_END), expected);
 });
+it('reads fractional movement written inside an optional transaction client', async () => {
+    await prisma.$transaction(async (transaction) => {
+        await transaction.movement.create({ data: { side: 'left', timestamp: T0 + 10000, total_movement: 50.9 } });
+        const rows = await loadMovement('left', T0 + 10000, T0 + 10000, transaction);
+        assert.deepEqual(rows.map(row => row.total_movement), [50.9]);
+    });
+});
 //# sourceMappingURL=movement.test.js.map

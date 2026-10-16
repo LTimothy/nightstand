@@ -51,6 +51,26 @@ const envWith = (extra) => {
     delete env.NIGHTSTAND_CHANNEL;
     return { ...env, ...extra };
 };
+describe('install.sh prebuilt-image credential check', () => {
+    for (const helperStatus of [null, 0, 1]) {
+        it(`continues with credential helper status ${helperStatus ?? 'absent'}`, t => {
+            const folder = mkdtempSync(path.join(tmpdir(), 'nightstand-image-check-'));
+            t.after(() => rmSync(folder, { recursive: true, force: true }));
+            mkdirSync(path.join(folder, 'scripts'));
+            if (helperStatus !== null) {
+                writeFileSync(path.join(folder, 'scripts/check_image_credentials.sh'), `#!/bin/bash\necho checked\nexit ${helperStatus}\n`);
+            }
+            const section = between('# Optional on older releases', '# Finish');
+            const result = spawnSync('bash', ['-c', `set -euo pipefail\nCOPY="$FIXTURE"\n${section}\necho continued`], {
+                encoding: 'utf8', env: envWith({ FIXTURE: folder }),
+            });
+            assert.equal(result.status, 0, result.stderr);
+            assert.match(result.stdout, /continued/);
+            assert.equal(result.stdout.includes('checked'), helperStatus !== null);
+            assert.equal(result.stdout.includes('WARNING'), helperStatus === 1);
+        });
+    }
+});
 function pick(env = {}, manifest = BETA_FIRST, curl = `printf '%s' '${manifest}'`, saved = {}) {
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-pick-'));
     const oldFile = path.join(dir, 'old-settingsDB.json');
@@ -80,6 +100,7 @@ function verify(expected, withScript = true, staged = '3.6.0') {
         writeFileSync(path.join(tree, 'server/src/serverInfo.json'), JSON.stringify({ version: staged }));
     const script = path.join(tree, 'scripts/tree_digest.py');
     copyFileSync(path.join(repoRoot, 'scripts/tree_digest.py'), script);
+    copyFileSync(path.join(repoRoot, 'scripts/system_scripts.py'), path.join(tree, 'scripts/system_scripts.py'));
     const digest = spawnSync('python3', [script, tree], { encoding: 'utf8' }).stdout.trim();
     if (!withScript)
         rmSync(script);
@@ -90,7 +111,8 @@ SRC_DIR="$TEST_TREE"
 EXPECTED_DIGEST="$TEST_DIGEST"
 ${between('# Checks the download', '# Stop both database writers')}
 echo continued`], {
-        env: envWith({ TEST_UNZIP: unzip, TEST_TREE: tree, TEST_DIGEST: expected(digest) }), encoding: 'utf8',
+        env: envWith({ TEST_UNZIP: unzip, TEST_TREE: tree, TEST_DIGEST: expected(digest), NIGHTSTAND_SYSTEM_DIR: path.join(unzip, 'system') }),
+        encoding: 'utf8',
     });
     const unzipKept = existsSync(unzip);
     rmSync(unzip, { recursive: true, force: true });
@@ -224,26 +246,27 @@ describe('install.sh release choice', () => {
         assert.ok(choose >= 0 && choose < download, 'choose before the download');
         assert.ok(download < check, 'check after the download');
         assert.ok(check < stop, 'check before any service stops');
-        assert.ok(check < src.indexOf('mv "$REPO_DIR" "$PREV_DIR"'), 'check before the live tree is replaced');
+        assert.ok(check < src.indexOf('move_tree "$REPO_DIR" "$PREV_DIR"'), 'check before the live tree is replaced');
     });
 });
 describe('install.sh download', () => {
     it('says plainly when the release cannot be downloaded, and cleans up', () => {
         const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-download-'));
-        const zip = path.join(dir, 'free-sleep.zip');
+        const system = path.join(dir, 'system');
         const result = spawnSync('bash', ['-c', `set -euo pipefail
 VERSION=3.6.0
-ZIP_FILE="$TEST_ZIP"
+SYSTEM_DIR="$TEST_SYSTEM"
 REPO_URL=https://example.invalid/v3.6.0.zip
 curl() { : > "$3"; return 22; }
 ${between('# Download the repository', 'echo "Unzipping the repository..."')}
-echo continued`], { env: envWith({ TEST_ZIP: zip }), encoding: 'utf8' });
-        const zipKept = existsSync(zip);
+echo continued`], { env: envWith({ TEST_SYSTEM: system }), encoding: 'utf8' });
+        // Downloaded into a private folder in the root-owned one, never the working directory.
+        const leftover = readdirSync(system);
         rmSync(dir, { recursive: true, force: true });
         assert.notEqual(result.status, 0);
         assert.match(result.stdout, /^Could not download v3\.6\.0 from GitHub\. Nothing was installed\.$/m);
         assert.doesNotMatch(result.stdout, /continued/);
-        assert.equal(zipKept, false);
+        assert.deepEqual(leftover, []);
     });
 });
 describe('install.sh checksum check', () => {
@@ -321,7 +344,7 @@ describe('install.sh saved channel', () => {
     it('runs after old settings are moved into place, before ownership is fixed', () => {
         const save = src.indexOf('# Save the update channel');
         assert.ok(save > src.indexOf('for entry in "${FILES_TO_MOVE[@]}"'), 'after the old settings move');
-        assert.ok(save < src.indexOf('chown -R "$USERNAME":"$USERNAME" /persistent/free-sleep-data/'), 'before the chown');
+        assert.ok(save < src.indexOf('chown -hR "$USERNAME":"$USERNAME" /persistent/free-sleep-data/'), 'before the chown');
     });
 });
 // From stopping the services to the step after Node: the stretch where a
@@ -342,6 +365,7 @@ function replaceTree({ live = true, nodeFails = true, started = [], stuck = '' }
     const result = spawnSync('bash', ['-c', `set -euo pipefail
 REPO_DIR="$FIXTURE/free-sleep"; PREV_DIR="$FIXTURE/free-sleep-prev"; FAILED_DIR="$FIXTURE/free-sleep-failed"
 UNZIP_DIR="$FIXTURE/unzip"; SRC_DIR="$UNZIP_DIR/nightstand"; USERNAME=dac
+COPY="$FIXTURE/copy"; mkdir -p "$COPY"; cp -R "$SRC_DIR/scripts" "$COPY/"
 systemctl() {
   local unit state stuck
   case "$1" in
@@ -455,6 +479,7 @@ function reinstall({ live = true, migrates = true, answers = true, interrupt = '
     const result = spawnSync('bash', ['-c', `set -euo pipefail
 REPO_DIR="$FIXTURE/free-sleep"; PREV_DIR="$FIXTURE/free-sleep-prev"; FAILED_DIR="$FIXTURE/free-sleep-failed"
 UNZIP_DIR="$FIXTURE/unzip"; SRC_DIR="$UNZIP_DIR/nightstand"; USERNAME=dac; SERVER_DIR="$REPO_DIR/server"
+COPY="$FIXTURE/copy"; mkdir -p "$COPY"; cp -R "$SRC_DIR/scripts" "$COPY/"
 VERSION=${NEXT}; STAGED_VERSION=${NEXT}; DEST="$FIXTURE/backup.db"
 systemctl() {
   local unit state
@@ -491,6 +516,7 @@ echo continued`], {
     const output = {
         ...result, live: read('free-sleep/version'), previous: read('free-sleep-prev/version'),
         failed: read('free-sleep-failed/version'), services: read('services'),
+        outside: existsSync(path.join(dir, 'outside')) ? readdirSync(path.join(dir, 'outside')) : [],
         serverState: read('state-free-sleep').trim(), tmpLeft: readdirSync(path.join(dir, 'tmp')),
         lockReleased: spawnSync('python3', ['-c',
             'import fcntl, sys; handle=open(sys.argv[1], "a"); fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)',
@@ -556,6 +582,7 @@ describe('install.sh keeps the previous install until the new one is healthy', (
     }
     const aroundMove = (when) => `mv() {
   local leaving=no
+  [ "$1" != -T ] || shift
   [ "$1 $2" != "$REPO_DIR $PREV_DIR" ] || leaving=yes
   ${when === 'before' ? '[ "$leaving" = no ] || kill -TERM $$' : ':'}
   command mv "$@" || return
@@ -575,6 +602,26 @@ describe('install.sh keeps the previous install until the new one is healthy', (
         assert.equal(result.live, 'old');
         assert.match(result.services, /^start free-sleep old$/m);
         assert.equal(result.serverState, 'active');
+    });
+    // The server user owns /home/dac, so it can put a symlink back at a name
+    // root has just removed.
+    const plantAfterRm = (target) => `mkdir -p "$FIXTURE/outside"
+rm() { command rm "$@"; [ "\${!#}" != "${target}" ] || ln -s "$FIXTURE/outside" "\${!#}"; }`;
+    it('moves the previous install into no symlink planted at its rollback slot, and starts it again', () => {
+        const result = reinstall({ setup: plantAfterRm('$PREV_DIR') });
+        assert.notEqual(result.status, 0, result.stdout + result.stderr);
+        assert.deepEqual(result.outside, []);
+        assert.equal(result.live, 'old');
+        assert.match(result.services, /^start free-sleep old$/m);
+    });
+    it('a failed install moves nothing into a symlink planted where the new files go, and starts what is live', () => {
+        const result = reinstall({ migrates: false, setup: plantAfterRm('$FAILED_DIR') });
+        assert.notEqual(result.status, 0, result.stdout + result.stderr);
+        assert.deepEqual(result.outside, []);
+        assert.equal(result.live, 'new');
+        assert.equal(result.previous, 'old');
+        assert.match(result.stdout, /previous install could not be put back/);
+        assert.match(result.services, /^start free-sleep new$/m);
     });
     it('keeps the new install once its server answers', () => {
         const result = reinstall();
@@ -664,5 +711,30 @@ PY
             assert.equal(result.lockReleased, true);
         });
     }
+});
+describe('install.sh root-owned copy', () => {
+    it('copies the scripts for root before the tree moves or changes owner, and runs only that copy', () => {
+        const publish = src.indexOf('COPY=$(python3 -B "$SRC_DIR/scripts/system_scripts.py" publish "$SRC_DIR")');
+        const move = src.indexOf('move_tree "$SRC_DIR" "$REPO_DIR"');
+        const owner = src.indexOf('chown -hR "$USERNAME":"$USERNAME" "$REPO_DIR"');
+        assert.ok(publish > 0 && publish < move && move < owner, `${publish} ${move} ${owner}`);
+        assert.match(src, /bash "\$COPY\/scripts\/setup_services\.sh" "\$COPY"/);
+        const unzip = mkdtempSync(path.join(tmpdir(), 'nightstand-install-copy-'));
+        try {
+            const tree = path.join(unzip, 'nightstand-3.7.0');
+            mkdirSync(path.join(tree, 'scripts'), { recursive: true });
+            copyFileSync(path.join(repoRoot, 'scripts/system_scripts.py'), path.join(tree, 'scripts/system_scripts.py'));
+            const result = spawnSync('bash', ['-c', `set -euo pipefail
+UNZIP_DIR="$1"; SRC_DIR="$2"
+${between('# Copied for root while only root', '# Report legacy')}
+echo "COPY=$COPY"`, 'install', unzip, tree], { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: path.join(unzip, 'system') }, encoding: 'utf8' });
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            const copy = /COPY=(.*)/.exec(result.stdout)?.[1] ?? '';
+            assert.ok(existsSync(path.join(copy, 'scripts/system_scripts.py')), result.stdout);
+        }
+        finally {
+            rmSync(unzip, { recursive: true, force: true });
+        }
+    });
 });
 //# sourceMappingURL=installScript.test.js.map

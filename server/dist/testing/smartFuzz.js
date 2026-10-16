@@ -15,6 +15,8 @@ export const SLEEP_CASES = [
     { timeZone: 'America/Los_Angeles', date: '2026-03-08', on: '02:33', wake: '03:06', off: '03:06' },
     { timeZone: 'America/Los_Angeles', date: '2026-03-08', on: '02:50', wake: '03:20', off: '04:00' },
     { timeZone: 'UTC', date: '2026-09-28', on: '20:00', wake: '20:00', off: '20:00' },
+    { timeZone: 'America/Los_Angeles', date: '2026-03-07', on: '20:00', wake: '20:00', off: '20:00' },
+    { timeZone: 'America/Los_Angeles', date: '2026-10-31', on: '20:00', wake: '20:00', off: '20:00' },
     { timeZone: 'UTC', date: '2026-09-28', on: '12:00', wake: '12:10', off: '12:10' },
     { timeZone: 'UTC', date: '2026-09-28', on: '20:00', wake: '20:29', off: '20:45' },
     { timeZone: 'Australia/Adelaide', date: '2026-04-05', on: '01:50', wake: '03:20', off: '04:00' },
@@ -63,6 +65,8 @@ export function assertCurve(points, input) {
     const bounds = curveBounds(input.smart.baseLevel);
     const start = input.bedtime.getTime() - prewarmMinutes(input.smart) * MINUTE;
     check(points.length > 0, 'curve is empty');
+    let lastStep;
+    const daySleep = isDaySleep(input.bedtime, input.wake, input.timeZone);
     const phases = ['prewarm', 'bedtime', 'cooldown', 'hold', 'warmup', 'wake', 'after'];
     points.forEach((point, index) => {
         const time = point.at.getTime();
@@ -76,6 +80,15 @@ export function assertCurve(points, input) {
         const previous = points[index - 1];
         if (previous) {
             check(time >= previous.at.getTime(), 'points go backwards');
+            if (point.level !== previous.level && point.phase !== 'after') {
+                check(Math.abs(point.level - previous.level) === 1, 'level step exceeds one');
+                if (lastStep) {
+                    const cooling = point.phase === 'cooldown' || point.phase === 'hold';
+                    const spacing = cooling ? CURVE.coolStepMinutes[daySleep ? 'day' : 'night'] : CURVE.warmStepMinutes;
+                    check(time - lastStep.at.getTime() >= spacing * MINUTE, 'level steps too close');
+                }
+                lastStep = point;
+            }
             check(phases.indexOf(point.phase) >= phases.indexOf(previous.phase), 'phase goes backwards');
             if (point.phase === 'cooldown' || point.phase === 'hold')
                 check(point.level <= previous.level, 'warming during cool-down');

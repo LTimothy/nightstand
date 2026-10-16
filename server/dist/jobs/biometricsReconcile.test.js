@@ -105,7 +105,7 @@ for (const [active, autostart] of [['active', 'enabled'], ['active', 'disabled']
         await reconcile();
         assert.equal(activeState, 'inactive');
         assert.equal(unitFileState, 'disabled');
-        assert.deepEqual(starts(), [['sudo', '-n', '--', '/bin/sh', '/home/dac/free-sleep/scripts/disable_biometrics.sh']]);
+        assert.deepEqual(starts(), [['sudo', '-n', '--', '/bin/sh', '/usr/local/lib/nightstand/live/scripts/disable_biometrics.sh']]);
     });
 }
 it('holds the operation lock while reading the switch and issuing the command', async () => {
@@ -150,7 +150,7 @@ it('reads the switch in queue order instead of using a stale on value', async ()
     const sync = reconcile();
     await Promise.all([off, sync]);
     assert.equal(starts().length, 1);
-    assert.ok(starts()[0].includes('/home/dac/free-sleep/scripts/disable_biometrics.sh'));
+    assert.ok(starts()[0].includes('/usr/local/lib/nightstand/live/scripts/disable_biometrics.sh'));
     assert.equal(activeState, 'inactive');
     assert.equal(unitFileState, 'disabled');
 });

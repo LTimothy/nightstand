@@ -58,7 +58,7 @@ describe('schedulePauseResume', () => {
     it('arms a resume job a minute after the pause end', async () => {
         const expiresAt = inHours(2);
         await setPause('left', true, expiresAt);
-        assert.equal(await schedulePauseResume(settingsDB.data, 'left'), false);
+        schedulePauseResume(settingsDB.data, 'left');
         const job = nodeSchedule.scheduledJobs['left-pause-resume'];
         assert.ok(job, 'no resume job was scheduled');
         assert.equal(PAUSE_RESUME_DELAY_MS, 60 * 1000);
@@ -68,28 +68,28 @@ describe('schedulePauseResume', () => {
     it('keeps the one minute delay when rebuilt just after the pause ends', async () => {
         const expiresAt = new Date(Date.now() - 30_000).toISOString();
         await setPause('left', true, expiresAt);
-        assert.equal(await schedulePauseResume(settingsDB.data, 'left'), false);
+        schedulePauseResume(settingsDB.data, 'left');
         assert.equal(nodeSchedule.scheduledJobs['left-pause-resume'].nextInvocation()?.getTime(), Date.parse(expiresAt) + PAUSE_RESUME_DELAY_MS);
         assert.equal((await storedPause('left')).active, true);
     });
     it('arms nothing for an open-ended or inactive pause', async () => {
         await setPause('left', true, '');
         await setPause('right', false, inHours(2));
-        assert.equal(await schedulePauseResume(settingsDB.data, 'left'), false);
-        assert.equal(await schedulePauseResume(settingsDB.data, 'right'), false);
+        schedulePauseResume(settingsDB.data, 'left');
+        schedulePauseResume(settingsDB.data, 'right');
         assert.deepEqual(Object.keys(nodeSchedule.scheduledJobs), []);
     });
     it('clears the pause when the job fires outside a scheduled night', async () => {
         const expiresAt = inHours(2);
         await setPause('left', true, expiresAt);
-        await schedulePauseResume(settingsDB.data, 'left');
+        schedulePauseResume(settingsDB.data, 'left');
         await nodeSchedule.scheduledJobs['left-pause-resume'].invoke();
         assert.deepEqual(await storedPause('left'), { active: false, expiresAt: '' });
         assert.deepEqual(deviceUpdates, []);
     });
     it('keeps a newer pause saved after the job was armed', async () => {
         await setPause('left', true, inHours(2));
-        await schedulePauseResume(settingsDB.data, 'left');
+        schedulePauseResume(settingsDB.data, 'left');
         const newer = inHours(5);
         await setPause('left', true, newer);
         await nodeSchedule.scheduledJobs['left-pause-resume'].invoke();
@@ -98,7 +98,7 @@ describe('schedulePauseResume', () => {
     it('keeps the pause readable at the end so an alarm due then stays silent', async () => {
         const expiresAt = inHours(2);
         await setPause('left', true, expiresAt);
-        await schedulePauseResume(settingsDB.data, 'left');
+        schedulePauseResume(settingsDB.data, 'left');
         const fireAt = nodeSchedule.scheduledJobs['left-pause-resume'].nextInvocation()?.getTime() ?? 0;
         assert.ok(fireAt > Date.parse(expiresAt), 'the clear is due at or before the pause end');
     });
@@ -110,21 +110,23 @@ describe('schedulePauseResume', () => {
         t.mock.restoreAll();
         assert.deepEqual(await storedPause('left'), { active: true, expiresAt });
     });
-    it('clears a pause that already ended without arming a job', async () => {
-        await setPause('left', true, inHours(-1));
-        assert.equal(await schedulePauseResume(settingsDB.data, 'left'), true);
-        assert.deepEqual(await storedPause('left'), { active: false, expiresAt: '' });
-        assert.equal(nodeSchedule.scheduledJobs['left-pause-resume'], undefined);
-    });
-    it('clears a pause whose end cannot be read', async () => {
-        await setPause('left', true, 'not a date');
-        assert.equal(await schedulePauseResume(settingsDB.data, 'left'), true);
-        assert.deepEqual(await storedPause('left'), { active: false, expiresAt: '' });
-    });
+    for (const [label, expiresAt] of [['already ended', inHours(-1)], ['cannot be read', 'not a date']]) {
+        it(`ends a pause whose end ${label} through a job a second away, not inline`, async () => {
+            await setPause('left', true, expiresAt);
+            const before = Date.now();
+            schedulePauseResume(settingsDB.data, 'left');
+            assert.equal((await storedPause('left')).active, true);
+            const job = nodeSchedule.scheduledJobs['left-pause-resume'];
+            const due = job.nextInvocation()?.getTime() ?? 0;
+            assert.ok(due >= before + 1000 && due <= Date.now() + 1000, `due ${due - before} ms after the rebuild`);
+            await job.invoke();
+            assert.deepEqual(await storedPause('left'), { active: false, expiresAt: '' });
+        });
+    }
     it('lets the next scheduled event run after the resume', async () => {
         await setPause('left', true, inHours(2));
         schedulePowerOn(settingsDB.data, 'left', 'monday', { on: '21:00', off: '07:00', enabled: true, onTemperature: 82 });
-        await schedulePauseResume(settingsDB.data, 'left');
+        schedulePauseResume(settingsDB.data, 'left');
         await nodeSchedule.scheduledJobs['left-monday-21:00-power-on'].invoke();
         assert.deepEqual(deviceUpdates, []);
         await nodeSchedule.scheduledJobs['left-pause-resume'].invoke();

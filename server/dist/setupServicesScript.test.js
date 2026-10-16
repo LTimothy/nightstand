@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,7 @@ function sandbox(opts = {}) {
     const tmpfiles = path.join(root, 'tmpfiles');
     const lock = path.join(root, 'operation.lock');
     const tmpfilesCalls = path.join(root, 'tmpfiles-calls');
+    const system = path.join(root, 'system');
     for (const dir of [bin, systemd, path.join(repo, 'scripts', 'systemd')])
         mkdirSync(dir, { recursive: true });
     const units = ['free-sleep-rollback.service', 'free-sleep-revert.service'];
@@ -37,6 +38,10 @@ function sandbox(opts = {}) {
         units.push('free-sleep-recover-update.service', 'free-sleep-recover-update.timer');
         copyFileSync(path.join(repoRoot, 'scripts/restore_helpers.sh'), path.join(repo, 'scripts/restore_helpers.sh'));
         copyFileSync(path.join(repoRoot, 'scripts/recover_update.sh'), path.join(repo, 'scripts/recover_update.sh'));
+        copyFileSync(path.join(repoRoot, 'scripts/write_result.py'), path.join(repo, 'scripts/write_result.py'));
+        for (const name of ['system_scripts.py', 'block_internet_access.sh']) {
+            copyFileSync(path.join(repoRoot, 'scripts', name), path.join(repo, 'scripts', name));
+        }
     }
     for (const unit of units) {
         copyFileSync(path.join(repoRoot, 'scripts/systemd', unit), path.join(repo, 'scripts/systemd', unit));
@@ -52,7 +57,9 @@ function sandbox(opts = {}) {
     chmodSync(path.join(bin, 'visudo'), 0o755);
     if (opts.existingSudoers !== undefined)
         writeFileSync(sudoers, opts.existingSudoers);
-    const run = () => spawnSync('bash', [SCRIPT, repo], {
+    // Callers copy the tree for root first and pass the copy.
+    const publish = () => spawnSync('python3', ['-B', path.join(repoRoot, 'scripts/system_scripts.py'), 'publish', repo], { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: system }, encoding: 'utf8' }).stdout.trim();
+    const run = (args = [publish()]) => spawnSync('bash', [SCRIPT, ...args], {
         encoding: 'utf8',
         env: {
             ...process.env,
@@ -62,10 +69,11 @@ function sandbox(opts = {}) {
             NIGHTSTAND_SUDOERS_FILE: sudoers,
             NIGHTSTAND_TMPFILES_DIR: tmpfiles,
             NIGHTSTAND_OPERATION_LOCK: lock,
+            NIGHTSTAND_SYSTEM_DIR: system,
         },
     });
     const read = (file) => readFileSync(file, 'utf8');
-    return { run, read, systemd, sudoers, calls, tmpfiles, lock, tmpfilesCalls };
+    return { run, publish, read, systemd, sudoers, calls, tmpfiles, lock, tmpfilesCalls, system, repo };
 }
 // Every command the server runs through sudo, read from its source.
 function serverSudoCommands() {
@@ -87,6 +95,20 @@ function serverSudoCommands() {
     return commands;
 }
 describe('setup_services.sh', () => {
+    it('removes the upstream updater override while preserving custom drop-ins', () => {
+        const box = sandbox();
+        const directory = path.join(box.systemd, 'free-sleep-update.service.d');
+        mkdirSync(directory, { recursive: true });
+        const upstream = path.join(directory, 'sqlite-maintenance.conf');
+        const custom = path.join(directory, 'custom.conf');
+        writeFileSync(upstream, '[Service]\nExecStart=\nExecStart=/persistent/free-sleep-maintenance/update_service.sh\n');
+        writeFileSync(custom, '[Service]\nEnvironment=CUSTOM=yes\n');
+        const result = box.run();
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        assert.equal(existsSync(upstream), false);
+        assert.equal(box.read(custom), '[Service]\nEnvironment=CUSTOM=yes\n');
+        assert.match(box.read(path.join(box.systemd, 'free-sleep-update.service')), /^ExecStart=\/bin\/bash .*update_service\.sh$/m);
+    });
     it('parses and carries the exec bit', () => {
         assert.doesNotThrow(() => execFileSync('bash', ['-n', SCRIPT]));
     });
@@ -191,8 +213,7 @@ describe('setup_services.sh', () => {
             'dac ALL=(root) NOPASSWD: /bin/systemctl start free-sleep-update.service --no-block',
             'dac ALL=(root) NOPASSWD: /bin/systemctl start free-sleep-rollback.service --no-block',
             'dac ALL=(root) NOPASSWD: /bin/systemctl start free-sleep-revert.service --no-block',
-            'dac ALL=(ALL) NOPASSWD: /bin/sh /home/dac/free-sleep/scripts/enable_biometrics.sh',
-            'dac ALL=(ALL) NOPASSWD: /bin/sh /home/dac/free-sleep/scripts/disable_biometrics.sh',
+            'dac ALL=(ALL) NOPASSWD: /bin/sh /usr/local/lib/nightstand/live/scripts/disable_biometrics.sh',
             'dac ALL=(root) NOPASSWD: /bin/systemctl enable --now free-sleep-stream.service',
         ]);
         assert.ok(rules.every((rule) => !/[*?[\]]/.test(rule.split('NOPASSWD:')[1])), 'no wildcards');
@@ -215,6 +236,68 @@ describe('setup_services.sh', () => {
         const result = box.run();
         assert.notEqual(result.status, 0);
         assert.equal(box.read(box.sudoers), existing);
+    });
+    it('makes the copy it is given live and runs every unit from the live copy', () => {
+        const box = sandbox();
+        const result = box.run();
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        const [copy] = readdirSync(path.join(box.system, 'copies')).filter(name => !name.startsWith('.'));
+        assert.equal(readlinkSync(path.join(box.system, 'live')), `copies/${copy}`);
+        assert.ok(existsSync(path.join(box.system, 'copies', copy, 'scripts/health_check.sh')));
+        for (const unit of readdirSync(box.systemd).filter(name => name.endsWith('.service'))) {
+            const text = box.read(path.join(box.systemd, unit));
+            assert.doesNotMatch(text, /^Exec[A-Za-z]*=.*\/home\/dac/m, unit);
+        }
+        assert.match(box.read(path.join(box.systemd, 'free-sleep-update.service')), /^ExecStart=\/bin\/bash \/usr\/local\/lib\/nightstand\/live\/scripts\/update_service\.sh$/m);
+    });
+    it('refuses an install tree, or a path that only looks like a copy, and changes nothing', () => {
+        const box = sandbox();
+        mkdirSync(path.join(box.system, 'copies'), { recursive: true });
+        for (const given of [box.repo, path.join(box.system, 'copies/../../repo'), path.join(box.system, 'copies')]) {
+            for (const args of [[given], [given, '--recovery-only']]) {
+                const result = box.run(args);
+                assert.notEqual(result.status, 0, `${args.join(' ')}: ${result.stdout}`);
+                assert.equal(existsSync(path.join(box.system, 'live')), false, given);
+                assert.deepEqual(readdirSync(box.systemd), [], given);
+                assert.equal(existsSync(box.sudoers), false, given);
+            }
+        }
+    });
+    it('uses a copy it is given and makes no other', () => {
+        const box = sandbox();
+        const copy = spawnSync('python3', ['-B', path.join(repoRoot, 'scripts/system_scripts.py'), 'publish', box.repo], { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: box.system }, encoding: 'utf8' }).stdout.trim();
+        const result = box.run([copy]);
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        assert.deepEqual(readdirSync(path.join(box.system, 'copies')).filter(name => !name.startsWith('.')), [path.basename(copy)]);
+    });
+    it('leaves the live copy alone when it only installs boot recovery', () => {
+        const box = sandbox({ withRecovery: true });
+        assert.equal(box.run().status, 0);
+        const before = readlinkSync(path.join(box.system, 'live'));
+        writeFileSync(path.join(box.repo, 'scripts/health_check.sh'), '# a newer version\n');
+        const result = box.run([box.publish(), '--recovery-only']);
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        assert.equal(readlinkSync(path.join(box.system, 'live')), before);
+    });
+    it('removes the old installer and stop rules from an existing sudoers file and keeps the rest', () => {
+        const existing = [
+            'dac ALL=(ALL) NOPASSWD: /sbin/reboot',
+            'dac ALL=(ALL) NOPASSWD: /bin/sh /home/dac/free-sleep/scripts/enable_biometrics.sh',
+            'dac ALL=(ALL) NOPASSWD: /bin/sh /home/dac/free-sleep/scripts/disable_biometrics.sh',
+            'dac ALL=(ALL) NOPASSWD: /usr/bin/something-else',
+        ].join('\n') + '\n';
+        const box = sandbox({ existingSudoers: existing });
+        const result = box.run();
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        const rules = box.read(box.sudoers);
+        assert.doesNotMatch(rules, /\/home\/dac/);
+        assert.match(rules, /^dac ALL=\(ALL\) NOPASSWD: \/usr\/bin\/something-else$/m);
+        assert.match(rules, /^dac ALL=\(ALL\) NOPASSWD: \/bin\/sh \/usr\/local\/lib\/nightstand\/live\/scripts\/disable_biometrics\.sh$/m);
+    });
+    it('installs boot and switch recovery in the root-owned folder by default', () => {
+        const src = readFileSync(SCRIPT, 'utf8');
+        assert.match(src, /^RECOVERY_DIR="\$\{NIGHTSTAND_RECOVERY_DIR:-\$SYSTEM_DIR\/recovery\}"$/m);
+        assert.match(src, /^SWITCH_RECOVERY_DIR="\$\{NIGHTSTAND_SWITCH_RECOVERY_DIR:-\$SYSTEM_DIR\/switch-recovery\}"$/m);
     });
 });
 //# sourceMappingURL=setupServicesScript.test.js.map

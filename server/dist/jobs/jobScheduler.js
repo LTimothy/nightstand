@@ -9,6 +9,7 @@ import serverStatus from '../serverStatus.js';
 import settingsDB from '../db/settings.js';
 import { SCHEDULE_SIDES, SCHEDULE_DAYS } from '../db/scheduleKeys.js';
 import { isSystemDateValid } from './isSystemDateValid.js';
+import { readNtpSynchronization } from './clockSynchronization.js';
 import { scheduleAlarm, scheduleAlarmOverride, scheduleOneOffAlarm } from './alarmScheduler.js';
 import { schedulePowerOff, schedulePowerOn, scheduleSleepAnalysis } from './powerScheduler.js';
 import { schedulePrimingRebootAndCalibration } from './primeScheduler.js';
@@ -60,10 +61,8 @@ async function rebuildJobs() {
             stopCurveRuntime();
         }
         logger.info('Scheduling jobs...');
-        // Clearing a pause that ended while the server was down writes settings,
-        // which triggers another rebuild.
-        await schedulePauseResume(settingsData, 'left');
-        await schedulePauseResume(settingsData, 'right');
+        schedulePauseResume(settingsData, 'left');
+        schedulePauseResume(settingsData, 'right');
         scheduleAlarmOverride(settingsData, 'left', engine.active ? rhythmSleepAt('left') : undefined);
         scheduleAlarmOverride(settingsData, 'right', engine.active ? rhythmSleepAt('right') : undefined);
         if (settingsData.features.oneOffAlarms) {
@@ -164,9 +163,12 @@ async function rebuildJobs() {
 }
 let setupRun = null;
 let setupRequested = false;
+let clockReady = false;
 // Coalesce changes during a rebuild, then read the latest files in another
 // pass. A caller that awaits gets the pass that saw its change.
 export function setupJobs() {
+    if (!clockReady)
+        return Promise.resolve();
     setupRequested = true;
     if (setupRun)
         return setupRun;
@@ -187,30 +189,50 @@ export function setupJobs() {
 }
 let RETRY_COUNT = 0;
 let alarmLedgerStarted = false;
+let clockCheck = null;
+let clockRetry;
 const FAST_RETRIES = 20;
 const FAST_RETRY_MS = 5_000;
 // The pod boots before NTP has corrected the clock, and a sync can take much
 // longer than the fast retries cover. Giving up permanently left the pod with
 // no jobs at all until someone edited a schedule, so keep checking slowly.
 const SLOW_RETRY_MS = 5 * 60 * 1000;
-function waitForValidDateAndSetupJobs() {
-    serverStatus.status.systemDate.status = 'started';
+// Clock synchronization is reported independently of the year floor that arms jobs.
+async function checkClockAndSetupJobs() {
     if (isSystemDateValid()) {
-        serverStatus.status.systemDate.status = 'healthy';
-        serverStatus.status.systemDate.message = '';
         RETRY_COUNT = 0;
-        logger.info('System date is valid. Setting up jobs...');
-        if (!alarmLedgerStarted) {
-            alarmLedgerStarted = true;
-            startAlarmLedger(new Date());
+        if (!clockReady) {
+            clockReady = true;
+            logger.info('System date is valid. Setting up jobs...');
+            if (!alarmLedgerStarted) {
+                alarmLedgerStarted = true;
+                startAlarmLedger(new Date());
+            }
+            await setupJobs();
         }
-        void setupJobs();
+        const synchronized = config.remoteDevMode ? true : await readNtpSynchronization();
+        let warning = '';
+        if (synchronized === false) {
+            warning = 'The Pod clock is not synchronized with NTP. Schedules are armed, but may run at the wrong time.';
+        }
+        else if (synchronized === undefined) {
+            warning = 'NTP synchronization status is unavailable. Jobs are using the system date.';
+        }
+        if (warning && warning !== serverStatus.status.systemDate.message)
+            logger.warn(warning);
+        serverStatus.status.systemDate.status = 'healthy';
+        serverStatus.status.systemDate.message = warning;
+        eventBus.emit('service-health', { systemDate: serverStatus.status.systemDate });
+        // eslint-disable-next-line no-use-before-define -- The retry callback calls a hoisted function.
+        clockRetry = setTimeout(waitForValidDateAndSetupJobs, SLOW_RETRY_MS);
+        clockRetry.unref?.();
         return;
     }
     const withinFastRetries = RETRY_COUNT < FAST_RETRIES;
     const delay = withinFastRetries ? FAST_RETRY_MS : SLOW_RETRY_MS;
     serverStatus.status.systemDate.status = 'retrying';
-    const message = `System date is invalid (year 2010). No jobs scheduled yet, retrying in ${delay / 1000}s (attempt #${RETRY_COUNT})`;
+    const message = `System date is invalid (year ${new Date().getFullYear()}). `
+        + `No jobs scheduled yet, retrying in ${delay / 1000}s (attempt #${RETRY_COUNT})`;
     serverStatus.status.systemDate.message = message;
     RETRY_COUNT++;
     if (withinFastRetries) {
@@ -219,7 +241,16 @@ function waitForValidDateAndSetupJobs() {
     else {
         logger.warn(message);
     }
-    setTimeout(waitForValidDateAndSetupJobs, delay).unref?.();
+    // eslint-disable-next-line no-use-before-define -- The retry callback calls a hoisted function.
+    clockRetry = setTimeout(waitForValidDateAndSetupJobs, delay);
+    clockRetry.unref?.();
+}
+// File changes and retries share one check while waiting for the year floor.
+function waitForValidDateAndSetupJobs() {
+    if (clockCheck)
+        return;
+    clearTimeout(clockRetry);
+    clockCheck = checkClockAndSetupJobs().finally(() => { clockCheck = null; });
 }
 // Monitor the JSON file and refresh jobs on change
 chokidar.watch(config.lowDbFolder).on('change', (changedPath) => {
@@ -232,7 +263,7 @@ chokidar.watch(config.lowDbFolder).on('change', (changedPath) => {
     else {
         logger.info(`Detected DB change, reloading... ${fileName}`);
     }
-    if (serverStatus.status.systemDate.status === 'healthy') {
+    if (clockReady) {
         void setupJobs();
     }
     else {

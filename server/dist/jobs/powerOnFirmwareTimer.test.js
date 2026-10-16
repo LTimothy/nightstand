@@ -20,6 +20,9 @@ mock.module(new URL('../8sleep/deviceApi.js', import.meta.url).href, {
         },
     },
 });
+mock.module(new URL('../8sleep/frankenServer.js', import.meta.url).href, {
+    namedExports: { connectFrankenWithin: async () => { throw new Error('No hardware connection under test'); } },
+});
 let settingsDB;
 let schedulePowerOn;
 let schedulePowerOff;

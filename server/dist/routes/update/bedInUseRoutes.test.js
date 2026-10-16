@@ -15,6 +15,7 @@ let reasons = [];
 const started = [];
 const targetWrites = [];
 const requestWrites = [];
+const switchTargets = [];
 let requestWriteFails = false;
 const writeFile = fs.promises.writeFile.bind(fs.promises);
 mock.method(fs.promises, 'writeFile', async (...args) => {
@@ -35,7 +36,9 @@ const trigger = async (hooks = {}) => {
 for (const [file, name] of [
     ['update', 'triggerUpdateService'], ['rollback', 'triggerRollbackService'], ['revertToStock', 'triggerRevertToStockService'],
 ]) {
-    mock.module(new URL(`../../jobs/${file}.js`, import.meta.url).href, { namedExports: { [name]: trigger } });
+    mock.module(new URL(`../../jobs/${file}.js`, import.meta.url).href, { namedExports: { [name]: file === 'revertToStock'
+                ? async (hooks = {}, request) => { switchTargets.push(request?.target); await trigger(hooks); }
+                : trigger } });
 }
 let server;
 let url;
@@ -59,6 +62,7 @@ beforeEach(() => {
     started.length = 0;
     targetWrites.length = 0;
     requestWrites.length = 0;
+    switchTargets.length = 0;
     requestWriteFails = false;
 });
 const send = async (method, route, body) => {
@@ -215,4 +219,31 @@ describe('GET /api/update/last-result', () => {
         }
     });
 });
+const confirmedUpstream = {
+    commit: 'e5172139874a274d1ced12c8da052ab2cbaa286d', version: '3.0.3',
+    treeSha256: '59073c3b2b2c3db7d133ad5b33a3471bfbe83b15ec63e3143f3d42a11e0f628b', date: '2026-10-07',
+};
+for (const route of ['/api/update/switch-to-upstream', '/api/update/revert-to-stock']) {
+    it(`${route} passes exactly the confirmed upstream record to the switch service`, async () => {
+        for (const target of [confirmedUpstream, { commit: 'ca7dc543119ae964dd10815c8ae0c80ddb9a4f8f',
+                date: '2026-10-02', treeSha256: 'a'.repeat(64) }]) {
+            assert.equal((await post(route, { target, confirmInUse: true })).status, 204);
+            assert.deepEqual(switchTargets.at(-1), target);
+        }
+    });
+    it(`${route} rejects malformed or extra target fields before starting`, async () => {
+        for (const target of [null, {}, { ...confirmedUpstream, commit: 'main' },
+            { ...confirmedUpstream, date: '2026-02-30' }, { ...confirmedUpstream, extra: true }]) {
+            assert.equal((await post(route, { target, confirmInUse: true })).status, 400);
+        }
+        assert.equal(started.length, 0);
+    });
+    it(`${route} retains the same target across the bed-use confirmation`, async () => {
+        reasons = ['left-on'];
+        assert.equal((await post(route, { target: confirmedUpstream })).status, 409);
+        assert.deepEqual(switchTargets, []);
+        assert.equal((await post(route, { target: confirmedUpstream, confirmInUse: true })).status, 204);
+        assert.deepEqual(switchTargets, [confirmedUpstream]);
+    });
+}
 //# sourceMappingURL=bedInUseRoutes.test.js.map

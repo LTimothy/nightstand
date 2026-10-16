@@ -75,6 +75,27 @@ describe('isAllowedOrigin', () => {
         assert.equal(isAllowedOrigin('http://eight-pod.local:3000'), true);
         assert.equal(isAllowedOrigin('http://eight-pod.local'), true);
     });
+    for (const hostname of [
+        'eight-pod', 'bed.room.local', 'eight-pod.lan', 'eight-pod.home.arpa', 'eight-pod.internal',
+    ]) {
+        it(`accepts local hostname ${hostname}`, () => {
+            assert.equal(isAllowedOrigin(`http://${hostname}:3000`), true);
+            assert.equal(isAllowedOrigin(`https://${hostname}`), true);
+        });
+    }
+    it('refuses public domains and suffix impersonation', () => {
+        for (const hostname of ['example.com', 'eight-pod.lan.example.com', 'eight-pod.home.arpa.example.com',
+            'eight-pod.internal.example.com', 'eight-pod.ts.net.example.com', 'nots.net', 'eight-pod.home']) {
+            assert.equal(isAllowedOrigin(`http://${hostname}:3000`), false, hostname);
+        }
+    });
+    it('accepts a ts.net origin only when it names the host the Pod was reached by', () => {
+        assert.equal(isAllowedOrigin('https://eight-pod.tailnet.ts.net', 'eight-pod.tailnet.ts.net'), true);
+        assert.equal(isAllowedOrigin('http://eight-pod.tailnet.ts.net:3000', 'EIGHT-POD.tailnet.ts.net:3000'), true);
+        assert.equal(isAllowedOrigin('https://site.other-tailnet.ts.net', 'eight-pod.tailnet.ts.net'), false);
+        assert.equal(isAllowedOrigin('https://site.other-tailnet.ts.net', '192.168.1.42:3000'), false);
+        assert.equal(isAllowedOrigin('https://eight-pod.tailnet.ts.net'), false);
+    });
     it('rejects names that only contain .local', () => {
         assert.equal(isAllowedOrigin('http://eight-pod.local.example.com'), false);
         assert.equal(isAllowedOrigin('https://example.com'), false);
@@ -130,7 +151,7 @@ test('rejected origins are blocked before parsing malformed JSON', async (t) => 
     const address = server.address();
     assert.ok(address && typeof address !== 'string');
     const response = await fetch(`http://127.0.0.1:${address.port}/example`, {
-        method: 'POST', headers: { Origin: 'https://attacker.example', 'Content-Type': 'application/json' }, body: '{',
+        method: 'POST', headers: { Origin: 'https://attacker.example', Host: 'attacker.example', 'Content-Type': 'application/json' }, body: '{',
     });
     assert.equal(response.status, 403);
     assert.deepEqual(await response.json(), { error: 'Origin is not allowed' });

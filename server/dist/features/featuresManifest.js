@@ -1,5 +1,196 @@
 export const FEATURES_MANIFEST = [
     {
+        id: 'cooling-warning', title: 'Cooling warning',
+        description: 'Warns when measured water keeps warming during sustained cooling demand. Does not send device commands.',
+        category: 'safety', version: '3.7.0', flag: 'coolingWarning', default: false,
+        touchpoints: ['biometrics/firmware_telemetry.py', 'server/src/firmware/coolingWarning.ts', 'app/src/components/CoolingNotice.tsx'],
+        depends_on: ['biometrics'], reversible: true,
+        tests: ['server/src/firmware/coolingWarning.test.ts', 'app/src/components/CoolingNotice.test.tsx'],
+        upstream_offer: true,
+        rationale: 'An optional observation. Threshold ideas from podd were reimplemented independently.',
+    },
+    {
+        id: 'tap-diagnostics', title: 'Tap diagnostics',
+        description: 'Records button and tap candidates on System status, with a JSON export. Does not dispatch actions.',
+        category: 'ui', version: '3.7.0', flag: 'tapDiagnostics', default: false,
+        touchpoints: ['biometrics/firmware_taps.py', 'server/src/firmware', 'app/src/pages/StatusPage/TapDiagnostics.tsx'],
+        depends_on: ['biometrics'], reversible: true,
+        tests: ['biometrics/__tests__/test_firmware_taps.py', 'server/src/firmware/firmwareTelemetry.test.ts'],
+        upstream_offer: true, rationale: 'Diagnostic candidates need labelled captures before they can drive bed actions.',
+    },
+    {
+        id: 'firmware-health', title: 'Firmware health',
+        description: 'Shows selected firmware health messages and new sensor-loss counters on System status. Needs Biometrics.',
+        category: 'biometrics', version: '3.7.0', flag: 'firmwareHealth', default: false,
+        touchpoints: ['biometrics/firmware_health.py', 'server/src/firmware/healthFeed.ts', 'app/src/pages/StatusPage/FirmwarePanel.tsx'],
+        depends_on: ['biometrics'], reversible: true,
+        tests: ['biometrics/__tests__/test_firmware_health.py', 'server/src/firmware/firmwareTelemetry.test.ts'],
+        upstream_offer: true, rationale: 'Optional diagnostics. Log severity alone is not evidence of a fault.',
+    },
+    {
+        id: 'firmware-target-readout', title: 'Firmware target',
+        description: 'Shows the thermostat target reported by firmware, separately from the legacy temperature controls.',
+        category: 'ui', version: '3.7.0', flag: 'firmwareTargetReadout', default: false,
+        touchpoints: ['biometrics/firmware_telemetry.py', 'server/src/firmware', 'app/src/pages/StatusPage/FirmwarePanel.tsx'],
+        depends_on: ['biometrics'], reversible: true,
+        tests: ['server/src/firmware/firmwareTelemetry.test.ts', 'app/src/pages/StatusPage/FirmwarePanel.test.tsx'],
+        upstream_offer: true, rationale: 'Optional readout. Stored temperatures and outgoing commands keep their existing convention.',
+    },
+    {
+        id: 'metrics-retention',
+        title: 'Metrics retention',
+        description: 'Opt-in, off by default. Deletes only detailed vitals older than 30 days. '
+            + 'Never deletes nightly summaries, sleep records, scores or movement. Deleted detail cannot be restored.',
+        category: 'biometrics',
+        version: '3.7.0',
+        flag: 'metricsRetention',
+        default: false,
+        touchpoints: [
+            'server/src/jobs/metricsRetention.ts', 'server/src/jobs/runMetricsRetention.ts',
+            'server/src/jobs/primeScheduler.ts', 'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+            'app/src/pages/SettingsPage/SettingsPage.tsx',
+        ],
+        depends_on: [],
+        reversible: false,
+        tests: ['server/src/jobs/metricsRetention.test.ts', 'server/src/jobs/runMetricsRetention.test.ts',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.test.tsx',
+            'app/src/pages/SettingsPage/SettingsPage.categories.test.tsx'],
+        upstream_offer: true,
+        rationale: 'Age-based pruning requires opt-in. Freed pages can be reused; the database file does not shrink.',
+    },
+    {
+        id: 'metrics-low-disk-protection',
+        title: 'Low-disk protection',
+        description: 'On by default. Below 150 MiB free, deletes the oldest detailed vitals in bounded batches '
+            + 'until 16 MiB of SQLite pages are reusable. Keeps at least the last two nights of detail. '
+            + 'Never deletes nightly summaries, sleep records, scores or movement. '
+            + 'Stops growth by reusing space; does not shrink the database file or run VACUUM.',
+        category: 'biometrics',
+        version: '3.7.0',
+        flag: 'metricsLowDiskProtection',
+        default: true,
+        touchpoints: ['server/src/jobs/metricsRetention.ts', 'server/src/jobs/runMetricsRetention.ts',
+            'server/src/db/vitalsSummary.ts', 'server/src/db/sleepStageSummary.ts', 'server/prisma/schema.prisma',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx'],
+        depends_on: [],
+        reversible: false,
+        tests: ['server/src/jobs/metricsRetention.test.ts', 'server/src/jobs/runMetricsRetention.test.ts',
+            'server/src/routes/metrics/vitals.test.ts', 'server/src/routes/metrics/sleepScore.test.ts',
+            'app/src/pages/DataPage/SleepPage/SleepPage.vitals2.test.tsx'],
+        upstream_offer: true,
+        rationale: 'Preserves summaries before pruning their detail. Deleted detail cannot be restored.',
+    },
+    {
+        id: 'raw-record-recovery',
+        title: 'Recover after a corrupt RAW record',
+        description: 'The live RAW reader scans for a complete later record after a decode failure '
+            + 'and logs skipped bytes. A partial live tail is retried at the same offset.',
+        category: 'biometrics',
+        version: '3.7.0',
+        flag: null,
+        default: true,
+        touchpoints: ['biometrics/stream/stream.py', 'biometrics/load_raw_files.py'],
+        depends_on: ['biometrics'],
+        reversible: true,
+        tests: ['biometrics/__tests__/test_stream_helpers.py', 'biometrics/__tests__/test_raw_record_parser.py'],
+        upstream_offer: true,
+        rationale: 'Bug fix: one corrupt record must not stall the stream until file rotation.',
+    },
+    {
+        id: 'integration-api-contract',
+        title: 'Integration API contracts',
+        description: 'Community client contracts, shared status polling and a bounded default sleep history.',
+        category: 'platform',
+        version: '3.7.0',
+        flag: null,
+        default: true,
+        touchpoints: [
+            'docs/INTEGRATIONS.md', 'server/src/routes/serverStatus/serverStatus.ts', 'server/src/serverStatus.ts',
+            'server/src/db/services.ts', 'server/src/routes/metrics/sleep.ts',
+            'app/src/pages/DataPage/SleepPage/SleepPage.tsx', 'app/src/pages/DataPage/SleepPage/SleepSideControl.tsx',
+        ],
+        depends_on: ['agent'],
+        reversible: true,
+        tests: [
+            'server/src/routes/integrationsContract.test.ts', 'server/src/routes/serverStatus/serverStatus.test.ts',
+            'server/src/serverStatusServices.test.ts', 'server/src/routes/metrics/rowsRange.test.ts',
+            'app/src/pages/DataPage/SleepPage/SleepPage.selection.test.tsx',
+        ],
+        upstream_offer: true,
+        rationale: 'Always on: bounds and shared reads reduce polling work; explicit history ranges remain available.',
+    },
+    {
+        id: 'legacy-alarm-updates',
+        title: 'Preserve later alarms on legacy writes',
+        description: 'A single alarm write edits the first weekly alarm without discarding later alarms.',
+        category: 'platform',
+        version: '3.7.0',
+        flag: null,
+        default: true,
+        touchpoints: ['server/src/routes/schedules/schedules.ts', 'docs/INTEGRATIONS.md'],
+        depends_on: ['agent'],
+        reversible: true,
+        tests: ['server/src/routes/schedules/schedulesValidation.test.ts'],
+        upstream_offer: true,
+        rationale: 'Always on: preventing loss of stored alarms is a bug fix and adds no stored fields.',
+    },
+    {
+        id: 'side-alarm-dismissal',
+        title: 'Dismiss only the ringing side',
+        description: 'An idle dismiss sends no vibration command. A ringing side gets a one-second replacement '
+            + 'without an unscoped alarm clear.',
+        category: 'safety',
+        version: '3.7.0',
+        flag: null,
+        default: true,
+        touchpoints: ['server/src/8sleep/dismissAlarm.ts'],
+        depends_on: [],
+        reversible: true,
+        tests: ['server/src/8sleep/alarmDismiss.test.ts'],
+        upstream_offer: true,
+        rationale: 'Always on: a dismissal should leave the other sleeper\'s alarm untouched.',
+    },
+    {
+        id: 'alarm-cover-pattern',
+        title: 'Alarm pattern for mixed hardware',
+        description: 'Builds up requires both a Pod 5 hub and cover. Other or unknown combinations use Double pulse.',
+        category: 'safety',
+        version: '3.7.0',
+        flag: null,
+        default: true,
+        touchpoints: ['server/src/jobs/alarmPattern.ts', 'server/src/jobs/alarmScheduler.ts', 'app/src/api/alarmPattern.ts'],
+        depends_on: [],
+        reversible: true,
+        tests: ['server/src/jobs/alarmPattern.test.ts', 'app/src/pages/SchedulePage/SchedulePage.test.tsx'],
+        upstream_offer: true,
+        rationale: 'Always on: an unsupported vibration pattern may leave an alarm silent.',
+    },
+    {
+        id: 'scheduler-confirmation',
+        title: 'Clock and daily prime confirmation',
+        description: 'Jobs arm when the system year is plausible. '
+            + 'System status warns when the clock is not synchronized with NTP or sync status is unavailable. '
+            + 'Daily priming reports failure if the Pod does not confirm it. Alarm dismissal dialogs track each side separately.',
+        category: 'safety',
+        version: '3.7.0',
+        flag: null,
+        default: true,
+        touchpoints: [
+            'server/src/jobs/clockSynchronization.ts', 'server/src/jobs/jobScheduler.ts', 'server/src/jobs/primeScheduler.ts',
+            'server/src/serverStatus.ts', 'app/src/pages/StatusPage/StatusPage.tsx',
+            'app/src/pages/ControlTempPage/AlarmDismissal.tsx',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: [
+            'server/src/jobs/clockSynchronization.test.ts', 'server/src/jobs/jobSchedulerNtp.test.ts',
+            'server/src/jobs/primeScheduler.test.ts', 'app/src/pages/ControlTempPage/AlarmDismissal.repeatAlarm.test.tsx',
+            'app/src/pages/StatusPage/StatusPage.test.tsx',
+        ],
+        upstream_offer: true,
+        rationale: 'Always on: schedules need a usable clock and maintenance failures need to be visible.',
+    },
+    {
         id: 'agent',
         title: 'Updates and rollback',
         description: 'In-app updates, rollback, switching to upstream free-sleep, and the Settings > Software page. '
@@ -32,7 +223,8 @@ export const FEATURES_MANIFEST = [
             + 'The marker clears only after a health check passes. A timeout or failed restore keeps it for manual '
             + 'recovery. Database and settings backups are not restored. Checked on one Pod 5 with no marker, a hand-set '
             + 'marker and a power cut after the server stopped, before the tree move. A cut during the move is covered '
-            + 'only by automated tests. An interrupted update records no new result, so the last result stays at the previous run.',
+            + 'only by automated tests. Boot recovery records the outcome of an interrupted update, including server or '
+            + 'Biometrics restart failures, so Settings shows the recovery result.',
         category: 'safety',
         version: '3.6.0',
         flag: null,
@@ -292,6 +484,33 @@ export const FEATURES_MANIFEST = [
             + 'biometrics and holds whenever presence is unknown, so it never acts without it. '
             + 'Off keeps tracking state, so turning it back on mid-session measures idle time '
             + 'correctly.',
+    },
+    {
+        id: 'cover-buttons',
+        title: 'Cover buttons',
+        description: 'For a Pod 4 hub with a Pod 5 cover, whose firmware ignores short clicks on the cover\'s '
+            + 'buttons. Reads those clicks from RAW files: plus and minus step that side by 1 F per click by default, and the '
+            + 'logo stops a ringing or snoozed alarm or sets a favorite temperature. A click takes 15 to 25 s, '
+            + 'because the firmware writes its log in batches. A Pod 5 hub handles its buttons itself, so this does nothing there.',
+        category: 'platform',
+        version: '3.7.0',
+        flag: 'coverButtons',
+        default: false,
+        touchpoints: [
+            'server/src/8sleep/buttonMonitor.ts', 'server/src/8sleep/buttonEvents.ts',
+            'app/src/pages/SettingsPage/FeaturesSection',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: [
+            'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/buttonEvents.test.ts',
+        ],
+        upstream_offer: false,
+        rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short cover clicks. '
+            + 'Reads no RAW files while off. Acts only on clicks the firmware logged as ignored, so a logo press the '
+            + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the favorite '
+            + 'are per side in settings. Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
+            + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
     },
     {
         id: 'biometrics-v2',

@@ -10,6 +10,7 @@ import serverInfo from '../serverInfo.json' with { type: 'json' };
 import servicesDB from '../db/services.js';
 import { WIFI_SIGNAL_STRENGTH } from './wifiSignalStrength.js';
 import { GestureSchema } from '../db/settingsSchema.js';
+import { observeFirmwareDevice } from '../firmware/firmwareRuntime.js';
 import { FirmwareAlarmDismiss } from './firmwareAlarmDismiss.js';
 const firmwareAlarmDismiss = new FirmwareAlarmDismiss();
 const RawDeviceData = z.object({
@@ -40,15 +41,9 @@ export const parseRawDeviceData = (response) => {
         throw error;
     }
 };
-// Scale goes from -100 < - > 100
-// Low  -> 55
-// High -> 110
-// 0 -> 82.5f
-// -100 -> 55f
-// 100 -> 110f
-// This mapping comes from the pod firmware's fixed level scale, not a
-// setting of ours, so 82.5/27.5 cannot change without the firmware itself
-// changing what a "level" means.
+// Legacy display and command convention, not the firmware's target scale.
+// Keep it for saved values and command compatibility. frzTherm reports the
+// separate Celsius target; observed pairs and limits are in the protocol notes.
 export const calculateTempInF = (value) => {
     const level = Number(value);
     if (level === 0) {
@@ -224,6 +219,7 @@ export async function loadDeviceStatus(response, getGestures, dismissalObserver 
             logger.error(error);
         }
     }
+    observeFirmwareDevice(deviceStatus);
     return deviceStatus;
 }
 //# sourceMappingURL=loadDeviceStatus.js.map

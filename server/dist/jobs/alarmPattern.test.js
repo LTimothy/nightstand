@@ -10,12 +10,13 @@ process.env.DATA_FOLDER = `${dataFolder}/`;
 process.env.ENV = 'local';
 const commands = [];
 let hubVersion = 'Pod 5';
+let coverVersion = 'Pod 5';
 mock.module(new URL('../8sleep/deviceApi.js', import.meta.url).href, {
     namedExports: { executeFunction: async (...args) => { commands.push(args); } },
 });
 mock.module(new URL('../8sleep/frankenServer.js', import.meta.url).href, {
     namedExports: { connectFrankenWithin: async () => ({
-            getDeviceStatus: async () => ({ left: { isOn: true }, right: { isOn: true }, hubVersion }),
+            getDeviceStatus: async () => ({ left: { isOn: true }, right: { isOn: true }, hubVersion, coverVersion }),
         }) },
 });
 let executeAlarm;
@@ -48,4 +49,11 @@ describe('alarm vibration pattern', () => {
         assert.equal(await sentPattern('double'), 'double');
     });
 });
+for (const cover of ['Pod 3', 'Pod 4', 'Version not found', undefined]) {
+    it(`sends double on a Pod 5 hub with cover ${cover}`, async () => {
+        hubVersion = 'Pod 5';
+        coverVersion = cover;
+        assert.equal(await sentPattern('rise'), 'double');
+    });
+}
 //# sourceMappingURL=alarmPattern.test.js.map

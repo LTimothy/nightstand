@@ -17,11 +17,41 @@ const executeFunctionMock = mock.fn(async (...args) => { void args; });
 mock.module('../../8sleep/deviceApi.js', {
     namedExports: { executeFunction: executeFunctionMock },
 });
+const alarmCommandMock = mock.fn(async (command, arg) => { void command; void arg; });
+const alarmConnectionMock = mock.fn(async (options, key) => {
+    void options;
+    void key;
+    return { callFunction: alarmCommandMock };
+});
+mock.module('../../8sleep/frankenServer.js', {
+    namedExports: { connectFrankenWithin: alarmConnectionMock },
+});
 const { updateDeviceStatus } = await import('./updateDeviceStatus.js');
 const { default: settingsDB } = await import('../../db/settings.js');
 const { FrankenSupersededError } = await import('../../8sleep/frankenErrors.js');
 const { keptSleeps, rememberKeptAlarms } = await import('../../jobs/rhythms/keptAlarms.js');
 describe('updateDeviceStatus', () => {
+    it('preserves all canonical and off-grid temperature writes with firmware readout on and off', async () => {
+        const targets = [55, 58, 61, 63, 66, 69, 72, 74, 77, 80, 83, 85, 88, 91, 94, 96, 99, 102, 105, 107, 110, 82.5, 79.3];
+        const expected = [-100, -89, -78, -71, -60, -49, -38, -31, -20, -9, 2, 9, 20, 31, 42, 49, 60, 71, 82, 89, 100, 0, -12];
+        try {
+            for (const enabled of [false, true]) {
+                settingsDB.data.features.firmwareTargetReadout = enabled;
+                await settingsDB.write();
+                for (const [index, target] of targets.entries()) {
+                    executeFunctionMock.mock.resetCalls();
+                    await updateDeviceStatus({ left: { targetTemperatureF: target }, right: { targetTemperatureF: target } });
+                    assert.deepEqual(executeFunctionMock.mock.calls.map(call => call.arguments.slice(0, 2)), [
+                        ['TEMP_LEVEL_LEFT', String(expected[index])], ['TEMP_LEVEL_RIGHT', String(expected[index])],
+                    ]);
+                }
+            }
+        }
+        finally {
+            settingsDB.data.features.firmwareTargetReadout = false;
+            await settingsDB.write();
+        }
+    });
     for (const payload of [{ isOn: true }, { isOn: true, secondsRemaining: 0 }]) {
         it(`keeps the manual power-on default for ${JSON.stringify(payload)}`, async () => {
             executeFunctionMock.mock.resetCalls();
@@ -56,15 +86,17 @@ describe('updateDeviceStatus', () => {
     });
     it('marks power and set point commands as state, and alarm clearing as not', async () => {
         executeFunctionMock.mock.resetCalls();
+        alarmCommandMock.mock.resetCalls();
+        alarmConnectionMock.mock.resetCalls();
+        const { default: memoryDB } = await import('../../db/memoryDB.js');
+        memoryDB.data.left.isAlarmVibrating = true;
         await updateDeviceStatus({ left: { isOn: false, targetTemperatureF: 80, isAlarmVibrating: false } }, { background: true });
         const options = (command) => executeFunctionMock.mock.calls
             .find(call => call.arguments[0] === command)?.arguments[2];
         assert.equal(options('LEFT_TEMP_DURATION')?.latest, true);
         assert.equal(options('TEMP_LEVEL_LEFT')?.latest, true);
-        for (const command of ['ALARM_LEFT', 'ALARM_CLEAR']) {
-            assert.ok(executeFunctionMock.mock.calls.some(call => call.arguments[0] === command), `${command} was never sent`);
-            assert.equal(options(command)?.latest, undefined);
-        }
+        assert.equal(alarmCommandMock.mock.calls[0]?.arguments[0], 'ALARM_LEFT');
+        assert.deepEqual(alarmConnectionMock.mock.calls[0]?.arguments, [{ background: true }, 'ALARM_LEFT']);
     });
     it('stops quietly when a newer update replaced this one while the Pod was unreachable', async () => {
         executeFunctionMock.mock.resetCalls();

@@ -11,13 +11,29 @@ process.env.ENV = 'local';
 let updateRejectsWith = null;
 let updateCalls = 0;
 let updatedStatus;
+// Every left target written, in order, and how many writes overlapped.
+let writtenLeftTargets = [];
+let updateDelayMs = 0;
+let writesInFlight = 0;
+let mostWritesInFlight = 0;
 mock.module(new URL('../routes/deviceStatus/updateDeviceStatus.js', import.meta.url).href, {
     namedExports: {
         updateDeviceStatus: async (status) => {
             updatedStatus = status;
             updateCalls += 1;
-            if (updateRejectsWith)
-                throw updateRejectsWith;
+            if (typeof status.left?.targetTemperatureF === 'number')
+                writtenLeftTargets.push(status.left.targetTemperatureF);
+            writesInFlight += 1;
+            mostWritesInFlight = Math.max(mostWritesInFlight, writesInFlight);
+            try {
+                if (updateDelayMs)
+                    await new Promise((resolve) => setTimeout(resolve, updateDelayMs));
+                if (updateRejectsWith)
+                    throw updateRejectsWith;
+            }
+            finally {
+                writesInFlight -= 1;
+            }
         },
     },
 });
@@ -70,6 +86,14 @@ async function settle() {
         await new Promise((resolve) => setImmediate(resolve));
     }
 }
+// Waits for the detached gesture chain to finish its writes.
+async function writesFinished(count) {
+    const deadline = Date.now() + 2000;
+    while (updateCalls < count || writesInFlight > 0) {
+        assert.ok(Date.now() < deadline, `only ${updateCalls} of ${count} writes happened`);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+}
 async function runGestureTick(previous, next) {
     const monitor = new FrankenMonitor();
     monitor.deviceStatus = previous;
@@ -109,6 +133,10 @@ describe('FrankenMonitor gesture handling', () => {
         updateRejectsWith = null;
         updateCalls = 0;
         updatedStatus = undefined;
+        writtenLeftTargets = [];
+        updateDelayMs = 0;
+        writesInFlight = 0;
+        mostWritesInFlight = 0;
         serverStatus.status.frankenMonitor.status = 'healthy';
         serverStatus.status.frankenMonitor.message = '';
         await settingsDB.read();
@@ -129,7 +157,9 @@ describe('FrankenMonitor gesture handling', () => {
             await settingsDB.write();
             const previous = deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 });
             previous.left.targetTemperatureF = target;
-            await runGestureTick(previous, deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 }));
+            const next = deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 });
+            next.left.targetTemperatureF = target;
+            await runGestureTick(previous, next);
             assert.equal(updatedStatus?.left?.targetTemperatureF, expected);
         });
     }
@@ -215,6 +245,73 @@ describe('FrankenMonitor gesture handling', () => {
         const seen = await runGestureTick(previous, next);
         assert.equal(updateCalls, 2, 'expected both sides to be attempted');
         assert.deepEqual(seen, []);
+    });
+});
+// Two gestures can land in one 2 s read: on a Pod 4 hub with a Pod 5 cover
+// the firmware reports a held cover button as a tap while the counters of an
+// earlier tap also moved. Both used to step from the read's target, so the
+// second write undid the first instead of stacking on it.
+describe('FrankenMonitor gestures in one read', () => {
+    const taps = (doubleTap, tripleTap) => ({ doubleTap, tripleTap, quadTap: 0 });
+    beforeEach(async () => {
+        updateRejectsWith = null;
+        updateCalls = 0;
+        writtenLeftTargets = [];
+        updateDelayMs = 0;
+        writesInFlight = 0;
+        mostWritesInFlight = 0;
+        serverStatus.status.frankenMonitor.status = 'healthy';
+        serverStatus.status.frankenMonitor.message = '';
+        await settingsDB.read();
+        settingsDB.data.left.taps.doubleTap = { type: 'temperature', change: 'decrement', amount: 2 };
+        settingsDB.data.left.taps.tripleTap = { type: 'temperature', change: 'increment', amount: 10 };
+        await settingsDB.write();
+    });
+    it('steps the second gesture from the target the first one wrote', async () => {
+        await runGestureTick(deviceStatus(taps(1, 1)), deviceStatus(taps(2, 2)));
+        assert.deepEqual(writtenLeftTargets, [80, 90]);
+    });
+    it('writes the gestures of one read one after another', async () => {
+        updateDelayMs = 5;
+        await runGestureTick(deviceStatus(taps(1, 1)), deviceStatus(taps(2, 2)));
+        await writesFinished(2);
+        assert.equal(mostWritesInFlight, 1, 'the second write started before the first finished');
+    });
+    it('still runs a later gesture after an earlier one in the read fails', async () => {
+        updateRejectsWith = new Error('franken write failed');
+        const seen = await runGestureTick(deviceStatus(taps(1, 1)), deviceStatus(taps(2, 2)));
+        assert.equal(updateCalls, 2, 'expected both gestures to be attempted');
+        assert.deepEqual(seen, []);
+        assert.equal(serverStatus.status.frankenMonitor.status, 'failed');
+    });
+    it('steps from the written target while a read still carries the old one', async () => {
+        // The read after a write can already have been in flight when the write
+        // happened, so it reports the target from before it.
+        await runGestureTicks([deviceStatus(taps(1, 0)), deviceStatus(taps(2, 0)), deviceStatus(taps(3, 0))]);
+        assert.deepEqual(writtenLeftTargets, [80, 78]);
+    });
+    it('steps from the read once the Pod reports the written target', async () => {
+        const reported = deviceStatus(taps(2, 0));
+        reported.left.targetTemperatureF = 80;
+        const changedInApp = deviceStatus(taps(3, 0));
+        changedInApp.left.targetTemperatureF = 90;
+        await runGestureTicks([deviceStatus(taps(1, 0)), deviceStatus(taps(2, 0)), reported, changedInApp]);
+        assert.deepEqual(writtenLeftTargets, [80, 88]);
+    });
+    it('steps from the read when something else changed the target first', async () => {
+        const changedInApp = deviceStatus(taps(3, 0));
+        changedInApp.left.targetTemperatureF = 90;
+        await runGestureTicks([deviceStatus(taps(1, 0)), deviceStatus(taps(2, 0)), changedInApp]);
+        assert.deepEqual(writtenLeftTargets, [80, 88]);
+    });
+    it('keeps stepping from the last write while only an earlier one is reported', async () => {
+        // Two writes from one read; the next reads show only the first landed.
+        const firstLanded = deviceStatus(taps(2, 2));
+        firstLanded.left.targetTemperatureF = 80;
+        const thirdTap = deviceStatus(taps(3, 2));
+        thirdTap.left.targetTemperatureF = 80;
+        await runGestureTicks([deviceStatus(taps(1, 1)), deviceStatus(taps(2, 2)), firstLanded, thirdTap]);
+        assert.deepEqual(writtenLeftTargets, [80, 90, 88]);
     });
 });
 //# sourceMappingURL=frankenMonitor.test.js.map

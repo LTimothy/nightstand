@@ -5,6 +5,7 @@ import { connectFranken, disconnectFranken, getFrankenQueueDepth } from './8slee
 import { FrankenMonitor } from './8sleep/frankenMonitor.js';
 import { initWaterLevel } from './8sleep/waterLevel.js';
 import { startPresenceAutoOff, stopPresenceAutoOff } from './8sleep/presenceAutoOffMonitor.js';
+import { startButtonMonitor, stopButtonMonitor } from './8sleep/buttonMonitor.js';
 import './jobs/jobScheduler.js';
 import { abortAlarmWaits } from './jobs/alarmActivity.js';
 import { setRebuilding } from './jobs/rebuildState.js';
@@ -15,7 +16,6 @@ import setupRoutes from './setup/routes.js';
 import config from './config.js';
 import serverStatus from './serverStatus.js';
 import { prisma } from './db/prisma.js';
-import { loadWifiSignalStrength } from './8sleep/wifiSignalStrength.js';
 import metrics from './metrics/metrics.js';
 import { wsServer } from './ws/wsServer.js';
 import settingsDB from './db/settings.js';
@@ -88,6 +88,7 @@ async function gracefulShutdown(signal) {
         }
         if (!config.remoteDevMode) {
             stopPresenceAutoOff();
+            stopButtonMonitor();
             frankenMonitor?.stop();
             await disconnectFranken();
             logger.debug('Successfully closed Franken components.');
@@ -120,6 +121,8 @@ const initFrankenMonitor = async () => {
     void frankenMonitor.start();
     logger.info('Frank monitor started!');
     startPresenceAutoOff();
+    // Checks settings.features.coverButtons on every poll, so it always starts.
+    startButtonMonitor();
 };
 // Main startup function
 async function startServer() {
@@ -151,8 +154,6 @@ async function startServer() {
             logger.error(error);
         });
     }
-    void loadWifiSignalStrength();
-    setInterval(loadWifiSignalStrength, 10_000);
     // Register signal handlers for graceful shutdown
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));

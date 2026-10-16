@@ -161,7 +161,7 @@ it('resumes the weekly night with its power-on temperature and firmware end', as
 it('resumes a Rhythms night with its power-on temperature and remaining firmware seconds', async () => {
     await rhythms();
     await clearEndedPause('left', expiry);
-    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 32640 } }]);
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80 } }]);
     assert.equal(armedEnd('left'), Date.parse('2026-10-05T07:00:00Z'));
     assert.deepEqual(alarms, []);
 });
@@ -213,7 +213,7 @@ for (const engine of ['weekly', 'rhythms']) {
         };
         await clearEndedPause('left', expiry);
         assert.deepEqual(updates, [{ left: {
-                    isOn: true, ...(engine === 'rhythms' ? { secondsRemaining: 32640 } : {}),
+                    isOn: true,
                 } }]);
     });
     it(`${engine}: logs a failed power-on without rejecting`, async () => {
@@ -273,6 +273,9 @@ for (const engine of ['weekly', 'rhythms']) {
         const res = { status(value) { code = value; return this; }, json() { } };
         await handler({ body: { left: { scheduleOverrides: { pause: { active: false, expiresAt: '' } } } } }, res, () => { });
         assert.equal(code, 200);
+        // The route answers before the resume finishes.
+        for (let spin = 0; spin < 400 && updates.length < 1; spin++)
+            await new Promise(resolve => setTimeout(resolve, 5));
         assert.equal(updates.length, 1);
         assert.equal(resumeCalls.length, 1);
         assert.equal(resumeCalls[0][0], 'left');
@@ -292,7 +295,7 @@ it('resumes the Smart Schedule curve and retains When I get up handling', async 
         smartOff: smartOffRuntime(),
     });
     await clearEndedPause('left', expiry);
-    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 88, secondsRemaining: 33240 } }]);
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 88 } }]);
     await controller.tick();
     assert.ok(controller.status('left', new Date()));
     assert.equal(smartPowerOffFor('left', '2026-10-04'), undefined);
@@ -321,7 +324,7 @@ it('respects a Smart Schedule manual hold set during the status read', async () 
     });
     onRead = async () => { assert.equal(controller.noteManualChange('left', new Date()), 'held'); };
     await clearEndedPause('left', expiry);
-    assert.deepEqual(updates, [{ left: { isOn: true, secondsRemaining: 33240 } }]);
+    assert.deepEqual(updates, [{ left: { isOn: true } }]);
 });
 it('resumes both sides when their pauses end together', async () => {
     settingsDB.data.right.scheduleOverrides.pause = { active: true, expiresAt: expiry };
@@ -344,7 +347,7 @@ for (const engine of ['weekly', 'rhythms']) {
         mock.timers.setTime(Date.parse('2026-10-05T01:01:00Z'));
         await clearEndedPause('left', expiry);
         assert.deepEqual(updates, [{ left: {
-                    isOn: true, targetTemperatureF: 80, ...(engine === 'rhythms' ? { secondsRemaining: 21840 } : {}),
+                    isOn: true, targetTemperatureF: 80,
                 } }]);
     });
     it(`${engine}: uses the configured timezone across the repeated autumn hour`, async () => {
@@ -358,7 +361,7 @@ for (const engine of ['weekly', 'rhythms']) {
         await clearEndedPause('left', expiry);
         assert.deepEqual(errors.map(String), []);
         assert.deepEqual(updates, [{ left: {
-                    isOn: true, targetTemperatureF: 80, ...(engine === 'rhythms' ? { secondsRemaining: 3900 } : {}),
+                    isOn: true, targetTemperatureF: 80,
                 } }]);
         if (engine === 'weekly')
             assert.equal(options[0].onUntil.toISOString(), '2026-11-01T10:35:00.000Z');
@@ -397,10 +400,11 @@ it('Rhythms resume calls the same power-on function and event as the scheduler',
     assert.equal(rhythmCalls.length, 2);
     assert.deepEqual(rhythmCalls[1], [side, sleep, { ...event, at: new Date('2026-10-04T20:00:00Z') }]);
     assert.deepEqual(updates, [
-        { left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 32640 } },
-        { left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 32640 } },
+        { left: { isOn: true, targetTemperatureF: 80 } },
+        { left: { isOn: true, targetTemperatureF: 80 } },
     ]);
-    assert.deepEqual(options, [{ background: true }, { background: true }]);
+    const onUntil = new Date('2026-10-05T07:05:00Z');
+    assert.deepEqual(options, [{ background: true, onUntil }, { background: true, onUntil }]);
 });
 function captureFollowUps() {
     const checks = [];

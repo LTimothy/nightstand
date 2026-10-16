@@ -40,7 +40,7 @@ async function disableStream() {
     if (await streamUnitMissing())
         return;
     await runPrivilegedCommand([
-        '/bin/sh', '/home/dac/free-sleep/scripts/disable_biometrics.sh',
+        '/bin/sh', '/usr/local/lib/nightstand/live/scripts/disable_biometrics.sh',
     ], 'free-sleep-stream.service', {
         // systemd may take 90 seconds to stop the streamer.
         timeout: 120_000,

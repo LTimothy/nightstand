@@ -41,4 +41,59 @@ it('reports preserved unknown keys and checks incompatible services without writ
         rmSync(folder, { recursive: true, force: true });
     }
 });
+it('refuses single schedules before they can become disabled weekly defaults', () => {
+    const folder = mkdtempSync(path.join(tmpdir(), 'compat-single-'));
+    try {
+        const source = readFileSync(new URL('../../../scripts/migrate/data-compat-check.mjs', import.meta.url), 'utf8');
+        const script = source.replaceAll('../../server/dist/db/', new URL('./', import.meta.url).href).replaceAll('Schema.js', 'Schema.ts');
+        const checker = path.join(folder, 'check.mjs');
+        writeFileSync(checker, script);
+        const fixture = readFileSync(new URL('../../../fixtures/compat/single-schedule/schedulesDB.json', import.meta.url), 'utf8');
+        const schedules = path.join(folder, 'schedulesDB.json');
+        for (const data of [fixture, JSON.stringify({ left: JSON.parse(fixture).left, right: { monday: {} } })]) {
+            writeFileSync(schedules, data);
+            const result = spawnSync(process.execPath, ['--no-warnings', '--loader', 'ts-node/esm', checker], {
+                encoding: 'utf8', env: { ...process.env, FS_MIGRATE_LOWDB_DIR: folder },
+            });
+            assert.equal(result.status, 1, result.stderr + result.stdout);
+            assert.match(result.stdout, /left.*single schedule/i);
+            assert.match(result.stdout, /alarms and power schedules would be disabled/i);
+            assert.match(result.stdout, /Aborting before touching your data/);
+            assert.equal(readFileSync(schedules, 'utf8'), data);
+        }
+    }
+    finally {
+        rmSync(folder, { recursive: true, force: true });
+    }
+});
+it('refuses dated away settings without changing active or scheduled away data', () => {
+    const folder = mkdtempSync(path.join(tmpdir(), 'compat-away-'));
+    try {
+        const source = readFileSync(new URL('../../../scripts/migrate/data-compat-check.mjs', import.meta.url), 'utf8');
+        const script = source.replaceAll('../../server/dist/db/', new URL('./', import.meta.url).href).replaceAll('Schema.js', 'Schema.ts');
+        const checker = path.join(folder, 'check.mjs');
+        writeFileSync(checker, script);
+        const settings = path.join(folder, 'settingsDB.json');
+        const fixture = readFileSync(new URL('../../../fixtures/compat/dated-away/settingsDB.json', import.meta.url), 'utf8');
+        const run = () => spawnSync(process.execPath, ['--no-warnings', '--loader', 'ts-node/esm', checker], {
+            encoding: 'utf8', env: { ...process.env, FS_MIGRATE_LOWDB_DIR: folder },
+        });
+        for (const data of [fixture, '{"left":{"awayMode":true,"awayReturn":"2020-01-01T00:00:00Z"}}',
+            '{"right":{"awayMode":false,"awayStart":"2030-01-01T00:00:00Z"}}']) {
+            writeFileSync(settings, data);
+            const result = run();
+            assert.equal(result.status, 1, result.stderr + result.stdout);
+            assert.match(result.stdout, /dated away|away dates/i);
+            assert.match(result.stdout, /alarms/i);
+            assert.match(result.stdout, /before switching/i);
+            assert.equal(readFileSync(settings, 'utf8'), data);
+        }
+        writeFileSync(settings, '{"left":{"awayMode":true,"awayStart":null,"awayReturn":""}}');
+        const emptyDates = run();
+        assert.equal(emptyDates.status, 0, emptyDates.stderr + emptyDates.stdout);
+    }
+    finally {
+        rmSync(folder, { recursive: true, force: true });
+    }
+});
 //# sourceMappingURL=dataCompatibilityCheck.test.js.map

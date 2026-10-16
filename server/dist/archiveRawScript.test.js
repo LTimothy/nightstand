@@ -177,12 +177,25 @@ echo 'fake 1.0G 0.7G 300000 70% /persistent'
         assert.deepEqual(archived(), []);
         assert.match(out, /floor_pruned=1/);
     });
-    it('keeps a firmware file that only shares its name with an older archived one', () => {
+    it('keeps the firmware file when the floor drops an older night of the same name', () => {
+        mkdirSync(archive);
+        addArchived('0001.RAW', 100);
+        addLive('0001.RAW', 1);
+        addLive('0002.RAW', 2);
+        run({ ARCHIVE_RAW_MIN_FREE_KB: '999999999999' });
+        assert.deepEqual(live(), ['0001.RAW']);
+        assert.deepEqual(archived(), ['0001.RAW']);
+        assert.equal(statSync(path.join(archive, '0001.RAW')).ino, statSync(path.join(persist, '0001.RAW')).ino);
+    });
+    it('keeps a firmware file that only shares its name with an older archived one when the move aside fails', () => {
         mkdirSync(archive);
         addArchived('0001.RAW', 100);
         addLive('0001.RAW', 1);
         addLive('0002.RAW', 0);
-        run({ ARCHIVE_RAW_MIN_FREE_KB: '999999999999' });
+        const bin = path.join(root, 'bin');
+        mkdirSync(bin);
+        writeFileSync(path.join(bin, 'mv'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+        run({ PATH: `${bin}:${process.env.PATH}`, ARCHIVE_RAW_MIN_FREE_KB: '999999999999' });
         assert.deepEqual(live(), ['0001.RAW', '0002.RAW']);
         assert.deepEqual(archived(), ['0002.RAW']);
     });
@@ -252,6 +265,35 @@ echo "fake 1000 0 $((1000 - n * 100)) 50% /persistent"
         symlinkSync(elsewhere, archive);
         assert.throws(() => run({ ARCHIVE_RAW_MIN_FREE_KB: '999999999999' }));
         assert.equal(existsSync(path.join(elsewhere, 'keep.RAW')), true);
+    });
+    it('keeps an archived night when the firmware reuses its file name', () => {
+        mkdirSync(archive);
+        writeFileSync(path.join(archive, '0007.RAW'), 'old night');
+        writeFileSync(path.join(persist, '0007.RAW'), 'new night');
+        const out = run();
+        const kept = archived();
+        assert.equal(kept.length, 2, kept.join(','));
+        assert.ok(kept.every(name => name.endsWith('.RAW')), kept.join(','));
+        assert.deepEqual(kept.map(name => readFileSync(path.join(archive, name), 'utf8')).sort(), ['new night', 'old night']);
+        assert.equal(statSync(path.join(archive, '0007.RAW')).ino, statSync(path.join(persist, '0007.RAW')).ino);
+        assert.match(out, /linked=1 /);
+    });
+    it('moves a reused name aside to the next free number without overwriting', () => {
+        mkdirSync(archive);
+        writeFileSync(path.join(archive, '0007.RAW'), 'second');
+        writeFileSync(path.join(archive, '0007.1.RAW'), 'first');
+        writeFileSync(path.join(persist, '0007.RAW'), 'third');
+        run();
+        const read = (name) => readFileSync(path.join(archive, name), 'utf8');
+        assert.deepEqual(archived(), ['0007.1.RAW', '0007.2.RAW', '0007.RAW']);
+        assert.deepEqual(['0007.1.RAW', '0007.2.RAW', '0007.RAW'].map(read), ['first', 'second', 'third']);
+    });
+    it('leaves a file it already linked alone', () => {
+        writeFileSync(path.join(persist, '0008.RAW'), 'night');
+        run();
+        const out = run();
+        assert.deepEqual(archived(), ['0008.RAW']);
+        assert.doesNotMatch(out, /linked=/);
     });
 });
 //# sourceMappingURL=archiveRawScript.test.js.map

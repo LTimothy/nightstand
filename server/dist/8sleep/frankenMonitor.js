@@ -25,6 +25,10 @@ import { handleAlarmTap } from './tapAlarm.js';
 // 5-10s when the app wasn't open. Gestures are a physical interaction
 // independent of whether anyone's watching the app, so always poll fast.
 const POLL_MS = 2_000;
+// How long a target written by a gesture stays the base for the next one
+// when the Pod has not reported it yet. Past this the latest read wins, so a
+// write the Pod refused cannot keep steering gestures.
+const WRITTEN_TARGET_MS = 10_000;
 export class FrankenMonitor {
     isRunning;
     deviceStatus;
@@ -32,6 +36,13 @@ export class FrankenMonitor {
     // The last tap counters read as numbers. A read missing a counter keeps the
     // one before it, so a tap made across that read is still seen.
     lastTaps = { left: {}, right: {} };
+    // The target a gesture last wrote per side, which the next gesture steps
+    // from until the Pod reports it. A read already in flight when a gesture
+    // wrote still carries the old target, and two gestures in one read were
+    // both applied to that same value: on a Pod 4 hub with a Pod 5 cover, where
+    // the firmware reports a held cover button as a tap, -24 then -16 were
+    // written back to back from a read of -24 instead of stacking.
+    writtenTargets = {};
     constructor() {
         this.isRunning = false;
         this.deviceStatus = undefined;
@@ -62,7 +73,8 @@ export class FrankenMonitor {
             eventBus.emit('service-health', { frankenMonitor: serverStatus.status.frankenMonitor });
         }
     }
-    async processGesture(side, gesture) {
+    // `readTarget` is the target of the read that carried the gesture.
+    async processGesture(side, gesture, readTarget) {
         const behavior = settingsDB.data[side]?.taps?.[gesture];
         if (!behavior) {
             logger.info(`[processGesture] No ${gesture} action set for the ${side} side`);
@@ -70,7 +82,7 @@ export class FrankenMonitor {
         }
         logger.debug(`[processGesture] side: ${side}, gesture: ${gesture}, type: ${behavior.type}`);
         if (behavior.type === 'temperature') {
-            const currentTemperatureTarget = this.deviceStatus[side].targetTemperatureF;
+            const currentTemperatureTarget = this.gestureBaseTarget(side, readTarget);
             let newTemperatureTargetF;
             const change = behavior.amount;
             if (behavior.change === 'increment') {
@@ -82,6 +94,7 @@ export class FrankenMonitor {
             newTemperatureTargetF = Math.max(MIN_TEMPERATURE_F, Math.min(MAX_TEMPERATURE_F, newTemperatureTargetF));
             logger.debug(`Processing gesture temperature change for ${side}. ${currentTemperatureTarget} -> ${newTemperatureTargetF}`);
             await updateDeviceStatus({ [side]: { targetTemperatureF: newTemperatureTargetF } }, { background: true });
+            this.noteWrittenTarget(side, newTemperatureTargetF, readTarget);
             // Tap counts as a manual change for schedule-override purposes.
             await markManualTempChange(side);
             return;
@@ -135,8 +148,52 @@ export class FrankenMonitor {
             await handleAlarmTap(side, behavior);
         }
     }
+    // The target a gesture steps from: the one the last gesture wrote while the
+    // Pod has not reported it yet, else the one the read carried.
+    gestureBaseTarget(side, readTarget) {
+        const written = this.writtenTargets[side];
+        if (written && Date.now() - written.at <= WRITTEN_TARGET_MS)
+            return written.targetF;
+        return readTarget;
+    }
+    noteWrittenTarget(side, targetF, readF) {
+        const written = this.writtenTargets[side]?.written ?? new Set();
+        written.add(targetF);
+        this.writtenTargets[side] = { targetF, readF, written, at: Date.now() };
+    }
+    // Forgets a side's written target once a read reports it, or reports a
+    // target that no gesture wrote and the read did not carry: the app or a
+    // schedule changed it, and the read is the truth again.
+    settleWrittenTargets(nextDeviceStatus) {
+        for (const side of ['left', 'right']) {
+            const written = this.writtenTargets[side];
+            if (!written)
+                continue;
+            const read = nextDeviceStatus[side].targetTemperatureF;
+            const confirmed = read === written.targetF;
+            const changedElsewhere = read !== written.readF && !written.written.has(read);
+            if (confirmed || changedElsewhere || Date.now() - written.at > WRITTEN_TARGET_MS) {
+                delete this.writtenTargets[side];
+            }
+        }
+    }
+    // Runs one read's gestures for a side one after another, so each steps
+    // from the target the one before it wrote.
+    async processGesturesInOrder(side, gestures, readTarget) {
+        for (const gesture of gestures) {
+            try {
+                await this.processGesture(side, gesture, readTarget);
+            }
+            catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                logger.error(`Failed to process ${gesture} on the ${side} side: ${message}`);
+                this.markStatus('failed', message);
+            }
+        }
+    }
     processGesturesForSide(nextDeviceStatus, side) {
         try {
+            const gestures = [];
             for (const gesture of GestureSchema.options) {
                 const prior = this.deviceStatus?.[side].taps?.[gesture];
                 if (this.lastTaps[side][gesture] === undefined && typeof prior === 'number') {
@@ -149,19 +206,18 @@ export class FrankenMonitor {
                 if (typeof current !== 'number')
                     continue;
                 this.lastTaps[side][gesture] = current;
-                if (previous !== undefined && current > previous) {
-                    // Deliberately detached: a base move takes seconds over BLE and this
-                    // loop doubles as the tap-detection cadence, so awaiting here would
-                    // delay the next gesture. Detached means the surrounding try cannot
-                    // see a rejection, and an unhandled one takes the whole server down
-                    // (the process-level handler shuts it down), so catch it here.
-                    void this.processGesture(side, gesture).catch(error => {
-                        const message = error instanceof Error ? error.message : String(error);
-                        logger.error(`Failed to process ${gesture} on the ${side} side: ${message}`);
-                        this.markStatus('failed', message);
-                    });
-                }
+                if (previous !== undefined && current > previous)
+                    gestures.push(gesture);
             }
+            if (gestures.length === 0)
+                return;
+            // Deliberately detached: a base move takes seconds over BLE and this
+            // loop doubles as the tap-detection cadence, so awaiting here would
+            // delay the next read. Detached means the surrounding try cannot see a
+            // rejection, and an unhandled one takes the whole server down (the
+            // process-level handler shuts it down), so each gesture is caught in
+            // processGesturesInOrder.
+            void this.processGesturesInOrder(side, gestures, nextDeviceStatus[side].targetTemperatureF);
         }
         catch (error) {
             logger.error(error);
@@ -174,6 +230,7 @@ export class FrankenMonitor {
             logger.warn('Missing current deviceStatus, exiting...');
             return;
         }
+        this.settleWrittenTargets(nextDeviceStatus);
         this.processGesturesForSide(nextDeviceStatus, 'left');
         this.processGesturesForSide(nextDeviceStatus, 'right');
     }

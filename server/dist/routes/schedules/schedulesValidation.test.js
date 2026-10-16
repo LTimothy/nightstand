@@ -51,6 +51,30 @@ const postSchedules = async (body) => {
     return { status: res.status, body: await res.json() };
 };
 describe('POST /schedules partial updates', () => {
+    it('updates or disables only the first alarm through a legacy write', async () => {
+        const later = { ...validAlarm, time: '08:00' };
+        const last = { ...validAlarm, time: '08:30', enabled: false };
+        await postSchedules({ left: { monday: { alarms: [validAlarm, later, last] } } });
+        for (const enabled of [true, false, true]) {
+            const first = { ...validAlarm, time: '07:15', enabled };
+            const res = await postSchedules({ left: { monday: { alarm: first } } });
+            assert.equal(res.status, 200);
+            assert.deepEqual(res.body.left.monday.alarms, [first, later, last]);
+            assert.deepEqual(res.body.left.monday.alarm, first);
+            await schedulesDB.read();
+            assert.deepEqual(schedulesDB.data.left.monday.alarms, [first, later, last]);
+        }
+    });
+    it('creates the first alarm on an empty day and lets the array replace it', async () => {
+        await postSchedules({ right: { tuesday: { alarms: [] } } });
+        const disabled = { ...validAlarm, enabled: false };
+        const res = await postSchedules({ right: { tuesday: { alarm: disabled } } });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.right.tuesday.alarms, [disabled]);
+        const cleared = await postSchedules({ right: { tuesday: { alarm: validAlarm, alarms: [] } } });
+        assert.deepEqual(cleared.body.right.tuesday.alarms, []);
+        assert.equal(cleared.body.right.tuesday.alarm.enabled, false);
+    });
     it('accepts a partial power patch', async () => {
         const res = await postSchedules({ left: { monday: { power: { enabled: true } } } });
         assert.equal(res.status, 200, `expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);

@@ -8,6 +8,23 @@ export const UpdateRequestSchema = z.object({
 export const OperationRequestSchema = z.object({
     confirmInUse: z.boolean().optional(),
 }).strict();
+const upstreamIdentity = {
+    commit: z.string().regex(/^[0-9a-f]{40}$/),
+    treeSha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+    date: z.string().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/).refine(value => {
+        const date = new Date(`${value}T00:00:00Z`);
+        return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value && !value.startsWith('0000');
+    }),
+};
+export const LegacyUpstreamSwitchTargetSchema = z.object(upstreamIdentity).strict();
+export const UpstreamSwitchTargetSchema = z.object({
+    ...upstreamIdentity,
+    treeSha256: z.string().regex(/^[0-9a-f]{64}$/),
+    version: z.string().regex(/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/),
+}).strict();
+export const SwitchRequestSchema = OperationRequestSchema.extend({
+    target: z.union([UpstreamSwitchTargetSchema, LegacyUpstreamSwitchTargetSchema]).optional(),
+}).strict();
 export const RollbackInfoSchema = z.object({
     available: z.boolean(),
     version: z.string().nullable(),

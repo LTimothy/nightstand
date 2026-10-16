@@ -4,6 +4,7 @@ import settingsDB from '../../db/settings.js';
 import servicesDB from '../../db/services.js';
 import { isSleepScoreActive } from './sleepScoreGuard.js';
 import { parseNightQuery } from './metricsQuery.js';
+import { retainedRestingHeartRate } from '../../db/vitalsSummary.js';
 const router = express.Router();
 // --- Component scorers (each returns 0-100) ---
 function scoreDuration(seconds) {
@@ -61,7 +62,12 @@ router.get('/sleep-score', async (req, res) => {
     });
     const inBedSec = sleepRecord?.sleep_period_seconds ?? endUnix - startUnix;
     const exits = sleepRecord?.times_exited_bed ?? 0;
-    const minHr = hrAgg._min.heart_rate ?? 0;
+    const saved = sleepRecord && Math.abs(sleepRecord.entered_bed_at - startUnix) <= 60
+        && Math.abs(sleepRecord.left_bed_at - endUnix) <= 60
+        ? await prisma.vitals_summaries.findUnique({ where: { side_entered_bed_at_left_bed_at: {
+                    side, entered_bed_at: sleepRecord.entered_bed_at, left_bed_at: sleepRecord.left_bed_at,
+                } } }) : null;
+    const minHr = saved ? retainedRestingHeartRate(saved.payload, startUnix, endUnix) : hrAgg._min.heart_rate ?? 0;
     const components = {
         duration: durationComponent(inBedSec),
         continuity: {

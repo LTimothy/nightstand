@@ -46,7 +46,7 @@ describe('switch-to-upstream.sh', () => {
     it('resolves the staged archive dir dynamically, never hardcoded', () => {
         const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
         assert.doesNotMatch(src, /free-sleep-main/, 'must not hardcode the archive dir name');
-        assert.match(src, /find "\$STAGE\.unzip".*-type d/);
+        assert.match(src, /find "\$WORK\/tree".*-type d/);
     });
     it('backs up code and data before swapping', () => {
         const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
@@ -86,7 +86,7 @@ describe('switch-to-upstream.sh', () => {
         assert.match(rest, /\/etc\/systemd\/system\/free-sleep-network-watchdog\.timer/);
         // The fork's tree is at $PREV by then; $LIVE is upstream's.
         // --switching records no owner choice, so a later install turns it on.
-        assert.match(rest, /bash "\$PREV\/scripts\/setup_watchdog\.sh" --remove --switching /);
+        assert.match(rest, /bash "\$NIGHTSTAND_SCRIPTS\/setup_watchdog\.sh" --remove --switching /);
     });
     it('never rewrites /persistent/free-sleep-data other than a backup copy', () => {
         const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
@@ -102,7 +102,7 @@ describe('switch-to-upstream.sh', () => {
         const full = path.join(repoRoot, UNIT);
         assert.equal(existsSync(full), true, `${UNIT} is missing`);
         const src = readFileSync(full, 'utf8');
-        assert.match(src, /^ExecStart=\/bin\/bash -c '[^'\n]*exec \/bin\/bash \/home\/dac\/free-sleep\/scripts\/switch-to-upstream\.sh;/m);
+        assert.match(src, /^ExecStart=\/bin\/bash -c '[^'\n]*exec \/bin\/bash \/usr\/local\/lib\/nightstand\/live\/scripts\/switch-to-upstream\.sh;/m);
     });
     it('keeps the old name working as a shim', () => {
         const shim = readFileSync(path.join(repoRoot, 'scripts/revert-to-stock.sh'), 'utf8');
@@ -140,7 +140,7 @@ describe('switch-to-upstream.sh', () => {
                 mkdirSync(path.join(dir, 'scripts'));
                 for (const name of names)
                     writeFileSync(path.join(dir, 'scripts', name), `echo ${name}\n`);
-                const run = spawnSync('bash', ['-c', command.replaceAll('/home/dac/free-sleep', dir)], { encoding: 'utf8' });
+                const run = spawnSync('bash', ['-c', command.replaceAll('/usr/local/lib/nightstand/live', dir)], { encoding: 'utf8' });
                 assert.equal(run.stdout, `${names[0]}\n`);
             }
             finally {
@@ -153,5 +153,18 @@ describe('switch-to-upstream.sh', () => {
         assert.match(src, /free-sleep-revert\.service/);
         assert.match(src, /NOPASSWD: \/bin\/systemctl start free-sleep-revert\.service --no-block/);
     });
+});
+it('uses the transaction only for a confirmed V2 artifact and retains recovery', () => {
+    const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
+    const start = src.indexOf('# Confirmed V2 targets use the durable transaction');
+    assert.ok(start >= 0);
+    const block = src.slice(start, src.indexOf('# Upstream imports', start));
+    assert.match(block, /\[ "\$TRANSACTIONAL_SWITCH" = yes \]/);
+    assert.match(block, /"\$\{SWITCH_ACTUAL:-\}" = "\$SWITCH_DIGEST"/);
+    assert.match(block, /forward --stage "\$STAGE"/);
+    assert.match(block, /--target-json "\$CONFIRMED_TARGET"/);
+    assert.match(block, /--recheck-in-use "\$RECHECK_IN_USE"/);
+    assert.doesNotMatch(block, /pip install|rm -rf.*recovery/);
+    assert.match(readFileSync(path.join(repoRoot, UNIT), 'utf8'), /ExecStopPost=-\/bin\/systemctl restart --no-block free-sleep-recover-switch.service/);
 });
 //# sourceMappingURL=switchToUpstreamScript.test.js.map

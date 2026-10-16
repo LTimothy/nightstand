@@ -18,6 +18,7 @@ mock.module(new URL('../../8sleep/frankenServer.js', import.meta.url).href, {
         },
         getDeviceStatusCoalesced: async () => ({}),
         isFrankenConnected: () => true,
+        connectFrankenWithin: async () => ({ callFunction: async (command, arg) => { sent.push([command, arg]); } }),
     },
 });
 const manualChanges = [];

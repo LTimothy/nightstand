@@ -63,7 +63,7 @@ describe('deploy.sh survives a stalled upload', () => {
         assert.match(src, /ServerAliveCountMax/, 'the ship must bound how long it waits on a stall');
     });
     it('verifies the staged tree arrived whole before anything is swapped', () => {
-        assert.match(src, /STAGE\/server\/dist\/server\.js/, 'a retried, truncatable transfer must be checked for completeness, not assumed');
+        assert.match(src, /SHIP_DIR\/tree\/server\/dist\/server\.js/, 'a retried, truncatable transfer must be checked for completeness, not assumed');
     });
     it('still aborts the deploy if every attempt stalls', () => {
         assert.match(src, /die "staging ship failed/, 'exhausting the retries must abort, never swap a partial tree');
@@ -210,6 +210,28 @@ describe('deploy.sh refuses stale bundles', () => {
         assert.ok(check !== -1 && check < src.indexOf('# --- preflight: pod'), 'bundle check must run before the pod preflight');
         assert.match(src.slice(check - 200, check + 800), /FORCE/);
         assert.match(src, /scripts\/check-bundles\.sh/);
+    });
+});
+describe('deploy.sh runs root-owned copies', () => {
+    it('deploy.sh copies the scripts for root before the stage changes owner, and runs only that copy', () => {
+        const src = readFileSync(path.join(repoRoot, 'ops/deploy.sh'), 'utf8');
+        // Shipped, unpacked and copied in a folder only root can write; the stage
+        // under /home/dac only ever receives the finished tree.
+        const ship = src.slice(src.indexOf('ship_to_stage() {'), src.indexOf('# --- dependencies'));
+        assert.match(ship, /SHIP_DIR=\$\(SSH "mkdir -p \$SYSTEM_DIR && mktemp -d \$SYSTEM_DIR\/\.download\.XXXXXX"\)/);
+        assert.match(ship, /SCP_SHIP "\$tarball" "\$SHIP_DIR\/ship\.tar"/);
+        assert.doesNotMatch(ship, /\/tmp\/|-C \$STAGE /);
+        const publish = src.indexOf('COPY=$(SSH "python3 -B $SHIP_DIR/tree/scripts/system_scripts.py publish $SHIP_DIR/tree")');
+        const stage = src.indexOf('move_tree $SHIP_DIR/tree $STAGE');
+        assert.ok(publish > 0 && publish < stage && stage < src.indexOf('chown -hR dac:dac $STAGE'));
+        assert.doesNotMatch(src, /\$STAGE\/scripts\/system_scripts\.py/);
+        assert.match(src, /bash \$COPY\/scripts\/close_update_window\.sh/);
+        assert.match(src, /sh "\$COPY\/scripts\/block_internet_access\.sh"/);
+        assert.match(src, /bash \$COPY\/scripts\/setup_resource_limits\.sh/);
+        const start = src.indexOf('if [ "$HEALTHY" = "yes" ]; then\n  # Root runs the new copy');
+        const healthy = src.slice(start, src.indexOf('# --- automatic rollback'));
+        assert.match(healthy, /SSH "bash \$COPY\/scripts\/setup_services\.sh \$COPY"/);
+        assert.doesNotMatch(src.slice(src.indexOf('# --- automatic rollback')), /setup_services|system_scripts\.py (?:publish|point)/);
     });
 });
 //# sourceMappingURL=opsScripts.test.js.map

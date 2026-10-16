@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import { readFile } from 'fs/promises';
 import memoryDB from '../db/memoryDB.js';
 import logger from '../logger.js';
+import { notificationBytes } from './bleOutput.js';
 // Configuration file path
 const BASE_CONFIG_PATH = '/persistent/AdjustableBaseConfiguration.json';
 // --- Angle-to-Ticks conversion maps from C# source ---
@@ -302,26 +303,8 @@ export class TriMixBaseControl {
         // Process each line separately to extract hex data
         const lines = output.split('\n');
         for (const line of lines) {
-            // Strip ANSI escape codes and other control characters from the line.
-            // The control characters are the point: bluetoothctl wraps its output in
-            // them, so the disables below are the rule not fitting, not a smell.
-            const cleanLine = line
-                // eslint-disable-next-line no-control-regex
-                .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // Remove ANSI escape sequences
-                // eslint-disable-next-line no-control-regex
-                .replace(/\u0001\x1b\[.*?\u0001\x1b\[.*?\u0002/g, '') // Remove specific color codes
-                // eslint-disable-next-line no-control-regex
-                .replace(/\u0001.*?\u0002/g, '') // Remove other control sequences
-                .replace(/\r/g, '') // Remove carriage returns
-                .replace(/[[^\\\]]*]/g, ''); // Remove any remaining bracket sequences
-            // Extract hex pairs from the line.
-            // We match any sequence of 2 hex digits.
-            // The processNotificationBuffer logic handles framing (finding 0xff 0xff 0xff 0xff header) and validation.
-            const hexPairs = cleanLine.match(/\b[0-9a-fA-F]{2}\b/g);
-            if (hexPairs) {
-                // Filter out likely non-data hex (e.g. '0x' prefix if somehow separated, or other noise)
-                // But strict 2-digit hex matching \b[0-9a-fA-F]{2}\b is usually safe enough given the buffer validation.
-                const newBytes = hexPairs.map((s) => parseInt(s, 16));
+            const newBytes = notificationBytes(line);
+            if (newBytes.length > 0) {
                 this.notificationBuffer.push(...newBytes);
                 this.processNotificationBuffer();
             }

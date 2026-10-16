@@ -36,7 +36,7 @@ router.post('/schedules', async (req, res) => {
                 }
                 else if (schedule.alarm) {
                     draft[side][day].alarm = schedule.alarm;
-                    draft[side][day].alarms = schedule.alarm.enabled ? [schedule.alarm] : [];
+                    draft[side][day].alarms = [schedule.alarm, ...draft[side][day].alarms.slice(1)];
                 }
             });
         });

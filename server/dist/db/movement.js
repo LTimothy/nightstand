@@ -1,7 +1,7 @@
 import { prisma } from './prisma.js';
 // Movement is stored with fractions.
-export async function loadMovement(side, startUnix, endUnix) {
-    return prisma.movement.findMany({
+export async function loadMovement(side, startUnix, endUnix, client = prisma) {
+    return client.movement.findMany({
         where: { side, timestamp: { gte: startUnix, lte: endUnix } },
         orderBy: { timestamp: 'asc' },
     });

@@ -30,18 +30,17 @@ export async function clearEndedPause(side, expiresAt) {
     }
     return cleared;
 }
-// Resolves true when a pause that already ended was cleared now. The
-// settings write then triggers the usual reschedule.
-export async function schedulePauseResume(settings, side, now = new Date()) {
+// Always a job, never inline: a rebuild that waited for the resume would plan
+// nothing meanwhile, and a weekly job due in that wait would skip a week. A
+// pause that already ended, or whose end cannot be read, ends a second later.
+export function schedulePauseResume(settings, side, now = new Date()) {
     const pause = settings[side]?.scheduleOverrides?.pause;
     if (!pause?.active || !pause.expiresAt)
-        return false;
+        return;
     const { expiresAt } = pause;
     const end = Date.parse(expiresAt);
-    if (!Number.isFinite(end) || end + PAUSE_RESUME_DELAY_MS <= now.getTime())
-        return clearEndedPause(side, expiresAt);
+    const due = Math.max(Number.isFinite(end) ? end + PAUSE_RESUME_DELAY_MS : 0, now.getTime() + 1000);
     logger.debug(`Scheduling the ${side} schedule pause to end at ${expiresAt}`);
-    schedule.scheduleJob(`${side}-pause-resume`, new Date(end + PAUSE_RESUME_DELAY_MS), () => clearEndedPause(side, expiresAt));
-    return false;
+    schedule.scheduleJob(`${side}-pause-resume`, new Date(due), () => clearEndedPause(side, expiresAt));
 }
 //# sourceMappingURL=pauseResume.js.map

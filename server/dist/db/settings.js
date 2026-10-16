@@ -5,7 +5,7 @@ import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
 import { defaultFeatures } from './settingsSchema.js';
 import config from '../config.js';
-const defaultSideSettings = {
+export const defaultSideSettings = {
     name: 'Side',
     awayMode: false,
     alarmsEnabled: true,
@@ -46,7 +46,12 @@ const defaultSideSettings = {
             type: 'base_control',
             behavior: 'toggle_preset',
         },
-    }
+    },
+    buttons: {
+        invertButtons: false,
+        stepF: 1,
+        favoriteTemperatureF: 80,
+    },
 };
 const defaultData = {
     id: crypto.randomUUID(),

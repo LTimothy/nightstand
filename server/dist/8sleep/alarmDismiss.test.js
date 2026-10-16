@@ -12,36 +12,58 @@ const calls = [];
 let onConnect = () => { };
 const franken = {
     callFunction: async (command, arg) => { calls.push([command, arg]); },
-    getDeviceStatus: async () => ({ left: { isOn: true }, right: { isOn: true }, hubVersion: 'Pod 5' }),
+    getDeviceStatus: async () => ({ left: { isOn: true }, right: { isOn: true }, hubVersion: 'Pod 5', coverVersion: 'Pod 5' }),
 };
 mock.module('./frankenServer.js', { namedExports: { connectFrankenWithin: async () => { onConnect(); return franken; } } });
 const { executeAlarm } = await import('../jobs/alarmScheduler.js');
 const { updateDeviceStatus } = await import('../routes/deviceStatus/updateDeviceStatus.js');
 const { default: memoryDB } = await import('../db/memoryDB.js');
 const alarm = { side: 'left', vibrationIntensity: 50, duration: 1, vibrationPattern: 'double', force: true };
-beforeEach(() => { calls.length = 0; onConnect = () => { }; });
+beforeEach(async () => {
+    calls.length = 0;
+    onConnect = () => { };
+    const { forgetActiveAlarm } = await import('../jobs/activeAlarms.js');
+    for (const side of ['left', 'right']) {
+        forgetActiveAlarm(side);
+        memoryDB.data[side].isAlarmVibrating = false;
+    }
+});
 after(() => rmSync(folder, { recursive: true, force: true }));
 for (const side of ['left', 'right']) {
-    test(`dismiss replaces the ${side} alarm for one second before clearing it`, async (t) => {
+    test(`dismiss replaces the ${side} alarm without an unscoped clear`, async (t) => {
         const now = 1_800_000_000_000;
         t.mock.timers.enable({ apis: ['Date'], now });
         memoryDB.data[side].isAlarmVibrating = true;
         await memoryDB.write();
         await updateDeviceStatus({ [side]: { isAlarmVibrating: false } });
-        assert.deepEqual(calls.map(([command]) => command), [side === 'left' ? 'ALARM_LEFT' : 'ALARM_RIGHT', 'ALARM_CLEAR']);
+        assert.deepEqual(calls.map(([command]) => command), [side === 'left' ? 'ALARM_LEFT' : 'ALARM_RIGHT']);
         assert.deepEqual(cbor.decodeFirstSync(Buffer.from(calls[0][1], 'hex')), {
             pl: 1, du: 1, pi: 'double', tt: 1_800_000_000,
         });
-        assert.equal(calls[1][1], 'empty');
         assert.equal(memoryDB.data[side].isAlarmVibrating, false);
     });
 }
 test('dismiss uses the time the replacement is sent after waiting for a connection', async (t) => {
     t.mock.timers.enable({ apis: ['Date'], now: 1_800_000_000_000 });
+    memoryDB.data.left.isAlarmVibrating = true;
     onConnect = () => t.mock.timers.tick(5_000);
     await updateDeviceStatus({ left: { isAlarmVibrating: false } });
     assert.equal(cbor.decodeFirstSync(Buffer.from(calls[0][1], 'hex')).tt, 1_800_000_005);
 });
+for (const side of ['left', 'right']) {
+    test(`dismiss sends nothing if ${side} stops ringing while waiting for a connection`, async (t) => {
+        t.mock.timers.enable({ apis: ['setTimeout'] });
+        const { forgetActiveAlarm } = await import('../jobs/activeAlarms.js');
+        await executeAlarm({ ...alarm, side });
+        calls.length = 0;
+        onConnect = () => {
+            forgetActiveAlarm(side);
+            memoryDB.data[side].isAlarmVibrating = false;
+        };
+        await updateDeviceStatus({ [side]: { isAlarmVibrating: false } });
+        assert.deepEqual(calls, []);
+    });
+}
 test('normal alarms retain their ten second minimum', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     assert.equal(await executeAlarm(alarm), 10_000);
@@ -79,6 +101,7 @@ test('dismissing one side leaves the other ringing side to its own timer', async
     await updateDeviceStatus({ left: { isAlarmVibrating: false } });
     assert.equal(memoryDB.data.left.isAlarmVibrating, false);
     assert.equal(memoryDB.data.right.isAlarmVibrating, true);
+    assert.deepEqual(calls.map(([command]) => command), ['ALARM_LEFT', 'ALARM_RIGHT', 'ALARM_LEFT']);
     await timers[0]();
     assert.equal(memoryDB.data.right.isAlarmVibrating, true, 'the dismissed side timer must not touch the other side');
     await timers[1]();
@@ -104,7 +127,9 @@ test('an alarm that does not start leaves the snooze in place', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const { cancelSnooze, hasSnooze, setSnooze } = await import('../jobs/activeAlarms.js');
     t.after(() => cancelSnooze('left'));
-    t.mock.method(franken, 'getDeviceStatus', async () => ({ left: { isOn: false }, right: { isOn: false }, hubVersion: 'Pod 5' }));
+    t.mock.method(franken, 'getDeviceStatus', async () => ({
+        left: { isOn: false }, right: { isOn: false }, hubVersion: 'Pod 5', coverVersion: 'Pod 5',
+    }));
     setSnooze('left', 300_000, () => { });
     assert.equal(await executeAlarm({ ...alarm, force: false }), 0);
     assert.equal(hasSnooze('left'), true);
@@ -180,4 +205,28 @@ for (const timing of ['before acceptance', 'after acceptance']) {
         assert.equal(activeAlarms.has('left'), false);
     });
 }
+for (const side of ['left', 'right']) {
+    test(`dismiss on an idle ${side} side sends no alarm command`, async () => {
+        const other = side === 'left' ? 'right' : 'left';
+        memoryDB.data[other].isAlarmVibrating = true;
+        await updateDeviceStatus({ [side]: { isAlarmVibrating: false } });
+        assert.deepEqual(calls, []);
+        assert.equal(memoryDB.data[other].isAlarmVibrating, true);
+    });
+}
+test('dismiss recognizes an active alarm even if its memory flag is false', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    await executeAlarm(alarm);
+    memoryDB.data.left.isAlarmVibrating = false;
+    calls.length = 0;
+    await updateDeviceStatus({ left: { isAlarmVibrating: false } });
+    assert.deepEqual(calls.map(([command]) => command), ['ALARM_LEFT']);
+});
+test('dismiss cancels an idle snooze without vibrating either side', async () => {
+    const { hasSnooze, setSnooze } = await import('../jobs/activeAlarms.js');
+    setSnooze('left', 300_000, () => { });
+    await updateDeviceStatus({ left: { isAlarmVibrating: false } });
+    assert.equal(hasSnooze('left'), false);
+    assert.deepEqual(calls, []);
+});
 //# sourceMappingURL=alarmDismiss.test.js.map

@@ -1,5 +1,7 @@
+import settingsDB from './db/settings.js';
+import { firmwareHealthSummary } from './firmware/firmwareRuntime.js';
 import { isSystemDateValid } from './jobs/isSystemDateValid.js';
-import servicesDB from './db/services.js';
+import servicesDB, { updateServices } from './db/services.js';
 import { prisma } from './db/prisma.js';
 import { findUnappliedMigrations, listLocalMigrations } from './db/unappliedMigrations.js';
 import moment from 'moment-timezone';
@@ -46,6 +48,12 @@ class ServerStatus {
                 description: 'Handles gestures and monitoring the status',
                 message: '',
             },
+            buttonMonitor: {
+                name: 'Cover buttons',
+                status: 'not_started',
+                description: 'Reads ignored cover clicks from the RAW files',
+                message: '',
+            },
             jobs: {
                 name: 'Job scheduler',
                 status: 'not_started',
@@ -79,7 +87,7 @@ class ServerStatus {
             systemDate: {
                 name: 'System date',
                 status: 'not_started',
-                description: 'Whether or not the system date is correct. Scheduling jobs depend on this.',
+                description: 'Jobs arm when the system year is plausible. NTP synchronization is checked separately.',
                 message: '',
             },
             temperatureSchedule: {
@@ -148,8 +156,12 @@ class ServerStatus {
     updateSystemDate() {
         const isValid = isSystemDateValid();
         if (isValid) {
-            this.status.systemDate.status = 'healthy';
-            this.status.systemDate.message = '';
+            // The scheduler owns the year check and clock synchronization warnings.
+            if (this.status.systemDate.status !== 'retrying' && this.status.systemDate.status !== 'healthy'
+                && this.status.systemDate.status !== 'started') {
+                this.status.systemDate.status = 'healthy';
+                this.status.systemDate.message = '';
+            }
         }
         else {
             this.status.systemDate.status = 'failed';
@@ -157,22 +169,27 @@ class ServerStatus {
         }
     }
     async updateServices() {
-        await servicesDB.read();
-        this.status.biometricsInstallation = servicesDB.data.biometrics.jobs.installation;
-        if (servicesDB.data.biometrics.enabled) {
-            this.status.analyzeSleepLeft = servicesDB.data.biometrics.jobs.analyzeSleepLeft;
-            this.status.analyzeSleepRight = servicesDB.data.biometrics.jobs.analyzeSleepRight;
-            this.status.biometricsCalibrationLeft = servicesDB.data.biometrics.jobs.calibrateLeft;
-            this.status.biometricsCalibrationRight = servicesDB.data.biometrics.jobs.calibrateRight;
-            this.status.pumpHealthLeft = servicesDB.data.biometrics.jobs.pumpLeft;
-            this.status.pumpHealthRight = servicesDB.data.biometrics.jobs.pumpRight;
-            const time = moment(servicesDB.data.biometrics.jobs.stream.timestamp);
-            if (moment().diff(time, 'minutes') >= 5) {
-                servicesDB.data.biometrics.jobs.stream.status = 'failed';
-                servicesDB.data.biometrics.jobs.stream.message = 'Biometrics stream died! Run `systemctl restart free-sleep-stream`';
-            }
-            await servicesDB.write();
-            this.status.biometricsStream = servicesDB.data.biometrics.jobs.stream;
+        // Check inside the write queue so a fresh stream report cannot be overwritten.
+        const services = await updateServices(draft => {
+            const stream = draft.biometrics.jobs.stream;
+            const message = 'Biometrics stream died! Run `systemctl restart free-sleep-stream`';
+            if (!draft.biometrics.enabled || moment().diff(moment(stream.timestamp), 'minutes') < 5
+                || !moment(stream.timestamp).isValid())
+                return false;
+            if (stream.status === 'failed' && stream.message === message)
+                return false;
+            stream.status = 'failed';
+            stream.message = message;
+        });
+        this.status.biometricsInstallation = services.biometrics.jobs.installation;
+        if (services.biometrics.enabled) {
+            this.status.analyzeSleepLeft = services.biometrics.jobs.analyzeSleepLeft;
+            this.status.analyzeSleepRight = services.biometrics.jobs.analyzeSleepRight;
+            this.status.biometricsCalibrationLeft = services.biometrics.jobs.calibrateLeft;
+            this.status.biometricsCalibrationRight = services.biometrics.jobs.calibrateRight;
+            this.status.pumpHealthLeft = services.biometrics.jobs.pumpLeft;
+            this.status.pumpHealthRight = services.biometrics.jobs.pumpRight;
+            this.status.biometricsStream = services.biometrics.jobs.stream;
         }
         else {
             // Delete keys from server status
@@ -189,6 +206,12 @@ class ServerStatus {
         await this.updateDB();
         await this.updateServices();
         this.updateSystemDate();
+        await settingsDB.read();
+        const firmwareHealth = firmwareHealthSummary(settingsDB.data.features, servicesDB.data.biometrics.enabled);
+        if (firmwareHealth)
+            this.status.firmwareHealth = firmwareHealth;
+        else
+            delete this.status.firmwareHealth;
         return this.status;
     }
 }

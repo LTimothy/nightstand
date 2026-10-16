@@ -6,6 +6,7 @@ import { updateDeviceStatus } from './updateDeviceStatus.js';
 import { markManualTempChange } from '../../jobs/scheduleOverride.js';
 import { noteManualPowerChange } from '../../jobs/manualPowerChange.js';
 import settingsDB from '../../db/settings.js';
+import { refreshWifiSignalStrength } from '../../8sleep/wifiSignalStrength.js';
 const router = express.Router();
 router.get('/deviceStatus', async (req, res) => {
     // Franken's initial hardware handshake can take ~25-30s (one connection
@@ -23,6 +24,7 @@ router.get('/deviceStatus', async (req, res) => {
         return;
     }
     try {
+        void refreshWifiSignalStrength();
         const resp = await getDeviceStatusCoalesced();
         res.json(resp);
     }

@@ -117,6 +117,7 @@ export const AGENT_MANIFEST = [
     { path: 'scripts/prepare-upstream.py', mode: 'add', why: 'prepares settings accepted by the upstream reader' },
     { path: 'scripts/write_result.py', mode: 'add', why: 'records how an update, rollback or switch ended, so the app can report it' },
     { path: 'scripts/tree_digest.py', mode: 'add', why: 'checks a downloaded release against the checksum releases.json publishes for it' },
+    { path: 'scripts/system_scripts.py', mode: 'add', why: 'keeps the scripts root runs in a folder only root can write' },
     // Server routes and jobs.
     { path: 'server/src/jobs/privilegedCommand.ts', mode: 'add', why: 'checks unit and sudo readiness before accepting an operation' },
     { path: 'server/src/jobs/update.ts', mode: 'copy', why: 'runs update.sh via the sudoers-permitted unit' },

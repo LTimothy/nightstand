@@ -72,13 +72,14 @@ const CHECKSUM_MISMATCH = (version) => `the download of v${version} does not mat
 describe('update.sh checks the staged tree', () => {
     const src = readFileSync(path.join(repoRoot, 'scripts/update.sh'), 'utf8');
     it('verifies before installing dependencies or handing off', () => {
-        const verify = src.indexOf('\nverify_tree\n');
-        assert.ok(verify > src.indexOf('mv "$STAGED_DIR" "$STAGE"'));
+        const verify = src.indexOf('\nverify_tree "$STAGED_DIR"\n');
+        assert.ok(verify > src.indexOf('STAGED_DIR=$(find'));
+        assert.ok(verify < src.indexOf('system_scripts.py" publish "$STAGED_DIR"'));
         assert.ok(verify < src.indexOf('run_limited 900 sudo -u dac'));
-        assert.ok(verify < src.indexOf('exec bash "$STAGE/scripts/update.sh"'));
+        assert.ok(verify < src.indexOf('exec bash "$NEW_COPY/scripts/update.sh"'));
     });
     it('uses the installed copy of the digest script, not the downloaded one', () => {
-        assert.match(src, /python3 "\$LIVE\/scripts\/tree_digest\.py" "\$STAGE"/);
+        assert.match(src, /python3 "\$NIGHTSTAND_SCRIPTS\/tree_digest\.py" "\$tree"/);
         assert.doesNotMatch(src, /python3 "\$STAGE\/scripts\/tree_digest\.py"/);
     });
     it('reports a checksum mismatch without changing the live install', () => {
@@ -96,11 +97,14 @@ function runStaging(script, marker, options) {
     mkdirSync(path.join(podHome, 'free-sleep/scripts'), { recursive: true });
     mkdirSync(data, { recursive: true });
     writeFileSync(path.join(podHome, 'free-sleep/server/src/serverInfo.json'), '{"version":"3.5.1"}');
+    // The root-owned scripts the run starts from hold the installed digest script.
+    const scriptDir = path.join(dir, 'scripts');
+    mkdirSync(scriptDir);
     if (options.liveDigest === 'broken') {
-        writeFileSync(path.join(podHome, 'free-sleep/scripts/tree_digest.py'), 'raise SystemExit(1)\n');
+        writeFileSync(path.join(scriptDir, 'tree_digest.py'), 'raise SystemExit(1)\n');
     }
     else if (options.liveDigest !== false) {
-        copyFileSync(path.join(repoRoot, 'scripts/tree_digest.py'), path.join(podHome, 'free-sleep/scripts/tree_digest.py'));
+        copyFileSync(path.join(repoRoot, 'scripts/tree_digest.py'), path.join(scriptDir, 'tree_digest.py'));
     }
     if (options.target)
         writeFileSync(path.join(data, 'update-target.json'), JSON.stringify({ version: options.target }));
@@ -138,14 +142,15 @@ cat "$FAKE_MANIFEST"
     if (options.manifest !== undefined) {
         writeFileSync(manifest, typeof options.manifest === 'string' ? options.manifest : JSON.stringify(options.manifest));
     }
-    const scriptDir = path.join(dir, 'scripts');
-    mkdirSync(scriptDir);
     copyFileSync(path.join(repoRoot, 'scripts/write_result.py'), path.join(scriptDir, 'write_result.py'));
+    copyFileSync(path.join(repoRoot, 'scripts/system_scripts.py'), path.join(scriptDir, 'system_scripts.py'));
+    copyFileSync(path.join(repoRoot, 'scripts/restore_helpers.sh'), path.join(scriptDir, 'restore_helpers.sh'));
     const end = script.indexOf(marker);
     assert.ok(end > 0, `missing ${marker}`);
     const file = path.join(scriptDir, 'run.sh');
     writeFileSync(file, script.slice(0, end)
         .replaceAll('/persistent/free-sleep-data', data)
+        .replaceAll('/usr/local/lib/nightstand', path.join(dir, 'system'))
         .replaceAll('/home/dac', podHome));
     const curlLog = path.join(dir, 'curl.log');
     const result = spawnSync('bash', [file], {
@@ -153,7 +158,7 @@ cat "$FAKE_MANIFEST"
         timeout: 20_000,
         env: {
             ...fakeDiskEnv(bin, { rootFreeMb: 100_000, persFreeMb: 100_000 }),
-            NIGHTSTAND_OPERATION_LOCK: path.join(dir, 'lock'),
+            NIGHTSTAND_OPERATION_LOCK: path.join(dir, 'lock'), NIGHTSTAND_SYSTEM_DIR: path.join(dir, 'system'),
             FAKE_ZIP: zip, FAKE_MANIFEST: manifest, FAKE_CURL_LOG: curlLog,
         },
     });

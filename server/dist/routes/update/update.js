@@ -5,7 +5,7 @@ import logger from '../../logger.js';
 import { triggerUpdateService } from '../../jobs/update.js';
 import { triggerRollbackService } from '../../jobs/rollback.js';
 import { triggerRevertToStockService } from '../../jobs/revertToStock.js';
-import { UpdateRequestSchema, UpdateResultSchema, OperationRequestSchema } from './updateSchema.js';
+import { UpdateRequestSchema, UpdateResultSchema, OperationRequestSchema, SwitchRequestSchema } from './updateSchema.js';
 import { inUseText } from './inUseText.js';
 import { PrivilegedCommandError, privilegedErrorStatus } from '../../jobs/privilegedCommand.js';
 const router = express.Router();
@@ -195,11 +195,15 @@ router.post('/rollback', async (req, res) => {
 // Reversible only by re-adopting via scripts/migrate/switch-to-this-fork.sh
 // afterward. There's no in-app way back once upstream free-sleep is running.
 async function switchToUpstream(req, res) {
-    const hooks = await admitted(req, res);
-    if (!hooks)
+    const parsed = SwitchRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid request data', details: parsed.error.errors });
+        return;
+    }
+    if (await refusedWhileInUse(res, parsed.data.confirmInUse))
         return;
     try {
-        await triggerRevertToStockService(hooks);
+        await triggerRevertToStockService(requestHooks(parsed.data.confirmInUse), parsed.data);
         res.status(204).end();
     }
     catch (error) {

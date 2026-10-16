@@ -25,8 +25,12 @@ const fakePrisma = {
             rows.set(where.id, next);
             return next;
         },
+        findFirst: async ({ where }) => [...rows.values()].find(row => row.id !== where.id.not
+            && row.side === where.side && row.entered_bed_at < where.entered_bed_at.lt && row.left_bed_at > where.left_bed_at.gt) ?? null,
         deleteMany: async ({ where }) => ({ count: rows.delete(where.id) ? 1 : 0 }),
     },
+    vitals_summaries: { findFirst: async () => null, updateMany: async () => ({ count: 0 }), deleteMany: async () => ({ count: 0 }) },
+    $transaction: async (work) => work(fakePrisma),
 };
 mock.module(new URL('../../db/prisma.js', import.meta.url).href, { namedExports: { prisma: fakePrisma } });
 const { default: router } = await import('./sleep.js');

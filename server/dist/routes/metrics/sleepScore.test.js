@@ -112,4 +112,16 @@ test('the score route reports time in bed for a night with plenty of heart readi
     const response = await scoreFor('left', night);
     assert.equal(response.components.duration.value, '1h 2m in bed');
 });
+test('nightly score and every component stay identical after detail pruning', async () => {
+    const { pruneMetrics, retentionCutoffs } = await import('../../jobs/metricsRetention.js');
+    const night = 1750000000;
+    await seedNight('left', night, 2, [0, 52, 64]);
+    await prisma.vitals.create({ data: { side: 'left', timestamp: night - 60, heart_rate: 40 } });
+    const before = await scoreFor('left', night);
+    const sleeps = await prisma.sleep_records.findMany();
+    await pruneMetrics(prisma, retentionCutoffs(new Date('2027-01-01T12:00:00Z'), null, { metricsRetention: true, metricsLowDiskProtection: false }));
+    assert.equal(await prisma.vitals.count({ where: { side: 'left', timestamp: { gte: night, lte: night + 3600 } } }), 0);
+    assert.deepEqual(await scoreFor('left', night), before);
+    assert.deepEqual(await prisma.sleep_records.findMany(), sleeps);
+});
 //# sourceMappingURL=sleepScore.test.js.map

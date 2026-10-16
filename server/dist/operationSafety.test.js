@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 const root = path.resolve('..');
-const script = (name) => readFileSync(path.join(root, 'scripts', name), 'utf8');
+const script = (name) => readFileSync(path.join(root, 'scripts', name), 'utf8')
+    .replace('$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh', path.join(root, 'scripts/restore_helpers.sh'));
 for (const name of ['update.sh', 'switch-to-upstream.sh']) {
     it(`${name} does not clean the incumbent stage when its lock is refused`, () => {
         const folder = mkdtempSync(path.join(tmpdir(), 'operation-refused-'));
@@ -15,7 +16,7 @@ for (const name of ['update.sh', 'switch-to-upstream.sh']) {
             writeFileSync(path.join(stage, 'keep'), 'incumbent');
             const source = script(name).replaceAll('/home/dac/', folder + '/')
                 .replaceAll('/persistent/', folder + '/persistent/');
-            const result = spawnSync('bash', ['-c', 'flock() { return 1; };\n' + source], {
+            const result = spawnSync('bash', ['-c', 'iptables() { return 0; }; ip6tables() { return 0; }; flock() { return 1; };\n' + source], {
                 encoding: 'utf8', env: { ...process.env, NIGHTSTAND_OPERATION_LOCK: path.join(folder, 'lock') },
             });
             assert.equal(result.status, 1, result.stdout + result.stderr);
@@ -182,7 +183,9 @@ it('a low disk refusal consumes the requested update target', () => {
         const result = spawnSync('bash', ['-c', `
 df() { printf 'header\ndisk 100 100 0\n'; }
 flock() { return 0; }
-export -f df flock
+iptables() { return 0; }
+ip6tables() { return 0; }
+export -f df flock iptables ip6tables
 ${source}`], { encoding: 'utf8', env: { ...process.env, NIGHTSTAND_OPERATION_LOCK: path.join(folder, 'lock') } });
         assert.equal(result.status, 1, result.stdout + result.stderr);
         assert.match(result.stdout, /low disk/);

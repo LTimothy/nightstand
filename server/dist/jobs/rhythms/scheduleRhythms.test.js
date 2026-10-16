@@ -134,7 +134,7 @@ const powerOnTonight = async () => {
     scheduleRhythms(settingsDB.data, testRhythmsDB(schedulesDB.data, everyNight(NIGHT)), at('2026-09-28T12:00:00Z'));
     setNow('2026-09-28T22:00:00Z');
     await schedule.scheduledJobs['rhythm-left-2026-09-28-power-on-2200-0'].invoke();
-    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 8 * 3600 + 300 } }]);
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80 } }]);
     updates.length = 0;
 };
 it('moves the off time of a sleep in progress whose end moves later, so its later alarm still rings', async () => {
@@ -225,7 +225,7 @@ it('fires at the right instants and sets the firmware across the fall back night
     assert.equal(fireTime('rhythm-left-2026-10-31-power-off-0600-0'), '2026-11-01T14:00:00.000Z');
     setNow('2026-11-01T05:00:00Z');
     await schedule.scheduledJobs['rhythm-left-2026-10-31-power-on-2200-0'].invoke();
-    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 9 * 3600 + 300 } }]);
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80 } }]);
 });
 it('moves a missing time forward and sets the firmware across the spring forward night', async () => {
     settingsDB.data.timeZone = 'America/Los_Angeles';
@@ -238,7 +238,7 @@ it('moves a missing time forward and sets the firmware across the spring forward
     assert.equal(fireTime('rhythm-left-2026-03-07-power-off-0600-0'), '2026-03-08T13:00:00.000Z');
     setNow('2026-03-08T06:00:00Z');
     await schedule.scheduledJobs['rhythm-left-2026-03-07-power-on-2200-0'].invoke();
-    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80, secondsRemaining: 7 * 3600 + 300 } }]);
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80 } }]);
 });
 const captureErrors = (t) => {
     const errors = [];
@@ -382,7 +382,7 @@ it('turns on a Smart Schedule sleep first planned after its turn-on time, so its
     replan(smartNight(), '2026-09-28T21:40:00Z');
     assert.equal(fireTime(LATE_ON), '2026-09-28T21:40:01.000Z');
     await schedule.scheduledJobs[LATE_ON].invoke();
-    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 88, secondsRemaining: 8 * 3600 + 20 * 60 + 300 } }]);
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 88 } }]);
     pod.left.isOn = true;
     setNow('2026-09-29T05:45:00Z');
     await schedule.scheduledJobs['rhythm-left-2026-09-28-alarm-0545-0'].invoke();

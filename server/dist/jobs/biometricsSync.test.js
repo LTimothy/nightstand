@@ -120,7 +120,7 @@ it('stops and disables the stream when persisted data turns biometrics off', asy
     await syncBiometrics();
     assert.equal(activeState, 'inactive');
     assert.equal(unitFileState, 'disabled');
-    assert.deepEqual(starts, [['-n', '--', '/bin/sh', '/home/dac/free-sleep/scripts/disable_biometrics.sh']]);
+    assert.deepEqual(starts, [['-n', '--', '/bin/sh', '/usr/local/lib/nightstand/live/scripts/disable_biometrics.sh']]);
 });
 it('does not touch systemd in local development', async () => {
     config.remoteDevMode = true;

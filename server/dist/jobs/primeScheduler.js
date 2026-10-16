@@ -8,7 +8,11 @@ import serverStatus from '../serverStatus.js';
 import servicesDB from '../db/services.js';
 import reboot from './reboot.js';
 import { rebootClock } from './rebootTime.js';
+import { connectFrankenWithin } from '../8sleep/frankenServer.js';
+import { wait } from '../8sleep/promises.js';
+import eventBus from '../events/eventBus.js';
 import { OperationCheckError, PrivilegedCommandError } from './privilegedCommand.js';
+import { runMetricsRetention } from './runMetricsRetention.js';
 const scheduleRebootJob = (onHour, onMinute, timeZone) => {
     const dailyRule = new schedule.RecurrenceRule();
     dailyRule.hour = onHour;
@@ -51,6 +55,8 @@ const scheduleCalibrationJob = (onHour, onMinute, timeZone, side) => {
     const time = `${String(onHour).padStart(2, '0')}:${String(onMinute).padStart(2, '0')}`;
     logger.debug(`Scheduling daily calibration job at ${time} for ${side}`);
     schedule.scheduleJob(`daily-calibration-${time}-${side}`, dailyRule, async () => {
+        if (side === 'left')
+            await runMetricsRetention();
         await servicesDB.read();
         if (!servicesDB.data.biometrics.enabled) {
             logger.debug('Not executing calibration job, biometrics is disabled');
@@ -90,7 +96,15 @@ export const schedulePrimingRebootAndCalibration = (settingsData) => {
     schedule.scheduleJob(`daily-priming-${time}`, dailyRule, async () => {
         try {
             logger.info(`Executing scheduled prime job`);
+            serverStatus.status.primeSchedule.status = 'started';
+            serverStatus.status.primeSchedule.message = 'Waiting for priming confirmation';
+            eventBus.emit('service-health', { primeSchedule: serverStatus.status.primeSchedule });
             await updateDeviceStatus({ isPriming: true }, { background: true });
+            await wait(30_000);
+            const connection = await connectFrankenWithin();
+            const status = await connection.getDeviceStatus();
+            if (!status.isPriming)
+                throw new Error('The Pod did not report priming after the daily prime command');
             serverStatus.status.primeSchedule.status = 'healthy';
             serverStatus.status.primeSchedule.message = '';
         }
@@ -99,6 +113,9 @@ export const schedulePrimingRebootAndCalibration = (settingsData) => {
             const message = error instanceof Error ? error.message : String(error);
             serverStatus.status.primeSchedule.message = message;
             logger.error(error);
+        }
+        finally {
+            eventBus.emit('service-health', { primeSchedule: serverStatus.status.primeSchedule });
         }
     });
 };

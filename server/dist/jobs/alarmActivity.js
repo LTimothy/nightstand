@@ -71,11 +71,13 @@ export async function waitForNightAlarms(side, fireDate, endsThisNight) {
         limits.push(limit);
         return limit;
     };
+    let onAbort = () => { };
     const aborted = new Promise(resolve => {
+        onAbort = () => resolve();
         if (signal.aborted)
             resolve();
         else
-            signal.addEventListener('abort', () => resolve(), { once: true });
+            signal.addEventListener('abort', onAbort, { once: true });
     });
     const waitForStarts = Promise.all(due.map(job => new Promise(resolve => {
         const limit = timed(ALARM_START_WAIT_MS);
@@ -92,8 +94,13 @@ export async function waitForNightAlarms(side, fireDate, endsThisNight) {
         const running = [...(ringing.get(side) ?? [])].filter(([, name]) => endsThisNight(name)).map(([done]) => done);
         await Promise.race([Promise.all(running), timed(ALARM_RING_WAIT_MS)]);
     };
-    await Promise.race([waitForRinging(), aborted]);
-    limits.forEach(limit => limit.cancel());
+    try {
+        await Promise.race([waitForRinging(), aborted]);
+    }
+    finally {
+        signal.removeEventListener('abort', onAbort);
+        limits.forEach(limit => limit.cancel());
+    }
 }
 // A recurring alarm belongs to the night named by day; an alarm on another
 // day's schedule starts that day's night and is left out.

@@ -6,6 +6,22 @@ import { addDays, rhythmNightBounds, wallClock } from '../../db/rhythmTimes.js';
 import { buildCurve } from '../../db/smartCurve.js';
 import { assertCurve, check, fuzzCase, FUZZ_RUNS, FUZZ_SEED, MINUTE, random, sleepInput, SLEEP_CASES } from '../../testing/smartFuzz.js';
 import { findOverlaps, resolveSleeps } from './resolve.js';
+for (const fixture of [
+    { date: '2026-03-07', start: '2026-03-08T04:00:00.000Z', end: '2026-03-09T03:00:00.000Z', hours: 23 },
+    { date: '2026-10-31', start: '2026-11-01T03:00:00.000Z', end: '2026-11-02T04:00:00.000Z', hours: 25 },
+]) {
+    it(`resolves equal on and off to a ${fixture.hours} hour night across the clock change`, () => {
+        const { rhythm, timeZone, date } = sleepInput(random(1), { date: fixture.date, timeZone: 'America/Los_Angeles', on: '20:00', wake: '20:00', off: '20:00' });
+        const plan = { rhythms: { generated: rhythm }, changes: [{ date, rhythmId: 'generated' }],
+            week: { sunday: null, monday: null, tuesday: null, wednesday: null, thursday: null, friday: null, saturday: null } };
+        const [sleep] = resolveSleeps({ db: { version: 1, legacyFingerprint: 'a'.repeat(64), left: plan, right: plan },
+            side: 'left', timeZone, from: new Date(fixture.start), to: new Date(fixture.end) });
+        assert.equal(sleep.start.toISOString(), fixture.start);
+        assert.equal(sleep.end.toISOString(), fixture.end);
+        assert.equal(sleep.wake.toISOString(), fixture.end);
+        assert.equal(sleep.end.getTime() - sleep.start.getTime(), fixture.hours * 60 * MINUTE);
+    });
+}
 it(`fuzzes resolved sleeps and DST wall clocks (${FUZZ_RUNS} runs, seed ${FUZZ_SEED})`, () => {
     const next = random();
     for (let run = 0; run < FUZZ_RUNS + SLEEP_CASES.length; run++) {

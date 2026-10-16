@@ -31,6 +31,13 @@ describe('the agent bootstrap scripts', () => {
             execFileSync('bash', ['-n', path.join(repoRoot, rel)]);
         }
     });
+    it('ships the helpers the restore sources beside it', () => {
+        const ship = read(LAPTOP)
+            .match(/scp -q -P "\$SSH_PORT" \\\n((?:\s+"[^"]+" \\\n)+)\s+"root@\$POD_IP:\/usr\/local\/lib\/nightstand\/migrate\/"/);
+        assert.ok(ship, 'the installer scp is missing');
+        assert.match(ship[1], /scripts\/migrate\/restore-original-fork\.sh/);
+        assert.match(ship[1], /scripts\/restore_helpers\.sh/);
+    });
     it('refuses a pod that is not stock, on both sides', () => {
         // The laptop half checks before it builds, so a wrong target costs nothing.
         // The pod half checks again because it can be run standalone, and because
@@ -47,8 +54,9 @@ describe('the agent bootstrap scripts', () => {
         // ends up underneath the agent, and so the running tree is untouched until
         // the swap. Both halves of that are load-bearing.
         assertOrder(read(POD), [
-            'cp -a "$LIVE" "$STAGE"',
+            'cp -a "$LIVE" "$FRESH"',
             'Applying the agent overlay to the copy',
+            'move_tree "$FRESH" "$STAGE"',
             'systemctl stop free-sleep',
         ], 'stage-before-stop');
     });
@@ -56,7 +64,7 @@ describe('the agent bootstrap scripts', () => {
         assertOrder(read(POD), [
             'systemctl enable --now "$SENTINEL_TIMER"',
             'systemctl stop free-sleep',
-            'mv "$LIVE" "$PREV"',
+            'move_tree "$LIVE" "$PREV"',
         ], 'sentinel-before-swap');
     });
     it('refuses to proceed if the sentinel cannot be armed', () => {
@@ -77,14 +85,14 @@ describe('the agent bootstrap scripts', () => {
         // restore-original-fork.sh keys off this marker to decide whether a swap
         // began. Setting it after the move would leave a window where a killed
         // installer looks like it never started.
-        assertOrder(read(POD), [': > "$SWAP_MARKER"', 'mv "$LIVE" "$PREV"'], 'marker-before-move');
+        assertOrder(read(POD), [': > "$SWAP_MARKER"', 'move_tree "$LIVE" "$PREV"'], 'marker-before-move');
     });
     it('installs the rollback and revert units and their sudoers rules only after a passed health check', () => {
         const pod = read(POD);
-        assert.ok(pod.indexOf('bash "$LIVE/scripts/setup_services.sh"') > pod.indexOf('if [ "$HEALTHY" != "1" ]; then'), 'setup_services.sh must not run before the health check');
+        assert.ok(pod.indexOf('bash "$COPY/scripts/setup_services.sh"') > pod.indexOf('if [ "$HEALTHY" != "1" ]; then'), 'setup_services.sh must not run before the health check');
         assertOrder(pod, [
             'if [ "$HEALTHY" != "1" ]; then',
-            'bash "$LIVE/scripts/setup_services.sh" "$LIVE"',
+            'bash "$COPY/scripts/setup_services.sh" "$COPY"',
             'rm -f "$SWAP_MARKER"',
         ], 'services-after-health');
     });
@@ -121,14 +129,14 @@ describe('the agent bootstrap scripts', () => {
     });
     it('applies the two patches to the pod\'s own files, not to shipped copies', () => {
         const pod = read(POD);
-        assert.match(pod, /\$STAGE\/server\/src\/setup\/routes\.ts/, 'routes.ts is not patched in the staged copy');
-        assert.match(pod, /\$STAGE\/server\/package\.json/, 'package.json is not patched in the staged copy');
+        assert.match(pod, /\$FRESH\/server\/src\/setup\/routes\.ts/, 'routes.ts is not patched in the staged copy');
+        assert.match(pod, /\$FRESH\/server\/package\.json/, 'package.json is not patched in the staged copy');
         // and the patch entries are skipped when copying files in
         assert.match(pod, /\[ "\$mode" = "patch" \]|patch\)/, 'the copy loop does not special-case patch entries');
     });
     it('keeps the stock tree for rollback rather than deleting it', () => {
         const pod = read(POD);
-        assert.match(pod, /mv "\$LIVE" "\$PREV"/, 'the stock tree is not preserved at $PREV');
+        assert.match(pod, /move_tree "\$LIVE" "\$PREV"/, 'the stock tree is not preserved at $PREV');
         assert.doesNotMatch(pod, /rm -rf "\$PREV"/, 'the stock tree must never be deleted outright');
     });
 });
