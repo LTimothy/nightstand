@@ -133,6 +133,7 @@ scp -q -P "$SSH_PORT" -r "$PAYLOAD/." "root@$POD_IP:/usr/local/lib/nightstand/mi
 scp -q -P "$SSH_PORT" \
   "$REPO_ROOT/scripts/migrate/agent-bootstrap-installer.sh" \
   "$REPO_ROOT/scripts/migrate/restore-original-fork.sh" \
+  "$REPO_ROOT/scripts/restore_helpers.sh" \
   "root@$POD_IP:/usr/local/lib/nightstand/migrate/" || fail "could not send the installer"
 
 say "Starting the installer detached (a dropped connection from here changes nothing)"

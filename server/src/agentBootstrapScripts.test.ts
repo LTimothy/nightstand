@@ -37,6 +37,14 @@ describe('the agent bootstrap scripts', () => {
     }
   });
 
+  it('ships the helpers the restore sources beside it', () => {
+    const ship = read(LAPTOP)
+      .match(/scp -q -P "\$SSH_PORT" \\\n((?:\s+"[^"]+" \\\n)+)\s+"root@\$POD_IP:\/usr\/local\/lib\/nightstand\/migrate\/"/);
+    assert.ok(ship, 'the installer scp is missing');
+    assert.match(ship[1], /scripts\/migrate\/restore-original-fork\.sh/);
+    assert.match(ship[1], /scripts\/restore_helpers\.sh/);
+  });
+
   it('refuses a pod that is not stock, on both sides', () => {
     // The laptop half checks before it builds, so a wrong target costs nothing.
     // The pod half checks again because it can be run standalone, and because
