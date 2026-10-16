@@ -43,11 +43,15 @@ mock.module(new URL('../routes/deviceStatus/updateDeviceStatus.js', import.meta.
   },
 });
 
-let manualChanges: string[] = [];
+let manualChanges: Array<[string, unknown]> = [];
 mock.module(new URL('../jobs/scheduleOverride.js', import.meta.url).href, {
   namedExports: {
-    markManualTempChange: async (side: string) => { manualChanges.push(side); },
+    markManualTempChange: async (side: string, change?: unknown) => { manualChanges.push([side, change]); },
   },
+});
+let snapshot: unknown;
+mock.module(new URL('./lastDeviceStatus.js', import.meta.url).href, {
+  namedExports: { lastDeviceStatus: () => snapshot, noteDeviceStatus: () => {} },
 });
 
 let readCalls: string[] = [];
@@ -152,6 +156,7 @@ describe('ButtonMonitor', () => {
 
   beforeEach(async () => {
     updates = []; manualChanges = []; readCalls = []; alarmTaps = [];
+    snapshot = undefined;
     activeAlarms.clear(); cancelSnooze('left'); cancelSnooze('right');
     updateRejectsWith = null;
     readRejectsWith = null; afterRead = null; afterWrite = null; writeOptions = [];
@@ -278,7 +283,22 @@ describe('ButtonMonitor', () => {
     await monitor.poll();
 
     assert.deepEqual(rightTargets(), [83]);
-    assert.deepEqual(manualChanges, ['right']);
+    assert.deepEqual(manualChanges.map(([side]) => side), ['right']);
+  });
+
+  it('passes a plus click as a hand change from the cover', async () => {
+    writeRaw('001.RAW', click('R', 97), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(manualChanges, [['right', { targetF: 83, fromF: 82, on: null, setsOn: false, source: 'tap' }]]);
+  });
+
+  it('passes the logo favorite as turning an off side on', async () => {
+    settingsDB.data.left.buttons.favoriteTemperatureF = 91;
+    await settingsDB.write();
+    snapshot = { left: { targetTemperatureF: 78, isOn: false }, right: { targetTemperatureF: 75, isOn: true } };
+    writeRaw('001.RAW', click('L', 98), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(manualChanges, [['left', { targetF: 91, fromF: 78, on: true, setsOn: true, source: 'tap' }]]);
   });
 
   it('steps the left side down on a bottom click', async () => {
@@ -407,7 +427,7 @@ describe('ButtonMonitor', () => {
     await monitor.poll();
     assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 91 } }]);
     assert.ok(writeOptions[0].notAfter !== undefined && writeOptions[0].notAfter >= at + 30_000);
-    assert.deepEqual(manualChanges, ['left']);
+    assert.deepEqual(manualChanges.map(([side]) => side), ['left']);
     assert.deepEqual(alarmTaps, []);
   });
 
