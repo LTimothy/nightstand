@@ -38,6 +38,7 @@ class TestUpdateSensorTemps(unittest.TestCase):
         # Reset the throttle and capture POSTs instead of hitting the network.
         service_health._last_sensor_temps_update = 0
         self.posts = []
+        self.timeouts = []
         self._orig_urlopen = service_health.urllib.request.urlopen
 
         test = self
@@ -51,8 +52,9 @@ class TestUpdateSensorTemps(unittest.TestCase):
             def __exit__(self, *args):
                 return False
 
-        def fake_urlopen(req):
+        def fake_urlopen(req, timeout=None):
             test.posts.append(json.loads(req.data.decode('utf-8')))
+            test.timeouts.append(timeout)
             return _FakeResponse()
 
         service_health.urllib.request.urlopen = fake_urlopen
@@ -119,6 +121,14 @@ class TestUpdateSensorTemps(unittest.TestCase):
         self.assertEqual(len(self.posts), 1)
         posted = datetime.fromisoformat(self._posted_temps()['lastUpdated'])
         self.assertGreaterEqual(posted, before)
+
+    def test_gives_up_on_a_server_that_does_not_answer(self):
+        service_health.update_sensor_temps(_frz_temp(ts=time.time()))
+        self.assertEqual(self.timeouts, [5])
+
+    def test_health_updates_give_up_too(self):
+        service_health.update_health('stream', 'healthy')
+        self.assertEqual(self.timeouts, [5])
 
     def test_string_timestamp_is_parsed_as_utc(self):
         # load_raw_files rewrites ts to a '%Y-%m-%d %H:%M:%S' UTC string;

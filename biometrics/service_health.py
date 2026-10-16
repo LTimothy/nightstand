@@ -89,7 +89,7 @@ def update_health(job_key: str, status: str, message: str = ''):
             data=data,
         )
 
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             if response.status == 200:
                 logger.debug("Updated status successfully")
             else:
@@ -152,7 +152,7 @@ def update_sensor_temps(frz_temp_data: dict):
             data=data,
         )
 
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             if response.status == 200:
                 logger.debug("Updated sensor temps successfully")
             else:
