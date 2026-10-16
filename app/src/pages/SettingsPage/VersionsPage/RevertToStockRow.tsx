@@ -102,8 +102,8 @@ export default function RevertToStockRow({ runningVersion }: Props) {
               </Typography>
               <Typography variant="body2" sx={ { mb: 2 } }>
                 Upstream keeps only the first enabled alarm per day, limits vibration to 180 seconds,
-                and does not run one-time alarms. Level temperatures become Fahrenheit and base-control
-                taps become alarm-dismiss actions. The original settings remain in the backup.
+                and does not run one-time alarms. Level temperatures become Fahrenheit, and
+                base-control and set-temperature taps become alarm-dismiss actions. The original settings remain in the backup.
               </Typography>
               <Typography variant="body2" sx={ { mb: 2 } }>
                 This does not remove everything Nightstand installed. Systemd units, disabled timers,

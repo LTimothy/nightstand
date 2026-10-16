@@ -247,6 +247,8 @@ generic message; the details go to the server log.
   - `{ "type": "temperature", "change": "increment" | "decrement", "amount": 0 to 10 }`
   - `{ "type": "base_control", "behavior": "toggle_preset" }`, which moves
     an adjustable base between its `relax` and `flat` presets
+  - `{ "type": "set_temperature", "temperatureF": 55 to 110 }`, a whole Fahrenheit degree: sets that side to it
+    and turns the side on. Releases before 3.7.0 skip a gesture set to this and do nothing.
   - `{ "type": "alarm", "behavior": "snooze" | "dismiss", "snoozeDuration": 60 to 600, "inactiveAlarmBehavior": "power" | "none" }`,
     the shape upstream free-sleep uses. On the tested Pod 5 the firmware
     handles a double or triple tap while an alarm rings and stops it without

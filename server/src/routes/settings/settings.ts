@@ -8,7 +8,7 @@ import logger from '../../logger.js';
 const router = express.Router();
 
 import settingsDB, { updateSettings } from '../../db/settings.js';
-import { SettingsSchema, type Gesture, type SideSettings } from '../../db/settingsSchema.js';
+import { SettingsSchema, type Gesture, type TapAction } from '../../db/settingsSchema.js';
 import { changesRhythmsFlag, pauseRejection, wouldOrphanLevelFormat } from './settingsGuards.js';
 import { syncRawArchiveConf } from '../../jobs/rawArchiveConf.js';
 
@@ -60,7 +60,7 @@ router.post('/settings', async (req: Request, res: Response) => {
     // A gesture is replaced whole, so no field of its previous action stays behind.
     for (const side of SCHEDULE_SIDES) {
       for (const [gesture, tap] of Object.entries(validatedUpdate[side]?.taps ?? {})) {
-        if (tap) draft[side].taps[gesture as Gesture] = tap as SideSettings['taps']['doubleTap'];
+        if (tap) draft[side].taps[gesture as Gesture] = tap as TapAction;
       }
     }
   }, async draft => {

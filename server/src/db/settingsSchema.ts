@@ -27,10 +27,17 @@ const BaseControlTapConfig = z.object({
   behavior: z.literal('toggle_preset'),
 });
 
+// Sets the side to temperatureF and turns it on. Older releases skip a tap type they do not know.
+const SetTemperatureTapConfig = z.object({
+  type: z.literal('set_temperature'),
+  temperatureF: z.number().int().min(55).max(110),
+});
+
 export const TapConfig = z.discriminatedUnion('type', [
   TemperatureTapConfig,
   AlarmTapConfig,
   BaseControlTapConfig,
+  SetTemperatureTapConfig,
 ]);
 
 export const GestureSchema = z.enum(['doubleTap', 'tripleTap', 'quadTap']);
@@ -157,5 +164,6 @@ export type Buttons = z.infer<typeof ButtonsSchema>;
 export type SideSettings = z.infer<typeof SideSettingsSchema>;
 export type Settings = z.infer<typeof SettingsSchema>;
 export type Features = z.infer<typeof FeaturesSchema>;
+export type TapAction = z.infer<typeof TapConfig>;
 export type Gesture = z.infer<typeof GestureSchema>
 export type UpdateChannelType = z.infer<typeof UpdateChannel>

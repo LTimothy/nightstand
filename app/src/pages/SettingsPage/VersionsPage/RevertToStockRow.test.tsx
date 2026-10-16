@@ -104,8 +104,10 @@ describe('RevertToStockRow target confirmation', () => {
     await openDialog();
 
     const conversion = screen.getByText(/first enabled alarm per day, limits vibration to 180 seconds/);
-    expect(conversion).toHaveTextContent('does not run one-time alarms. Level temperatures become Fahrenheit');
-    expect(conversion).toHaveTextContent('base-control taps become alarm-dismiss actions. The original settings remain in the backup.');
+    expect(conversion).toHaveTextContent('does not run one-time alarms. Level temperatures become Fahrenheit,');
+    expect(conversion).toHaveTextContent(
+      'base-control and set-temperature taps become alarm-dismiss actions. The original settings remain in the backup.',
+    );
     expect(screen.getByText(/timestamped prerevert-to-stock directory/))
       .toHaveTextContent('/persistent/free-sleep-backups/');
     expect(screen.getByText(/timestamped prerevert-to-stock directory/))

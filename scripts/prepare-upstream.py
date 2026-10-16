@@ -89,7 +89,7 @@ def prepare(folder):
     for side in ('left', 'right'):
         taps = settings.get(side, {}).get('taps', {})
         for gesture in ('doubleTap', 'tripleTap', 'quadTap'):
-            if taps.get(gesture, {}).get('type') == 'base_control':
+            if taps.get(gesture, {}).get('type') in ('base_control', 'set_temperature'):
                 taps[gesture] = dict(type='alarm', behavior='dismiss',
                                      snoozeDuration=300, inactiveAlarmBehavior='none')
         for day in DAYS:
