@@ -78,6 +78,20 @@ is a hard fork; for the history of the projects it descends from, see
   needs a hardware check.
 - SSH setup now uses the built-in SFTP server, so file transfers do not
   depend on an external `sftp-server` binary that some Pods lack.
+- Root now runs Nightstand's scripts only from a folder only root can
+  write, `/usr/local/lib/nightstand`. Before, the health check, network
+  watchdog, archiver, updater, rollback and recovery helpers ran from the
+  install folder, which the server's own user owns. Each install, update,
+  deploy and rollback uses the copy that matches the version it put in
+  place. Installs, updates, deploys and the Biometrics installer now unpack
+  downloads in a folder only root can write before anything is moved into
+  place, and root's inline Python runs in isolated mode so it never picks
+  up modules from the folder it was started in. The unused sudo rule for
+  `enable_biometrics.sh` is removed; run the installer as
+  `sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh`. The
+  Biometrics installer, run by hand, still uses the Python environment in
+  `/home/dac`. After rolling back to an earlier release, turning Biometrics
+  off in the app works again after the next update.
 
 ### Installation and fork migration
 
@@ -230,6 +244,29 @@ is a hard fork; for the history of the projects it descends from, see
   credited in 3.6.1, and credits the
   [preset integration](https://github.com/Geczy/free-sleep/commit/c17cb0866489889b2230f698e99eb74184c15623),
   including the HTTP route, app API client and four-tap base action.
+
+### Biometrics
+
+- Installing Biometrics with `enable_biometrics.sh` no longer turns the
+  firewall off. Only HTTPS and DNS go out while Python and its packages
+  download, each download has a 15 minute limit, and the install waits for
+  a running update, rollback or switch instead of running beside it. It
+  also works when started with `sh` on a Pod whose `sh` is not bash.
+- The Biometrics stream and jobs give up on a status post to the server
+  after 5 seconds, so a server that stops answering cannot stall them.
+- The RAW archive keeps an older night when the firmware writes a new file
+  with the same name after its sequence restarts. The older file is kept
+  beside it as `<name>.1.RAW` (then `.2`, and so on if the name comes back
+  again).
+
+### Schedules
+
+- A schedule pause that ended while the server was down is cleared a
+  second after the server plans its jobs. Before, the server could wait up
+  to two minutes on the resume before planning anything, and a weekly job
+  due in that wait, such as a 7:00 alarm after a power cut, was skipped
+  until the next week. Resume schedule in the app also answers at once
+  instead of waiting for the side to come on.
 
 ## [3.6.1] - 2026-10-07
 
