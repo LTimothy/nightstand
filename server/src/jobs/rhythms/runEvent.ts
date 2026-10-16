@@ -151,15 +151,17 @@ export async function runRhythmEvent(side: Side, sleep: ResolvedSleep, event: Rh
   logger.info(`Executing ${label}`);
   try {
     if (event.kind === 'power-on') {
-      const secondsRemaining = firmwareSeconds(sleep.end, now, marginFor(sleep));
+      // One timed write, counted when it is sent: a later timeout cannot
+      // leave the firmware's 12 hour default in place.
+      const onUntil = new Date(sleep.end.getTime() + marginFor(sleep) * 1000);
       // Smart Schedule nights use the curve's own hold instead of the 12 hour one.
       const held = sleep.mode === 'smart'
         ? smartTemperatureGate(side, sleep.date, event.at) !== 'run'
         : isTempScheduleOverridden(side);
       if (held) logger.info(`Temperature held by a manual change, powering ${side} on without setting it`);
       await updateDeviceStatus({
-        [side]: held ? { isOn: true, secondsRemaining } : { isOn: true, targetTemperatureF: event.temperatureF, secondsRemaining },
-      }, SCHEDULED);
+        [side]: held ? { isOn: true } : { isOn: true, targetTemperatureF: event.temperatureF },
+      }, { ...SCHEDULED, onUntil });
       noteArmed(settings, side, sleep.end);
       markStatus('powerSchedule');
     } else if (event.kind === 'temperature') {
