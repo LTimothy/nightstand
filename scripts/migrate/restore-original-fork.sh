@@ -189,7 +189,7 @@ if [ ! -f "$SWAP_MARKER" ]; then
   # already present it's the pod's own untouched slot, leave it alone.
   if [ ! -d "$PREV" ] && [ -d "$PREEXISTING_PREV" ]; then
     say "Restoring the pod's pre-existing rollback slot to $PREV"
-    mv "$PREEXISTING_PREV" "$PREV" 2>/dev/null || say "WARNING: could not restore $PREV"
+    move_tree "$PREEXISTING_PREV" "$PREV" 2>/dev/null || say "WARNING: could not restore $PREV"
   fi
   restore_iptables
   # pod-installer.sh may have already stopped their service before hitting a
@@ -212,7 +212,7 @@ systemctl stop free-sleep-stream >/dev/null 2>&1 || true
 if [ "$(cat "$RESTORE_STATE" 2>/dev/null)" != trees-restored ] && [ -d "$PREV" ]; then
   if [ -d "$LIVE" ]; then
     rm -rf "$ABORTED_QUARANTINE"
-    mv "$LIVE" "$ABORTED_QUARANTINE" || {
+    move_tree "$LIVE" "$ABORTED_QUARANTINE" || {
       say "FATAL: could not move $LIVE aside. The original tree remains at $PREV; manual recovery may be required."
       write_status "restore_failed" "could not move current tree aside; original tree preserved"
       # Keep the marker and sentinel: moving PREV into an existing LIVE would
@@ -220,7 +220,7 @@ if [ "$(cat "$RESTORE_STATE" 2>/dev/null)" != trees-restored ] && [ -d "$PREV" ]
       exit 1
     }
   fi
-  mv "$PREV" "$LIVE" || {
+  move_tree "$PREV" "$LIVE" || {
     say "FATAL: could not move $PREV into place. Manual recovery needed:"
     say "  the untouched original tree is at $PREV"
     write_status "restore_failed" "could not move original tree into place"
@@ -237,7 +237,7 @@ record_restore_state trees-restored
 if [ -d "$PREEXISTING_PREV" ]; then
   say "Restoring the pod's pre-existing rollback slot to $PREV"
   rm -rf "$PREV"
-  mv "$PREEXISTING_PREV" "$PREV" 2>/dev/null || say "WARNING: could not restore the pod's pre-existing rollback slot at $PREV"
+  move_tree "$PREEXISTING_PREV" "$PREV" 2>/dev/null || say "WARNING: could not restore the pod's pre-existing rollback slot at $PREV"
 fi
 
 cleanup_nightstand_services

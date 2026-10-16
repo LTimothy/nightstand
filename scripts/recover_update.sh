@@ -200,11 +200,21 @@ if ! stop_writer free-sleep || ! stop_writer free-sleep-stream; then
   fail "a database writer did not stop; both trees and the marker were kept"
 fi
 if [ "$RESTORE_FROM" = "$PREV" ]; then
+  SET_ASIDE=no
   if [ -d "$LIVE" ]; then
     rm -rf "$FAILED"
-    mv "$LIVE" "$FAILED" || fail "could not preserve the failed tree"
+    move_tree "$LIVE" "$FAILED" || {
+      restore_restart_services best-effort || true
+      fail "could not preserve the failed tree"
+    }
+    SET_ASIDE=yes
   fi
-  mv "$PREV" "$LIVE" || fail "could not restore the previous tree; marker kept"
+  move_tree "$PREV" "$LIVE" || {
+    if [ "$SET_ASIDE" = yes ] && move_tree "$FAILED" "$LIVE"; then
+      restore_restart_services best-effort || true
+    fi
+    fail "could not restore the previous tree; marker kept"
+  }
 fi
 for source in "$FAILED" "$STAGE"; do
   restore_dependencies "$source"

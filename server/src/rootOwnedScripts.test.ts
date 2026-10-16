@@ -312,6 +312,19 @@ describe('update.sh', () => {
   const helpers = read('scripts/restore_helpers.sh');
   const moveTree = helpers.slice(helpers.indexOf('move_tree() {'), helpers.indexOf('\n}\n', helpers.indexOf('move_tree() {')) + 3);
 
+  it('a refused move leaves no marker behind in the tree', () => {
+    const dir = scratch();
+    try {
+      mkdirSync(path.join(dir, 'live'));
+      mkdirSync(path.join(dir, 'prev/taken'), { recursive: true });
+      const result = spawnSync('bash', ['-c', `${moveTree}\nmove_tree "$1/live" "$1/prev"`, 'x', dir], { encoding: 'utf8' });
+      assert.notEqual(result.status, 0);
+      assert.deepEqual(readdirSync(path.join(dir, 'live')), []);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   function download(isDowngrade: 'yes' | 'no', setup = '') {
     const dir = scratch();
     const release = tree(path.join(dir, 'release', 'nightstand-3.7.0'), '3.7.0');
@@ -443,8 +456,99 @@ describe('trees moved into the server user\'s folder', () => {
   it('every script moves them with the same checked move_tree', () => {
     const reference = helper(read('scripts/restore_helpers.sh'));
     for (const file of ['scripts/install.sh', 'scripts/migrate/pod-installer.sh',
-      'scripts/migrate/agent-bootstrap-installer.sh', 'ops/deploy.sh']) {
+      'scripts/migrate/agent-bootstrap-installer.sh', 'ops/deploy.sh', 'ops/rollback.sh',
+      'scripts/migrate/switch-to-this-fork.sh']) {
       assert.equal(helper(read(file)), reference, file);
+    }
+  });
+
+  // The server user can put a symlink where root is about to move a tree.
+  const plantAfterRm = (...targets: string[]) => `mkdir -p "$FIXTURE/outside"
+rm() { command rm "$@"; case "\${!#}" in ${targets.join('|')}) ln -s "$FIXTURE/outside" "\${!#}";; esac; }`;
+  const gnuMv = 'mv() { if [ "$1" = -T ]; then python3 -c \'import os, sys; os.rename(*sys.argv[1:])\' "$2" "$3"; else command mv "$@"; fi; }';
+
+  function switchDownload(setup = '') {
+    const dir = scratch();
+    const release = path.join(dir, 'release', 'free-sleep-abc');
+    mkdirSync(path.join(release, 'server'), { recursive: true });
+    writeFileSync(path.join(release, 'server/marker'), 'upstream');
+    spawnSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
+      path.join(dir, 'release'), path.join(dir, 'release')]);
+    const src = read('scripts/switch-to-upstream.sh');
+    const start = src.indexOf('say "Downloading upstream');
+    const section = src.slice(start, src.indexOf('chown -hR dac:dac "$STAGE"', start));
+    const result = spawnSync('bash', ['-c', `set -uo pipefail
+SYSTEM_DIR="$FIXTURE/system"; STAGE="$FIXTURE/home/free-sleep-revert-staging"; ZIP="$FIXTURE/home/free-sleep-revert.zip"
+SWITCH_COMMIT=abc; UPSTREAM_ZIP_URL=https://example.invalid/abc.zip
+mkdir -p "$FIXTURE/home"
+say() { :; }
+fail() { echo "FAIL $*"; exit 1; }
+curl() { while [ "$1" != -o ]; do shift; done; cp "$FIXTURE/release.zip" "$2"; }
+chown() { echo "chown $*" >> "$FIXTURE/calls"; }
+${helper(read('scripts/restore_helpers.sh'))}
+${setup}
+${section}chown -hR dac:dac "$STAGE"
+echo STAGED`], { env: { ...process.env, FIXTURE: dir }, encoding: 'utf8' });
+    const list = (name: string) => (existsSync(path.join(dir, name)) ? readdirSync(path.join(dir, name)) : []);
+    return { dir, result, outside: list('outside'), staged: list('home/free-sleep-revert-staging/server'),
+      calls: existsSync(path.join(dir, 'calls')) ? readFileSync(path.join(dir, 'calls'), 'utf8') : '' };
+  }
+
+  it('switch-to-upstream.sh unpacks upstream where only root can write, then stages it', () => {
+    const box = switchDownload();
+    try {
+      assert.match(box.result.stdout, /^STAGED$/m, box.result.stdout + box.result.stderr);
+      assert.deepEqual(box.staged, ['marker']);
+      assert.match(box.calls, /^chown -hR dac:dac \S+free-sleep-revert-staging$/m);
+    } finally { rmSync(box.dir, { recursive: true, force: true }); }
+  });
+
+  it('switch-to-upstream.sh unpacks nothing into a symlink the server user plants', () => {
+    for (const emulate of ['', gnuMv]) {
+      const box = switchDownload(`${plantAfterRm('"$STAGE"', '"$STAGE.unzip"')}\n${emulate}`);
+      try {
+        assert.match(box.result.stdout, /^FAIL could not stage upstream; live install untouched$/m, box.result.stdout + box.result.stderr);
+        assert.deepEqual(box.outside, []);
+        assert.doesNotMatch(box.calls, /chown/);
+      } finally { rmSync(box.dir, { recursive: true, force: true }); }
+    }
+  });
+
+  it('restore_dependencies moves nothing into a symlink planted at the live node_modules', () => {
+    const dir = scratch();
+    try {
+      for (const tree of ['live', 'failed']) {
+        mkdirSync(path.join(dir, tree, 'server'), { recursive: true });
+        writeFileSync(path.join(dir, tree, 'server/package-lock.json'), 'same');
+      }
+      mkdirSync(path.join(dir, 'failed/server/node_modules'));
+      mkdirSync(path.join(dir, 'outside'));
+      // Planted after the check that no node_modules is there.
+      const result = spawnSync('bash', ['-c', `source "$1"; LIVE="$FIXTURE/live"
+cmp() { ln -s "$FIXTURE/outside" "$LIVE/server/node_modules"; command cmp "$@"; }
+chown() { echo "chown $*"; }
+restore_dependencies "$FIXTURE/failed"`, 'test', path.join(repoRoot, 'scripts/restore_helpers.sh')],
+      { env: { ...process.env, FIXTURE: dir }, encoding: 'utf8' });
+      assert.deepEqual(readdirSync(path.join(dir, 'outside')), []);
+      assert.doesNotMatch(result.stdout, /chown/);
+      assert.match(result.stdout, /WARNING: could not move dependencies back/);
+      assert.ok(existsSync(path.join(dir, 'failed/server/node_modules')));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('moves no tree with a plain mv', () => {
+    // Files, not trees: the settings carried over from old installs and the restore progress note.
+    const files = /SOURCE_FILE|RESTORE_STATE\.tmp/;
+    for (const file of ['scripts/update.sh', 'scripts/switch-to-upstream.sh', 'scripts/rollback_pod.sh',
+      'scripts/recover_update.sh', 'scripts/restore_helpers.sh', 'scripts/install.sh',
+      'scripts/migrate/restore-original-fork.sh', 'scripts/migrate/pod-installer.sh',
+      'scripts/migrate/agent-bootstrap-installer.sh', 'scripts/migrate/switch-to-this-fork.sh',
+      'ops/deploy.sh', 'ops/rollback.sh']) {
+      const text = read(file);
+      const start = text.indexOf('move_tree() {');
+      const rest = start < 0 ? text : text.slice(0, start) + text.slice(text.indexOf('\n}\n', start) + 3);
+      const lines = rest.split('\n').filter(line => !/^\s*#/.test(line) && /(?:^|[\s{(|&;])mv\s+\\?["$]/.test(line) && !files.test(line));
+      assert.deepEqual(lines, [], file);
     }
   });
 

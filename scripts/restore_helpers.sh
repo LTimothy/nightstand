@@ -15,11 +15,13 @@ follow_scripts() {
 
 # Moves tree $1 to $2 in the server user's folder without following anything
 # planted at $2: mv -T where mv has it, else only onto a free name. Fails
-# unless $2 is then the moved tree.
+# unless $1 is a real folder and $2 is then the moved tree.
 move_tree() {
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
   move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
   mv -T "$1" "$2" 2>/dev/null \
-    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } \
+    || { [ -d "$1" ] && [ ! -L "$1" ] && rm -f "$1/${move_mark##*/}"; return 1; }
   [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
 }
 
@@ -49,8 +51,11 @@ restore_dependencies() {
   local source=$1
   if [ -d "$source/server/node_modules" ] && [ ! -d "$LIVE/server/node_modules" ] \
     && cmp -s "$LIVE/server/package-lock.json" "$source/server/package-lock.json"; then
-    mv "$source/server/node_modules" "$LIVE/server/node_modules"
-    chown -hR dac:dac "$LIVE/server/node_modules"
+    if move_tree "$source/server/node_modules" "$LIVE/server/node_modules"; then
+      chown -hR dac:dac "$LIVE/server/node_modules"
+    else
+      echo "WARNING: could not move dependencies back from $source"
+    fi
   fi
 }
 

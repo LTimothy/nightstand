@@ -175,7 +175,7 @@ while True:
         install = (ROOT / 'scripts/install.sh').read_text()
         self.assertNotIn('rm -f /persistent/free-sleep-data/free-sleep.db-shm', install)
         self.assertIn('sqlite-safety.py', install)
-        self.assertLess(install.index('systemctl stop "$service"'), install.index('mv "$REPO_DIR" "$PREV_DIR"'))
+        self.assertLess(install.index('systemctl stop "$service"'), install.index('move_tree "$REPO_DIR" "$PREV_DIR"'))
         reset = (ROOT / 'scripts/reset_db.sh').read_text()
         self.assertIn('set -euo pipefail', reset)
         self.assertLess(reset.index('sqlite-safety.py'), reset.index('rm -f'))

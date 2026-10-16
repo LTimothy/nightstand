@@ -253,14 +253,14 @@ describe('fork-switch tool scripts', () => {
     // aside (never rm -rf) and drop a swap marker so restore keys off "did WE
     // swap", not the bare existence of $PREV.
     it('sets the pod\'s pre-existing rollback slot aside instead of destroying it', () => {
-      assert.match(src, /mv "\$PREV" "\$PREEXISTING_PREV"/);
+      assert.match(src, /move_tree "\$PREV" "\$PREEXISTING_PREV"/);
       assert.doesNotMatch(src, /^\s*rm -rf "\$PREV"\s*$/m);
     });
 
     it('drops the swap marker before mutating $LIVE and clears it on success', () => {
       assertOrder(src, [
         ': > "$SWAP_MARKER"',
-        'mv "$LIVE" "$PREV"',
+        'move_tree "$LIVE" "$PREV"',
         'move_tree "$STAGE" "$LIVE"',
         'Health check passed',
         'rm -f "$SWAP_MARKER"',
@@ -403,7 +403,7 @@ cat "$LOG"; rm -f "$LOG"`], { encoding: 'utf8' });
     it('restores the pod\'s pre-existing rollback slot on both the no-op and revert paths', () => {
       // On revert the stashed slot goes back to $PREV; on the no-op path (died
       // before the swap) it is only put back when $PREV is currently free.
-      assert.match(src, /mv "\$PREEXISTING_PREV" "\$PREV"/);
+      assert.match(src, /move_tree "\$PREEXISTING_PREV" "\$PREV"/);
       assert.match(src, /if \[ ! -d "\$PREV" \] && \[ -d "\$PREEXISTING_PREV" \]/);
     });
 

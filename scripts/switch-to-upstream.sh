@@ -18,7 +18,7 @@ LIVE=/home/dac/free-sleep
 PREV=/home/dac/free-sleep-prev
 STAGE=/home/dac/free-sleep-revert-staging
 FAILED=/home/dac/free-sleep-revert-failed
-ZIP=/home/dac/free-sleep-revert.zip
+SYSTEM_DIR=/usr/local/lib/nightstand
 BACKUPS=/persistent/free-sleep-backups
 DATABASE_BACKUPS=/persistent/free-sleep-database-backups
 SQLITE_SAFETY="$(dirname "${BASH_SOURCE[0]}")/sqlite-safety.py"
@@ -136,7 +136,7 @@ finish_interrupted_swap() {
   if [ -n "${RESTORE_TREE:-}" ] && [ -n "${SWAP_NEW:-}" ] && [ ! -d "$SWAP_NEW" ] && [ -d "$LIVE" ] && [ -d "$RESTORE_TREE" ]; then
     # Nothing moves, and no settings go back, under a writer that will not stop.
     if stop_writer free-sleep && stop_writer free-sleep-stream; then
-      mv "$LIVE" "$SWAP_NEW" || { say "Could not move the new tree at $LIVE aside; manual recovery required"; return 0; }
+      move_tree "$LIVE" "$SWAP_NEW" || { say "Could not move the new tree at $LIVE aside; manual recovery required"; return 0; }
       modules_from=$SWAP_NEW
     else
       DATA_CHANGED=no
@@ -146,11 +146,11 @@ finish_interrupted_swap() {
   restore_switch_data || say "WARNING: restore settings from $BK/lowdb before restarting"
   [ -n "${RESTORE_TREE:-}" ] || return 0
   if [ ! -d "$LIVE" ]; then
-    mv "$RESTORE_TREE" "$LIVE" || { say "Could not move $RESTORE_TREE back to $LIVE; manual recovery required"; return 0; }
+    move_tree "$RESTORE_TREE" "$LIVE" || { say "Could not move $RESTORE_TREE back to $LIVE; manual recovery required"; return 0; }
     moved=yes
   fi
   if [ "${MOVED_MODULES:-no}" = yes ] && [ ! -d "$LIVE/server/node_modules" ] && [ -d "$modules_from/server/node_modules" ]; then
-    mv "$modules_from/server/node_modules" "$LIVE/server/node_modules"
+    move_tree "$modules_from/server/node_modules" "$LIVE/server/node_modules"
   fi
   if [ "${ARCHIVE_WAS_ACTIVE:-}" = active ]; then
     systemctl start free-sleep-archive-raw.timer >/dev/null 2>&1 || true
@@ -167,7 +167,7 @@ finish_interrupted_swap() {
     systemctl start free-sleep-stream
   fi
 }
-cleanup() { local status=$?; trap '' HUP INT TERM; close_wan; finish_interrupted_swap; rm -rf "$STAGE" "$STAGE.unzip" "$STAGE.health" "$ZIP"; record_result "$status"; }
+cleanup() { local status=$?; trap '' HUP INT TERM; close_wan; finish_interrupted_swap; rm -rf "$STAGE" "$STAGE.health" "${WORK:-}"; record_result "$status"; }
 
 fail() { say "FATAL: $*"; [ -n "${RESULT_REASON:-}" ] || RESULT_REASON="$*"; exit 1; }
 
@@ -348,16 +348,18 @@ else
   say "No checked upstream commit is recorded; installing upstream's main"
 fi
 say "Downloading upstream (throwaway31265/free-sleep ${SWITCH_COMMIT:-main})..."
-curl -fL --max-time 300 -o "$ZIP" "$UPSTREAM_ZIP_URL" || fail "download failed; live install untouched"
-rm -rf "$STAGE" "$STAGE.unzip"
-unzip -q "$ZIP" -d "$STAGE.unzip" || fail "unzip failed; live install untouched"
+# Unpacked in a folder only root can reach, then moved to the stage.
+mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
+  || fail "could not create a download folder in $SYSTEM_DIR; live install untouched"
+curl -fL --max-time 300 -o "$WORK/upstream.zip" "$UPSTREAM_ZIP_URL" || fail "download failed; live install untouched"
+unzip -q "$WORK/upstream.zip" -d "$WORK/tree" || fail "unzip failed; live install untouched"
 # GitHub names the archive's top dir after the repo and ref (repo-name +
 # "-" + branch), so resolve it dynamically rather than hardcoding it.
-STAGED_DIR=$(find "$STAGE.unzip" -mindepth 1 -maxdepth 1 -type d | head -n1)
+STAGED_DIR=$(find "$WORK/tree" -mindepth 1 -maxdepth 1 -type d | head -n1)
 [ -d "$STAGED_DIR" ] || fail "unexpected zip layout; live install untouched"
+rm -rf "$STAGE"
 move_tree "$STAGED_DIR" "$STAGE" || fail "could not stage upstream; live install untouched"
-rm -rf "$STAGE.unzip"
-rm -f "$ZIP"
+rm -rf "$WORK"
 chown -hR dac:dac "$STAGE"
 # Checked with the installed copy of the digest script, never the downloaded one.
 if [ -n "$SWITCH_COMMIT" ]; then
@@ -487,7 +489,7 @@ python3 "$(dirname "${BASH_SOURCE[0]}")/prepare-upstream.py" /persistent/free-sl
 say "RAW archive retained; remove it manually only if no longer needed:"
 du -sh /persistent/free-sleep-data/raw-archive 2>/dev/null || true
 rm -rf "$PREV"
-mv "$LIVE" "$PREV" || {
+move_tree "$LIVE" "$PREV" || {
   restore_switch_data_or_fail "could not restore settings from $BK/lowdb"
   systemctl start free-sleep
   if [ "$STREAM_WAS_ACTIVE" = active ]; then
@@ -512,8 +514,8 @@ RESULT_PHASE=swapped
 MOVED_MODULES=no
 if [ "$LOCK_SAME" = yes ]; then
   MOVED_MODULES=yes
-  mv "$PREV/server/node_modules" "$LIVE/server/node_modules"
-  chown -hR dac:dac "$LIVE/server/node_modules"
+  move_tree "$PREV/server/node_modules" "$LIVE/server/node_modules" \
+    && chown -hR dac:dac "$LIVE/server/node_modules"
 fi
 
 # No prisma step: migrations are additive, so upstream's schema is already
@@ -622,7 +624,7 @@ if ! stop_writer free-sleep || ! stop_writer free-sleep-stream; then
 fi
 rm -rf "$FAILED"
 SWAP_NEW=
-mv "$LIVE" "$FAILED" || {
+move_tree "$LIVE" "$FAILED" || {
   restore_switch_data_or_fail "could not restore settings from $BK/lowdb"
   systemctl start free-sleep
   if [ "$STREAM_WAS_ACTIVE" = active ]; then
@@ -630,8 +632,8 @@ mv "$LIVE" "$FAILED" || {
   fi
   fail "could not move failed tree aside; attempted to restart the tree at $LIVE; manual recovery required"
 }
-mv "$PREV" "$LIVE" || {
-  mv "$FAILED" "$LIVE" || fail "could not restore either tree; manual recovery required"
+move_tree "$PREV" "$LIVE" || {
+  move_tree "$FAILED" "$LIVE" || fail "could not restore either tree; manual recovery required"
   restore_switch_data_or_fail "could not restore settings from $BK/lowdb"
   systemctl start free-sleep
   if [ "$STREAM_WAS_ACTIVE" = active ]; then
@@ -641,7 +643,7 @@ mv "$PREV" "$LIVE" || {
 }
 RESULT_PHASE=restored
 if [ "$MOVED_MODULES" = yes ]; then
-  mv "$FAILED/server/node_modules" "$LIVE/server/node_modules"
+  move_tree "$FAILED/server/node_modules" "$LIVE/server/node_modules"
 fi
 restore_switch_data_or_fail "could not restore settings from $BK/lowdb"
 sh "$NIGHTSTAND_SCRIPTS/block_internet_access.sh" || say "WARNING: restored firewall could not be applied"

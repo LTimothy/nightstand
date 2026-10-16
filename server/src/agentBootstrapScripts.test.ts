@@ -66,7 +66,7 @@ describe('the agent bootstrap scripts', () => {
     assertOrder(read(POD), [
       'systemctl enable --now "$SENTINEL_TIMER"',
       'systemctl stop free-sleep',
-      'mv "$LIVE" "$PREV"',
+      'move_tree "$LIVE" "$PREV"',
     ], 'sentinel-before-swap');
   });
 
@@ -94,7 +94,7 @@ describe('the agent bootstrap scripts', () => {
     // restore-original-fork.sh keys off this marker to decide whether a swap
     // began. Setting it after the move would leave a window where a killed
     // installer looks like it never started.
-    assertOrder(read(POD), [': > "$SWAP_MARKER"', 'mv "$LIVE" "$PREV"'], 'marker-before-move');
+    assertOrder(read(POD), [': > "$SWAP_MARKER"', 'move_tree "$LIVE" "$PREV"'], 'marker-before-move');
   });
 
   it('installs the rollback and revert units and their sudoers rules only after a passed health check', () => {
@@ -158,7 +158,7 @@ describe('the agent bootstrap scripts', () => {
 
   it('keeps the stock tree for rollback rather than deleting it', () => {
     const pod = read(POD);
-    assert.match(pod, /mv "\$LIVE" "\$PREV"/, 'the stock tree is not preserved at $PREV');
+    assert.match(pod, /move_tree "\$LIVE" "\$PREV"/, 'the stock tree is not preserved at $PREV');
     assert.doesNotMatch(pod, /rm -rf "\$PREV"/, 'the stock tree must never be deleted outright');
   });
 });

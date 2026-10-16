@@ -117,13 +117,26 @@ if [ -n "$RESTORE_TARBALL" ]; then
   done
   [ -n "$SSH_PORT" ] || fail "could not reach $POD_IP over SSH on port 8822 or 22"
   say "Pushing backup tarball..."
-  scp_to_pod "$SSH_PORT" "$RESTORE_TARBALL" "/home/dac/free-sleep-restore.tar.gz" \
+  { ssh_cmd "$SSH_PORT" "mkdir -p /usr/local/lib/nightstand" \
+    && scp_to_pod "$SSH_PORT" "$RESTORE_TARBALL" "/usr/local/lib/nightstand/free-sleep-restore.tar.gz"; } \
     || fail "could not upload backup; live install untouched"
   say "Extracting and restarting..."
+  # The same move_tree as the pod scripts.
+  MOVE_TREE='move_tree() {
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
+  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
+  mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } \
+    || { [ -d "$1" ] && [ ! -L "$1" ] && rm -f "$1/${move_mark##*/}"; return 1; }
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+}
+'
+  # Unpacked where only root can write, so the server user cannot swap it.
   ssh_cmd "$SSH_PORT" "
     set -eu
+    $MOVE_TREE
     LIVE=/home/dac/free-sleep
-    STAGE=\$(mktemp -d /home/dac/free-sleep-restore.XXXXXX)
+    STAGE=\$(mktemp -d /usr/local/lib/nightstand/.restore.XXXXXX)
     report_restore_tree() {
       if [ -d \"\$STAGE/previous\" ]; then
         du -sh \"\$STAGE/previous\"
@@ -133,7 +146,7 @@ if [ -n "$RESTORE_TARBALL" ]; then
       fi
     }
     trap report_restore_tree EXIT
-    tar xzf /home/dac/free-sleep-restore.tar.gz -C \"\$STAGE\"
+    tar xzf /usr/local/lib/nightstand/free-sleep-restore.tar.gz -C \"\$STAGE\"
     [ -f \"\$STAGE/free-sleep/server/dist/server.js\" ] &&
       [ -f \"\$STAGE/free-sleep/server/public/index.html\" ] &&
       [ -f \"\$STAGE/free-sleep/server/package.json\" ] &&
@@ -153,16 +166,16 @@ if [ -n "$RESTORE_TARBALL" ]; then
     systemctl stop free-sleep-stream 2>/dev/null || true
     systemctl stop free-sleep 2>/dev/null || true
     if [ -e \"\$LIVE\" ]; then
-      mv \"\$LIVE\" \"\$STAGE/previous\" || { restart_services; exit 1; }
+      move_tree \"\$LIVE\" \"\$STAGE/previous\" || { restart_services; exit 1; }
     fi
-    mv \"\$STAGE/free-sleep\" \"\$LIVE\" || {
+    move_tree \"\$STAGE/free-sleep\" \"\$LIVE\" || {
       if [ -d \"\$STAGE/previous\" ]; then
-        mv \"\$STAGE/previous\" \"\$LIVE\" && restart_services
+        move_tree \"\$STAGE/previous\" \"\$LIVE\" && restart_services
       fi
       exit 1
     }
     restart_services
-    rm -f /home/dac/free-sleep-restore.tar.gz
+    rm -f /usr/local/lib/nightstand/free-sleep-restore.tar.gz
   " || fail "restore failed over SSH. Keep $RESTORE_TARBALL and inspect the Pod state before retrying"
   say "Restore complete. Check http://$POD_IP:3000/ once it's back up."
   exit 0

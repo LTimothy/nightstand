@@ -316,7 +316,7 @@ describe('where each script marks its progress', () => {
     assert.ok(src.indexOf('RESULT_PHASE=swapping') < src.indexOf('! stop_late_stream; then'));
     assert.ok(src.indexOf('RESULT_PHASE=swapped') > src.indexOf('move_tree "$STAGE" "$LIVE" || {'));
     const rollback = src.indexOf('# --- automatic rollback');
-    assert.ok(src.indexOf('RESULT_PHASE=restored', rollback) > src.indexOf('mv "$PREV" "$LIVE" || {', rollback));
+    assert.ok(src.indexOf('RESULT_PHASE=restored', rollback) > src.indexOf('move_tree "$PREV" "$LIVE" || {', rollback));
     assert.ok(src.indexOf('UP_TO_DATE=yes') < src.indexOf('Already up to date'));
     assert.match(src, /RESULT_REASON="Nightstand is already up to date \(the newest published version is v\$REMOTE_VERSION\)"/);
   });
@@ -325,10 +325,10 @@ describe('where each script marks its progress', () => {
     const src = read('scripts/update.sh');
     // The rollback slot is deleted and the services restart before either move, so the old
     // tree coming back is a restore, not an untouched install.
-    const first = follows(src, 'RESULT_PHASE=restored', 'mv "$LIVE" "$PREV" || {');
+    const first = follows(src, 'RESULT_PHASE=restored', 'move_tree "$LIVE" "$PREV" || {');
     assert.ok(first < src.indexOf('fail "swap failed moving live aside"'));
     const second = follows(src, 'RESULT_PHASE=restored', 'move_tree "$STAGE" "$LIVE" || {');
-    assert.ok(second > src.indexOf('mv "$PREV" "$LIVE" || fail "swap failed and previous tree could not be restored'));
+    assert.ok(second > src.indexOf('move_tree "$PREV" "$LIVE" || fail "swap failed and previous tree could not be restored'));
     assert.ok(second < src.indexOf('fail "swap failed; previous version restored"'));
   });
 
@@ -352,12 +352,12 @@ describe('where each script marks its progress', () => {
     const start = script.indexOf('# --- swap ');
     assert.ok(start >= 0, 'missing the legacy swap section');
     const src = script.slice(start);
-    assert.ok(src.indexOf('RESULT_PHASE=swapped') > src.indexOf('mv "$PREV" "$LIVE" || {'));
+    assert.ok(src.indexOf('RESULT_PHASE=swapped') > src.indexOf('move_tree "$PREV" "$LIVE" || {'));
     assert.match(src, /RESULT_PHASE=swapping/);
     const back = src.slice(src.indexOf('# --- swap back on failure'));
     const restored = back.indexOf('RESULT_PHASE=restored');
-    assert.ok(restored > back.indexOf('mv "$PREV" "$LIVE" || {'));
-    assert.ok(restored < back.indexOf('mv "$TMP" "$PREV" || {'));
+    assert.ok(restored > back.indexOf('move_tree "$PREV" "$LIVE" || {'));
+    assert.ok(restored < back.indexOf('move_tree "$TMP" "$PREV" || {'));
     assert.match(back, /else\n {2}RESULT_PHASE=swapped\n {2}fail "rollback failed AND the restore-back health check failed too/);
   });
 
@@ -435,11 +435,11 @@ wait $!
     const src = script.slice(start);
     assert.ok(src.indexOf('RESULT_PHASE=swapped') > src.indexOf('move_tree "$STAGE" "$LIVE" || {'));
     const rollback = src.indexOf('# --- automatic rollback');
-    assert.ok(src.indexOf('RESULT_PHASE=restored', rollback) > src.indexOf('mv "$PREV" "$LIVE" || {', rollback));
+    assert.ok(src.indexOf('RESULT_PHASE=restored', rollback) > src.indexOf('move_tree "$PREV" "$LIVE" || {', rollback));
     assert.ok(src.indexOf('RESULT_PHASE=swapping') > src.indexOf('# --- atomic swap'));
     // A server that will not stop has changed nothing, so it is not yet a swap.
     assert.ok(src.indexOf('RESULT_PHASE=swapping') > src.indexOf('could not stop the server before converting settings'));
-    const phases = src.slice(src.indexOf('rm -rf "$PREV"\nmv "$LIVE" "$PREV" || {'));
+    const phases = src.slice(src.indexOf('rm -rf "$PREV"\nmove_tree "$LIVE" "$PREV" || {'));
     assert.ok(phases.indexOf('RESULT_PHASE=restored') < phases.indexOf('fail "swap failed moving live aside"'));
     const secondMove = phases.indexOf('move_tree "$STAGE" "$LIVE" || {');
     assert.ok(phases.indexOf('RESULT_PHASE=restored', secondMove) < phases.indexOf('fail "swap failed; fork restored"'));
@@ -572,7 +572,7 @@ ${section}
       'the new version could not be put in place, so it never started',
     ],
     [
-      'scripts/switch-to-upstream.sh', 'switch', 'rm -rf "$PREV"\nmv "$LIVE" "$PREV" || {',
+      'scripts/switch-to-upstream.sh', 'switch', 'rm -rf "$PREV"\nmove_tree "$LIVE" "$PREV" || {',
       'upstream free-sleep could not be put in place, so it never started',
     ],
   ];
@@ -609,7 +609,7 @@ CUR_VERSION=3.6.0; EXPECTED_VERSION=3.5.1; STAGED_VERSION=1.0.0; TARGET_VERSION=
 LIVE=live; PREV=prev; TMP=tmp; FAILED=failed; STAGE=stage; BK=bk; MOVED_MODULES=no; STREAM_WAS_ACTIVE=no
 SYSTEM_DIR=system; NIGHTSTAND_SCRIPTS=scripts; follow_scripts() { :; }
 RESULT_PHASE=swapped
-systemctl() { :; }; stop_writer() { :; }; rm() { :; }; mv() { :; }; sh() { :; }; tail() { :; }
+systemctl() { :; }; stop_writer() { :; }; rm() { :; }; mv() { :; }; move_tree() { :; }; sh() { :; }; tail() { :; }
 restore_switch_data_or_fail() { :; }; restart_services() { :; }; fix_shared_node_modules() { :; }
 sleep() { echo $(( $(cat '${clock}') + $1 )) > '${clock}'; }
 # The server answers with the code for the current second; 000 is no answer.

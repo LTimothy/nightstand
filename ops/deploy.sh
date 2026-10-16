@@ -211,9 +211,11 @@ SYSTEM_DIR=/usr/local/lib/nightstand
 SHIP_DIR=
 # The same move_tree as the pod scripts, for the commands run there over SSH.
 MOVE_TREE='move_tree() {
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
   move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
   mv -T "$1" "$2" 2>/dev/null \
-    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } \
+    || { [ -d "$1" ] && [ ! -L "$1" ] && rm -f "$1/${move_mark##*/}"; return 1; }
   [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
 }
 '
@@ -368,11 +370,11 @@ SSH "set -e
   $MOVE_TREE
   systemctl stop free-sleep
   rm -rf $PREV
-  mv $LIVE $PREV
-  move_tree $STAGE $LIVE
+  move_tree $LIVE $PREV || { systemctl start free-sleep; exit 1; }
+  move_tree $STAGE $LIVE || { move_tree $PREV $LIVE; systemctl start free-sleep; exit 1; }
 " || die "swap failed - pod may need manual attention: $POD_SSH_HINT, check $LIVE/$PREV/$STAGE"
 if [ "$LOCK_SAME" = "yes" ]; then
-  SSH "mv $PREV/server/node_modules $LIVE/server/node_modules && chown -hR dac:dac $LIVE/server/node_modules"
+  SSH "$MOVE_TREE move_tree $PREV/server/node_modules $LIVE/server/node_modules && chown -hR dac:dac $LIVE/server/node_modules"
   MOVED_MODULES=yes
 fi
 
@@ -486,9 +488,9 @@ SSH "set -e
   $MOVE_TREE
   systemctl stop free-sleep || true
   rm -rf /home/dac/free-sleep-failed
-  mv $LIVE /home/dac/free-sleep-failed
-  move_tree $PREV $LIVE
-  if [ '$MOVED_MODULES' = yes ]; then mv /home/dac/free-sleep-failed/server/node_modules $LIVE/server/node_modules; fi
+  move_tree $LIVE /home/dac/free-sleep-failed || { systemctl start free-sleep; exit 1; }
+  move_tree $PREV $LIVE || { move_tree /home/dac/free-sleep-failed $LIVE; systemctl start free-sleep; exit 1; }
+  if [ '$MOVED_MODULES' = yes ]; then move_tree /home/dac/free-sleep-failed/server/node_modules $LIVE/server/node_modules; fi
   systemctl start free-sleep
 "
 sleep 8

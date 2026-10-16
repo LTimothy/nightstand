@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -29,7 +29,7 @@ function run(script: string, setup = '') {
     'import os, sys\nopen(os.environ["FIXTURE"] + "/system-scripts", "a").write(" ".join(sys.argv[1:]) + "\\n")\n');
   const env = { ...process.env, FIXTURE: dir };
   const fixtureScript = script.replaceAll('/home/dac/free-sleep', `${dir}/live`)
-    .replaceAll('/persistent/', `${dir}/persistent/`);
+    .replaceAll('/persistent/', `${dir}/persistent/`).replaceAll('/usr/local/lib/nightstand', `${dir}/system`);
   const result = spawnSync('bash', ['-c', `set -uo pipefail
 LIVE="$FIXTURE/live"; PREV="$FIXTURE/prev"; FAILED="$FIXTURE/failed"; TMP="$FIXTURE/tmp"; STAGE="$FIXTURE/stage"
 NIGHTSTAND_SCRIPTS="$FIXTURE/scripts"; NEW_COPY="$FIXTURE/copy"; SYSTEM_DIR="$FIXTURE/system"
@@ -68,6 +68,7 @@ ${fixtureScript}`], { env, encoding: 'utf8', input: 'y\n', timeout: 5000 });
     liveVersion: read('live/version'), previousVersion: read('prev/version'), marker: read('marker'),
     serverState: read('state-free-sleep').trim(), streamState: read('state-free-sleep-stream').trim(), phase: read('phase'),
     failedVersion: read('failed/version'), tmpVersion: read('tmp/version'),
+    outside: existsSync(path.join(dir, 'outside')) ? readdirSync(path.join(dir, 'outside')) : [],
     settings: read('persistent/free-sleep-data/lowdb/settingsDB.json'), modules: read('live/server/node_modules/marker'),
   };
   rmSync(dir, { recursive: true, force: true });
@@ -173,12 +174,12 @@ curl() { return 22; }
 function runRestore(setup = '') {
   return run(section('scripts/migrate/switch-to-this-fork.sh', '  say "Extracting and restarting..."', '  say "Restore complete.'), `
 RESTORE_TARBALL=backup
-mkdir -p "$FIXTURE/archive/free-sleep/server/"{dist,public,node_modules}
+mkdir -p "$FIXTURE/system" "$FIXTURE/archive/free-sleep/server/"{dist,public,node_modules}
 printf restored > "$FIXTURE/archive/free-sleep/version"
 touch "$FIXTURE/archive/free-sleep/server/dist/server.js" "$FIXTURE/archive/free-sleep/server/public/index.html"
 echo '{"name":"fixture"}' > "$FIXTURE/archive/free-sleep/server/package.json"
 echo dependency > "$FIXTURE/archive/free-sleep/server/node_modules/dependency"
-tar czf "$FIXTURE/live-restore.tar.gz" -C "$FIXTURE/archive" .
+tar czf "$FIXTURE/system/free-sleep-restore.tar.gz" -C "$FIXTURE/archive" .
 ssh_cmd() { command bash -c "$2"; }
 export -f systemctl chown
 export LIVE
@@ -187,7 +188,7 @@ ${setup}
 }
 
 it('a corrupt restore archive leaves the live tree running and exits with failure', () => {
-  const result = runRestore('echo corrupt > "$FIXTURE/live-restore.tar.gz"');
+  const result = runRestore('echo corrupt > "$FIXTURE/system/free-sleep-restore.tar.gz"');
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.equal(result.liveVersion, 'failed');
   assert.equal(result.services, '');
@@ -196,7 +197,7 @@ it('a corrupt restore archive leaves the live tree running and exits with failur
 it('a restore archive without installed dependencies leaves the live tree untouched', () => {
   const result = runRestore(`
 rm -rf "$FIXTURE/archive/free-sleep/server/node_modules"
-tar czf "$FIXTURE/live-restore.tar.gz" -C "$FIXTURE/archive" .
+tar czf "$FIXTURE/system/free-sleep-restore.tar.gz" -C "$FIXTURE/archive" .
 `);
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.equal(result.liveVersion, 'failed');
@@ -216,14 +217,14 @@ export -f systemctl
   assert.match(result.services, /stop free-sleep-stream failed/);
   assert.match(result.services, /start free-sleep restored/);
   assert.match(result.services, /restart free-sleep-stream restored/);
-  assert.match(result.stdout, /[0-9]+[KMGT]?\s+.*restore\.[^/]+\/previous/);
+  assert.match(result.stdout, /[0-9]+[KMGT]?\s+.*\.restore\.[^/]+\/previous/);
   assert.match(result.stdout, /remove.*after|after.*remove/i);
 });
 
 it('a restore service start failure is reported as failure', () => {
   const result = runRestore('systemctl() { [ "$1" != start ]; }; export -f systemctl');
   assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.match(result.stdout, /[0-9]+[KMGT]?\s+.*restore\.[^/]+\/previous/);
+  assert.match(result.stdout, /[0-9]+[KMGT]?\s+.*\.restore\.[^/]+\/previous/);
   assert.match(result.stdout, /remove.*after|after.*remove/i);
 });
 
@@ -231,7 +232,7 @@ for (const mode of ['previous', 'backup']) {
   it(`ops rollback ${mode} restores the biometrics service with code`, () => {
     const script = section('ops/rollback.sh', 'if [ "${1:-}" = "--from" ]; then', '\nsleep 8');
     const result = run(script, `
-BACKUPS="$FIXTURE/backups"
+BACKUPS="$FIXTURE/backups"; MOVE_TREE=
 SSH() { echo "$*" > "$FIXTURE/ssh"; }
 ${mode === 'backup' ? 'set -- --from fixture' : 'set --'}
 `);
@@ -258,7 +259,7 @@ disarm_sentinel() { echo disarmed; }
 for (const failedSource of ['LIVE', 'PREV']) {
   it(`rollback recovery restarts the surviving tree when moving ${failedSource} fails`, () => {
     const result = run(section('scripts/rollback_pod.sh', '# --- swap back on failure'), `
-mv() { if [ "$1" = "$${failedSource}" ]; then return 1; else command mv "$@"; fi; }
+mv() { [ "$1" != -T ] || shift; if [ "$1" = "$${failedSource}" ]; then return 1; else command mv "$@"; fi; }
 `);
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.equal(result.liveVersion, 'failed');
@@ -270,7 +271,7 @@ mv() { if [ "$1" = "$${failedSource}" ]; then return 1; else command mv "$@"; fi
 
 it('rollback recovery reports manual recovery when neither tree can be restored', () => {
   const result = run(section('scripts/rollback_pod.sh', '# --- swap back on failure'), `
-mv() { if [ "$2" = "$LIVE" ]; then return 1; else command mv "$@"; fi; }
+mv() { [ "$1" != -T ] || shift; if [ "$2" = "$LIVE" ]; then return 1; else command mv "$@"; fi; }
 `);
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.equal(result.liveVersion, '');
@@ -280,7 +281,7 @@ mv() { if [ "$2" = "$LIVE" ]; then return 1; else command mv "$@"; fi; }
 
 it('a failed forward rollback bookkeeping move restores the original tree before exiting', () => {
   const result = run(section('scripts/rollback_pod.sh', '# --- swap', '# --- health check'), `
-mv() { if [ "$1" = "$TMP" ] && [ "$2" = "$PREV" ]; then return 1; else command mv "$@"; fi; }
+mv() { [ "$1" != -T ] || shift; if [ "$1" = "$TMP" ] && [ "$2" = "$PREV" ]; then return 1; else command mv "$@"; fi; }
 ${statefulServices()}
 `);
   assert.equal(result.status, 1, result.stdout + result.stderr);
@@ -308,7 +309,7 @@ it('original-fork restore preserves the previous tree and sentinel when quaranti
   const result = run(section('scripts/migrate/restore-original-fork.sh', 'say "Swap marker present'), `
 ABORTED_QUARANTINE="$FIXTURE/quarantine"; PREEXISTING_PREV="$FIXTURE/preexisting"
 SWAP_MARKER="$FIXTURE/marker"; echo armed > "$SWAP_MARKER"
-mv() { if [ "$1" = "$LIVE" ]; then return 1; else command mv "$@"; fi; }
+mv() { [ "$1" != -T ] || shift; if [ "$1" = "$LIVE" ]; then return 1; else command mv "$@"; fi; }
 restore_iptables() { :; }
 write_status() { echo "status: $*"; }
 disarm_sentinel() { echo disarmed; }
@@ -322,7 +323,7 @@ disarm_sentinel() { echo disarmed; }
 
 it('a failed rollback bookkeeping move still starts the restored install', () => {
   const result = run(section('scripts/rollback_pod.sh', '# --- swap back on failure'), `
-mv() { if [ "$1" = "$TMP" ] && [ "$2" = "$PREV" ]; then return 1; else command mv "$@"; fi; }
+mv() { [ "$1" != -T ] || shift; if [ "$1" = "$TMP" ] && [ "$2" = "$PREV" ]; then return 1; else command mv "$@"; fi; }
 `);
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.equal(result.liveVersion, 'restored');
@@ -334,7 +335,7 @@ for (const file of ['scripts/update.sh', 'scripts/switch-to-upstream.sh']) {
   for (const failedSource of ['LIVE', 'PREV']) {
     it(`${file} restarts the available tree when moving ${failedSource} fails during recovery`, () => {
       const result = run(section(file, '# --- automatic rollback'), `
-mv() { if [ "$1" = "$${failedSource}" ]; then return 1; else command mv "$@"; fi; }
+mv() { [ "$1" != -T ] || shift; if [ "$1" = "$${failedSource}" ]; then return 1; else command mv "$@"; fi; }
 `);
       assert.equal(result.status, 1, result.stdout + result.stderr);
       assert.equal(result.liveVersion, 'failed');
@@ -383,7 +384,7 @@ it('a failed rollback bookkeeping move recovers shared dependencies before start
 mkdir "$LIVE/server/node_modules"
 echo same > "$LIVE/server/package-lock.json"
 echo same > "$PREV/server/package-lock.json"
-mv() { if [ "$1" = "$TMP" ] && [ "$2" = "$PREV" ]; then return 1; else command mv "$@"; fi; }
+mv() { [ "$1" != -T ] || shift; if [ "$1" = "$TMP" ] && [ "$2" = "$PREV" ]; then return 1; else command mv "$@"; fi; }
 systemctl() {
   [ "$1" != is-active ] || { echo inactive; return 3; }
   if [ "$1" = start ]; then [ -d "$LIVE/server/node_modules" ] && echo modules > "$FIXTURE/marker"; fi
@@ -396,7 +397,7 @@ systemctl() {
 for (const failedMove of ['live', 'replacement']) {
   it(`a restore ${failedMove} move failure restarts the original install`, () => {
     const result = runRestore(`
-mv() {
+mv() { [ "$1" != -T ] || shift;
   if ${failedMove === 'live' ? '[ "$1" = "$LIVE" ]' : '[[ "$1" = */free-sleep ]]'}; then return 1; fi
   command mv "$@"
 }
@@ -505,7 +506,7 @@ for (const { failedSources, expectedVersion } of [
   it(`forward rollback preserves a tree when moves from ${failedSources.join(', ')} fail`, () => {
     const result = run(section('scripts/rollback_pod.sh', '# --- swap', '# --- health check'), `
 moves=0
-mv() {
+mv() { [ "$1" != -T ] || shift;
   moves=$((moves + 1))
   if [ "$moves" -ge ${failedSources[0] === 'TMP' ? 3 : 1} ]; then
     case "$1" in ${failedSources.map(source => `"$${source}"`).join('|')}) return 1;; esac
@@ -588,7 +589,7 @@ for (const [file, from, to, reason, setup, tree] of [
   });
 }
 
-const termAfterMovingLive = 'mv() { command mv "$@" || return; [ "$1" != "$LIVE" ] || kill -TERM $$; }';
+const termAfterMovingLive = 'mv() { [ "$1" != -T ] || shift; command mv "$@" || return; [ "$1" != "$LIVE" ] || kill -TERM $$; }';
 
 // The script's own exit handling around one of its swaps.
 function withExitHandling(file: string, swap: string) {
@@ -641,7 +642,7 @@ restore_switch_data() { DATA_CHANGED=no; }; ${staged}`, 'failed'],
     it(`${file} interrupted right after moving the new tree in starts the previous one`, () => {
       const result = run(withExitHandling(file, swap), `${stubs}\n${statefulServices()}\n${setup}
 LOCK_SAME=yes; mkdir -p "$LIVE/server/node_modules"
-mv() { command mv "$@" || return; [ "$1 $2" != "$STAGE $LIVE" ] || kill -TERM $$; }`);
+mv() { [ "$1" != -T ] || shift; command mv "$@" || return; [ "$1 $2" != "$STAGE $LIVE" ] || kill -TERM $$; }`);
       assert.equal(result.status, 143, result.stdout + result.stderr);
       assert.equal(result.liveVersion, 'failed', result.stdout + result.stderr);
       assert.equal(result.serverState, 'active', result.services);
@@ -707,7 +708,7 @@ STOP_FAILS=free-sleep`);
 
 // The stream started while the server stopped is stopped again before any
 // tree moves, and runs again once the swap is done.
-const streamAtMove = 'mv() { cat "$FIXTURE/state-free-sleep-stream" >> "$FIXTURE/ssh"; command mv "$@"; }';
+const streamAtMove = 'mv() { [ "$1" != -T ] || shift; cat "$FIXTURE/state-free-sleep-stream" >> "$FIXTURE/ssh"; command mv "$@"; }';
 for (const [file, from, to, setup] of [
   ['scripts/update.sh', '# --- atomic swap', 'MOVED_MODULES=no', `IS_DOWNGRADE=no; STAGED_VERSION=3.2.0; ${staged}`],
   ['scripts/rollback_pod.sh', '# --- swap', '# --- health check', ''],
@@ -743,7 +744,7 @@ for (const [file, from, to, setup] of [
 const revertSettings = `${section('scripts/switch-to-upstream.sh', 'restore_switch_data() {', '\n# While downloading')}`;
 const switchedSettings = `DATA_CHANGED=yes; RESTORE_ATTEMPTED=no; ARCHIVE_WAS_ACTIVE=inactive; BK="$FIXTURE/bk"
 mkdir -p "$BK/lowdb"; echo original > "$BK/lowdb/settingsDB.json"; echo original > "$BK/lowdb/schedulesDB.json"`;
-const recordMoves = 'mv() { echo "mv $*" >> "$FIXTURE/ssh"; command mv "$@"; }';
+const recordMoves = 'mv() { [ "$1" != -T ] || shift; echo "mv $*" >> "$FIXTURE/ssh"; command mv "$@"; }';
 for (const [file, marker] of [
   ['scripts/update.sh', '# --- automatic rollback'],
   ['scripts/rollback_pod.sh', '# --- swap back on failure'],
@@ -953,7 +954,8 @@ ${switchSettings}`, '1.0.0'],
   const setup = (extra: string) =>
     `${stubs}\n${statefulServices()}\n${lentModules}\nfw4() { :; }; fw6() { :; }; sh() { :; }\n${staging}\n${extra}`;
   const interruptions: [string, string][] = [
-    ['after the dependencies move', 'mv() { command mv "$@" || return; [ "$1" != "$PREV/server/node_modules" ] || kill -TERM $$; }'],
+    ['after the dependencies move',
+      'mv() { [ "$1" != -T ] || shift; command mv "$@" || return; [ "$1" != "$PREV/server/node_modules" ] || kill -TERM $$; }'],
     ['after the new server starts', `TERM_ON="start free-sleep"\n${answering(healthyVersion)}`],
     ['during the health check', `TERM_ON_HEALTH=1\n${answering(healthyVersion)}`],
   ];
@@ -1076,3 +1078,109 @@ python3() {
     assert.match(result.marker, /companion --stage/);
   }
 });
+
+// The server user owns /home/dac, so it can put a symlink back at a name root
+// has just removed. Each move refuses it: nothing lands in the link's
+// target, and the tree that was running starts again.
+const plantAfterRm = (target: string) => `mkdir -p "$FIXTURE/outside"
+rm() { command rm "$@"; [ "\${!#}" != "${target}" ] || ln -s "$FIXTURE/outside" "\${!#}"; }
+export -f rm`;
+for (const [file, from, to, target] of [
+  ['scripts/update.sh', '# Flush the installed recovery helper', 'RESULT_PHASE=swapped', '$PREV'],
+  ['scripts/update.sh', '# --- automatic rollback', undefined, '$FAILED'],
+  ['scripts/switch-to-upstream.sh', 'du -sh /persistent/free-sleep-data/raw-archive', 'RESULT_PHASE=swapped', '$PREV'],
+  ['scripts/switch-to-upstream.sh', '# --- automatic rollback', undefined, '$FAILED'],
+  ['scripts/rollback_pod.sh', '# --- swap', '# --- health check', '$TMP'],
+  ['scripts/rollback_pod.sh', '# --- swap back on failure', undefined, '$TMP'],
+] as const) {
+  it(`${file} moves no tree into a symlink planted at ${target} (${from.slice(0, 30)})`, () => {
+    const result = run(section(file, from, to), `${plantAfterRm(target)}
+${statefulServices()}`);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.deepEqual(result.outside, []);
+    assert.equal(result.liveVersion, 'failed');
+    if (target !== '$PREV') assert.equal(result.previousVersion, 'restored');
+    assert.match(result.services, /^start free-sleep failed$/m);
+  });
+}
+
+it('original-fork restore moves no tree into a symlink planted at the quarantine', () => {
+  const result = run(section('scripts/migrate/restore-original-fork.sh', 'say "Swap marker present'), `
+ABORTED_QUARANTINE="$FIXTURE/quarantine"; PREEXISTING_PREV="$FIXTURE/preexisting"
+SWAP_MARKER="$FIXTURE/marker"; echo armed > "$SWAP_MARKER"
+${plantAfterRm('$ABORTED_QUARANTINE')}
+restore_iptables() { :; }
+write_status() { echo "status: $*"; }
+disarm_sentinel() { echo disarmed; }
+`);
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.deepEqual(result.outside, []);
+  assert.equal(result.liveVersion, 'failed');
+  assert.equal(result.previousVersion, 'restored');
+  assert.equal(result.marker, 'armed\n');
+});
+
+for (const mode of ['previous', 'backup']) {
+  it(`ops rollback ${mode} moves no tree into a symlink planted where the live tree goes`, () => {
+    const target = mode === 'backup' ? '$PREV' : '$LIVE-failed';
+    const result = run(section('ops/rollback.sh', "MOVE_TREE='", '\nif ssh ') +
+      section('ops/rollback.sh', 'if [ "${1:-}" = "--from" ]; then', '\nsleep 8'), `
+BACKUPS="$FIXTURE/backups"; mkdir -p "$BACKUPS/fixture"
+tar czf "$BACKUPS/fixture/code.tar.gz" -C "$FIXTURE" prev
+${plantAfterRm(target)}
+SSH() { command bash -c "$1"; }
+python3() { :; }
+export -f systemctl python3; export LIVE PREV
+${mode === 'backup' ? 'set -- --from fixture' : 'set --'}
+`);
+    assert.deepEqual(result.outside, []);
+    assert.equal(result.liveVersion, 'failed');
+    assert.match(result.services, /^start free-sleep failed$/m);
+  });
+}
+
+it('ops deploy rollback moves no tree into a symlink planted where the failed tree goes', () => {
+  const result = run(section('ops/deploy.sh', "MOVE_TREE='", 'ship_to_stage() {') +
+    section('ops/deploy.sh', '# --- automatic rollback', '\nsleep 8'), `
+POD_VERSION=3.0.0; POD_IP=pod; MOVED_MODULES=no
+${plantAfterRm('$LIVE-failed')}
+SSH() { command bash -c "$1"; }
+export -f systemctl; export LIVE
+`);
+  assert.deepEqual(result.outside, []);
+  assert.equal(result.liveVersion, 'failed');
+  assert.match(result.services, /^start free-sleep failed$/m);
+});
+
+it('a laptop restore moves no tree into a symlink planted at the live path', () => {
+  const result = runRestore(`
+mkdir -p "$FIXTURE/outside"
+mv() {
+  local from=$1
+  [ "$from" != -T ] || from=$2
+  command mv "$@" || return
+  [ "$from" != "$LIVE" ] || ln -s "$FIXTURE/outside" "$LIVE"
+}
+export -f mv
+`);
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.deepEqual(result.outside, []);
+  assert.match(result.stdout, /\.restore\.[^/]+\/previous/);
+});
+
+for (const [file, from] of [
+  ['scripts/migrate/pod-installer.sh', 'rm -rf "$PREEXISTING_PREV"'],
+  ['scripts/migrate/agent-bootstrap-installer.sh', 'rm -rf "$PREEXISTING_PREV"'],
+]) {
+  it(`${file} sets no rollback slot aside into a symlink planted there, and hands over to the restore`, () => {
+    const result = run(section(file, from, 'chown -hR dac:dac "$LIVE"'), `
+PREEXISTING_PREV="$FIXTURE/preexisting"; SWAP_MARKER="$FIXTURE/marker"
+${plantAfterRm('$PREEXISTING_PREV')}
+`);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.deepEqual(result.outside, []);
+    assert.equal(result.previousVersion, 'restored');
+    assert.equal(result.liveVersion, 'failed');
+    assert.equal(result.restored, 'restored\n');
+  });
+}

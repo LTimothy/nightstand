@@ -129,11 +129,13 @@ fail() {
 
 # Moves tree $1 to $2 in the server user's folder without following anything
 # planted at $2: mv -T where mv has it, else only onto a free name. Fails
-# unless $2 is then the moved tree.
+# unless $1 is a real folder and $2 is then the moved tree.
 move_tree() {
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
   move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
   mv -T "$1" "$2" 2>/dev/null \
-    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } \
+    || { [ -d "$1" ] && [ ! -L "$1" ] && rm -f "$1/${move_mark##*/}"; return 1; }
   [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
 }
 
@@ -411,13 +413,13 @@ fi
 rm -rf "$PREEXISTING_PREV"
 if [ -d "$PREV" ]; then
   say "Pod already keeps a rollback tree at $PREV, setting it aside as $PREEXISTING_PREV"
-  mv "$PREV" "$PREEXISTING_PREV" || { restore_and_report "could not set aside the pod's existing rollback slot"; exit 1; }
+  move_tree "$PREV" "$PREEXISTING_PREV" || { restore_and_report "could not set aside the pod's existing rollback slot"; exit 1; }
 fi
 # From this marker on, $LIVE is being mutated; restore-original-fork.sh must run
 # to completion if we die past here. It is removed only after a passed health check.
 : > "$SWAP_MARKER"
 if [ -d "$LIVE" ]; then
-  mv "$LIVE" "$PREV" || { restore_and_report "could not move their tree aside"; exit 1; }
+  move_tree "$LIVE" "$PREV" || { restore_and_report "could not move their tree aside"; exit 1; }
 fi
 move_tree "$STAGE" "$LIVE" || {
   # $LIVE is already gone (moved to $PREV above), do NOT also move $PREV

@@ -53,7 +53,7 @@ describe('switch-to-upstream.sh', () => {
   it('resolves the staged archive dir dynamically, never hardcoded', () => {
     const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
     assert.doesNotMatch(src, /free-sleep-main/, 'must not hardcode the archive dir name');
-    assert.match(src, /find "\$STAGE\.unzip".*-type d/);
+    assert.match(src, /find "\$WORK\/tree".*-type d/);
   });
 
   it('backs up code and data before swapping', () => {

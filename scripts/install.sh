@@ -174,20 +174,22 @@ STOPPED_SERVICES=()
 RESTORE_PREVIOUS=no
 # The reinstall's health check keeps the server's answers here.
 HBODY=
+# Moves tree $1 to $2 in the server user's folder without following anything
+# planted at $2: mv -T where mv has it, else only onto a free name. Fails
+# unless $1 is a real folder and $2 is then the moved tree.
+move_tree() {
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
+  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
+  mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } \
+    || { [ -d "$1" ] && [ ! -L "$1" ] && rm -f "$1/${move_mark##*/}"; return 1; }
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+}
+
 # Stops a service that writes the data and confirms it is not running. Kept
 # identical in the update, rollback, switch, reset and install scripts.
 # systemd refuses to stop a unit that is not installed or does not load, even
 # one that is not running, so the unit's state decides, not the stop.
-# Moves tree $1 to $2 in the server user's folder without following anything
-# planted at $2: mv -T where mv has it, else only onto a free name. Fails
-# unless $2 is then the moved tree.
-move_tree() {
-  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
-  mv -T "$1" "$2" 2>/dev/null \
-    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
-  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
-}
-
 stop_writer() {
   systemctl stop "$1" 2>/dev/null
   case "$(systemctl is-active "$1" 2>/dev/null)" in
@@ -202,14 +204,14 @@ restart_on_failure() {
   set +e
   trap '' HUP INT TERM PIPE
   # Without PREV_DIR the previous install never left REPO_DIR.
-  if [ "$result" -ne 0 ] && [ "$RESTORE_PREVIOUS" = yes ] && [ -d "$PREV_DIR" ]; then
+  if [ "$result" -ne 0 ] && [ "$RESTORE_PREVIOUS" = yes ] && [ -d "$PREV_DIR" ] && [ ! -L "$PREV_DIR" ]; then
     # The new install may have started the stream already. Nothing moves
     # under a writer that will not stop.
     if ! stop_writer free-sleep || ! stop_writer free-sleep-stream; then
       echo "WARNING: the previous install could not be put back. It is in $PREV_DIR."
     else
       rm -rf "$FAILED_DIR"
-      if { [ ! -d "$REPO_DIR" ] || mv "$REPO_DIR" "$FAILED_DIR"; } && mv "$PREV_DIR" "$REPO_DIR"; then
+      if { [ ! -d "$REPO_DIR" ] || move_tree "$REPO_DIR" "$FAILED_DIR"; } && move_tree "$PREV_DIR" "$REPO_DIR"; then
         echo "The install did not finish, so the previous install was put back. The new files are in $FAILED_DIR."
       else
         echo "WARNING: the previous install could not be put back. It is in $PREV_DIR."
@@ -255,7 +257,7 @@ fi
 rm -rf "$PREV_DIR"
 if [ -d "$REPO_DIR" ]; then
   RESTORE_PREVIOUS=yes
-  mv "$REPO_DIR" "$PREV_DIR"
+  move_tree "$REPO_DIR" "$PREV_DIR" || { echo "Could not move the previous install aside to $PREV_DIR"; exit 1; }
 fi
 move_tree "$SRC_DIR" "$REPO_DIR" || { echo "Could not put the new install in place at $REPO_DIR"; exit 1; }
 rm -rf "$UNZIP_DIR"
@@ -375,9 +377,13 @@ if [ -f "$BACKUP_PATH" ] && [ -f "$NEW_PATH" ]; then
   else
     echo "package-lock.json unchanged, restoring node_modules from backup..."
     if [ -d "$NODE_MODULES_BACKUP" ]; then
-      mv "$NODE_MODULES_BACKUP" "$NODE_MODULES_NEW"
-      chown -hR "$USERNAME:$USERNAME" "$NODE_MODULES_NEW" || true
-      echo "node_modules restored from backup."
+      if move_tree "$NODE_MODULES_BACKUP" "$NODE_MODULES_NEW"; then
+        chown -hR "$USERNAME:$USERNAME" "$NODE_MODULES_NEW" || true
+        echo "node_modules restored from backup."
+      else
+        echo "Could not restore node_modules from backup, running npm install instead..."
+        sudo -u "$USERNAME" bash -c "cd '$SERVER_DIR' && /home/$USERNAME/.volta/bin/npm install"
+      fi
     else
       echo "Backup node_modules not found, running npm install instead..."
       sudo -u "$USERNAME" bash -c "cd '$SERVER_DIR' && /home/$USERNAME/.volta/bin/npm install"

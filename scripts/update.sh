@@ -138,19 +138,19 @@ finish_interrupted_swap() {
   if [ -n "${SWAP_NEW:-}" ] && [ ! -d "$SWAP_NEW" ] && [ -d "$LIVE" ] && [ -d "$RESTORE_TREE" ]; then
     # Nothing moves under a writer that will not stop.
     if stop_writer free-sleep && stop_writer free-sleep-stream; then
-      mv "$LIVE" "$SWAP_NEW" || { say "Could not move the new tree at $LIVE aside; manual recovery required"; return 0; }
+      move_tree "$LIVE" "$SWAP_NEW" || { say "Could not move the new tree at $LIVE aside; manual recovery required"; return 0; }
       modules_from=$SWAP_NEW
     else
       say "A service did not stop, so v${CUR_VERSION:-} was not put back. It is kept at $RESTORE_TREE. Manual recovery required"
     fi
   fi
   if [ ! -d "$LIVE" ]; then
-    mv "$RESTORE_TREE" "$LIVE" || { say "Could not move $RESTORE_TREE back to $LIVE; manual recovery required"; return 0; }
+    move_tree "$RESTORE_TREE" "$LIVE" || { say "Could not move $RESTORE_TREE back to $LIVE; manual recovery required"; return 0; }
     moved=yes
   fi
   [ "$moved" = no ] || follow_scripts
   if [ "${MOVED_MODULES:-no}" = yes ] && [ ! -d "$LIVE/server/node_modules" ] && [ -d "$modules_from/server/node_modules" ]; then
-    mv "$modules_from/server/node_modules" "$LIVE/server/node_modules"
+    move_tree "$modules_from/server/node_modules" "$LIVE/server/node_modules"
   fi
   # The previous version runs again: an interrupted swap changed nothing, and
   # an interrupted swap back is a restore.
@@ -598,7 +598,7 @@ bash "$RECOVERY_HELPER" --arm "$STREAM_WAS_ACTIVE" "$STAGED_VERSION" \
 # Flush the installed recovery helper, unit and marker before moving trees.
 sync
 rm -rf "$PREV"
-mv "$LIVE" "$PREV" || {
+move_tree "$LIVE" "$PREV" || {
   RESULT_PHASE=restored
   systemctl start free-sleep
   if [ "$STREAM_WAS_ACTIVE" = active ]; then
@@ -623,8 +623,8 @@ python3 -B "$NIGHTSTAND_SCRIPTS/system_scripts.py" point "$NEW_COPY" \
 MOVED_MODULES=no
 if [ "$LOCK_SAME" = yes ]; then
   MOVED_MODULES=yes
-  mv "$PREV/server/node_modules" "$LIVE/server/node_modules"
-  chown -hR dac:dac "$LIVE/server/node_modules"
+  move_tree "$PREV/server/node_modules" "$LIVE/server/node_modules" \
+    && chown -hR dac:dac "$LIVE/server/node_modules"
 fi
 
 # Check the database for pending migrations even when the schema is unchanged.
@@ -837,15 +837,15 @@ if ! stop_writer free-sleep || ! stop_writer free-sleep-stream; then
 fi
 rm -rf "$FAILED"
 SWAP_NEW=
-mv "$LIVE" "$FAILED" || {
+move_tree "$LIVE" "$FAILED" || {
   systemctl start free-sleep
   if [ "$STREAM_WAS_ACTIVE" = active ]; then
     systemctl restart free-sleep-stream 2>/dev/null || true
   fi
   fail "could not move failed tree aside; attempted to restart the tree at $LIVE; manual recovery required"
 }
-mv "$PREV" "$LIVE" || {
-  mv "$FAILED" "$LIVE" || fail "could not restore either tree; manual recovery required"
+move_tree "$PREV" "$LIVE" || {
+  move_tree "$FAILED" "$LIVE" || fail "could not restore either tree; manual recovery required"
   systemctl start free-sleep
   if [ "$STREAM_WAS_ACTIVE" = active ]; then
     systemctl restart free-sleep-stream 2>/dev/null || true
@@ -855,7 +855,7 @@ mv "$PREV" "$LIVE" || {
 RESULT_PHASE=restored
 follow_scripts
 if [ "$MOVED_MODULES" = yes ]; then
-  mv "$FAILED/server/node_modules" "$LIVE/server/node_modules"
+  move_tree "$FAILED/server/node_modules" "$LIVE/server/node_modules"
 fi
 systemctl start free-sleep
 if [ "$STREAM_WAS_ACTIVE" = active ]; then

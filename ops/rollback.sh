@@ -30,6 +30,16 @@ fi
 LIVE=/home/dac/free-sleep
 PREV=/home/dac/free-sleep-prev
 BACKUPS=/persistent/free-sleep-backups
+# The same move_tree as the pod scripts, for the commands run there over SSH.
+MOVE_TREE='move_tree() {
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
+  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
+  mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } \
+    || { [ -d "$1" ] && [ ! -L "$1" ] && rm -f "$1/${move_mark##*/}"; return 1; }
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+}
+'
 
 if ssh -o BatchMode=yes -o ConnectTimeout=5 $SSH_CONN "$POD" true 2>/dev/null; then
   SSH() { ssh $SSH_CONN "$POD" "$@"; }
@@ -53,13 +63,15 @@ if [ "${1:-}" = "--from" ]; then
     STREAM_WAS_ACTIVE=\$(systemctl is-active free-sleep-stream 2>/dev/null || true)
     systemctl stop free-sleep-stream 2>/dev/null || true
     systemctl stop free-sleep
-    rm -rf /home/dac/free-sleep-restore
-    mkdir /home/dac/free-sleep-restore
-    tar xzf '$BK/code.tar.gz' -C /home/dac/free-sleep-restore
-    rm -rf $PREV; mv $LIVE $PREV
-    mv /home/dac/free-sleep-restore/free-sleep $LIVE
-    rmdir /home/dac/free-sleep-restore
-    mv $PREV/server/node_modules $LIVE/server/node_modules
+    $MOVE_TREE
+    mkdir -p /usr/local/lib/nightstand
+    RESTORE=\$(mktemp -d /usr/local/lib/nightstand/.download.XXXXXX)
+    tar xzf '$BK/code.tar.gz' -C \$RESTORE
+    rm -rf $PREV
+    move_tree $LIVE $PREV || { rm -rf \$RESTORE; systemctl start free-sleep; exit 1; }
+    move_tree \$RESTORE/free-sleep $LIVE || { rm -rf \$RESTORE; move_tree $PREV $LIVE; systemctl start free-sleep; exit 1; }
+    rm -rf \$RESTORE
+    move_tree $PREV/server/node_modules $LIVE/server/node_modules
     chown -hR dac:dac $LIVE
     systemctl start free-sleep
     python3 -B /usr/local/lib/nightstand/live/scripts/system_scripts.py follow $LIVE >/dev/null 2>&1 || true
@@ -74,10 +86,11 @@ else
     STREAM_WAS_ACTIVE=\$(systemctl is-active free-sleep-stream 2>/dev/null || true)
     systemctl stop free-sleep-stream 2>/dev/null || true
     systemctl stop free-sleep
+    $MOVE_TREE
     rm -rf /home/dac/free-sleep-failed
-    mv $LIVE /home/dac/free-sleep-failed
-    mv $PREV $LIVE
-    [ -d $LIVE/server/node_modules ] || mv /home/dac/free-sleep-failed/server/node_modules $LIVE/server/node_modules
+    move_tree $LIVE /home/dac/free-sleep-failed || { systemctl start free-sleep; exit 1; }
+    move_tree $PREV $LIVE || { move_tree /home/dac/free-sleep-failed $LIVE; systemctl start free-sleep; exit 1; }
+    [ -d $LIVE/server/node_modules ] || move_tree /home/dac/free-sleep-failed/server/node_modules $LIVE/server/node_modules
     systemctl start free-sleep
     python3 -B /usr/local/lib/nightstand/live/scripts/system_scripts.py follow $LIVE >/dev/null 2>&1 || true
     if [ \"\$STREAM_WAS_ACTIVE\" = active ]; then

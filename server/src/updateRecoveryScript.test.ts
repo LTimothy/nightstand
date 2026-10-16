@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { UpdateResultSchema } from './routes/update/updateSchema.js';
 
 const repo = path.resolve('..');
 const source = () => readFileSync(path.join(repo, 'scripts/recover_update.sh'), 'utf8');
+const helperText = readFileSync(path.join(repo, 'scripts/restore_helpers.sh'), 'utf8');
+const moveTree = helperText.slice(helperText.indexOf('move_tree() {'), helperText.indexOf('\n}\n', helperText.indexOf('move_tree() {')) + 3);
 
 function fixture() {
   const root = mkdtempSync(path.join(tmpdir(), 'update-recovery-'));
@@ -165,6 +169,26 @@ describe('interrupted update recovery', () => {
       assert.equal(box.version(box.live), '3.6.0');
       assert.equal(readlinkSync(path.join(box.system, 'live')), `copies/${path.basename(target)}`);
       assert.ok(!existsSync(box.marker));
+    } finally { box.dispose(); }
+  });
+
+  it('moves no tree into a symlink planted where the failed tree goes, and restarts the live tree', () => {
+    const box = fixture();
+    try {
+      box.prepare();
+      const outside = path.join(box.root, 'outside');
+      mkdirSync(outside);
+      // The server user owns /home/dac, so it can put a symlink back after the rm.
+      const result = box.run([], {}, `rm() { command rm "$@"; [ "\${!#}" != '${box.failed}' ] || ln -s '${outside}' '${box.failed}'; }
+source '${box.recoveryFile}'`);
+      assert.equal(result.status, 1, result.stdout + result.stderr);
+      assert.match(result.stdout, /could not preserve the failed tree/);
+      assert.deepEqual(readdirSync(outside), []);
+      assert.equal(box.version(box.live), '3.7.0');
+      assert.equal(box.version(box.prev), '3.6.0');
+      assert.match(readFileSync(box.calls, 'utf8'), /^start free-sleep$/m);
+      assert.match(readFileSync(box.calls, 'utf8'), /^firewall$/m);
+      assert.ok(existsSync(box.marker));
     } finally { box.dispose(); }
   });
 
@@ -587,9 +611,11 @@ rm() {
 }
 mv() {
   [ -f "$SWAP_MARKER" ] || exit 99
+  [ "$1" != -T ] || shift
   command mv "$@"
   exit 137
 }
+${moveTree}
 ${swap}`], { encoding: 'utf8', env: { ...process.env, FIXTURE: box.root } });
       assert.equal(result.status, 137, result.stdout + result.stderr);
       assert.ok(!existsSync(box.live));
@@ -632,6 +658,7 @@ describe('recovery settlement', () => {
         const result = box.run([], { healthy }, `
 LIVE='${box.live}'; PREV='${box.prev}'; STAGE='${box.stage}'; FAILED='${box.failed}'
 SWAP_MARKER='${box.marker}'; RECOVERY_HELPER='${box.recoveryFile}'
+${moveTree}
 ${helpers}
 CUR_VERSION=3.6.0; RESTORE_TREE=$PREV; SWAP_NEW=$STAGE; RESULT_PHASE=swapped; STREAM_WAS_ACTIVE=active
 export NIGHTSTAND_OPERATION_OWNER=$$

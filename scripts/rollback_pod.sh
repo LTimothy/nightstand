@@ -149,9 +149,9 @@ RESTORE_TREE=
 finish_interrupted_swap() {
   [ -n "${RESTORE_TREE:-}" ] || return 0
   if [ ! -d "$LIVE" ]; then
-    mv "$RESTORE_TREE" "$LIVE" || { say "Could not move $RESTORE_TREE back to $LIVE; manual recovery required"; return 0; }
+    move_tree "$RESTORE_TREE" "$LIVE" || { say "Could not move $RESTORE_TREE back to $LIVE; manual recovery required"; return 0; }
   fi
-  [ -d "$PREV" ] || [ ! -d "$TMP" ] || mv "$TMP" "$PREV" || say "WARNING: could not preserve rollback slot; tree remains at $TMP"
+  [ -d "$PREV" ] || [ ! -d "$TMP" ] || move_tree "$TMP" "$PREV" || say "WARNING: could not preserve rollback slot; tree remains at $TMP"
   fix_shared_node_modules "$TMP"
   fix_shared_node_modules
   if ! systemctl is-active free-sleep >/dev/null 2>&1; then
@@ -231,26 +231,26 @@ if ! stop_writer free-sleep-stream || ! stop_writer free-sleep || ! stop_late_st
   fail "could not stop the running services; live install untouched"
 fi
 rm -rf "$TMP"
-mv "$LIVE" "$TMP" || {
+move_tree "$LIVE" "$TMP" || {
   RESULT_PHASE=preflight
   restart_services
   fail "swap failed moving live aside"
 }
-mv "$PREV" "$LIVE" || {
-  mv "$TMP" "$LIVE" || fail "swap failed and running tree could not be restored; manual recovery required"
+move_tree "$PREV" "$LIVE" || {
+  move_tree "$TMP" "$LIVE" || fail "swap failed and running tree could not be restored; manual recovery required"
   RESULT_PHASE=preflight
   restart_services
   fail "swap failed; running version restored"
 }
-mv "$TMP" "$PREV" || {
+move_tree "$TMP" "$PREV" || {
   # Keep the original tree safe if the rollback slot cannot be finalized.
-  mv "$LIVE" "$PREV" || {
+  move_tree "$LIVE" "$PREV" || {
     fix_shared_node_modules "$TMP"
     restart_services
     fail "could not preserve rollback slot; attempted to restart $LIVE; original tree kept at $TMP; manual recovery required"
   }
-  mv "$TMP" "$LIVE" || {
-    mv "$PREV" "$LIVE" || fail "could not restore either tree; trees kept at $TMP and $PREV; manual recovery required"
+  move_tree "$TMP" "$LIVE" || {
+    move_tree "$PREV" "$LIVE" || fail "could not restore either tree; trees kept at $TMP and $PREV; manual recovery required"
     fix_shared_node_modules "$TMP"
     restart_services
     fail "could not restore original tree at $TMP; attempted to restart $LIVE; manual recovery required"
@@ -341,17 +341,17 @@ if ! stop_writer free-sleep || ! stop_writer free-sleep-stream; then
   fail "rollback failed and a service did not stop, so v$CUR_VERSION was not put back. It is kept at $PREV. Manual recovery required"
 fi
 rm -rf "$TMP"
-mv "$LIVE" "$TMP" || {
+move_tree "$LIVE" "$TMP" || {
   restart_services
   fail "could not move failed tree aside; attempted to restart $LIVE; manual recovery required"
 }
-mv "$PREV" "$LIVE" || {
-  mv "$TMP" "$LIVE" || fail "could not restore either tree; trees kept at $TMP and $PREV; manual recovery required"
+move_tree "$PREV" "$LIVE" || {
+  move_tree "$TMP" "$LIVE" || fail "could not restore either tree; trees kept at $TMP and $PREV; manual recovery required"
   restart_services
   fail "could not restore previous tree; attempted to restart $LIVE; manual recovery required"
 }
 RESULT_PHASE=restored
-mv "$TMP" "$PREV" || {
+move_tree "$TMP" "$PREV" || {
   say "WARNING: could not preserve rollback slot; tree remains at $TMP"
   fix_shared_node_modules "$TMP"
 }

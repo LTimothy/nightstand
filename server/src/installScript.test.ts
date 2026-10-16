@@ -265,7 +265,7 @@ describe('install.sh release choice', () => {
     assert.ok(choose >= 0 && choose < download, 'choose before the download');
     assert.ok(download < check, 'check after the download');
     assert.ok(check < stop, 'check before any service stops');
-    assert.ok(check < src.indexOf('mv "$REPO_DIR" "$PREV_DIR"'), 'check before the live tree is replaced');
+    assert.ok(check < src.indexOf('move_tree "$REPO_DIR" "$PREV_DIR"'), 'check before the live tree is replaced');
   });
 });
 
@@ -558,6 +558,7 @@ echo continued`], {
   const output = {
     ...result, live: read('free-sleep/version'), previous: read('free-sleep-prev/version'),
     failed: read('free-sleep-failed/version'), services: read('services'),
+    outside: existsSync(path.join(dir, 'outside')) ? readdirSync(path.join(dir, 'outside')) : [],
     serverState: read('state-free-sleep').trim(), tmpLeft: readdirSync(path.join(dir, 'tmp')),
     lockReleased: spawnSync('python3', ['-c',
       'import fcntl, sys; handle=open(sys.argv[1], "a"); fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)',
@@ -628,6 +629,7 @@ describe('install.sh keeps the previous install until the new one is healthy', (
 
   const aroundMove = (when: 'before' | 'after') => `mv() {
   local leaving=no
+  [ "$1" != -T ] || shift
   [ "$1 $2" != "$REPO_DIR $PREV_DIR" ] || leaving=yes
   ${when === 'before' ? '[ "$leaving" = no ] || kill -TERM $$' : ':'}
   command mv "$@" || return
@@ -649,6 +651,29 @@ describe('install.sh keeps the previous install until the new one is healthy', (
     assert.equal(result.live, 'old');
     assert.match(result.services, /^start free-sleep old$/m);
     assert.equal(result.serverState, 'active');
+  });
+
+  // The server user owns /home/dac, so it can put a symlink back at a name
+  // root has just removed.
+  const plantAfterRm = (target: string) => `mkdir -p "$FIXTURE/outside"
+rm() { command rm "$@"; [ "\${!#}" != "${target}" ] || ln -s "$FIXTURE/outside" "\${!#}"; }`;
+
+  it('moves the previous install into no symlink planted at its rollback slot, and starts it again', () => {
+    const result = reinstall({ setup: plantAfterRm('$PREV_DIR') });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.deepEqual(result.outside, []);
+    assert.equal(result.live, 'old');
+    assert.match(result.services, /^start free-sleep old$/m);
+  });
+
+  it('a failed install moves nothing into a symlink planted where the new files go, and starts what is live', () => {
+    const result = reinstall({ migrates: false, setup: plantAfterRm('$FAILED_DIR') });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.deepEqual(result.outside, []);
+    assert.equal(result.live, 'new');
+    assert.equal(result.previous, 'old');
+    assert.match(result.stdout, /previous install could not be put back/);
+    assert.match(result.services, /^start free-sleep new$/m);
   });
 
   it('keeps the new install once its server answers', () => {
