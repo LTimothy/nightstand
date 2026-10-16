@@ -273,8 +273,8 @@ describe('deploy.sh runs root-owned copies', () => {
     assert.match(ship, /SCP_SHIP "\$tarball" "\$SHIP_DIR\/ship\.tar"/);
     assert.doesNotMatch(ship, /\/tmp\/|-C \$STAGE /);
     const publish = src.indexOf('COPY=$(SSH "python3 -B $SHIP_DIR/tree/scripts/system_scripts.py publish $SHIP_DIR/tree")');
-    const stage = src.indexOf('mv $SHIP_DIR/tree $STAGE');
-    assert.ok(publish > 0 && publish < stage && stage < src.indexOf('chown -R dac:dac $STAGE'));
+    const stage = src.indexOf('move_tree $SHIP_DIR/tree $STAGE');
+    assert.ok(publish > 0 && publish < stage && stage < src.indexOf('chown -hR dac:dac $STAGE'));
     assert.doesNotMatch(src, /\$STAGE\/scripts\/system_scripts\.py/);
     assert.match(src, /bash \$COPY\/scripts\/close_update_window\.sh/);
     assert.match(src, /sh "\$COPY\/scripts\/block_internet_access\.sh"/);

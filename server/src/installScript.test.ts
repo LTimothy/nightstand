@@ -377,7 +377,7 @@ describe('install.sh saved channel', () => {
   it('runs after old settings are moved into place, before ownership is fixed', () => {
     const save = src.indexOf('# Save the update channel');
     assert.ok(save > src.indexOf('for entry in "${FILES_TO_MOVE[@]}"'), 'after the old settings move');
-    assert.ok(save < src.indexOf('chown -R "$USERNAME":"$USERNAME" /persistent/free-sleep-data/'), 'before the chown');
+    assert.ok(save < src.indexOf('chown -hR "$USERNAME":"$USERNAME" /persistent/free-sleep-data/'), 'before the chown');
   });
 });
 
@@ -749,8 +749,8 @@ PY
 describe('install.sh root-owned copy', () => {
   it('copies the scripts for root before the tree moves or changes owner, and runs only that copy', () => {
     const publish = src.indexOf('COPY=$(python3 -B "$SRC_DIR/scripts/system_scripts.py" publish "$SRC_DIR")');
-    const move = src.indexOf('mv "$SRC_DIR" "$REPO_DIR"');
-    const owner = src.indexOf('chown -R "$USERNAME":"$USERNAME" "$REPO_DIR"');
+    const move = src.indexOf('move_tree "$SRC_DIR" "$REPO_DIR"');
+    const owner = src.indexOf('chown -hR "$USERNAME":"$USERNAME" "$REPO_DIR"');
     assert.ok(publish > 0 && publish < move && move < owner, `${publish} ${move} ${owner}`);
     assert.match(src, /bash "\$COPY\/scripts\/setup_services\.sh" "\$COPY"/);
     const unzip = mkdtempSync(path.join(tmpdir(), 'nightstand-install-copy-'));

@@ -212,7 +212,7 @@ describe('the scripts that change system files record them first', () => {
   it('install.sh records the unit states once the tree is in place, without failing on it', () => {
     const src = read('scripts/install.sh');
     const record = src.indexOf('bash "$COPY/scripts/record_stock.sh" units || true');
-    assert.ok(record > src.indexOf('chown -R "$USERNAME":"$USERNAME" "$REPO_DIR"'));
+    assert.ok(record > src.indexOf('chown -hR "$USERNAME":"$USERNAME" "$REPO_DIR"'));
   });
   it('record_stock.sh parses and is executable', () => {
     const script = path.join(repoRoot, 'scripts/record_stock.sh');

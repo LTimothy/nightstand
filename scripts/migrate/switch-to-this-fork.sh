@@ -142,7 +142,7 @@ if [ -n "$RESTORE_TARBALL" ]; then
         echo 'Backup is incomplete or lacks installed dependencies; live install untouched. Use the rollback in the app (Settings > Software > Recovery) if available, or supply a complete backup created with the current migration script.' >&2
         exit 1
       }
-    chown -R dac:dac \"\$STAGE/free-sleep\"
+    chown -hR dac:dac \"\$STAGE/free-sleep\"
     STREAM_WAS_ACTIVE=\$(systemctl is-active free-sleep-stream 2>/dev/null || true)
     restart_services() {
       systemctl start free-sleep || return 1

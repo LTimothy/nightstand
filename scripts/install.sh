@@ -178,6 +178,16 @@ HBODY=
 # identical in the update, rollback, switch, reset and install scripts.
 # systemd refuses to stop a unit that is not installed or does not load, even
 # one that is not running, so the unit's state decides, not the stop.
+# Moves tree $1 to $2 in the server user's folder without following anything
+# planted at $2: mv -T where mv has it, else only onto a free name. Fails
+# unless $2 is then the moved tree.
+move_tree() {
+  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
+  mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+}
+
 stop_writer() {
   systemctl stop "$1" 2>/dev/null
   case "$(systemctl is-active "$1" 2>/dev/null)" in
@@ -247,11 +257,11 @@ if [ -d "$REPO_DIR" ]; then
   RESTORE_PREVIOUS=yes
   mv "$REPO_DIR" "$PREV_DIR"
 fi
-mv "$SRC_DIR" "$REPO_DIR"
+move_tree "$SRC_DIR" "$REPO_DIR" || { echo "Could not put the new install in place at $REPO_DIR"; exit 1; }
 rm -rf "$UNZIP_DIR"
 rmdir "$(dirname "$UNZIP_DIR")" 2>/dev/null || true
 
-chown -R "$USERNAME":"$USERNAME" "$REPO_DIR"
+chown -hR "$USERNAME":"$USERNAME" "$REPO_DIR"
 bash "$COPY/scripts/record_stock.sh" units || true
 
 # --------------------------------------------------------------------------------
@@ -331,15 +341,15 @@ except Exception:
 PY
 
 if [ -d /persistent/deviceinfo/ ]; then
-  chown -R "$USERNAME":"$USERNAME" /persistent/deviceinfo/
+  chown -hR "$USERNAME":"$USERNAME" /persistent/deviceinfo/
 fi
 
 if [ -d /deviceinfo/ ]; then
-  chown -R "$USERNAME":"$USERNAME" /deviceinfo/
+  chown -hR "$USERNAME":"$USERNAME" /deviceinfo/
 fi
 
 # Change ownership and permissions
-chown -R "$USERNAME":"$USERNAME" /persistent/free-sleep-data/
+chown -hR "$USERNAME":"$USERNAME" /persistent/free-sleep-data/
 chmod 770 /persistent/free-sleep-data/
 chmod g+s /persistent/free-sleep-data/
 
@@ -366,7 +376,7 @@ if [ -f "$BACKUP_PATH" ] && [ -f "$NEW_PATH" ]; then
     echo "package-lock.json unchanged, restoring node_modules from backup..."
     if [ -d "$NODE_MODULES_BACKUP" ]; then
       mv "$NODE_MODULES_BACKUP" "$NODE_MODULES_NEW"
-      chown -R "$USERNAME:$USERNAME" "$NODE_MODULES_NEW" || true
+      chown -hR "$USERNAME:$USERNAME" "$NODE_MODULES_NEW" || true
       echo "node_modules restored from backup."
     else
       echo "Backup node_modules not found, running npm install instead..."

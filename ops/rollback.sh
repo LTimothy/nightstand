@@ -60,7 +60,7 @@ if [ "${1:-}" = "--from" ]; then
     mv /home/dac/free-sleep-restore/free-sleep $LIVE
     rmdir /home/dac/free-sleep-restore
     mv $PREV/server/node_modules $LIVE/server/node_modules
-    chown -R dac:dac $LIVE
+    chown -hR dac:dac $LIVE
     systemctl start free-sleep
     python3 -B /usr/local/lib/nightstand/live/scripts/system_scripts.py follow $LIVE >/dev/null 2>&1 || true
     if [ \"\$STREAM_WAS_ACTIVE\" = active ]; then

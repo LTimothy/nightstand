@@ -13,6 +13,16 @@ follow_scripts() {
     || say "WARNING: could not check which scripts root runs for $LIVE"
 }
 
+# Moves tree $1 to $2 in the server user's folder without following anything
+# planted at $2: mv -T where mv has it, else only onto a free name. Fails
+# unless $2 is then the moved tree.
+move_tree() {
+  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
+  mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+}
+
 has_switch_journal() {
   local root="${1:-${NIGHTSTAND_TRANSACTION_ROOT:-/persistent/free-sleep-maintenance/nightstand-transactions}}" journal
   for journal in "$root"/*/journal.json; do
@@ -40,7 +50,7 @@ restore_dependencies() {
   if [ -d "$source/server/node_modules" ] && [ ! -d "$LIVE/server/node_modules" ] \
     && cmp -s "$LIVE/server/package-lock.json" "$source/server/package-lock.json"; then
     mv "$source/server/node_modules" "$LIVE/server/node_modules"
-    chown -R dac:dac "$LIVE/server/node_modules"
+    chown -hR dac:dac "$LIVE/server/node_modules"
   fi
 }
 

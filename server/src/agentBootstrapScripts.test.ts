@@ -57,7 +57,7 @@ describe('the agent bootstrap scripts', () => {
     assertOrder(read(POD), [
       'cp -a "$LIVE" "$FRESH"',
       'Applying the agent overlay to the copy',
-      'mv "$FRESH" "$STAGE"',
+      'move_tree "$FRESH" "$STAGE"',
       'systemctl stop free-sleep',
     ], 'stage-before-stop');
   });

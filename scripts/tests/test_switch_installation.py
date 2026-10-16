@@ -293,7 +293,8 @@ restore_cross_fork_rollback() {
             shutil.copy2(source, self.stage / 'scripts' / source.name)
         shutil.copy2(SCRIPTS / 'restore_helpers.sh', self.stage / 'scripts/restore_helpers.sh')
         installer = (SCRIPTS / 'migrate/pod-installer.sh').read_text()
-        swap = installer[installer.index('# Preserve the pod\'s own rollback slot'):
+        helper = installer[installer.index('move_tree() {'):installer.index('\n}\n', installer.index('move_tree() {')) + 3]
+        swap = helper + installer[installer.index('# Preserve the pod\'s own rollback slot'):
                          installer.index('say "Installing the RAW-archive timer units..."')]
         previous = self.system.live.parent / 'free-sleep-prev'
         environment = dict(os.environ, LIVE=str(self.system.live), PREV=str(previous), STAGE=str(self.stage),

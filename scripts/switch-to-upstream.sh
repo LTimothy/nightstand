@@ -355,9 +355,10 @@ unzip -q "$ZIP" -d "$STAGE.unzip" || fail "unzip failed; live install untouched"
 # "-" + branch), so resolve it dynamically rather than hardcoding it.
 STAGED_DIR=$(find "$STAGE.unzip" -mindepth 1 -maxdepth 1 -type d | head -n1)
 [ -d "$STAGED_DIR" ] || fail "unexpected zip layout; live install untouched"
-mv "$STAGED_DIR" "$STAGE" && rm -rf "$STAGE.unzip"
+move_tree "$STAGED_DIR" "$STAGE" || fail "could not stage upstream; live install untouched"
+rm -rf "$STAGE.unzip"
 rm -f "$ZIP"
-chown -R dac:dac "$STAGE"
+chown -hR dac:dac "$STAGE"
 # Checked with the installed copy of the digest script, never the downloaded one.
 if [ -n "$SWITCH_COMMIT" ]; then
   if [ -z "$SWITCH_DIGEST" ]; then
@@ -496,8 +497,8 @@ mv "$LIVE" "$PREV" || {
   RESULT_REASON="upstream free-sleep could not be put in place, so it never started"
   fail "swap failed moving live aside"
 }
-mv "$STAGE" "$LIVE" || {
-  mv "$PREV" "$LIVE" || fail "swap failed and previous tree could not be restored; manual recovery required"
+move_tree "$STAGE" "$LIVE" || {
+  move_tree "$PREV" "$LIVE" || fail "swap failed and previous tree could not be restored; manual recovery required"
   restore_switch_data_or_fail "could not restore settings from $BK/lowdb"
   systemctl start free-sleep
   if [ "$STREAM_WAS_ACTIVE" = active ]; then
@@ -512,7 +513,7 @@ MOVED_MODULES=no
 if [ "$LOCK_SAME" = yes ]; then
   MOVED_MODULES=yes
   mv "$PREV/server/node_modules" "$LIVE/server/node_modules"
-  chown -R dac:dac "$LIVE/server/node_modules"
+  chown -hR dac:dac "$LIVE/server/node_modules"
 fi
 
 # No prisma step: migrations are additive, so upstream's schema is already

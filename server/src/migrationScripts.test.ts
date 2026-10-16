@@ -261,7 +261,7 @@ describe('fork-switch tool scripts', () => {
       assertOrder(src, [
         ': > "$SWAP_MARKER"',
         'mv "$LIVE" "$PREV"',
-        'mv "$STAGE" "$LIVE"',
+        'move_tree "$STAGE" "$LIVE"',
         'Health check passed',
         'rm -f "$SWAP_MARKER"',
       ], 'pod-installer.sh swap marker');
@@ -322,7 +322,7 @@ echo "$STREAM_WAS_ACTIVE"`], { encoding: 'utf8' });
     it('saves the installed release\'s channel after the swap, before the server starts', () => {
       assert.match(src, /read -r TARGET_VERSION TARGET_CHANNEL <<< "\$PICK"/);
       assertOrder(src, [
-        'mv "$STAGE" "$LIVE"',
+        'move_tree "$STAGE" "$LIVE"',
         '# A fork moving here has no update channel yet',
         '/persistent/free-sleep-data/lowdb/settingsDB.json "$TARGET_CHANNEL"',
         'systemctl start free-sleep ||',
@@ -519,36 +519,51 @@ describe('the fork switch runs root-owned copies', () => {
       const src = readScript(file);
       const work = src.indexOf('WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX")');
       const publish = src.indexOf('COPY=$(python3 -B "$FRESH/scripts/system_scripts.py" publish "$FRESH")');
-      const stage = src.indexOf('mv "$FRESH" "$STAGE"');
-      assert.ok(work > 0 && work < publish && publish < stage && stage < src.indexOf('chown -R dac:dac "$STAGE"'), file);
+      const stage = src.indexOf('move_tree "$FRESH" "$STAGE"');
+      assert.ok(work > 0 && work < publish && publish < stage && stage < src.indexOf('chown -hR dac:dac "$STAGE"'), file);
       assert.doesNotMatch(src, /\$STAGE\/scripts\/system_scripts\.py/, file);
       assert.match(src, /bash "\$COPY\/scripts\/setup_services\.sh" "\$COPY"/, file);
     }
   });
 
-  it('downloads, unpacks and copies the release where the server user cannot reach it', () => {
-    const src = readScript('scripts/migrate/pod-installer.sh');
-    const start = src.indexOf('say "Downloading v$TARGET_VERSION');
-    const end = src.indexOf('chown -R dac:dac "$STAGE"', start);
-    assert.ok(start > 0 && end > start);
+  const stageSection = (src: string, start: number) => {
+    const chown = /chown -h?R dac:dac "\$STAGE"\n/.exec(src.slice(start));
+    assert.ok(start > 0 && chown);
+    return src.slice(start, start + chown.index + chown[0].length);
+  };
+  const moveTree = (src: string) => {
+    const start = src.indexOf('move_tree() {');
+    return start < 0 ? '' : src.slice(start, src.indexOf('\n}\n', start) + 3);
+  };
+  function stage(file: string, setup = '') {
+    const src = readScript(file);
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-migrate-stage-'));
-    try {
-      const release = path.join(dir, 'release/nightstand-main/scripts');
-      mkdirSync(release, { recursive: true });
-      writeFileSync(path.join(release, 'system_scripts.py'),
-        'import os, sys\nrecord = os.path.abspath(__file__) + " " + " ".join(sys.argv[1:])\n'
-        + 'open(os.environ["FIXTURE"] + "/published", "w").write(record)\nprint("/copy")\n');
-      execFileSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
-        path.join(dir, 'release'), path.join(dir, 'release')]);
-      const result = spawnSync('bash', ['-c', `set -uo pipefail
+    const release = path.join(dir, 'release/nightstand-main/scripts');
+    mkdirSync(release, { recursive: true });
+    writeFileSync(path.join(release, 'system_scripts.py'),
+      'import os, sys\nrecord = os.path.abspath(__file__) + " " + " ".join(sys.argv[1:])\n'
+      + 'open(os.environ["FIXTURE"] + "/published", "w").write(record)\nprint("/copy")\n');
+    execFileSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
+      path.join(dir, 'release'), path.join(dir, 'release')]);
+    const result = spawnSync('bash', ['-c', `set -uo pipefail
 SYSTEM_DIR="$FIXTURE/system"; STAGE="$FIXTURE/home/free-sleep-migrate-staging"
 TARGET_VERSION=3.7.0; MAIN_ZIP_URL=https://example.invalid/main.zip
-mkdir -p "$FIXTURE/home" "$STAGE/old"
+mkdir -p "$FIXTURE/home" "$FIXTURE/outside" "$STAGE/old"
 say() { :; }
 fail() { echo "FAIL $*"; exit 1; }
 curl() { while [ "$1" != -o ]; do shift; done; cp "$FIXTURE/release.zip" "$2"; }
-${src.slice(start, end)}
+chown() { echo "chown $*" >> "$FIXTURE/chowned"; }
+${setup}
+${moveTree(src)}
+${stageSection(src, src.indexOf('say "Downloading v$TARGET_VERSION'))}
 echo "COPY=$COPY"`], { encoding: 'utf8', env: { ...process.env, FIXTURE: dir } });
+    const chowned = existsSync(path.join(dir, 'chowned')) ? readFileSync(path.join(dir, 'chowned'), 'utf8') : '';
+    return { dir, result, chowned };
+  }
+
+  it('downloads, unpacks and copies the release where the server user cannot reach it', () => {
+    const { dir, result, chowned } = stage('scripts/migrate/pod-installer.sh');
+    try {
       assert.equal(result.status, 0, result.stdout + result.stderr);
       assert.match(result.stdout, /^COPY=\/copy$/m);
       const [tool, command, tree] = readFileSync(path.join(dir, 'published'), 'utf8').split(' ');
@@ -556,11 +571,29 @@ echo "COPY=$COPY"`], { encoding: 'utf8', env: { ...process.env, FIXTURE: dir } }
       assert.equal(command, 'publish');
       assert.match(tree, new RegExp(`^${system}/\\.download\\.[^/]+/tree/nightstand-main$`));
       assert.equal(tool, path.join(tree, 'scripts/system_scripts.py'));
-      assert.ok(existsSync(path.join(dir, 'home/free-sleep-migrate-staging/scripts/system_scripts.py')));
-      assert.ok(!existsSync(path.join(dir, 'home/free-sleep-migrate-staging/old')));
+      assert.deepEqual(readdirSync(path.join(dir, 'home/free-sleep-migrate-staging')), ['scripts']);
       assert.deepEqual(readdirSync(system), []);
+      assert.equal(chowned, `chown -hR dac:dac ${path.join(dir, 'home/free-sleep-migrate-staging')}\n`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('stops before any chown when the server user swaps the stage for a symlink', () => {
+    // The server user owns the folder the stage lives in, so it can put a
+    // symlink back between the rm and the move.
+    const race = 'rm() { command rm "$@"; [ "${!#}" != "$STAGE" ] || ln -s "$FIXTURE/outside" "$STAGE"; }';
+    // GNU mv -T is a rename that never follows the target; macOS mv has no -T.
+    const gnuMv = 'mv() { if [ "$1" = -T ]; then python3 -c \'import os, sys; os.rename(*sys.argv[1:])\' "$2" "$3"; else command mv "$@"; fi; }';
+    for (const emulate of ['', gnuMv]) {
+      const { dir, result, chowned } = stage('scripts/migrate/pod-installer.sh', `${race}\n${emulate}`);
+      try {
+        assert.match(result.stdout, /^FAIL could not stage/m, result.stdout + result.stderr);
+        assert.deepEqual(readdirSync(path.join(dir, 'outside')), []);
+        assert.equal(chowned, '');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     }
   });
 });

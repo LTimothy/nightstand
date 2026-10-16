@@ -209,6 +209,14 @@ SHIP_ATTEMPTS=4
 # swap the tree before root copies its scripts.
 SYSTEM_DIR=/usr/local/lib/nightstand
 SHIP_DIR=
+# The same move_tree as the pod scripts, for the commands run there over SSH.
+MOVE_TREE='move_tree() {
+  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
+  mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+}
+'
 ship_to_stage() {
   local tarball="$1"
   attempt=1
@@ -242,7 +250,7 @@ rm -f "$SHIP_TAR"; trap - EXIT
 # to the stage the server user owns.
 COPY=$(SSH "python3 -B $SHIP_DIR/tree/scripts/system_scripts.py publish $SHIP_DIR/tree") \
   || { SSH "rm -rf $SHIP_DIR"; die "could not copy the scripts root runs on the pod; live install untouched"; }
-SSH "rm -rf $STAGE && mv $SHIP_DIR/tree $STAGE && rm -rf $SHIP_DIR && chown -R dac:dac $STAGE" \
+SSH "$MOVE_TREE rm -rf $STAGE && move_tree $SHIP_DIR/tree $STAGE && rm -rf $SHIP_DIR && chown -hR dac:dac $STAGE" \
   || die "could not move the shipped tree to $STAGE; live install untouched"
 
 # --- dependencies (while old server still runs) ------------------------------
@@ -357,13 +365,14 @@ fi
 say "Swapping (service stops now)"
 MOVED_MODULES=no
 SSH "set -e
+  $MOVE_TREE
   systemctl stop free-sleep
   rm -rf $PREV
   mv $LIVE $PREV
-  mv $STAGE $LIVE
+  move_tree $STAGE $LIVE
 " || die "swap failed - pod may need manual attention: $POD_SSH_HINT, check $LIVE/$PREV/$STAGE"
 if [ "$LOCK_SAME" = "yes" ]; then
-  SSH "mv $PREV/server/node_modules $LIVE/server/node_modules && chown -R dac:dac $LIVE/server/node_modules"
+  SSH "mv $PREV/server/node_modules $LIVE/server/node_modules && chown -hR dac:dac $LIVE/server/node_modules"
   MOVED_MODULES=yes
 fi
 
@@ -474,10 +483,11 @@ printf '\033[1;31m==> Health check FAILED - rolling back to v%s\033[0m\n' "$POD_
 say "Last 60 server log lines from the failed build (for diagnosis)"
 SSH "tail -n 60 /persistent/free-sleep-data/logs/free-sleep.log 2>/dev/null" || echo "  (no server log available)"
 SSH "set -e
+  $MOVE_TREE
   systemctl stop free-sleep || true
   rm -rf /home/dac/free-sleep-failed
   mv $LIVE /home/dac/free-sleep-failed
-  mv $PREV $LIVE
+  move_tree $PREV $LIVE
   if [ '$MOVED_MODULES' = yes ]; then mv /home/dac/free-sleep-failed/server/node_modules $LIVE/server/node_modules; fi
   systemctl start free-sleep
 "

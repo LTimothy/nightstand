@@ -104,7 +104,7 @@ rm -rf "$DATA_DIR"
 mkdir -p "$DATA_DIR/lowdb" "$DATA_DIR/logs"
 [ -z "$SOCK_PATH" ] || printf '%s\n' "$SOCK_PATH" > "$SOCK_FILE"
 [ -z "$MARK" ] || printf '%s' "${MARK%x}" > "$WATCHDOG_MARK"
-chown -R dac:dac "$DATA_DIR"
+chown -hR dac:dac "$DATA_DIR"
 chmod 770 "$DATA_DIR"
 chmod g+s "$DATA_DIR"
 

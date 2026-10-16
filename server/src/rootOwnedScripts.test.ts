@@ -309,7 +309,10 @@ describe('update.sh', () => {
     return update.slice(start, end);
   };
 
-  function download(isDowngrade: 'yes' | 'no') {
+  const helpers = read('scripts/restore_helpers.sh');
+  const moveTree = helpers.slice(helpers.indexOf('move_tree() {'), helpers.indexOf('\n}\n', helpers.indexOf('move_tree() {')) + 3);
+
+  function download(isDowngrade: 'yes' | 'no', setup = '') {
     const dir = scratch();
     const release = tree(path.join(dir, 'release', 'nightstand-3.7.0'), '3.7.0');
     writeFileSync(path.join(release, 'scripts/archive-raw.sh'), 'RETENTION_HOURS=100\nMIN_FREE_KB=1\n');
@@ -317,17 +320,19 @@ describe('update.sh', () => {
     writeFileSync(path.join(dir, 'persistent/free-sleep-data/raw-archive.conf'), 'RETENTION_HOURS=200\n');
     spawnSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
       path.join(dir, 'release'), path.join(dir, 'release')]);
-    const section = between('# --- download + stage', 'chown -R dac:dac "$STAGE"').replaceAll('/persistent/', `${dir}/persistent/`);
+    const section = between('# --- download + stage', 'chown -hR dac:dac "$STAGE"').replaceAll('/persistent/', `${dir}/persistent/`);
     const result = spawnSync('bash', ['-c', `set -uo pipefail
 SYSTEM_DIR="$FIXTURE/system"; STAGE="$FIXTURE/home/free-sleep-staging"; NIGHTSTAND_SCRIPTS="${repoRoot}/scripts"
 EXPECTED_VERSION=3.7.0; RESOLVED_ZIP_URL=https://example.invalid/v3.7.0.zip; IS_DOWNGRADE=${isDowngrade}
-mkdir -p "$FIXTURE/home"
+mkdir -p "$FIXTURE/home" "$FIXTURE/outside"
 say() { :; }
 fail() { echo "FAIL $*"; exit 1; }
 curl() { while [ "$1" != -o ]; do shift; done; cp "$FIXTURE/release.zip" "$2"; }
 verify_tree() { echo "verify $1" >> "$FIXTURE/calls"; }
 chown() { echo "chown $* published=$(ls "$SYSTEM_DIR/copies" | grep -vc '^[.]')" >> "$FIXTURE/calls"; }
-${section}chown -R dac:dac "$STAGE"
+${moveTree}
+${setup}
+${section}chown -hR dac:dac "$STAGE"
 echo "NEW_COPY=$NEW_COPY"`], { env: { ...env(path.join(dir, 'system')), FIXTURE: dir }, encoding: 'utf8' });
     return { dir, result, system: path.join(dir, 'system'), stage: path.join(dir, 'home/free-sleep-staging'),
       calls: existsSync(path.join(dir, 'calls')) ? readFileSync(path.join(dir, 'calls'), 'utf8') : '' };
@@ -341,9 +346,24 @@ echo "NEW_COPY=$NEW_COPY"`], { env: { ...env(path.join(dir, 'system')), FIXTURE:
       assert.equal(path.dirname(copy), path.join(box.system, 'copies'));
       assert.equal(readFileSync(path.join(copy, 'scripts/update.sh'), 'utf8'), readFileSync(path.join(box.stage, 'scripts/update.sh'), 'utf8'));
       assert.match(box.calls, new RegExp(`^verify ${box.system}/\\.download\\.[^/]+/tree/nightstand-3\\.7\\.0$`, 'm'));
-      assert.match(box.calls, /^chown -R dac:dac \S+ published=1$/m);
+      assert.match(box.calls, /^chown -hR dac:dac \S+ published=1$/m);
       assert.deepEqual(readdirSync(box.system).filter(name => name.startsWith('.download.')), []);
     } finally { rmSync(box.dir, { recursive: true, force: true }); }
+  });
+
+  it('stops before the chown when the server user swaps the stage for a symlink', () => {
+    // The server user owns /home/dac, so it can put a symlink back between
+    // the rm and the move. GNU mv -T is a rename that never follows it.
+    const race = 'rm() { command rm "$@"; [ "${!#}" != "$STAGE" ] || ln -s "$FIXTURE/outside" "$STAGE"; }';
+    const gnuMv = 'mv() { if [ "$1" = -T ]; then python3 -c \'import os, sys; os.rename(*sys.argv[1:])\' "$2" "$3"; else command mv "$@"; fi; }';
+    for (const emulate of ['', gnuMv]) {
+      const box = download('no', `${race}\n${emulate}`);
+      try {
+        assert.match(box.result.stdout, /^FAIL could not stage v3\.7\.0$/m, box.result.stdout + box.result.stderr);
+        assert.deepEqual(readdirSync(path.join(box.dir, 'outside')), []);
+        assert.doesNotMatch(box.calls, /chown/);
+      } finally { rmSync(box.dir, { recursive: true, force: true }); }
+    }
   });
 
   it('keeps the configured archive retention in the copy root runs on a downgrade', () => {
@@ -399,7 +419,7 @@ echo "NEW_COPY=$NEW_COPY"; echo "SCRIPTS=$NIGHTSTAND_SCRIPTS"`, 'handoff', syste
   });
 
   it('points root at the new copy right after the swap, before the new units', () => {
-    const swap = update.indexOf('mv "$STAGE" "$LIVE" ||');
+    const swap = update.indexOf('move_tree "$STAGE" "$LIVE" ||');
     const point = update.indexOf('system_scripts.py" point "$NEW_COPY"');
     const services = update.indexOf('bash "$NEW_COPY/scripts/setup_services.sh" "$NEW_COPY"');
     assert.ok(swap > 0 && swap < point && point < services, `${swap} ${point} ${services}`);
@@ -410,6 +430,28 @@ echo "NEW_COPY=$NEW_COPY"; echo "SCRIPTS=$NIGHTSTAND_SCRIPTS"`, 'handoff', syste
     assert.ok(rollback.indexOf('follow_scripts') > rollback.indexOf('mv "$PREV" "$LIVE"'), 'follow after the restore');
     const interrupted = between('finish_interrupted_swap() {', '\n}\n');
     assert.match(interrupted, /follow_scripts/);
+  });
+});
+
+describe('trees moved into the server user\'s folder', () => {
+  const helper = (src: string) => {
+    const start = src.indexOf('move_tree() {');
+    assert.ok(start >= 0);
+    return src.slice(start, src.indexOf('\n}\n', start) + 3);
+  };
+
+  it('every script moves them with the same checked move_tree', () => {
+    const reference = helper(read('scripts/restore_helpers.sh'));
+    for (const file of ['scripts/install.sh', 'scripts/migrate/pod-installer.sh',
+      'scripts/migrate/agent-bootstrap-installer.sh', 'ops/deploy.sh']) {
+      assert.equal(helper(read(file)), reference, file);
+    }
+  });
+
+  it('never chowns recursively through a symlink', () => {
+    const files = spawnSync('git', ['ls-files', 'scripts', 'ops'], { cwd: repoRoot, encoding: 'utf8' })
+      .stdout.split('\n').filter(file => /\.(sh|py)$/.test(file) && !file.startsWith('scripts/tests/'));
+    for (const file of files) assert.doesNotMatch(read(file), /chown -R\b/, file);
   });
 });
 

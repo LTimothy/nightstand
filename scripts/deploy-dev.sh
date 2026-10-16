@@ -97,7 +97,7 @@ case "${1:-}" in
       || fail "scp of biometrics tarball failed."
     pod "set -e
          tar -xzf /tmp/fs-biometrics.tgz -C /home/dac/free-sleep/
-         chown -R dac:dac /home/dac/free-sleep/biometrics
+         chown -hR dac:dac /home/dac/free-sleep/biometrics
          rm -f /tmp/fs-biometrics.tgz
          systemctl restart free-sleep-stream || true
          systemctl is-active free-sleep-stream" \
@@ -182,7 +182,7 @@ if [ "$DO_BACKEND" = "true" ]; then
 
       ( cd "$REPO_ROOT/server" && tar -cf - -T "$ADD_LIST" 2>/dev/null ) | \
         ssh "${SSH_OPTS[@]}" "$SSH_TARGET" \
-          "mkdir -p /home/dac/free-sleep/server && tar -xf - -C /home/dac/free-sleep/server && chown -R dac:dac /home/dac/free-sleep/server/node_modules" \
+          "mkdir -p /home/dac/free-sleep/server && tar -xf - -C /home/dac/free-sleep/server && chown -hR dac:dac /home/dac/free-sleep/server/node_modules" \
         || fail "Dep upload failed."
       ok "Synced ${add_count} dep dir(s) to Pod."
     fi
@@ -346,7 +346,7 @@ if [ "$fail_count" -gt 0 ]; then
   fail "$fail_count file(s) failed to upload. Service NOT restarted. Re-run, or use --full."
 fi
 
-pod "chown -R dac:dac '${POD_DIR}/server/dist' '${POD_DIR}/server/public'" || true
+pod "chown -hR dac:dac '${POD_DIR}/server/dist' '${POD_DIR}/server/public'" || true
 
 # --------------------------------------------------------------------------------
 # 6. Restart service

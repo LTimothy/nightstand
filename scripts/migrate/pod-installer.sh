@@ -127,6 +127,16 @@ fail() {
   exit 1
 }
 
+# Moves tree $1 to $2 in the server user's folder without following anything
+# planted at $2: mv -T where mv has it, else only onto a free name. Fails
+# unless $2 is then the moved tree.
+move_tree() {
+  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
+  mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+}
+
 # Free-space helpers, kept identical in update.sh, switch-to-upstream.sh,
 # migrate/pod-installer.sh, migrate/switch-to-this-fork.sh and ops/deploy.sh.
 # Sizes are whole MB, rounded up, and a missing path counts as 0.
@@ -217,9 +227,9 @@ FRESH=$(find "$WORK/tree" -mindepth 1 -maxdepth 1 -type d | head -n1)
 COPY=$(python3 -B "$FRESH/scripts/system_scripts.py" publish "$FRESH") \
   || fail "could not copy the scripts root runs; their server was never touched"
 rm -rf "$STAGE"
-mv "$FRESH" "$STAGE" || fail "could not stage v$TARGET_VERSION; their server was never touched"
+move_tree "$FRESH" "$STAGE" || fail "could not stage v$TARGET_VERSION; their server was never touched"
 rm -rf "$WORK"
-chown -R dac:dac "$STAGE"
+chown -hR dac:dac "$STAGE"
 
 [ -f "$STAGE/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"
 [ -f "$STAGE/server/public/index.html" ] || fail "staged tree is missing server/public/index.html"
@@ -293,7 +303,7 @@ if [ -f "$DATABASE" ]; then
     || fail "could not create database preflight directory"
   python3 "$COPY/scripts/sqlite-safety.py" backup "$DATABASE_BACKUP" "$DB_PREFLIGHT/check.db" \
     || fail "could not prepare database preflight snapshot"
-  chown -R dac:dac "$DB_PREFLIGHT" || fail "could not set database preflight ownership"
+  chown -hR dac:dac "$DB_PREFLIGHT" || fail "could not set database preflight ownership"
   sudo -u dac bash -c "cd '$STAGE/server' && DATABASE_URL='file:$DB_PREFLIGHT/check.db' '$NPX' prisma migrate deploy" \
     || fail "database histories are incompatible; original install and database were not changed. Do not reset the database"
   rm -rf "$DB_PREFLIGHT"
@@ -409,7 +419,7 @@ fi
 if [ -d "$LIVE" ]; then
   mv "$LIVE" "$PREV" || { restore_and_report "could not move their tree aside"; exit 1; }
 fi
-mv "$STAGE" "$LIVE" || {
+move_tree "$STAGE" "$LIVE" || {
   # $LIVE is already gone (moved to $PREV above), do NOT also move $PREV
   # back here ourselves; restore-original-fork.sh's job is exactly this
   # move, and doing it twice would leave it looking at a $LIVE that already
@@ -417,7 +427,7 @@ mv "$STAGE" "$LIVE" || {
   restore_and_report "could not move staged tree into place"
   exit 1
 }
-chown -R dac:dac "$LIVE"
+chown -hR dac:dac "$LIVE"
 
 say "Installing the RAW-archive timer units..."
 cp "$COPY/scripts/systemd/free-sleep-archive-raw.service" "$COPY/scripts/systemd/free-sleep-archive-raw.timer" /etc/systemd/system/ 2>/dev/null || true

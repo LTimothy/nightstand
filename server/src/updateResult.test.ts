@@ -314,7 +314,7 @@ describe('where each script marks its progress', () => {
     const src = read('scripts/update.sh');
     assert.ok(src.indexOf('RESULT_PHASE=swapping') > src.indexOf('# --- atomic swap'));
     assert.ok(src.indexOf('RESULT_PHASE=swapping') < src.indexOf('! stop_late_stream; then'));
-    assert.ok(src.indexOf('RESULT_PHASE=swapped') > src.indexOf('mv "$STAGE" "$LIVE" || {'));
+    assert.ok(src.indexOf('RESULT_PHASE=swapped') > src.indexOf('move_tree "$STAGE" "$LIVE" || {'));
     const rollback = src.indexOf('# --- automatic rollback');
     assert.ok(src.indexOf('RESULT_PHASE=restored', rollback) > src.indexOf('mv "$PREV" "$LIVE" || {', rollback));
     assert.ok(src.indexOf('UP_TO_DATE=yes') < src.indexOf('Already up to date'));
@@ -327,7 +327,7 @@ describe('where each script marks its progress', () => {
     // tree coming back is a restore, not an untouched install.
     const first = follows(src, 'RESULT_PHASE=restored', 'mv "$LIVE" "$PREV" || {');
     assert.ok(first < src.indexOf('fail "swap failed moving live aside"'));
-    const second = follows(src, 'RESULT_PHASE=restored', 'mv "$STAGE" "$LIVE" || {');
+    const second = follows(src, 'RESULT_PHASE=restored', 'move_tree "$STAGE" "$LIVE" || {');
     assert.ok(second > src.indexOf('mv "$PREV" "$LIVE" || fail "swap failed and previous tree could not be restored'));
     assert.ok(second < src.indexOf('fail "swap failed; previous version restored"'));
   });
@@ -433,7 +433,7 @@ wait $!
     const start = script.indexOf('# --- atomic swap');
     assert.ok(start >= 0, 'missing the legacy swap section');
     const src = script.slice(start);
-    assert.ok(src.indexOf('RESULT_PHASE=swapped') > src.indexOf('mv "$STAGE" "$LIVE" || {'));
+    assert.ok(src.indexOf('RESULT_PHASE=swapped') > src.indexOf('move_tree "$STAGE" "$LIVE" || {'));
     const rollback = src.indexOf('# --- automatic rollback');
     assert.ok(src.indexOf('RESULT_PHASE=restored', rollback) > src.indexOf('mv "$PREV" "$LIVE" || {', rollback));
     assert.ok(src.indexOf('RESULT_PHASE=swapping') > src.indexOf('# --- atomic swap'));
@@ -441,7 +441,7 @@ wait $!
     assert.ok(src.indexOf('RESULT_PHASE=swapping') > src.indexOf('could not stop the server before converting settings'));
     const phases = src.slice(src.indexOf('rm -rf "$PREV"\nmv "$LIVE" "$PREV" || {'));
     assert.ok(phases.indexOf('RESULT_PHASE=restored') < phases.indexOf('fail "swap failed moving live aside"'));
-    const secondMove = phases.indexOf('mv "$STAGE" "$LIVE" || {');
+    const secondMove = phases.indexOf('move_tree "$STAGE" "$LIVE" || {');
     assert.ok(phases.indexOf('RESULT_PHASE=restored', secondMove) < phases.indexOf('fail "swap failed; fork restored"'));
   });
 
@@ -556,6 +556,7 @@ bash() { :; }; sync() { :; }; recheck_in_use() { :; }
 RESULT_PHASE=swapping
 systemctl() { :; }; stop_writer() { :; }; stop_late_stream() { :; }; rm() { :; }; curl() { :; }; restore_switch_data_or_fail() { :; }
 mv() { [ "$1" = ${failMove === 'live' ? 'live' : 'stage'} ] && return 1; return 0; }
+move_tree() { mv "$@"; }
 ${section}
 `);
       spawnSync('bash', [path.join(dir, 'harness.sh')], { encoding: 'utf8' });

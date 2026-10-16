@@ -485,9 +485,9 @@ fi
 NEW_COPY=$(python3 -B "$NIGHTSTAND_SCRIPTS/system_scripts.py" publish "$STAGED_DIR") \
   || fail "could not copy the new version's scripts for root; live install untouched"
 rm -rf "$STAGE"
-mv "$STAGED_DIR" "$STAGE" || fail "could not stage v$EXPECTED_VERSION"
+move_tree "$STAGED_DIR" "$STAGE" || fail "could not stage v$EXPECTED_VERSION"
 rm -rf "$WORK"
-chown -R dac:dac "$STAGE"
+chown -hR dac:dac "$STAGE"
 fi
 
 # the pod runs prebuilt code; refuse anything missing its build output
@@ -607,8 +607,8 @@ mv "$LIVE" "$PREV" || {
   RESULT_REASON="the new version could not be put in place, so it never started"
   fail "swap failed moving live aside"
 }
-mv "$STAGE" "$LIVE" || {
-  mv "$PREV" "$LIVE" || fail "swap failed and previous tree could not be restored; manual recovery required"
+move_tree "$STAGE" "$LIVE" || {
+  move_tree "$PREV" "$LIVE" || fail "swap failed and previous tree could not be restored; manual recovery required"
   RESULT_PHASE=restored
   systemctl start free-sleep
   if [ "$STREAM_WAS_ACTIVE" = active ]; then
@@ -624,7 +624,7 @@ MOVED_MODULES=no
 if [ "$LOCK_SAME" = yes ]; then
   MOVED_MODULES=yes
   mv "$PREV/server/node_modules" "$LIVE/server/node_modules"
-  chown -R dac:dac "$LIVE/server/node_modules"
+  chown -hR dac:dac "$LIVE/server/node_modules"
 fi
 
 # Check the database for pending migrations even when the schema is unchanged.

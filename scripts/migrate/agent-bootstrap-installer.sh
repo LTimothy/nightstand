@@ -61,6 +61,16 @@ fi
 : > "$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"; if [ -n "$WORK" ]; then rm -rf "$WORK"; fi' EXIT
 
+# Moves tree $1 to $2 in the server user's folder without following anything
+# planted at $2: mv -T where mv has it, else only onto a free name. Fails
+# unless $2 is then the moved tree.
+move_tree() {
+  move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
+  mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } || return 1
+  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+}
+
 fail() {
   say "FATAL: $*"
   write_status "install" "failed" "$*"
@@ -104,7 +114,7 @@ mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
   || fail "could not create a work folder in $SYSTEM_DIR; nothing was touched"
 FRESH="$WORK/tree"
 cp -a "$LIVE" "$FRESH" || fail "could not copy the upstream free-sleep install; nothing was touched"
-chown -R root:root "$FRESH" && chmod -R go-w "$FRESH" \
+chown -hR root:root "$FRESH" && chmod -R go-w "$FRESH" \
   || fail "could not take the copy of the upstream free-sleep install for root; nothing was touched"
 
 say "Applying the agent overlay to the copy"
@@ -170,9 +180,9 @@ PY
 COPY=$(python3 -B "$FRESH/scripts/system_scripts.py" publish "$FRESH") \
   || fail "could not copy the scripts root runs; their server was never touched"
 rm -rf "$STAGE"
-mv "$FRESH" "$STAGE" || fail "could not stage the agent; their server was never touched"
+move_tree "$FRESH" "$STAGE" || fail "could not stage the agent; their server was never touched"
 rm -rf "$WORK"
-chown -R dac:dac "$STAGE"
+chown -hR dac:dac "$STAGE"
 write_status "stage" "ok" "agent applied to a copy of upstream free-sleep"
 
 # ==============================================================================
@@ -235,8 +245,8 @@ if [ -d "$PREV" ]; then
 fi
 : > "$SWAP_MARKER"
 mv "$LIVE" "$PREV" || { restore_and_report "could not move their tree aside"; exit 1; }
-mv "$STAGE" "$LIVE" || { restore_and_report "could not move the staged tree into place"; exit 1; }
-chown -R dac:dac "$LIVE"
+move_tree "$STAGE" "$LIVE" || { restore_and_report "could not move the staged tree into place"; exit 1; }
+chown -hR dac:dac "$LIVE"
 
 # NB: the rollback and revert units are STATIC, on-demand oneshots the app
 # starts when the user requests rollback or switches to upstream free-sleep.
