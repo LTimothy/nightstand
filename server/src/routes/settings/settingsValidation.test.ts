@@ -225,3 +225,14 @@ describe('POST /settings features.rhythms', () => {
     assert.equal((await postSettings({ features: { rhythms: 'yes' } })).status, 400);
   });
 });
+
+describe('POST /settings tap gestures', () => {
+  it('replaces a gesture instead of keeping fields of its previous action', async () => {
+    await postSettings({ right: { taps: { doubleTap: {
+      type: 'alarm', behavior: 'snooze', snoozeDuration: 300, inactiveAlarmBehavior: 'none',
+    } } } });
+    const res = await postSettings({ right: { taps: { doubleTap: { type: 'temperature', change: 'increment', amount: 3 } } } });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.right.taps.doubleTap, { type: 'temperature', change: 'increment', amount: 3 });
+  });
+});

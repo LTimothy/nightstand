@@ -10,6 +10,9 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Cover taps
 
+- `POST /api/settings` now replaces a tap gesture whole, as the API guide says.
+  Before, fields of the gesture's previous action stayed in the stored
+  settings.
 - Two taps that arrive in the same 2 s read now step one after the other,
   each from the target the one before it wrote, and a tap after a read that
   still carries the old target steps from the written one. Before, both
