@@ -9,6 +9,8 @@ import { Side } from '../db/schedulesSchema.js';
 import { Gesture, GestureSchema } from '../db/settingsSchema.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import { markManualTempChange } from '../jobs/scheduleOverride.js';
+import { drivingSide } from '../jobs/scheduleQueries.js';
+import { noteDeviceStatus } from './lastDeviceStatus.js';
 import { DeepPartial } from 'ts-essentials';
 import serverStatus from '../serverStatus.js';
 import { trimixBase } from './trimixBaseControl.js';
@@ -16,6 +18,8 @@ import { BASE_PRESETS } from './basePresets.js';
 import eventBus from '../events/eventBus.js';
 import { waterLevelTracker } from './waterLevel.js';
 import { handleAlarmTap } from './tapAlarm.js';
+
+export { lastDeviceStatus } from './lastDeviceStatus.js';
 
 // Pod 4+ only: gestures and the 2s cadence are the only path. The Pod 3
 // 60s slow-poll branch was removed alongside the WebSocket initiative.
@@ -82,6 +86,11 @@ export class FrankenMonitor {
     this.isRunning = false;
   }
 
+  private setDeviceStatus(next: DeviceStatus) {
+    this.deviceStatus = next;
+    noteDeviceStatus(next);
+  }
+
   private markStatus(status: 'healthy' | 'failed', message = '') {
     const prev = serverStatus.status.frankenMonitor.status;
     serverStatus.status.frankenMonitor.status = status;
@@ -112,17 +121,24 @@ export class FrankenMonitor {
       }
       newTemperatureTargetF = Math.max(MIN_TEMPERATURE_F, Math.min(MAX_TEMPERATURE_F, newTemperatureTargetF));
       logger.debug(`Processing gesture temperature change for ${side}. ${currentTemperatureTarget} -> ${newTemperatureTargetF}`);
+      // Away mode writes both sides together, so the side the bed follows has the same target.
+      const driver = drivingSide(settingsDB.data, side) ?? side;
+      const fromF = this.deviceStatus?.[driver].targetTemperatureF ?? null;
+      const on = this.deviceStatus?.[driver].isOn ?? null;
       await updateDeviceStatus({ [side]: { targetTemperatureF: newTemperatureTargetF } } as DeepPartial<DeviceStatus>, { background: true });
       this.noteWrittenTarget(side, newTemperatureTargetF, readTarget);
       // Tap counts as a manual change for schedule-override purposes.
-      await markManualTempChange(side);
+      await markManualTempChange(side, { targetF: newTemperatureTargetF, fromF, on, setsOn: false, source: 'tap' });
       return;
     } else if (behavior.type === 'set_temperature') {
       const targetF = behavior.temperatureF;
       logger.debug(`Processing gesture set temperature for ${side}: ${targetF} F and on`);
+      const before = this.deviceStatus?.[drivingSide(settingsDB.data, side) ?? side];
       await updateDeviceStatus({ [side]: { isOn: true, targetTemperatureF: targetF } } as DeepPartial<DeviceStatus>, { background: true });
       this.noteWrittenTarget(side, targetF, readTarget);
-      await markManualTempChange(side);
+      await markManualTempChange(side, {
+        targetF, fromF: before?.targetTemperatureF ?? null, on: true, setsOn: before?.isOn === false, source: 'tap',
+      });
       return;
     } else if (behavior.type === 'base_control') {
       this.currentBasePreset =
@@ -280,8 +296,9 @@ export class FrankenMonitor {
   private async frankenLoop() {
     const franken = await connectFranken();
     try {
-      this.deviceStatus = await franken.getDeviceStatus(true);
-      eventBus.emit('device-status', this.deviceStatus);
+      const first = await franken.getDeviceStatus(true);
+      this.setDeviceStatus(first);
+      eventBus.emit('device-status', first);
     } catch (error) {
       // A failed first read must not kill the monitor before its retry loop
       // even starts: the loop below fetches every tick, and gestures resume
@@ -315,7 +332,7 @@ export class FrankenMonitor {
           if (this.hasStatusChanged(nextDeviceStatus)) {
             eventBus.emit('device-status', nextDeviceStatus);
           }
-          this.deviceStatus = nextDeviceStatus;
+          this.setDeviceStatus(nextDeviceStatus);
           this.markStatus('healthy', '');
         }
       } catch (error) {

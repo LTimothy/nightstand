@@ -23,12 +23,19 @@ mock.module(new URL('../../8sleep/frankenServer.js', import.meta.url).href, {
     connectFrankenWithin: async () => ({ callFunction: async (command: string, arg: string) => { sent.push([command, arg]); } }),
   },
 });
-const manualChanges: string[] = [];
+const manualChanges: Array<[string, unknown]> = [];
 mock.module(new URL('../../jobs/scheduleOverride.js', import.meta.url).href, {
-  namedExports: { markManualTempChange: async (side: string) => { manualChanges.push(side); } },
+  namedExports: { markManualTempChange: async (side: string, change?: unknown) => { manualChanges.push([side, change]); } },
+});
+let snapshot: unknown;
+// What the bed reads once a write has gone out; unset keeps the snapshot static.
+let afterWrite: unknown;
+mock.module(new URL('../../8sleep/lastDeviceStatus.js', import.meta.url).href, {
+  namedExports: { lastDeviceStatus: () => (afterWrite !== undefined && sent.length > 0 ? afterWrite : snapshot), noteDeviceStatus: () => {} },
 });
 
 const { default: router } = await import('./deviceStatus.js');
+const { updateSettings } = await import('../../db/settings.js');
 const app = express();
 app.use(express.json(), router);
 const server = app.listen(0, '127.0.0.1');
@@ -50,9 +57,51 @@ const post = async (body: unknown) => {
 beforeEach(() => {
   sent.length = 0;
   manualChanges.length = 0;
+  snapshot = undefined;
+  afterWrite = undefined;
 });
 
 describe('POST /deviceStatus', () => {
+  const reading = (targetTemperatureF: number, isOn: boolean) => ({
+    currentTemperatureLevel: 0, currentTemperatureF: 80, targetTemperatureF, secondsRemaining: 0, isOn, isAlarmVibrating: false,
+  });
+
+  it('passes the written value, the bed\'s previous target and its on state', async () => {
+    snapshot = { left: reading(82, true), right: reading(75, false) };
+    assert.equal(await post({ left: { targetTemperatureF: 78.8 } }), 204);
+    assert.deepEqual(manualChanges, [['left', { targetF: 78.8, fromF: 82, on: true, setsOn: false, source: 'api' }]]);
+  });
+
+  it('takes the snapshot before the write reaches the bed', async () => {
+    snapshot = { left: reading(82, true), right: reading(75, false) };
+    afterWrite = { left: reading(78.8, true), right: reading(75, false) };
+    assert.equal(await post({ left: { targetTemperatureF: 78.8 } }), 204);
+    assert.equal(sent.length > 0, true);
+    assert.deepEqual(manualChanges, [['left', { targetF: 78.8, fromF: 82, on: true, setsOn: false, source: 'api' }]]);
+  });
+
+  it('marks a request that turns the side on with its temperature', async () => {
+    snapshot = { left: reading(82, false), right: reading(75, false) };
+    assert.equal(await post({ left: { isOn: true, targetTemperatureF: 80 } }), 204);
+    assert.deepEqual(manualChanges, [['left', { targetF: 80, fromF: 82, on: true, setsOn: true, source: 'api' }]]);
+  });
+
+  it('reads the side the bed follows while this side is away', async () => {
+    await updateSettings(draft => { draft.left.awayMode = true; });
+    snapshot = { left: reading(90, false), right: reading(75, true) };
+    try {
+      assert.equal(await post({ left: { targetTemperatureF: 73 } }), 204);
+      assert.deepEqual(manualChanges, [['left', { targetF: 73, fromF: 75, on: true, setsOn: false, source: 'api' }]]);
+    } finally {
+      await updateSettings(draft => { draft.left.awayMode = false; });
+    }
+  });
+
+  it('passes unknown readings before the monitor has read the Pod', async () => {
+    assert.equal(await post({ right: { targetTemperatureF: 70 } }), 204);
+    assert.deepEqual(manualChanges, [['right', { targetF: 70, fromF: null, on: null, setsOn: false, source: 'api' }]]);
+  });
+
   const rejected: [string, unknown][] = [
     ['a huge duration', { left: { secondsRemaining: 1e21 } }],
     ['a negative duration', { right: { secondsRemaining: -5 } }],
@@ -88,7 +137,7 @@ describe('POST /deviceStatus', () => {
     assert.equal(await post({ settings: { v: 1, gainLeft: 400, gainRight: 400, ledBrightness: 60 } }), 204);
     assert.equal(await post({ settings: { v: 70_000, gainLeft: 2_147_483_647, gainRight: 0, ledBrightness: 0 } }), 204);
     assert.equal(await post({ right: { targetTemperatureF: 55 } }), 204);
-    assert.deepEqual(manualChanges, ['left', 'right']);
+    assert.deepEqual(manualChanges.map(([side]) => side), ['left', 'right']);
   });
 
   it('ignores isPriming false without sending an unverified cancellation command', async () => {
