@@ -81,4 +81,19 @@ describe('rhythms history', () => {
   it('never writes inside the lowdb folder', () => {
     assert.equal(existsSync(path.join(dataFolder, 'lowdb', 'rhythms-history.jsonl')), false);
   });
+
+  it('rewrites a file with the kept lines and the new ones', async () => {
+    const file = path.join(dataFolder, 'pruned.jsonl');
+    writeFileSync(file, 'keep 1\ndrop\n\nkeep 2\n');
+    await history.appendPruned(file, line => line.startsWith('keep'), ['new']);
+    assert.equal(readFileSync(file, 'utf8'), 'keep 1\nkeep 2\nnew\n');
+    assert.equal(existsSync(`${file}.tmp`), false);
+  });
+
+  it('creates a missing file and throws when it cannot write', async () => {
+    const file = path.join(dataFolder, 'fresh.jsonl');
+    await history.appendPruned(file, () => true, ['one']);
+    assert.equal(readFileSync(file, 'utf8'), 'one\n');
+    await assert.rejects(history.appendPruned(path.join(dataFolder, 'missing-dir', 'x.jsonl'), () => true, ['one']));
+  });
 });

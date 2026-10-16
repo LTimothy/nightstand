@@ -26,6 +26,22 @@ function isRecent(line: string, cutoff: number): boolean {
   }
 }
 
+// Rewrites the file with the lines `keep` accepts plus `add`, through a
+// temporary file. Throws; callers decide how to report a failure.
+export async function appendPruned(file: string, keep: (line: string) => boolean, add: string[]): Promise<void> {
+  let existing = '';
+  try {
+    existing = await readFile(file, 'utf8');
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  const lines = existing.split('\n').filter(line => line.trim() !== '' && keep(line));
+  lines.push(...add);
+  const temporary = `${file}.tmp`;
+  await writeFile(temporary, `${lines.join('\n')}\n`, 'utf8');
+  await rename(temporary, file);
+}
+
 // Appends one record and drops records whose sleep ended more than 90 days
 // ago. Never throws: history must not affect the engine.
 export async function appendHistory(
@@ -33,19 +49,8 @@ export async function appendHistory(
   options: { path?: string; now?: Date } = {},
 ): Promise<void> {
   try {
-    const file = options.path ?? historyPath();
     const cutoff = (options.now ?? new Date()).getTime() - HISTORY_RETENTION_DAYS * DAY;
-    let existing = '';
-    try {
-      existing = await readFile(file, 'utf8');
-    } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
-    const lines = existing.split('\n').filter(line => line.trim() !== '' && isRecent(line, cutoff));
-    lines.push(JSON.stringify(record));
-    const temporary = `${file}.tmp`;
-    await writeFile(temporary, `${lines.join('\n')}\n`, 'utf8');
-    await rename(temporary, file);
+    await appendPruned(options.path ?? historyPath(), line => isRecent(line, cutoff), [JSON.stringify(record)]);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`smart schedule: history not written: ${message}`);
