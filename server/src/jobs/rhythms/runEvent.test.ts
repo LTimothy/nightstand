@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, afterEach, beforeEach, describe, it, mock } from 'node:test';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { ResolvedSleep, RhythmEvent } from './resolve.js';
@@ -60,6 +60,7 @@ const { smartPowerOffFor, startCurveController, stopCurveController } = await im
 const { resetPowerOnTimes } = await import('../powerScheduler.js');
 const { setEngineActivation } = await import('../scheduleQueries.js');
 const { nextReboot } = await import('../rebootTime.js');
+const { changesPath, flushHandChanges, forgetHandChanges } = await import('./handChanges.js');
 
 const at = (iso: string) => new Date(iso);
 const setNow = (iso: string) => mock.timers.setTime(Date.parse(iso));
@@ -601,5 +602,55 @@ describe('"When I get up" sleeps', () => {
     holdForHandBack(new Date());
     assert.equal(await armExtensionStep('left', at('2026-09-29T06:15:00Z'), at('2026-09-29T09:00:00Z'), at('2026-09-29T06:00:00Z')), false);
     assert.deepEqual(updates, []);
+  });
+});
+
+describe('night notes', () => {
+  beforeEach(() => forgetHandChanges());
+  afterEach(async () => {
+    settingsDB.data.features.rhythmSuggestions = false;
+    await settingsDB.write();
+  });
+  const nightLines = () => (existsSync(changesPath()) ? readFileSync(changesPath(), 'utf8').trim().split('\n') : [])
+    .map(line => JSON.parse(line) as { kind: string; date: string; side: string });
+
+  it('writes one night line when a rhythm power-on runs with suggestions on', async () => {
+    settingsDB.data.features.rhythmSuggestions = true;
+    await settingsDB.write();
+    const sleep = sleepOn('2026-09-28');
+    setNow('2026-09-28T22:00:00Z');
+    await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
+    await flushHandChanges();
+    assert.deepEqual(nightLines().map(line => [line.kind, line.side, line.date]), [['night', 'left', '2026-09-28']]);
+  });
+
+  it('writes nothing with suggestions off', async () => {
+    const sleep = sleepOn('2026-09-28');
+    setNow('2026-09-28T22:00:00Z');
+    await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
+    await flushHandChanges();
+    assert.deepEqual(nightLines(), []);
+  });
+
+  it('writes nothing when the power-on is skipped', async () => {
+    settingsDB.data.features.rhythmSuggestions = true;
+    settingsDB.data.left.scheduleOverrides.pause = { active: true, expiresAt: '' };
+    await settingsDB.write();
+    const sleep = sleepOn('2026-09-28');
+    setNow('2026-09-28T22:00:00Z');
+    await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
+    await flushHandChanges();
+    assert.deepEqual(nightLines(), []);
+  });
+
+  it('writes nothing when the power-on write fails', async () => {
+    settingsDB.data.features.rhythmSuggestions = true;
+    await settingsDB.write();
+    writes.fail = true;
+    const sleep = sleepOn('2026-09-28');
+    setNow('2026-09-28T22:00:00Z');
+    await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
+    await flushHandChanges();
+    assert.deepEqual(nightLines(), []);
   });
 });
