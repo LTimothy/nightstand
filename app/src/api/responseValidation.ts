@@ -107,6 +107,7 @@ const sideSettingsResponse = SettingsSchema.shape.left.extend({
   }),
   oneOffAlarm: oneOffResponse,
   taps: soft(sideSettingsShape.taps.optional(), undefined),
+  buttons: soft(sideSettingsShape.buttons.optional(), undefined),
 });
 // The zone list is a picker, not a limit: any zone the app can format is kept.
 // Unset stays unset (the Pod schedules nothing without a zone); so does one the

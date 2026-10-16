@@ -9,6 +9,9 @@ export const activeAlarms = new Map<Side, ActiveAlarm>();
 
 const snoozes = new Map<Side, ReturnType<typeof setTimeout>>();
 
+// When each side's last alarm stopped ringing, by dismissal or on its own.
+export const alarmEndedAt = new Map<Side, number>();
+
 export function hasSnooze(side: Side): boolean {
   return snoozes.has(side);
 }
@@ -31,6 +34,7 @@ export function setSnooze(side: Side, delayMs: number, ring: () => void): void {
 
 // A dismissed alarm also ends its snooze.
 export function forgetActiveAlarm(side: Side): void {
+  if (activeAlarms.has(side) || snoozes.has(side)) alarmEndedAt.set(side, Date.now());
   activeAlarms.delete(side);
   cancelSnooze(side);
 }
@@ -49,6 +53,7 @@ export async function recordActiveAlarm(side: Side, alarm: ActiveAlarm, duration
     await memoryDB.read();
     if (activeAlarms.get(side) !== activeAlarm) return;
     activeAlarms.delete(side);
+    alarmEndedAt.set(side, Date.now());
     memoryDB.data[side].isAlarmVibrating = false;
     await memoryDB.write();
   }, durationSeconds * 1_000);

@@ -54,6 +54,15 @@ const OneOffAlarmSchema = z.object({
   duration: z.number().int().min(0).max(180),
 });
 
+// The buttons on a Pod 5 cover, used by buttonMonitor.ts only for clicks the
+// firmware logged as ignored. invertButtons swaps plus and minus; the logo
+// stops an alarm or sets the side to favoriteTemperatureF.
+const ButtonsSchema = z.object({
+  invertButtons: z.boolean(),
+  stepF: z.number().min(0).max(10),
+  favoriteTemperatureF: z.number().int().min(55).max(110),
+}).strict();
+
 const SideSettingsSchema = z.object({
   name: z.string().min(1).max(20),
   awayMode: z.boolean(),
@@ -79,7 +88,8 @@ const SideSettingsSchema = z.object({
     doubleTap: TapConfig,
     tripleTap: TapConfig,
     quadTap: TapConfig,
-  })
+  }),
+  buttons: ButtonsSchema,
 }).strict();
 
 // Which release channel the update alert/version picker treats as "latest".
@@ -107,6 +117,8 @@ export const defaultFeatures = {
   coolingWarning: false,
   metricsRetention: false,
   metricsLowDiskProtection: true,
+  // The buttons on a Pod 5 cover (buttonMonitor.ts). Off: no RAW file is read.
+  coverButtons: false,
 } as const;
 const FeaturesSchema = z.object({
   sleepScore: z.boolean(),
@@ -122,6 +134,7 @@ const FeaturesSchema = z.object({
   coolingWarning: z.boolean(),
   metricsRetention: z.boolean(),
   metricsLowDiskProtection: z.boolean(),
+  coverButtons: z.boolean(),
 }).strict();
 
 export const SettingsSchema = z.object({
@@ -140,6 +153,7 @@ export const SettingsSchema = z.object({
   features: FeaturesSchema,
 }).strict();
 
+export type Buttons = z.infer<typeof ButtonsSchema>;
 export type SideSettings = z.infer<typeof SideSettingsSchema>;
 export type Settings = z.infer<typeof SettingsSchema>;
 export type Features = z.infer<typeof FeaturesSchema>;

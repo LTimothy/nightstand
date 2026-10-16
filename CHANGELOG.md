@@ -16,6 +16,16 @@ is a hard fork; for the history of the projects it descends from, see
   stepped from the same read's target and the second write undid the first.
   Seen on a Pod 4 hub with a Pod 5 cover by @2-X, where the newer host
   firmware reports a held cover button as a tap.
+- Settings > Features has a new Cover buttons switch, off by default. It is
+  for a Pod 4 hub with a Pod 5 cover, whose firmware ignores short clicks on
+  the cover's buttons. With it on, Nightstand reads those ignored clicks
+  from the Pod's RAW files. Plus and minus step that side, 1 F per click by
+  default, and the logo button stops a ringing or snoozed alarm or else
+  sets the side to a favorite temperature and turns it on. The step, a plus
+  and minus swap and the favorite temperature are set per side through the
+  API. A click can take 15 to 25 s to apply, because the firmware writes
+  its log in batches. A Pod 5 hub handles its buttons itself, so the switch
+  does nothing there. By @2-X.
 
 ### Alarms
 

@@ -56,6 +56,17 @@ it('accepts fields absent from older settings and services', () => {
   expect(() => validateResponse('/services', services)).not.toThrow();
 });
 
+it('reads settings whose cover buttons are absent or out of range', () => {
+  const settings = structuredClone(getSettings());
+  const left = settings.left as unknown as Record<string, unknown>;
+  delete left.buttons;
+  settings.right.buttons = { ...settings.right.buttons, stepF: 50 };
+  const parsed = validateResponse('/settings', settings) as typeof settings;
+  expect(parsed.left.buttons).toBeUndefined();
+  expect(parsed.right.buttons).toBeUndefined();
+  expect(validateResponse('/settings', getSettings())).toMatchObject({ right: { buttons: getSettings().right.buttons } });
+});
+
 it('accepts settings from a version without the new sleep tracking switch', () => {
   const settings = structuredClone(getSettings());
   const features: Record<string, unknown> = { ...settings.features };

@@ -284,7 +284,8 @@ const createSettings = (): Settings => ({
         snoozeDuration: 60,
         inactiveAlarmBehavior: 'power',
       },
-    }
+    },
+    buttons: { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 },
   },
   right: {
     name: 'Sam',
@@ -319,7 +320,8 @@ const createSettings = (): Settings => ({
         snoozeDuration: 60,
         inactiveAlarmBehavior: 'power',
       },
-    }
+    },
+    buttons: { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 },
   },
   primePodDaily: { enabled: true, time: '14:30' },
 });
@@ -460,6 +462,12 @@ const createServerStatus = (): ServerStatus => ({
     status: 'healthy',
     description: 'Handles gestures and monitoring the status',
     message: '',
+  },
+  buttonMonitor: {
+    name: 'Cover buttons',
+    status: 'healthy',
+    description: 'Reads ignored cover clicks from the RAW files',
+    message: 'Off in Settings > Features',
   },
   jobs: {
     name: 'Job scheduler',
