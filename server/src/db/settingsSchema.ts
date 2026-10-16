@@ -124,6 +124,7 @@ export const defaultFeatures = {
   coolingWarning: false,
   metricsRetention: false,
   metricsLowDiskProtection: true,
+  rhythmSuggestions: false,
   // The buttons on a Pod 5 cover (buttonMonitor.ts). Off: no RAW file is read.
   coverButtons: false,
 } as const;
@@ -141,6 +142,7 @@ const FeaturesSchema = z.object({
   coolingWarning: z.boolean(),
   metricsRetention: z.boolean(),
   metricsLowDiskProtection: z.boolean(),
+  rhythmSuggestions: z.boolean(),
   coverButtons: z.boolean(),
 }).strict();
 

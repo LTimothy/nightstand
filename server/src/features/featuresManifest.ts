@@ -1000,6 +1000,24 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       + ' A rhythm set to turn off when the person gets up carries one optional key, which 3.5.0 drops on read.',
   },
   {
+    id: 'rhythm-suggestions',
+    title: 'Suggestions from your changes',
+    description: 'Notes temperature changes made by hand during a rhythm and suggests one repeated on half or more of the '
+      + 'last nights. Nothing changes until it is added.',
+    category: 'platform',
+    version: '3.7.0',
+    flag: 'rhythmSuggestions',
+    default: false,
+    touchpoints: ['server/src/db/settingsSchema.ts', 'server/src/db/suggestionRules.ts', 'app/src/api/suggestionRules.ts'],
+    depends_on: ['rhythms'],
+    reversible: true,
+    tests: ['server/src/db/suggestionRules.test.ts', 'server/src/features/featuresManifest.test.ts'],
+    upstream_offer: false,
+    rationale: 'Off by default. Learns only from hand changes, never from sleep data or presence, and only proposes: a rhythm '
+      + 'changes when the person adds a suggestion, through the ordinary rhythms save. The notes live in rhythms-changes.jsonl '
+      + 'next to the lowdb folder, which older versions never read.',
+  },
+  {
     id: 'tap-alarm',
     title: 'Alarm taps',
     description: 'Accepts the alarm tap action upstream uses, which has no effect yet. On a Pod 5 the firmware '
