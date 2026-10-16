@@ -7,7 +7,7 @@ import { JSONFile } from 'lowdb/node';
 import { Settings, SideSettings, defaultFeatures } from './settingsSchema.js';
 import config from '../config.js';
 
-const defaultSideSettings: SideSettings = {
+export const defaultSideSettings: SideSettings = {
   name: 'Side',
   awayMode: false,
   alarmsEnabled: true,

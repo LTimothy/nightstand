@@ -24,9 +24,9 @@ export class ButtonEventMachine {
       const count = Number(ignored[1]);
       // The result names no side, so attribution follows the pending order.
       const fresh = this.pending.filter(event => tsMs - event.at <= 5000);
-      // A logo click counts only when every fresh click was ignored, so a logo
+      // A logo click counts only when every pending click was ignored, so a logo
       // the firmware acted on itself is never applied a second time.
-      const candidates = count >= fresh.length ? fresh : fresh.filter(event => event.button !== 'middle');
+      const candidates = count >= this.pending.length ? fresh : fresh.filter(event => event.button !== 'middle');
       const events = count > 0 ? candidates.slice(-count).map(event => ({ ...event, at: tsMs })) : [];
       this.pending = [];
       return events;

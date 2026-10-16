@@ -270,10 +270,10 @@ generic message; the details go to the server log.
 - `features` are feature flags. `sleepScore` turns the sleep score and sleep
   stage routes on and off; the app no longer shows either.
   `coverButtons` is Cover buttons, off by default. It is for a Pod 4 hub with
-  a Pod 5 cover, whose firmware ignores short clicks on the cover's plus and
-  minus buttons. With it on, Nightstand reads those ignored clicks from
-  `/persistent/*.RAW` and acts on them as `buttons` above says. A click can take 15 to 25 s to apply, because the firmware writes
-  its log in batches. A Pod 5 hub handles its buttons itself, so the switch
+  a Pod 5 cover, whose firmware ignores short clicks on the cover's plus, minus
+  and logo buttons. With it on, Nightstand reads those ignored clicks from
+  `/persistent/*.RAW` and acts on them as `buttons` above says. A click can
+  take 15 to 25 s to apply, because the firmware writes its log in batches. A Pod 5 hub handles its buttons itself, so the switch
   does nothing there. While off, the server opens no RAW files for buttons.
   `nightstandTheme` is no longer read and stays so stored settings keep
   validating. `features.rhythms` is the Rhythms switch (see `/api/rhythms`

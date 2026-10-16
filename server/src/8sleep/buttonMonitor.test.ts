@@ -73,7 +73,11 @@ mock.module(new URL('./frankenServer.js', import.meta.url).href, {
 let alarmTaps: Array<{ side: string; behavior: string }> = [];
 mock.module(new URL('./tapAlarm.js', import.meta.url).href, {
   namedExports: {
-    handleAlarmTap: async (side: string, tap: { behavior: string }) => { alarmTaps.push({ side, behavior: tap.behavior }); },
+    handleAlarmTap: async (side: string, tap: { behavior: string }) => {
+      alarmTaps.push({ side, behavior: tap.behavior });
+      // Like the real handler, a dismiss forgets the alarm.
+      (await import('../jobs/activeAlarms.js')).activeAlarms.delete(side as 'left' | 'right');
+    },
   },
 });
 
@@ -348,6 +352,41 @@ describe('ButtonMonitor', () => {
     await monitor.poll();
     assert.deepEqual(alarmTaps, [{ side: 'right', behavior: 'dismiss' }]);
     assert.deepEqual(updates, []);
+  });
+
+  it('stops the alarm once for two logo clicks in one batch', async () => {
+    activeAlarms.set('left', { vibrationIntensity: 50, duration: 30, vibrationPattern: 'rise' });
+    const lines = ['[tca8418L] gpi press 98', '[tca8418L] gpi release 98', '[tca8418L] gpi press 98', '[tca8418L] gpi release 98',
+      '[TTC] ignoring 2 short clicks'];
+    writeRaw('001.RAW', Buffer.concat(lines.map(line => logRecord(line))), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(alarmTaps, [{ side: 'left', behavior: 'dismiss' }]);
+    assert.deepEqual(updates, []);
+  });
+
+  it('sets the favorite for a logo click after the window that followed a stop', async () => {
+    const t = Date.now();
+    activeAlarms.set('left', { vibrationIntensity: 50, duration: 30, vibrationPattern: 'rise' });
+    await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at: t - 20_000 });
+    mock.timers.enable({ apis: ['Date'], now: t + 2_000 });
+    try {
+      await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at: t + 2_000 });
+      assert.deepEqual(updates, []);
+      mock.timers.tick(40_000);
+      await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at: t + 42_000 });
+    } finally {
+      mock.timers.reset();
+    }
+    assert.deepEqual(alarmTaps.length, 1);
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80 } }]);
+  });
+
+  it('uses the default options when a side has no buttons settings', async () => {
+    delete (settingsDB.data.right as { buttons?: unknown }).buttons;
+    await settingsDB.write();
+    writeRaw('001.RAW', click('R', 97), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(rightTargets(), [83]);
   });
 
   it('sets the favorite temperature and turns the side on for a logo click with no alarm', async () => {

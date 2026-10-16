@@ -7,7 +7,7 @@ import moment from 'moment-timezone';
 import { DeepPartial } from 'ts-essentials';
 
 import logger from '../logger.js';
-import settingsDB from '../db/settings.js';
+import settingsDB, { defaultSideSettings } from '../db/settings.js';
 import serverStatus from '../serverStatus.js';
 import eventBus from '../events/eventBus.js';
 import { Side } from '../db/schedulesSchema.js';
@@ -276,17 +276,22 @@ export class ButtonMonitor {
     return events;
   }
 
+  // Clicks apply 15 to 25 s late, so repeats of the logo click that stopped an
+  // alarm must not fall through to the favorite temperature.
+  private logoStoppedAlarmAt: Partial<Record<Side, number>> = {};
+
   private async dispatch(event: ButtonEvent): Promise<void> {
     try {
       await settingsDB.read();
       if (!settingsDB.data.features.coverButtons || Date.now() - event.at > MAX_PRESS_AGE_MS) return;
       const side: Side = event.side;
-      const buttons = settingsDB.data[side].buttons;
+      const buttons = settingsDB.data[side].buttons ?? defaultSideSettings.buttons;
       if (event.button === 'middle') {
         if (activeAlarms.has(side) || hasSnooze(side)) {
           logger.info(`[buttonMonitor] ${side} logo button: stopping the alarm`);
           await handleAlarmTap(side, { type: 'alarm', behavior: 'dismiss', snoozeDuration: 60, inactiveAlarmBehavior: 'none' });
-        } else {
+          this.logoStoppedAlarmAt[side] = event.at;
+        } else if (Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS) {
           await this.setFavorite(side, buttons.favoriteTemperatureF, event.at);
         }
         return;

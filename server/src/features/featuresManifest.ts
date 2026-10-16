@@ -516,7 +516,7 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     id: 'cover-buttons',
     title: 'Cover buttons',
     description: 'For a Pod 4 hub with a Pod 5 cover, whose firmware ignores short clicks on the cover\'s '
-      + 'buttons. Reads those clicks from RAW files: plus and minus step that side by 1 F per click, and the '
+      + 'buttons. Reads those clicks from RAW files: plus and minus step that side by 1 F per click by default, and the '
       + 'logo stops a ringing or snoozed alarm or sets a favorite temperature. A click takes 15 to 25 s, '
       + 'because the firmware writes its log in batches. A Pod 5 hub handles its buttons itself, so this does nothing there.',
     category: 'platform',

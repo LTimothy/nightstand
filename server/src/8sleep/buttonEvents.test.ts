@@ -25,6 +25,13 @@ describe('ButtonEventMachine', () => {
     assert.deepEqual(machine.push('[TTC] ignoring 2 short clicks', 6001), [{ ...bottomLeft, at: 6001 }]);
   });
 
+  it('drops a firmware-handled logo when a click just past five seconds filtered out', () => {
+    const machine = new ButtonEventMachine();
+    click(machine, 'R', 97, 0);
+    click(machine, 'R', 98, 4000);
+    assert.deepEqual(machine.push('[TTC] ignoring 1 short clicks', 5500), []);
+  });
+
   it('keeps only the last eight pending clicks', () => {
     const machine = new ButtonEventMachine();
     click(machine, 'L', 99);
