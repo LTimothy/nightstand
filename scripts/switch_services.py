@@ -139,7 +139,7 @@ def nightstand_scripts(config):
     """Root-owned scripts for the Nightstand tree at config.live, never the tree."""
     try:
         copy = config.system / 'copies' / system_scripts.digest(str(config.live))
-    except SystemExit:
+    except (SystemExit, OSError):
         copy = None
     return (copy if copy and copy.is_dir() else config.system / 'live') / 'scripts'
 

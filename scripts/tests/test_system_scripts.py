@@ -1,11 +1,14 @@
 """Root-owned copies of the scripts root runs."""
+import errno
 import importlib.util
 import os
 from pathlib import Path
+import socket
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -47,7 +50,7 @@ class SystemScriptsTests(unittest.TestCase):
 
     def test_publish_copies_the_scripts_root_runs_and_nothing_else(self):
         tree = self.tree('a', {
-            'update.sh': ('echo a\n', 0o775), 'write_result.py': ('pass\n', 0o664),
+            'update.sh': ('echo a\n', 0o700), 'write_result.py': ('pass\n', 0o600),
             'systemd/x.service': ('[Unit]\n', 0o644), 'migrate/y.sh': ('echo y\n', 0o755),
             'tests/test_x.py': ('', 0o644), '__pycache__/x.cpython-39.pyc': ('', 0o644)})
         copy = self.publish(tree)
@@ -199,6 +202,114 @@ class SystemScriptsTests(unittest.TestCase):
         self.assertIn('refusing', str(raised.exception))
         self.assertFalse(self.system.exists())
 
+
+    def test_skips_sockets_and_fifos_and_refuses_a_file_that_turns_into_one(self):
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755)})
+        plain = self.publish(self.tree('b', {'update.sh': ('echo a\n', 0o755)}))
+        os.mkfifo(str(tree / 'scripts/pipe'))
+        cwd = os.getcwd()
+        listener = socket.socket(socket.AF_UNIX)
+        self.addCleanup(listener.close)
+        try:
+            os.chdir(str(tree / 'scripts'))
+            listener.bind('server.sock')
+        finally:
+            os.chdir(cwd)
+        self.assertEqual(self.publish(tree), plain)
+        found = self.tool('find', tree)
+        self.assertEqual((found.returncode, found.stdout.strip()), (0, str(plain)))
+        module = self.module()
+        real_open = os.open
+
+        def swapped(path, *args, **kwargs):
+            if path == 'update.sh':
+                raise OSError(errno.ENXIO, 'No such device or address')
+            return real_open(path, *args, **kwargs)
+        with patch.object(module.os, 'open', swapped):
+            with self.assertRaises(SystemExit) as raised:
+                module.digest(str(tree))
+            self.assertIsNone(module.find(str(tree)))
+        self.assertIn('refusing', str(raised.exception))
+
+    def test_refuses_a_regular_name_that_is_a_fifo_once_opened(self):
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755)})
+        module = self.module()
+        real_fstat = os.fstat
+
+        def fifo(fd):
+            info = real_fstat(fd)
+            if not stat.S_ISREG(info.st_mode):
+                return info
+            values = list(info)
+            values[stat.ST_MODE] = stat.S_IFIFO | 0o600
+            return os.stat_result(values)
+        with patch.object(module.os, 'fstat', fifo):
+            with self.assertRaises(SystemExit) as raised:
+                module.digest(str(tree))
+        self.assertIn('refusing', str(raised.exception))
+
+    def test_prune_skips_what_a_deploy_removes_mid_sweep(self):
+        for name in 'abcde':
+            self.publish(self.tree(name, {'update.sh': ('echo %s\n' % name, 0o755)}))
+        module = self.module()
+        copies = self.system / 'copies'
+        gone = sorted(path.name for path in copies.iterdir())[0]
+        real_lstat, real_rmtree = os.lstat, module.shutil.rmtree
+
+        def lstat(path, *args, **kwargs):
+            if os.path.basename(str(path)) == gone:
+                raise FileNotFoundError(errno.ENOENT, 'gone')
+            return real_lstat(path, *args, **kwargs)
+
+        def rmtree(path, *args, **kwargs):
+            real_rmtree(path, *args, **kwargs)
+            raise FileNotFoundError(errno.ENOENT, 'gone')
+        with patch.object(module.os, 'lstat', lstat):
+            module.prune()
+        with patch.object(module.shutil, 'rmtree', rmtree):
+            module.prune()
+        self.assertLessEqual(len(list(copies.iterdir())), module.KEEP + 1)
+
+    def test_refuses_files_a_group_other_than_root_can_change(self):
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755)})
+        (tree / 'scripts/update.sh').chmod(0o775)
+        module = self.module()
+        info = os.stat(str(tree))
+        self.assertNotEqual(info.st_gid, 0)
+        with self.assertRaises(SystemExit) as raised:
+            module.publish(str(tree))
+        self.assertIn('refusing', str(raised.exception))
+        # A release unpacked by root keeps git's 0664 modes with group root.
+        real_fstat = os.fstat
+        (tree / 'scripts/data.txt').write_text('x\n')
+        (tree / 'scripts/data.txt').chmod(0o664)
+        with patch.object(module.os, 'fstat', lambda fd: _with_gid(real_fstat(fd), 0)):
+            copy = Path(module.publish(str(tree)))
+        self.assertEqual(stat.S_IMODE((copy / 'scripts/update.sh').stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE((copy / 'scripts/data.txt').stat().st_mode), 0o644)
+
+    def test_prune_removes_download_folders_over_a_day_old(self):
+        self.publish(self.tree('a', {'update.sh': ('echo a\n', 0o755)}))
+        old, new = self.system / '.download.old', self.system / '.download.new'
+        for folder in (old, new):
+            (folder / 'tree').mkdir(parents=True)
+        os.utime(str(old), (time.time() - 2 * 86400,) * 2)
+        self.assertEqual(self.tool('prune').returncode, 0)
+        self.assertFalse(old.exists())
+        self.assertTrue((new / 'tree').is_dir())
+
+    def module(self):
+        spec = importlib.util.spec_from_file_location('system_scripts_module', str(TOOL))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.SYSTEM = str(self.system)
+        return module
+
+
+def _with_gid(info, gid):
+    values = list(info)
+    values[stat.ST_GID] = gid
+    return os.stat_result(values)
 
 if __name__ == '__main__':
     unittest.main()

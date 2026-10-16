@@ -2,6 +2,7 @@
 import importlib.util
 import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
 import tempfile
@@ -179,6 +180,17 @@ iptables -C OUTPUT -j DROP && ip6tables -C OUTPUT -j DROP
         with patch.object(self.module, 'execute', side_effect=wrong):
             with self.assertRaises(ValueError):
                 self.module.apply(self.store, 'switch', self.config, 'upstream')
+
+    def test_a_socket_in_the_tree_falls_back_to_the_live_copy_instead_of_failing(self):
+        cwd = os.getcwd()
+        listener = socket.socket(socket.AF_UNIX)
+        self.addCleanup(listener.close)
+        try:
+            os.chdir(str(self.live / 'scripts'))
+            listener.bind('server.sock')
+        finally:
+            os.chdir(cwd)
+        self.assertEqual(self.module.nightstand_scripts(self.config), self.config.system / 'live/scripts')
 
     def test_return_removes_upstream_override_before_nightstand_setup(self):
         override = self.config.systemd / 'free-sleep-update.service.d/sqlite-maintenance.conf'

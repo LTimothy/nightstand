@@ -102,6 +102,7 @@ echo "Installing Nightstand v$VERSION from the $CHANNEL channel"
 # Downloaded and unpacked where only root can write.
 mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
   || { echo "Could not create a download folder in $SYSTEM_DIR. Nothing was installed."; exit 1; }
+trap 'rm -rf "$WORK"' EXIT
 ZIP_FILE="$WORK/release.zip"
 UNZIP_DIR="$WORK/tree"
 
@@ -211,6 +212,7 @@ restart_on_failure() {
     done
   fi
   [ -z "$HBODY" ] || rm -f "$HBODY"
+  rm -rf "$WORK"
 }
 trap restart_on_failure EXIT
 # Without these, an interrupted run reaches the trap above with status 0.

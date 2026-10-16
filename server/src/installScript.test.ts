@@ -281,12 +281,12 @@ curl() { : > "$3"; return 22; }
 ${between('# Download the repository', 'echo "Unzipping the repository..."')}
 echo continued`], { env: envWith({ TEST_SYSTEM: system }), encoding: 'utf8' });
     // Downloaded into a private folder in the root-owned one, never the working directory.
-    const zipKept = readdirSync(system).some(name => existsSync(path.join(system, name, 'release.zip')));
+    const leftover = readdirSync(system);
     rmSync(dir, { recursive: true, force: true });
     assert.notEqual(result.status, 0);
     assert.match(result.stdout, /^Could not download v3\.6\.0 from GitHub\. Nothing was installed\.$/m);
     assert.doesNotMatch(result.stdout, /continued/);
-    assert.equal(zipKept, false);
+    assert.deepEqual(leftover, []);
   });
 });
 
