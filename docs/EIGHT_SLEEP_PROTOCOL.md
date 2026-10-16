@@ -154,12 +154,12 @@ buffer truncates it. See `biometrics/load_raw_files.py` and
 | `type` | Contents | Consumed by free-sleep? |
 |---|---|---|
 | `piezo-dual` | Raw piezo sensor waveform, both sides | ✅ yes: core presence/vitals signal |
-| `capSense` (Pod 3, possibly some Pod 5) / `capSense2` (Pod 5 newer cover; Pod 4 not confirmed) | Capacitance sensor readings; Pod 5's `capSense2` shape is normalized to the legacy `capSense` fields (`out`/`cen`/`in`) | ✅ yes |
-| `bedTemp` (Pod 3, v1 integer centidegrees) / `bedTemp2` (Pod 4/5, float °C, `temps[]` array) | Bed-surface temperature sensors. On my Pod 5, `bedTemp2` has `{version: 1, mcu, left: {amb, hu, board, temps: [four values]}, right: {...}}`; `-327.68` marks a missing reading, including in `temps`, `amb` and `hu`. | `bedTemp` yes; `bedTemp2` surface temperatures are not used yet |
+| `capSense` (Pod 3, possibly some Pod 5, and a Pod 4 hub with a Pod 5 cover) / `capSense2` (Pod 5 newer cover; a Pod 4 cover not confirmed) | Capacitance sensor readings; Pod 5's `capSense2` shape is normalized to the legacy `capSense` fields (`out`/`cen`/`in`) | ✅ yes |
+| `bedTemp` (Pod 3, v1 integer centidegrees; also a Pod 4 hub with a Pod 5 cover) / `bedTemp2` (Pod 4/5, float °C, `temps[]` array) | Bed-surface temperature sensors. On my Pod 5, `bedTemp2` has `{version: 1, mcu, left: {amb, hu, board, temps: [four values]}, right: {...}}`; `-327.68` marks a missing reading, including in `temps`, `amb` and `hu`. | `bedTemp` yes; `bedTemp2` surface temperatures are not used yet |
 | `frzTemp` | `{amb, hs, left, right}`: ambient, heatsink, and per-side hub sensor temps in centidegrees C | ✅ yes: feeds the Settings page sensor-temp display |
-| `frzHealth` | `{left, right, fan}`, each side `{tec: {current}, pump: {mode, rpm, water}, temps: {flowrate}}`: see [pump/thermal telemetry](#pumpthermal-telemetry-frzhealth) below | ✅ yes: pump-stall detection and pump-speed checks for the newer vitals estimators |
+| `frzHealth` | `{left, right, fan}`, each side `{tec: {current}, pump: {mode, rpm, water}, temps: {flowrate}}`: see [pump/thermal telemetry](#pumpthermal-telemetry-frzhealth) below. Not written by every firmware: see [other Pod generations](#other-pod-generations) | ✅ yes: pump-stall detection and pump-speed checks for the newer vitals estimators |
 | `frzTherm` | `{version: 1, left, right}`, each `{target, power, valid, enabled}` on my Pod 5; target is Celsius, and negative power was observed while cooling | ✅ decoded from offline captures on my Pod 5; optional target readout and cooling diagnostics |
-| `log` | `{type, ts, level, msg}`, firmware's internal messages. Several log records can share one RAW envelope's `data` payload. | ✅ observed on my Pod 5; optional allowlisted health feed and dismissal diagnostics; no raw text sent to clients |
+| `log` | `{type, ts, level, msg}`, firmware's internal messages, including Pod 5 cover button presses (see [other Pod generations](#other-pod-generations)). Several log records can share one RAW envelope's `data` payload. | ✅ observed on my Pod 5; optional allowlisted health feed and dismissal diagnostics; no raw text sent to clients |
 | `buttonEvent` | `{type, ts, left/right: {top/bottom: count}}`, the temperature buttons via the TCA8418 keypad | ✅ on my Pod 5, five right-side events (three `top: 1`, two `bottom: 1`), alongside `[tca8418R]` logs; optional diagnostics |
 | `tap-gesture` | `{type, ts, side, taps}` | Optional diagnostics only. 📖 [Reported by dallonby on a Pod 3 hub with a Pod 4 cover](https://github.com/throwaway31265/free-sleep/pull/30), which reports no taps in `DEVICE_STATUS`; not seen on my Pod 5 |
 
@@ -171,6 +171,15 @@ logs; the fifth accompanied `off | off`, so a button record alone does not
 prove a temperature change. The public [RAW samples](https://github.com/davidsilva2841/8sleep_biometrics/commit/0dd440b7483b984d18b65f163d7041460a3a38c8)
 also show `log` fields; dallonby's [tap reader](https://github.com/dallonby/free-sleep/commit/514086f96919699230227b74d8872c60aa743892)
 documents the separate `tap-gesture` shape.
+
+On my Pod 5, `[tca8418R] gpi press 97` and `gpi release 97` are followed
+by `[TTC] right top button clicked 1 times` and `[buttons] enc {id:0,clicks:1}`,
+then `[thermostat] temp_up right -24->-14`. Two quick clicks report
+`clicks:2` and "clicked 2 times". The firmware changes the target itself by
+10 levels per click, so the buttons already work without Nightstand.
+The Pod 4 hub with a Pod 5 cover instead logs `[TTC] ignoring N short clicks`
+for plus and minus. My Pod 5 also logs a stray `gpi press 105` with
+`invalid gpi->row 105->255` every five minutes.
 
 ### Pump/thermal telemetry (`frzHealth`)
 
@@ -253,7 +262,9 @@ segments from their labels, with serial numbers omitted.
 ## Other Pod generations
 
 I test on my Pod 5. These notes come from other owners and projects and
-have not been verified here.
+have not been verified here. The Pod 4 hub with a Pod 5 cover reports
+come from [2-X](https://github.com/2-X), with RAW records and firmware log
+lines from that bed.
 
 - 📖 **Alarm pattern.** Pod 3 firmware accepts only `double`: with `rise`
   it answers with an error code and does not vibrate
@@ -316,12 +327,50 @@ have not been verified here.
   newer Pod 5 cover and report one Pod 5 on newer firmware writing `capSense`
   ([sleepypod sensor profiles](https://github.com/sleepypod/core/blob/main/docs/hardware/sensor-profiles.md),
   [NATS frame notes](https://github.com/sleepypod/core/blob/main/docs/nats-frame-readers.md)).
-  We have not found a published Pod 4 capture of either. Nightstand
+  We have not found a published Pod 4 cover capture of either. Nightstand
   therefore reads the format from the records and treats anything but
   `capSense2` on a Pod 5 as experimental. On `capSense` its new sleep tracking
   starts from sleepypod's `capSense` entry level of 300 counts
   ([sleepypod sleep detector](https://github.com/sleepypod/core/blob/main/docs/sleep-detector.md))
   and then learns each side's own level.
+- 📖 **A Pod 4 hub with a Pod 5 cover.** The two fit together and run
+  Nightstand. `DEVICE_STATUS` reports the cover as a Pod 5 through
+  `sensorLabel` and the hub as a Pod 4, so alarms go out as `double` and
+  the model-gated features treat the bed as unchecked. Its RAW files hold
+  `capSense` and `bedTemp` records, not `capSense2` or `bedTemp2`, on both
+  the host firmware from February 2025 and a newer host with Frozen 1.5.58.
+- 📖 **`frzHealth` depends on the host firmware.** The Pod 4 host firmware
+  from February 2025 writes `piezo-dual`, `capSense`, `bedTemp`, `frzTemp`
+  and `log` records and no `frzHealth` at all (a scan of three RAW files
+  found 2,896 `capSense`, 1,447 `piezo-dual`, 145 `bedTemp`, 145 `frzTemp`
+  and 55 `log` records, and the binary carries no `frzHealth` string). The
+  same hub wrote `frzHealth` about every 10 seconds once it ran a newer
+  host firmware with Frozen 1.5.58, with the pumps reading about 1,900 to
+  2,000 rpm while circulating and 0 when off, as on the Pod 5 above. On a
+  Pod without `frzHealth`, pump health stays `not_started` and the newer
+  vitals estimators report the pump speed as unknown.
+- 📖 **Cover buttons on a Pod 4 hub with a Pod 5 cover.** Each side has
+  three buttons (plus, logo, minus) on a TCA8418 keypad. The firmware logs
+  every press and release to the RAW `log` records as `[tca8418R] gpi press 97` and
+  `[tca8418R] gpi release 97` (`L` for the left side; codes 97, 98 and 99
+  are the plus, logo and minus buttons). A short click on plus or minus
+  is logged as `[TTC] ignoring N short clicks` and does nothing: it changes
+  no tap counter and no temperature. On the February 2025 Pod 4 host
+  firmware a long press was logged as `[buttons] top button held for 320ms (abort)` and also did
+  nothing. On the newer host firmware a press held for 500 ms is logged as
+  `[buttons] long press top: 500ms` before the release, then `[TTC]
+  temperature up gesture`, the firmware plays a short vibration of its
+  own, and the gesture reaches `DEVICE_STATUS` through the tap counters:
+  a long press on plus as `tripleTap`, a short click on the logo as
+  `quadTap`, and a long press on minus presumably as `doubleTap`. The
+  firmware changes no target itself; the step comes from Nightstand's tap
+  action, so with the default actions long presses step by the tap
+  amounts and the logo button tries to move an adjustable base, which
+  fails harmlessly when none is paired. The Pod 5 hub handles short clicks
+  differently, as noted above. The firmware batches about a minute of `log`
+  records into one RAW chunk, so a press can be 15 to 25 seconds old
+  before it is readable; in one archive 3 of 93 presses were older than 15
+  seconds.
 - 📖 **Files the firmware keeps in `/persistent`.** Pod 3 firmware reads
   `frozen.heartbeat` relative to its working directory; moving it made the
   firmware reload every 30 seconds and leak file descriptors
@@ -377,6 +426,8 @@ Reported by users, not verified here:
   throwaway31265/free-sleep#54 and #55.
 - [jmakes/free-sleep](https://github.com/jmakes/free-sleep), Pod 4 alarm
   pattern behavior.
+- [2-X](https://github.com/2-X), the Pod 4 hub with a Pod 5 cover notes:
+  record formats, `frzHealth` by host firmware, and the cover buttons.
 - [Geczy/free-sleep](https://github.com/Geczy/free-sleep/commit/39e2b25e631299e26a175f375b7914336e364b80),
   conflicting hardware-generation thresholds and the base-control work
   linked above.
