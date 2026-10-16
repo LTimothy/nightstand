@@ -52,6 +52,13 @@ router.post('/settings', async (req, res) => {
                 resumed.push(side);
         }
         _.merge(draft, validatedUpdate);
+        // A gesture is replaced whole, so no field of its previous action stays behind.
+        for (const side of SCHEDULE_SIDES) {
+            for (const [gesture, tap] of Object.entries(validatedUpdate[side]?.taps ?? {})) {
+                if (tap)
+                    draft[side].taps[gesture] = tap;
+            }
+        }
     }, async (draft) => {
         if (validatedUpdate.rawArchiveRetentionDays !== undefined) {
             await syncRawArchiveConf(draft.rawArchiveRetentionDays);

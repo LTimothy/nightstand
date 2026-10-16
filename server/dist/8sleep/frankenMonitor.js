@@ -99,6 +99,14 @@ export class FrankenMonitor {
             await markManualTempChange(side);
             return;
         }
+        else if (behavior.type === 'set_temperature') {
+            const targetF = behavior.temperatureF;
+            logger.debug(`Processing gesture set temperature for ${side}: ${targetF} F and on`);
+            await updateDeviceStatus({ [side]: { isOn: true, targetTemperatureF: targetF } }, { background: true });
+            this.noteWrittenTarget(side, targetF, readTarget);
+            await markManualTempChange(side);
+            return;
+        }
         else if (behavior.type === 'base_control') {
             this.currentBasePreset =
                 this.currentBasePreset === 'relax' ? 'flat' : 'relax';

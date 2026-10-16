@@ -78,7 +78,11 @@ const file = new JSONFile(`${config.lowDbFolder}settingsDB.json`);
 const settingsDB = new Low(file, defaultData);
 await settingsDB.read();
 // Allows us to add default values to the settings if users have existing settingsDB.json data
-settingsDB.data = _.merge({}, defaultData, settingsDB.data);
+const stored = settingsDB.data;
+settingsDB.data = _.merge({}, defaultData, stored);
+// A stored gesture is a whole action; merging would add the default's fields.
+for (const side of ['left', 'right'])
+    Object.assign(settingsDB.data[side].taps, stored?.[side]?.taps);
 await settingsDB.write();
 export const updateSettings = createSerializedUpdate(settingsDB);
 export default settingsDB;

@@ -499,17 +499,22 @@ export const FEATURES_MANIFEST = [
         touchpoints: [
             'server/src/8sleep/buttonMonitor.ts', 'server/src/8sleep/buttonEvents.ts',
             'app/src/pages/SettingsPage/FeaturesSection',
+            'app/src/pages/SettingsPage/FeaturesSection/CoverButtonOptions.tsx',
+            'app/src/pages/SettingsPage/FeaturesSection/coverButtons.ts',
         ],
         depends_on: [],
         reversible: true,
         tests: [
             'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/buttonEvents.test.ts',
+            'app/src/pages/SettingsPage/FeaturesSection/coverButtons.test.ts',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.coverButtons.test.tsx',
         ],
         upstream_offer: false,
         rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short cover clicks. '
             + 'Reads no RAW files while off. Acts only on clicks the firmware logged as ignored, so a logo press the '
-            + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the favorite '
-            + 'are per side in settings. Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
+            + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the logo '
+            + 'temperature are per side, edited under the switch; on a Pod 5 hub the same options write the tap actions, '
+            + 'so only one path is ever written. Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
             + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
     },
     {
@@ -993,6 +998,30 @@ export const FEATURES_MANIFEST = [
         upstream_offer: false,
         rationale: 'Always on: accepts an existing tap setting and reads firmware dismissals so the server can '
             + 'clear a stale ringing record. A tap set to anything else behaves as before, and older versions keep the setting.',
+    },
+    {
+        id: 'tap-gestures',
+        title: 'Tap gestures',
+        description: 'Each side\'s double, triple and quad tap actions, edited in Settings > Bed and sides. '
+            + 'A tap can also set its side to a chosen temperature and turn it on.',
+        category: 'ui',
+        version: '3.7.0',
+        flag: null,
+        default: true,
+        touchpoints: [
+            'server/src/8sleep/frankenMonitor.ts', 'server/src/db/settingsSchema.ts',
+            'app/src/pages/SettingsPage/TapGestures.tsx', 'app/src/pages/SettingsPage/tapActions.ts',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: [
+            'server/src/8sleep/frankenMonitor.test.ts', 'server/src/db/tapCompat.test.ts',
+            'app/src/pages/SettingsPage/TapGestures.test.tsx', 'app/src/pages/SettingsPage/tapActions.test.ts',
+        ],
+        upstream_offer: false,
+        rationale: 'Always on: it edits settings that already existed, and nothing changes until someone picks an action. '
+            + 'The set temperature action is its own tap type, which releases before 3.7.0 skip, so a rollback leaves that '
+            + 'gesture doing nothing instead of stepping the bed.',
     },
 ];
 //# sourceMappingURL=featuresManifest.js.map

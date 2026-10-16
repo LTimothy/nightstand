@@ -21,10 +21,16 @@ const BaseControlTapConfig = z.object({
     type: z.literal('base_control'),
     behavior: z.literal('toggle_preset'),
 });
+// Sets the side to temperatureF and turns it on. Older releases skip a tap type they do not know.
+const SetTemperatureTapConfig = z.object({
+    type: z.literal('set_temperature'),
+    temperatureF: z.number().int().min(55).max(110),
+});
 export const TapConfig = z.discriminatedUnion('type', [
     TemperatureTapConfig,
     AlarmTapConfig,
     BaseControlTapConfig,
+    SetTemperatureTapConfig,
 ]);
 export const GestureSchema = z.enum(['doubleTap', 'tripleTap', 'quadTap']);
 // alarmScheduler arms real jobs off these strings, and moment overflows or

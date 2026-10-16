@@ -188,4 +188,25 @@ describe('POST /settings features.rhythms', () => {
         assert.equal((await postSettings({ features: { rhythms: 'yes' } })).status, 400);
     });
 });
+describe('POST /settings tap gestures', () => {
+    it('replaces a gesture instead of keeping fields of its previous action', async () => {
+        await postSettings({ right: { taps: { doubleTap: {
+                        type: 'alarm', behavior: 'snooze', snoozeDuration: 300, inactiveAlarmBehavior: 'none',
+                    } } } });
+        const res = await postSettings({ right: { taps: { doubleTap: { type: 'temperature', change: 'increment', amount: 3 } } } });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.right.taps.doubleTap, { type: 'temperature', change: 'increment', amount: 3 });
+    });
+    it('saves a gesture that sets a temperature', async () => {
+        const res = await postSettings({ left: { taps: { quadTap: { type: 'set_temperature', temperatureF: 78 } } } });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.left.taps.quadTap, { type: 'set_temperature', temperatureF: 78 });
+    });
+    for (const temperatureF of [54, 111, 78.5, undefined]) {
+        it(`refuses a set temperature of ${temperatureF}`, async () => {
+            const res = await postSettings({ left: { taps: { quadTap: { type: 'set_temperature', temperatureF } } } });
+            assert.equal(res.status, 400);
+        });
+    }
+});
 //# sourceMappingURL=settingsValidation.test.js.map

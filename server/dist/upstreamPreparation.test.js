@@ -36,6 +36,24 @@ it('prepares upstream day saves while retaining unrelated and future data', () =
         rmSync(folder, { recursive: true, force: true });
     }
 });
+it('turns a set temperature tap into an alarm dismiss tap for upstream', () => {
+    const folder = mkdtempSync(path.join(tmpdir(), 'upstream-data-'));
+    try {
+        writeFileSync(path.join(folder, 'schedulesDB.json'), '{}');
+        writeFileSync(path.join(folder, 'settingsDB.json'), JSON.stringify({
+            right: { taps: { quadTap: { type: 'set_temperature', temperatureF: 76 } } },
+        }));
+        const result = spawnSync('python3', ['../scripts/prepare-upstream.py', folder], { encoding: 'utf8' });
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        const settings = JSON.parse(readFileSync(path.join(folder, 'settingsDB.json'), 'utf8'));
+        assert.deepEqual(settings.right.taps.quadTap, {
+            type: 'alarm', behavior: 'dismiss', snoozeDuration: 300, inactiveAlarmBehavior: 'none',
+        });
+    }
+    finally {
+        rmSync(folder, { recursive: true, force: true });
+    }
+});
 it('does not enable a disabled alarm when no enabled alarm remains', () => {
     const folder = mkdtempSync(path.join(tmpdir(), 'upstream-data-'));
     try {
