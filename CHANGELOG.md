@@ -127,6 +127,8 @@ is a hard fork; for the history of the projects it descends from, see
   measured water keeps warming while cooling is requested. It needs
   Biometrics and does not send a hardware command. The warning is a sensor
   observation, not a diagnosis of a failed component.
+- A firmware health incident that is still being reported stays listed
+  past a day, with its count.
 
 ### Sleep data and retention
 
@@ -152,6 +154,16 @@ is a hard fork; for the history of the projects it descends from, see
   last 90 days when no range is given, instead of reading every recorded
   night. Explicit ranges and older-week browsing still work, and the app
   keeps the latest recording visible while a newer night is being analysed.
+- Editing a sleep record's times moves its saved nightly summary with it,
+  and times that overlap another record on the same side are refused with
+  `409`. Nights that only touch are allowed. Deleting a record removes its
+  summary. Moving a night back to times where an earlier release left its
+  summary picks that summary up again.
+- Nightly averages over a range count every night that overlaps none
+  already counted, including nights that only touch.
+- The database drops three indexes that duplicated unique ones, saving
+  about 37 MB a year of one-a-minute readings. Earlier releases still
+  start on it and read it.
 
 ### System status
 
@@ -163,6 +175,10 @@ is a hard fork; for the history of the projects it descends from, see
 - Status polls within 15 seconds share one snapshot, measured with a
   monotonic clock. The status check writes stream health to disk only when
   it changes, reducing work from integrations that poll frequently.
+- The server reads Wi-Fi strength from NetworkManager's last scan, at most
+  once a minute and only when the device status is asked for, instead of
+  every 10 seconds with a rescan every 30. When the read fails, Settings
+  hides the strength instead of showing an old one.
 
 ### Integrations
 
@@ -267,6 +283,15 @@ is a hard fork; for the history of the projects it descends from, see
   due in that wait, such as a 7:00 alarm after a power cut, was skipped
   until the next week. Resume schedule in the app also answers at once
   instead of waiting for the side to come on.
+- A Rhythms power-on hands the firmware its off time in one write,
+  counted when it is sent, as the weekly schedule does. Before, a timeout
+  on the last of three writes could leave a 12 hour timer.
+
+### App
+
+- The app ships one copy of zod and moment-timezone instead of two, about
+  70 KB less to download.
+- The compact side picker no longer polls presence.
 
 ## [3.6.1] - 2026-10-07
 
