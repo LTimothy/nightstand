@@ -11,6 +11,7 @@ import { Side } from '../db/schedulesSchema.js';
 import logger from '../logger.js';
 import { nextScheduledChange } from './scheduleQueries.js';
 import { smartManualChange } from './rhythms/curveController.js';
+import { recordHandChange, type HandChange } from './rhythms/handChanges.js';
 
 export const OVERRIDE_WINDOW_HOURS = 3;
 export const OVERRIDE_DURATION_HOURS = 12;
@@ -22,7 +23,9 @@ export const isTempScheduleOverridden = (side: Side): boolean => {
   return moment(override.expiresAt).isAfter(moment());
 };
 
-export const markManualTempChange = async (side: Side): Promise<void> => {
+export const markManualTempChange = async (side: Side, change?: HandChange): Promise<void> => {
+  // Noted first, so the note sees the hold or override from before this change.
+  if (change) recordHandChange(side, change);
   // Smart Schedule nights hold the curve until its next phase instead.
   if (smartManualChange(side) !== 'not-smart') return;
   await schedulesDB.read();
