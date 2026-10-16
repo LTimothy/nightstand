@@ -4,7 +4,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
-import { getDeviceStatus, getSettings, mockCalibration } from '../../../mocks/mockData';
+import { getDeviceStatus, getServices, getSettings, mockCalibration } from '../../../mocks/mockData';
 import { EXPERIMENTAL_ON_THIS_POD } from '@api/sleepTrackingValidation.ts';
 import FeaturesSection from './FeaturesSection';
 
@@ -115,6 +115,18 @@ describe('FeaturesSection', () => {
     await user.click(toggle);
 
     expect(posted).toEqual({ features: { biometricsV2: true } });
+  });
+
+  it('shows and copies the root-owned installer path when biometrics is not installed', async () => {
+    const services = structuredClone(getServices());
+    services.biometrics.jobs.installation.status = 'not_started';
+    server.use(http.get('*/api/services', () => HttpResponse.json(services)));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    const command = 'sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh';
+    await user.click(await screen.findByText('How to install'));
+    expect(screen.getByText(command)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Copy command' }));
+    expect(await navigator.clipboard.readText()).toBe(command);
   });
 });
 

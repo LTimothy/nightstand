@@ -127,11 +127,11 @@ export default function FeaturesSection() {
         <AccordionDetails>
           <Typography variant="body2">Run this command over SSH, then enable Biometrics here.</Typography>
           <Box component="code" sx={ { display: 'block', overflowWrap: 'anywhere', my: 1 } }>
-                sh /home/dac/free-sleep/scripts/enable_biometrics.sh
+                sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh
           </Box>
           <Button
             onClick={ async () => {
-              try { await navigator.clipboard.writeText('sh /home/dac/free-sleep/scripts/enable_biometrics.sh'); }
+              try { await navigator.clipboard.writeText('sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh'); }
               catch { setError('Could not copy the command. Select and copy it above.'); }
             } }>Copy command</Button>
         </AccordionDetails>
