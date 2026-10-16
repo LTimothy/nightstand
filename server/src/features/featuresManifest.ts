@@ -516,9 +516,9 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     id: 'cover-buttons',
     title: 'Cover buttons',
     description: 'For a Pod 4 hub with a Pod 5 cover, whose firmware ignores short clicks on the cover\'s '
-      + 'plus and minus buttons. Reads those clicks from RAW files and steps that side by 1 F per click, '
-      + '15 to 25 s later, because the firmware writes its log in batches. A Pod 5 hub handles its buttons '
-      + 'itself, so this does nothing there.',
+      + 'buttons. Reads those clicks from RAW files: plus and minus step that side by 1 F per click, and the '
+      + 'logo stops a ringing or snoozed alarm or sets a favorite temperature. A click takes 15 to 25 s, '
+      + 'because the firmware writes its log in batches. A Pod 5 hub handles its buttons itself, so this does nothing there.',
     category: 'platform',
     version: '3.7.0',
     flag: 'coverButtons',
@@ -533,9 +533,11 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/buttonEvents.test.ts',
     ],
     upstream_offer: false,
-    rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short plus and minus clicks. '
-      + 'Reads no RAW files while off. Each ignored click steps that side by 1 F, with a 15 to 25 s delay '
-      + 'because the firmware writes its log in batches. A Pod 5 hub handles its buttons itself, so this does nothing there.',
+    rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short cover clicks. '
+      + 'Reads no RAW files while off. Acts only on clicks the firmware logged as ignored, so a logo press the '
+      + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the favorite '
+      + 'are per side in settings. Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
+      + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
   },
   {
     id: 'biometrics-v2',

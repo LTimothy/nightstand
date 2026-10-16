@@ -82,14 +82,39 @@ describe('ButtonEventMachine', () => {
     assert.deepEqual(machine.push('[TTC] ignoring 2 short clicks', 1000), [topRight]);
   });
 
-  it('ignores logo clicks, invalid keypad noise and incomplete presses', () => {
+  it('ignores invalid keypad noise and incomplete presses', () => {
     const machine = new ButtonEventMachine();
-    click(machine, 'L', 98);
     click(machine, 'R', 105);
     machine.push('[tca8418R] invalid gpi->row 105->255', 1000);
     machine.push('[tca8418R] gpi press 127', 1000);
     machine.push('[tca8418R] gpi press 97', 1000);
     assert.deepEqual(machine.push('[TTC] ignoring 4 short clicks', 1000), []);
+  });
+
+  it('emits an ignored logo click as the middle button', () => {
+    const machine = new ButtonEventMachine();
+    click(machine, 'L', 98);
+    assert.deepEqual(machine.push('[TTC] ignoring 1 short clicks', 1000), [{ ...bottomLeft, button: 'middle' }]);
+  });
+
+  it('emits a logo click only when every fresh click was ignored', () => {
+    const machine = new ButtonEventMachine();
+    click(machine, 'R', 97);
+    click(machine, 'L', 98);
+    assert.deepEqual(machine.push('[TTC] ignoring 1 short clicks', 1000), [topRight]);
+    click(machine, 'L', 98);
+    click(machine, 'R', 97);
+    assert.deepEqual(machine.push('[TTC] ignoring 1 short clicks', 1000), [topRight]);
+    click(machine, 'L', 98);
+    click(machine, 'R', 97);
+    assert.deepEqual(machine.push('[TTC] ignoring 2 short clicks', 1000), [{ ...bottomLeft, button: 'middle' }, topRight]);
+  });
+
+  it('never emits a logo click the firmware handled itself', () => {
+    const machine = new ButtonEventMachine();
+    click(machine, 'L', 98);
+    assert.deepEqual(machine.push('[TTC] left middle button clicked 1 times', 1000), []);
+    assert.deepEqual(machine.push('[TTC] ignoring 1 short clicks', 1000), []);
   });
 
   it('leaves firmware long presses without an ignoring result alone', () => {

@@ -1,5 +1,5 @@
 export type ButtonSide = 'left' | 'right';
-export type ButtonName = 'top' | 'bottom';
+export type ButtonName = 'top' | 'middle' | 'bottom';
 
 export interface ButtonEvent {
   side: ButtonSide;
@@ -8,7 +8,7 @@ export interface ButtonEvent {
   at: number;
 }
 
-const CODE_TO_BUTTON: Record<number, ButtonName> = { 97: 'top', 99: 'bottom' };
+const CODE_TO_BUTTON: Record<number, ButtonName> = { 97: 'top', 98: 'middle', 99: 'bottom' };
 const PRESS_RE = /\[tca8418([RL])\]\s+gpi\s+(press|release)\s+(\d+)/i;
 const IGNORED_RE = /\[TTC\]\s+ignoring\s+(\d+)\s+short clicks/i;
 const HANDLED_RE = /\[TTC\]|\[thermostat\]\s+temp_(?:up|down)/i;
@@ -23,9 +23,11 @@ export class ButtonEventMachine {
     if (ignored) {
       const count = Number(ignored[1]);
       // The result names no side, so attribution follows the pending order.
-      const events = count > 0 ? this.pending.slice(-count)
-        .filter(event => tsMs - event.at <= 5000)
-        .map(event => ({ ...event, at: tsMs })) : [];
+      const fresh = this.pending.filter(event => tsMs - event.at <= 5000);
+      // A logo click counts only when every fresh click was ignored, so a logo
+      // the firmware acted on itself is never applied a second time.
+      const candidates = count >= fresh.length ? fresh : fresh.filter(event => event.button !== 'middle');
+      const events = count > 0 ? candidates.slice(-count).map(event => ({ ...event, at: tsMs })) : [];
       this.pending = [];
       return events;
     }

@@ -140,8 +140,8 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
   },
   buttonMonitor: {
     group: 'core',
-    blurb: 'For a Pod 4 hub with a Pod 5 cover. When Cover buttons is on, reads ignored plus and minus clicks '
-      + 'from RAW files and steps that side by 1 F, 15 to 25 s later, because the firmware writes its log in batches. '
+    blurb: 'For a Pod 4 hub with a Pod 5 cover. When Cover buttons is on, reads ignored cover clicks from RAW files '
+      + 'and acts on them 15 to 25 s later, because the firmware writes its log in batches. '
       + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
     meaning: {
       healthy: 'Watching for ignored button clicks, or off in Settings.',

@@ -70,11 +70,22 @@ mock.module(new URL('./frankenServer.js', import.meta.url).href, {
   },
 });
 
+let alarmTaps: Array<{ side: string; behavior: string }> = [];
+mock.module(new URL('./tapAlarm.js', import.meta.url).href, {
+  namedExports: {
+    handleAlarmTap: async (side: string, tap: { behavior: string }) => { alarmTaps.push({ side, behavior: tap.behavior }); },
+  },
+});
+
 let ButtonMonitor: typeof import('./buttonMonitor.js')['ButtonMonitor'];
 let settingsDB: typeof import('../db/settings.js')['default'];
 let serverStatus: typeof import('../serverStatus.js')['default'];
+let activeAlarms: typeof import('../jobs/activeAlarms.js')['activeAlarms'];
+let setSnooze: typeof import('../jobs/activeAlarms.js')['setSnooze'];
+let cancelSnooze: typeof import('../jobs/activeAlarms.js')['cancelSnooze'];
 before(async () => {
   ({ ButtonMonitor } = await import('./buttonMonitor.js'));
+  ({ activeAlarms, setSnooze, cancelSnooze } = await import('../jobs/activeAlarms.js'));
   ({ default: settingsDB } = await import('../db/settings.js'));
   ({ default: serverStatus } = await import('../serverStatus.js'));
 });
@@ -135,13 +146,17 @@ describe('ButtonMonitor', () => {
   let monitor: Internals;
 
   beforeEach(async () => {
-    updates = []; manualChanges = []; readCalls = [];
+    updates = []; manualChanges = []; readCalls = []; alarmTaps = [];
+    activeAlarms.clear(); cancelSnooze('left'); cancelSnooze('right');
     updateRejectsWith = null;
     readRejectsWith = null; afterRead = null; afterWrite = null; writeOptions = [];
     readTargets = { left: 82, right: 82 };
     for (const file of readdirSync(rawDir)) rmSync(path.join(rawDir, file));
     await settingsDB.read();
     settingsDB.data.features.coverButtons = true;
+    for (const side of ['left', 'right'] as const) {
+      settingsDB.data[side].buttons = { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 };
+    }
     await settingsDB.write();
 
     monitor = new ButtonMonitor() as unknown as Internals;
@@ -292,9 +307,78 @@ describe('ButtonMonitor', () => {
     assert.deepEqual(rightTargets(), [110]);
   });
 
-  it('does nothing for a logo click or keypad noise', async () => {
+  it('steps by the side\'s stepF', async () => {
+    settingsDB.data.right.buttons.stepF = 2.5;
+    await settingsDB.write();
+    writeRaw('001.RAW', Buffer.concat([click('R', 97), click('L', 97)]), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(rightTargets(), [84.5]);
+    assert.deepEqual(leftTargets(), [83]);
+  });
+
+  it('swaps plus and minus when invertButtons is on', async () => {
+    settingsDB.data.left.buttons.invertButtons = true;
+    await settingsDB.write();
+    writeRaw('001.RAW', Buffer.concat([click('L', 97), click('L', 99), click('L', 99), click('R', 97)]), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(leftTargets(), [81, 82, 83]);
+    assert.deepEqual(rightTargets(), [83]);
+  });
+
+  it('clamps a large step to the temperature limits', async () => {
+    settingsDB.data.right.buttons.stepF = 10;
+    await settingsDB.write();
+    readTargets.right = 105;
+    writeRaw('001.RAW', click('R', 97), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(rightTargets(), [110]);
+  });
+
+  it('stops a ringing alarm on an ignored logo click through the alarm tap path', async () => {
+    activeAlarms.set('left', { vibrationIntensity: 50, duration: 30, vibrationPattern: 'rise' });
+    writeRaw('001.RAW', click('L', 98), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(alarmTaps, [{ side: 'left', behavior: 'dismiss' }]);
+    assert.deepEqual(updates, []);
+  });
+
+  it('stops a snoozed alarm on an ignored logo click', async () => {
+    setSnooze('right', 60_000, () => {});
+    writeRaw('001.RAW', click('R', 98), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(alarmTaps, [{ side: 'right', behavior: 'dismiss' }]);
+    assert.deepEqual(updates, []);
+  });
+
+  it('sets the favorite temperature and turns the side on for a logo click with no alarm', async () => {
+    settingsDB.data.left.buttons.favoriteTemperatureF = 91;
+    await settingsDB.write();
+    const at = Date.now();
+    writeRaw('001.RAW', click('L', 98), at / 1000);
+    await monitor.poll();
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 91 } }]);
+    assert.ok(writeOptions[0].notAfter !== undefined && writeOptions[0].notAfter >= at + 30_000);
+    assert.deepEqual(manualChanges, ['left']);
+    assert.deepEqual(alarmTaps, []);
+  });
+
+  for (const handled of [[], ['[TTC] right middle button clicked 1 times'], ['[TTC] ignoring 1 short clicks']]) {
+    it(`does nothing for a logo press the firmware did not log as ignored (${handled.length ? handled[0] : 'no result'})`, async () => {
+      activeAlarms.set('right', { vibrationIntensity: 50, duration: 30, vibrationPattern: 'rise' });
+      const lines = handled[0]?.includes('ignoring')
+        // The firmware ignored a top click, but the logo press beside it was not ignored.
+        ? ['[tca8418R] gpi press 97', '[tca8418R] gpi release 97', '[tca8418R] gpi press 98', '[tca8418R] gpi release 98', ...handled]
+        : ['[tca8418R] gpi press 98', '[tca8418R] gpi release 98', ...handled];
+      writeRaw('001.RAW', Buffer.concat(lines.map(line => logRecord(line))), Date.now() / 1000);
+      await monitor.poll();
+      assert.deepEqual(alarmTaps, []);
+      assert.deepEqual(updates, handled[0]?.includes('ignoring') ? [{ right: { targetTemperatureF: 83 } }] : []);
+    });
+  }
+
+  it('does nothing for keypad noise', async () => {
     writeRaw('001.RAW', Buffer.concat([
-      click('L', 98), click('R', 105),
+      click('R', 105),
       logRecord('[tca8418R] invalid gpi->row 105->255'),
       logRecord('[tca8418R] gpi press 127'),
       logRecord('[TTC] ignoring 1 short clicks'),

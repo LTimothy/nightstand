@@ -1,4 +1,4 @@
-// Applies cover temperature clicks only when the firmware logged them as ignored.
+// Applies cover clicks only when the firmware logged them as ignored.
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
@@ -15,6 +15,8 @@ import { DeviceStatus, MIN_TEMPERATURE_F, MAX_TEMPERATURE_F } from '../routes/de
 import { connectFrankenWithin } from './frankenServer.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import { markManualTempChange } from '../jobs/scheduleOverride.js';
+import { activeAlarms, hasSnooze } from '../jobs/activeAlarms.js';
+import { handleAlarmTap } from './tapAlarm.js';
 import { ButtonEventMachine, ButtonEvent, ButtonName } from './buttonEvents.js';
 
 // Where the firmware writes its rolling RAW captures. Tests point it elsewhere.
@@ -279,7 +281,18 @@ export class ButtonMonitor {
       await settingsDB.read();
       if (!settingsDB.data.features.coverButtons || Date.now() - event.at > MAX_PRESS_AGE_MS) return;
       const side: Side = event.side;
-      await this.step(side, event.button === 'top' ? 1 : -1, event.button, event.at);
+      const buttons = settingsDB.data[side].buttons;
+      if (event.button === 'middle') {
+        if (activeAlarms.has(side) || hasSnooze(side)) {
+          logger.info(`[buttonMonitor] ${side} logo button: stopping the alarm`);
+          await handleAlarmTap(side, { type: 'alarm', behavior: 'dismiss', snoozeDuration: 60, inactiveAlarmBehavior: 'none' });
+        } else {
+          await this.setFavorite(side, buttons.favoriteTemperatureF, event.at);
+        }
+        return;
+      }
+      const raises = buttons.invertButtons ? event.button === 'bottom' : event.button === 'top';
+      await this.step(side, raises ? buttons.stepF : -buttons.stepF, event.button, event.at);
     } catch (error) {
       logger.warn(`[buttonMonitor] ${event.side} ${event.button} ${event.kind} failed: ${errorMessage(error)}`);
       this.pollError = errorMessage(error);
@@ -298,6 +311,14 @@ export class ButtonMonitor {
     logger.info(`[buttonMonitor] ${side} ${button} button: ${readTarget} -> ${targetF} F`);
     await updateDeviceStatus({ [side]: { targetTemperatureF: targetF } } as DeepPartial<DeviceStatus>, { notAfter: at + MAX_PRESS_AGE_MS });
     // A press counts as a manual change for the schedule override, as a tap does.
+    await markManualTempChange(side);
+  }
+
+  // The logo with no alarm: an absolute target, so pressing it again changes nothing.
+  private async setFavorite(side: Side, favoriteF: number, at: number): Promise<void> {
+    logger.info(`[buttonMonitor] ${side} logo button: ${favoriteF} F and on`);
+    const update = { [side]: { isOn: true, targetTemperatureF: favoriteF } } as DeepPartial<DeviceStatus>;
+    await updateDeviceStatus(update, { notAfter: at + MAX_PRESS_AGE_MS });
     await markManualTempChange(side);
   }
 }

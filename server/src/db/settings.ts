@@ -49,6 +49,11 @@ const defaultSideSettings: SideSettings = {
       behavior: 'toggle_preset',
     },
   },
+  buttons: {
+    invertButtons: false,
+    stepF: 1,
+    favoriteTemperatureF: 80,
+  },
 };
 
 const defaultData: Settings = {
@@ -78,10 +83,6 @@ const settingsDB = new Low<Settings>(file, defaultData);
 await settingsDB.read();
 // Allows us to add default values to the settings if users have existing settingsDB.json data
 settingsDB.data = _.merge({}, defaultData, settingsDB.data);
-// Remove obsolete cover button settings so full settings updates validate.
-for (const side of ['left', 'right'] as const) {
-  delete (settingsDB.data[side] as SideSettings & { buttons?: unknown }).buttons;
-}
 
 await settingsDB.write();
 

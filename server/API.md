@@ -185,7 +185,8 @@ generic message; the details go to the server log.
       "doubleTap": { "type": "temperature", "change": "decrement", "amount": 2 },
       "tripleTap": { "type": "temperature", "change": "increment", "amount": 2 },
       "quadTap": { "type": "base_control", "behavior": "toggle_preset" }
-    }
+    },
+    "buttons": { "invertButtons": false, "stepF": 1, "favoriteTemperatureF": 80 }
   },
   "right": { "...": "same shape as left" },
   "primePodDaily": {
@@ -256,13 +257,22 @@ generic message; the details go to the server log.
     tap stopped a Nightstand alarm in firmware, the `dismissAlarm` value
     rose, and Nightstand cleared its ringing state and logged the dismissal.
     Timestamp units remain unverified.
+- `buttons` is what the buttons on a Pod 5 cover do while
+  `features.coverButtons` is on, and only for clicks the firmware logged as
+  ignored. A plus click adds `stepF` (0 to 10, default 1) to that side's
+  target and a minus click takes it away, within 55 to 110 F;
+  `invertButtons: true` swaps plus and minus. A logo click stops a ringing
+  or snoozed alarm on that side, as an alarm tap set to dismiss does, and
+  otherwise sets the side to `favoriteTemperatureF` (55 to 110, default 80)
+  and turns it on. Firmware that reports the logo as a tap logs no ignored
+  click for it, so `taps` stays in charge there. The app has no editor for
+  them.
 - `features` are feature flags. `sleepScore` turns the sleep score and sleep
   stage routes on and off; the app no longer shows either.
   `coverButtons` is Cover buttons, off by default. It is for a Pod 4 hub with
   a Pod 5 cover, whose firmware ignores short clicks on the cover's plus and
   minus buttons. With it on, Nightstand reads those ignored clicks from
-  `/persistent/*.RAW` and steps that side by 1 F per click, within 55 to
-  110 F. A click can take 15 to 25 s to apply, because the firmware writes
+  `/persistent/*.RAW` and acts on them as `buttons` above says. A click can take 15 to 25 s to apply, because the firmware writes
   its log in batches. A Pod 5 hub handles its buttons itself, so the switch
   does nothing there. While off, the server opens no RAW files for buttons.
   `nightstandTheme` is no longer read and stays so stored settings keep
