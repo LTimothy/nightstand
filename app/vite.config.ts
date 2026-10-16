@@ -32,6 +32,9 @@ const themeBoot = (): Plugin => ({
 
 export default defineConfig({
   plugins: [react(), tsconfigPaths(), demoMeta(), themeBoot()],
+  // The app imports the server's schemas; one copy of each shared package,
+  // so moment.tz.setDefault reaches the server code too.
+  resolve: { dedupe: ['zod', 'moment', 'moment-timezone'] },
   server: {
     fs: { allow: [
       searchForWorkspaceRoot(process.cwd()),
