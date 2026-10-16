@@ -93,14 +93,53 @@ function pythonOffenders(file: string, text: string) {
     })
     .map(({ at, line }) => `${at}: ${line.trim()}`);
 }
+// Skipping the ownership check is for the stage a 3.6 updater hands off from, and nothing else.
+function anyOwnerOffenders(files: Record<string, string>) {
+  const uses = Object.entries(files).flatMap(([file, text]) => text.split('\n')
+    .map((line, index) => ({ file, line, index, lines: text.split('\n') }))
+    .filter(({ line }) => line.includes('--any-owner') && !/^\s*#/.test(line)));
+  const handoff = (lines: string[], index: number) => {
+    const start = lines.indexOf('if [ "$HANDOFF" = 1 ]; then');
+    const end = lines.findIndex((line, at) => at > start && /^(?:else|elif|fi)\b/.test(line));
+    return start >= 0 && start < index && index < end;
+  };
+  const ok = uses.length === 1 && uses[0].file === 'scripts/update.sh' && handoff(uses[0].lines, uses[0].index)
+    && /publish --any-owner "\$STAGE"\)/.test(uses[0].line);
+  return ok ? [] : uses.map(({ file, index, line }) => `${file}:${index + 1}: ${line.trim()}`);
+}
+
+// The trees the publish exemption trusts come only from root's private download folder.
+const TRUSTED_FROM: Record<string, RegExp> = {
+  WORK: /^(?:""|\$\(mktemp -d "\$SYSTEM_DIR\/\.download\.XXXXXX"\)(?: \\)?)$/,
+  UNZIP_DIR: /^"\$WORK\/tree"$/,
+  FRESH: /^(?:"\$WORK\/tree"|\$\(find "\$WORK\/tree" -mindepth 1 -maxdepth 1 -type d \| head -n1\))$/,
+  SRC_DIR: /^\$\(find "\$UNZIP_DIR" -mindepth 1 -maxdepth 1 -type d \| head -n1\)$/,
+  SYSTEM_DIR: /^(?:\/usr\/local\/lib\/nightstand|"\$\{NIGHTSTAND_SYSTEM_DIR:-\/usr\/local\/lib\/nightstand\}")$/,
+};
+function trustedOffenders(file: string, text: string) {
+  if (!text.split('\n').some(line => PUBLISH.test(line.trim()))) return [];
+  return text.split('\n').map((line, index) => ({ line, at: `${file}:${index + 1}`, match: ASSIGN.exec(line) }))
+    .filter(({ line, match }) => !/^\s*#/.test(line) && match && match[1] in TRUSTED_FROM
+      && !TRUSTED_FROM[match[1]].test((match[2] ?? '').trim()))
+    .map(({ at, line }) => `${at}: ${line.trim()}`);
+}
+
 // With -c, -m or a script on stdin Python puts the working directory on its
 // path, and the working directory may be the server user's. -I leaves it off.
 function unisolatedOffenders(file: string, text: string) {
+  const option = String.raw`(?:['"]?-[WX]['"]?\s+[^\s-]\S*|['"]?-[A-Za-z]+['"]?)`;
+  const binary = String.raw`(?:^|[\s;&|(/'"])python(?:3(?:\.\d+)?)?['"]?`;
+  const python = new RegExp(String.raw`${binary}((?:\s+${option})*\s+['"]?-(?:[A-Za-z]*[cm])?)['"]?(?=\s|$)`, 'g');
   return text.split('\n').map((line, index) => ({ line, at: `${file}:${index + 1}` }))
-    .filter(({ line }) => !/^\s*#/.test(line) && /(?:^|[\s;&|(/'"])python3?((?:\s+-[A-Za-z]+)*)\s+-(?:c|m|)(?=\s|$)/.test(line)
-      && [...line.matchAll(/(?:^|[\s;&|(/'"])python3?((?:\s+-[A-Za-z]+)*)\s+-(?:c|m|)(?=\s|$)/g)]
-        .some(match => !/\s-[A-Za-z]*[IP]/.test(match[1])))
+    .filter(({ line }) => !/^\s*#/.test(line)
+      && [...line.matchAll(python)].some(match => !/(?:^|[\s'"])-[A-Za-z]*[IP]/.test(match[1])))
     .map(({ at, line }) => `${at}: ${line.trim()}`);
+}
+// Only the publish tool itself may name the ownership exemption in Python.
+function pythonAnyOwnerOffenders(files: Record<string, string>) {
+  return Object.entries(files).filter(([file]) => file !== 'scripts/system_scripts.py')
+    .flatMap(([file, text]) => text.split('\n').map((line, index) => ({ line, at: `${file}:${index + 1}` }))
+      .filter(({ line }) => /any_owner\s*=\s*True/.test(line)).map(({ at, line }) => `${at}: ${line.trim()}`));
 }
 const env = (system: string) => ({ ...process.env, NIGHTSTAND_SYSTEM_DIR: system });
 
@@ -153,13 +192,37 @@ describe('root runs nothing from the server user\'s folders', () => {
     }
   });
 
+  it('skips the ownership check only for the 3.6 handoff, and publishes only root\'s own download', () => {
+    const all = [...ROOT_RUN, ...DEVELOPER_TOOLS, ...listed('scripts', '.py').filter(file => file !== 'scripts/system_scripts.py')];
+    const texts = Object.fromEntries(all.map(file => [file, read(file)]));
+    assert.deepEqual(anyOwnerOffenders(texts), []);
+    const python = Object.fromEntries(spawnSync('git', ['ls-files', '*.py'], { cwd: repoRoot, encoding: 'utf8' }).stdout
+      .split('\n').filter(Boolean).map(file => [file, read(file)]));
+    assert.ok(Object.keys(python).length > 10);
+    assert.deepEqual(pythonAnyOwnerOffenders(python), []);
+    assert.notDeepEqual(pythonAnyOwnerOffenders({ ...python, 'scripts/switch_installation.py': 'copy = publish(tree, any_owner=True)' }), []);
+    assert.deepEqual(ROOT_RUN.flatMap(file => trustedOffenders(file, read(file))), []);
+    for (const [file, probe] of [['scripts/rollback_pod.sh', 'python3 -B "$NIGHTSTAND_SCRIPTS/system_scripts.py" publish --any-owner "$LIVE"'],
+      ['scripts/install.sh', 'COPY=$(python3 -B "$TOOL" publish --any-owner "$STAGE")']]) {
+      assert.notDeepEqual(anyOwnerOffenders({ ...texts, [file]: `${texts[file]}\n${probe}\n` }), [], probe);
+    }
+    for (const [file, probe] of [['scripts/migrate/pod-installer.sh', 'FRESH="$STAGE"'],
+      ['scripts/install.sh', 'SRC_DIR=/home/dac/free-sleep'], ['scripts/migrate/agent-bootstrap-installer.sh', 'WORK=$(mktemp -d)'],
+      ['scripts/install.sh', 'UNZIP_DIR="free-sleep-unzip"'], ['scripts/migrate/pod-installer.sh', 'SYSTEM_DIR=/home/dac/system']]) {
+      assert.notDeepEqual(trustedOffenders(file, `${read(file)}\n${probe}\n`), [], probe);
+    }
+  });
+
   it('runs inline Python as root only in isolated mode', () => {
     assert.deepEqual(ROOT_RUN.flatMap(file => unisolatedOffenders(file, read(file))), []);
     for (const probe of ["python3 -c 'import json'", 'python3 - "$1" <<\'PY\'', 'x=$(printf x | python3 -c "', 'python3 -B -c pass',
-      'python3 -m json.tool', '/home/dac/venv/bin/python -c pass', 'ok && python3 -I -c pass; python3 -c pass']) {
+      'python3 -m json.tool', '/home/dac/venv/bin/python -c pass', 'ok && python3 -I -c pass; python3 -c pass',
+      'python3 -Bc \'import json\'', 'python3 "-Bc" pass', 'python3 -W ignore -c pass', 'python3 -X utf8 -c pass',
+      '"$VENV/bin/python" -c pass', '/usr/bin/python3.11 -B -m json.tool', '"$VENV/bin/python3.9" -Wignore -c pass']) {
       assert.notDeepEqual(unisolatedOffenders('scripts/x.sh', probe), [], probe);
     }
-    for (const fine of ['python3 -I -c pass', 'python3 -B -I - "$1" <<\'PY\'', 'python3 -B "$COPY/scripts/x.py"', 'python3 -IB -c pass']) {
+    for (const fine of ['python3 -I -c pass', 'python3 -B -I - "$1" <<\'PY\'', 'python3 -B "$COPY/scripts/x.py"', 'python3 -IB -c pass',
+      'python3 -Ic pass', 'python3 -W ignore -I -c pass', '"$VENV/bin/python" -I -X utf8 -c pass', 'python3 -B "$COPY/x.py" -c']) {
       assert.deepEqual(unisolatedOffenders('scripts/x.sh', fine), [], fine);
     }
   });
