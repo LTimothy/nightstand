@@ -30,3 +30,15 @@ it.each(['fahrenheit', 'celsius'] as const)('keeps one Fahrenheit degree steps i
   expect(first.value).toBe(61);
   expect(stepTemperature(first.value, format, -1, first).value).toBe(60);
 });
+
+it.each(['fahrenheit', 'celsius', 'level'] as const)('only ever steps to whole Fahrenheit values in range in %s mode', (format) => {
+  for (const direction of [1, -1] as const) {
+    let state = stepTemperature(80, format, direction);
+    for (let i = 0; i < 80; i++) {
+      expect(Number.isInteger(state.value)).toBe(true);
+      expect(state.value).toBeGreaterThanOrEqual(55);
+      expect(state.value).toBeLessThanOrEqual(110);
+      state = stepTemperature(state.value, format, direction, state);
+    }
+  }
+});

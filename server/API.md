@@ -272,8 +272,8 @@ generic message; the details go to the server log.
   or snoozed alarm on that side, as an alarm tap set to dismiss does, and
   otherwise sets the side to `favoriteTemperatureF` (55 to 110, default 80)
   and turns it on. Firmware that reports the logo as a tap logs no ignored
-  click for it, so `taps` stays in charge there. The app has no editor for
-  them.
+  click for it, so `taps` stays in charge there. Settings > Features >
+  Cover buttons edits them on a Pod 4 hub with a Pod 5 cover.
 - `features` are feature flags. `sleepScore` turns the sleep score and sleep
   stage routes on and off; the app no longer shows either.
   `coverButtons` is Cover buttons, off by default. It is for a Pod 4 hub with
@@ -281,7 +281,11 @@ generic message; the details go to the server log.
   and logo buttons. With it on, Nightstand reads those ignored clicks from
   `/persistent/*.RAW` and acts on them as `buttons` above says. A click can
   take 15 to 25 s to apply, because the firmware writes its log in batches. A Pod 5 hub handles its buttons itself, so the switch
-  does nothing there. While off, the server opens no RAW files for buttons.
+  does nothing there. On a Pod 5 hub the app's Cover buttons options change
+  `taps` instead: `tripleTap` for plus, `doubleTap` for minus and `quadTap`
+  for the logo. The plus and minus mapping comes from the Pod's logs; the
+  logo is not yet checked on a Pod. While off, the server opens no RAW files
+  for buttons.
   `nightstandTheme` is no longer read and stays so stored settings keep
   validating. `features.rhythms` is the Rhythms switch (see `/api/rhythms`
   below); it changes only through `POST /api/rhythms/enable` and

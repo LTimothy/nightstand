@@ -526,17 +526,22 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     touchpoints: [
       'server/src/8sleep/buttonMonitor.ts', 'server/src/8sleep/buttonEvents.ts',
       'app/src/pages/SettingsPage/FeaturesSection',
+      'app/src/pages/SettingsPage/FeaturesSection/CoverButtonOptions.tsx',
+      'app/src/pages/SettingsPage/FeaturesSection/coverButtons.ts',
     ],
     depends_on: [],
     reversible: true,
     tests: [
       'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/buttonEvents.test.ts',
+      'app/src/pages/SettingsPage/FeaturesSection/coverButtons.test.ts',
+      'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.coverButtons.test.tsx',
     ],
     upstream_offer: false,
     rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short cover clicks. '
       + 'Reads no RAW files while off. Acts only on clicks the firmware logged as ignored, so a logo press the '
-      + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the favorite '
-      + 'are per side in settings. Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
+      + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the logo '
+      + 'temperature are per side, edited under the switch; on a Pod 5 hub the same options write the tap actions, '
+      + 'so only one path is ever written. Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
       + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
   },
   {

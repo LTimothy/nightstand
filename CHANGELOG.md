@@ -33,10 +33,14 @@ is a hard fork; for the history of the projects it descends from, see
   from the Pod's RAW files. Plus and minus step that side, 1 F per click by
   default, and the logo button stops a ringing or snoozed alarm or else
   sets the side to a favorite temperature and turns it on. The step, a plus
-  and minus swap and the favorite temperature are set per side through the
-  API. A click can take 15 to 25 s to apply, because the firmware writes
+  and minus swap and the logo temperature are set per side under the
+  switch. A click can take 15 to 25 s to apply, because the firmware writes
   its log in batches. A Pod 5 hub handles its buttons itself, so the switch
   does nothing there. By @2-X.
+- On a Pod 5 hub, which handles its buttons itself, the same Cover buttons
+  options change the tap actions instead. The Pod's logs show a plus click
+  counting as a triple tap and a minus click as a double tap; the logo as a
+  quad tap still needs a check on a Pod 5.
 
 ### Alarms
 

@@ -6,6 +6,9 @@ import RawArchiveRetention from '../DeviceSettingsSection/RawArchiveRetention';
 import FeatureToggleRow from './FeatureToggleRow.tsx';
 import DisableRhythmsDialog from './DisableRhythmsDialog.tsx';
 import EnableRhythmsDialog from './EnableRhythmsDialog.tsx';
+import CoverButtonOptions from './CoverButtonOptions.tsx';
+import { coverButtonsPath, POD5_HUB_GESTURES } from './coverButtons.ts';
+import { GESTURE_LABELS } from '../tapActions.ts';
 import { Services, useServices, postServices } from '@api/services.ts';
 import { useSettings, postSettings } from '@api/settings.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
@@ -23,6 +26,10 @@ const COVER_BUTTONS = 'For a Pod 4 hub with a Pod 5 cover, whose firmware ignore
   + 'Each ignored plus or minus click steps that side by 1 F per click by default, and the logo stops an alarm or sets a favorite temperature, '
   + '15 to 25 s later, because the firmware writes its log in batches. '
   + 'A Pod 5 hub handles its buttons itself, so this does nothing there.';
+const gestureName = (gesture: keyof typeof GESTURE_LABELS) => GESTURE_LABELS[gesture].toLowerCase();
+const COVER_BUTTONS_POD5_HUB = 'Your Pod 5 hub handles the cover\'s buttons itself. These options change the tap actions it '
+  + `triggers: plus is a ${gestureName(POD5_HUB_GESTURES.plus)}, minus a ${gestureName(POD5_HUB_GESTURES.minus)}, `
+  + `and the logo probably a ${gestureName(POD5_HUB_GESTURES.logo)} (not yet checked on a Pod). They work with the switch on or off.`;
 const NEW_SLEEP_TRACKING_CHECKED = 'Tells the two sides apart with the bed\'s capacitance sensors, for bed times, '
   + 'the in-bed indicator, auto-off and Smart Schedule; that part has been checked on one Pod 5. '
   + 'Heart rate and breathing use newer estimates.';
@@ -67,6 +74,14 @@ export default function FeaturesSection() {
       .finally(() => setIsUpdating(false));
   };
 
+  const saveSettings = (patch: DeepPartial<Settings>) => {
+    setError(null);
+    setIsUpdating(true);
+    postSettings(patch).then(() => refetchSettings())
+      .catch(() => setError('Could not save this change. Try again.'))
+      .finally(() => setIsUpdating(false));
+  };
+
   if (servicesError || settingsError) return <Alert
     severity="warning"
     action={ <Button onClick={ () => { void refetchServices(); void refetchSettings(); } }>Retry</Button> }>
@@ -89,6 +104,7 @@ export default function FeaturesSection() {
   // Biometrics only needs the model: the capacitance format is a New sleep tracking matter.
   const modelUnchecked = deviceStatus === undefined
     || sleepTrackingExperimental(deviceStatus.coverVersion, deviceStatus.hubVersion, []);
+  const coverPath = coverButtonsPath(deviceStatus?.hubVersion, deviceStatus?.coverVersion);
 
   return (
     <Section>
@@ -114,13 +130,7 @@ export default function FeaturesSection() {
       { biometricsEnabled && <Box sx={ { pl: 2, my: 2, borderLeft: 1, borderColor: 'divider' } }>
         <RawArchiveRetention
           settings={ settings }
-          updateSettings={ patch => {
-            setError(null);
-            setIsUpdating(true);
-            postSettings(patch).then(() => refetchSettings())
-              .catch(() => setError('Could not save this change. Try again.'))
-              .finally(() => setIsUpdating(false));
-          } } />
+          updateSettings={ saveSettings } />
       </Box> }
       { !biometricsInstalled && <Accordion disableGutters>
         <AccordionSummary expandIcon={ <ExpandMoreIcon/> }>How to install</AccordionSummary>
@@ -228,8 +238,13 @@ export default function FeaturesSection() {
         disabled={ isUpdating || features?.coverButtons === undefined }
         checked={ features?.coverButtons ?? false }
         onChange={ (next) => updateFeature({ coverButtons: next }) }
-        description={ COVER_BUTTONS }
+        description={ coverPath === 'taps' ? COVER_BUTTONS_POD5_HUB : COVER_BUTTONS }
       />
+      { (coverPath === 'taps' || (coverPath === 'buttons' && features?.coverButtons)) && <CoverButtonOptions
+        path={ coverPath }
+        settings={ settings }
+        disabled={ isUpdating }
+        save={ saveSettings }/> }
       <FeatureToggleRow
         label="Rhythms (beta)"
         ariaLabel="Rhythms"

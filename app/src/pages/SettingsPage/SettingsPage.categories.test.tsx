@@ -54,7 +54,7 @@ it('keeps optional toggles together and bed maintenance with the sides', async (
 it('counts every visible feature switch', async () => {
   const features = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings/features' });
   await screen.findByRole('switch', { name: 'Biometrics' });
-  const total = screen.getAllByRole('switch').length;
+  const total = screen.getAllByRole('switch').filter(control => !control.closest('[role="group"][aria-label$=" side buttons"]')).length;
   features.unmount();
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
   expect(await screen.findByText(`5 of ${total} on`)).toBeVisible();
