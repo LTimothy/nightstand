@@ -90,6 +90,10 @@ generic message; the details go to the server log.
 
 - `freeSleep` holds Nightstand's version and the branch it was built from.
   The name is kept so tools written for free-sleep keep working.
+- `wifiStrength` is NetworkManager's last reading, refreshed at most once
+  a minute when this endpoint is called, and `0` when unknown or when the
+  read fails. A reply can carry the previous reading. The WebSocket
+  `device-status` payload repeats the last value and does not refresh it.
 - `sensorTemps` is `null` until the biometrics service has reported an
   ambient temperature at least once. It is not available on every Pod.
 - Each side can also carry `taps`, the count of double, triple and quad taps

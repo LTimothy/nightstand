@@ -6,6 +6,7 @@ import { updateDeviceStatus } from './updateDeviceStatus.js';
 import { markManualTempChange } from '../../jobs/scheduleOverride.js';
 import { noteManualPowerChange } from '../../jobs/manualPowerChange.js';
 import settingsDB from '../../db/settings.js';
+import { refreshWifiSignalStrength } from '../../8sleep/wifiSignalStrength.js';
 
 const router = express.Router();
 
@@ -26,6 +27,7 @@ router.get('/deviceStatus', async (req: Request, res: Response) => {
   }
 
   try {
+    void refreshWifiSignalStrength();
     const resp = await getDeviceStatusCoalesced();
     res.json(resp);
   } catch (error) {

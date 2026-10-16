@@ -19,7 +19,6 @@ import setupRoutes from './setup/routes.js';
 import config from './config.js';
 import serverStatus from './serverStatus.js';
 import { prisma } from './db/prisma.js';
-import { loadWifiSignalStrength } from './8sleep/wifiSignalStrength.js';
 import metrics from './metrics/metrics.js';
 import { wsServer } from './ws/wsServer.js';
 import settingsDB from './db/settings.js';
@@ -171,8 +170,6 @@ async function startServer() {
         logger.error(error);
       });
   }
-  void loadWifiSignalStrength();
-  setInterval(loadWifiSignalStrength, 10_000);
 
   // Register signal handlers for graceful shutdown
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
