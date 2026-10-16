@@ -211,3 +211,117 @@ describe('night line', () => {
     ]);
   });
 });
+
+describe('hand change', () => {
+  const change = (over: Partial<import('./handChanges.js').HandChange> = {}) => ({
+    targetF: 79, fromF: 82, on: true, setsOn: false, source: 'api' as const, ...over,
+  });
+  const record = async (side: 'left' | 'right', over: Partial<import('./handChanges.js').HandChange> = {}, at = IN_NIGHT) => {
+    notes.recordHandChange(side, change(over), at);
+    await notes.flushHandChanges();
+    return fileLines();
+  };
+
+  it('writes the plan, the change and where the night stood', async () => {
+    const [line] = await record('left');
+    assert.deepEqual(line, {
+      v: 1, kind: 'change', at: IN_NIGHT.toISOString(), side: 'left', rhythmId: 'off-days', mode: 'manual',
+      planKey: notes.rhythmPlanKey(HAND), date: '2026-10-01',
+      sleepStart: '2026-10-01T22:00:00.000Z', sleepEnd: '2026-10-02T06:00:00.000Z',
+      offsetMin: 90, plannedF: 82, holdF: null, fromF: 82, targetF: 79, phase: null, held: false, source: 'api',
+    });
+  });
+
+  it('takes the plan in force at the change, after a step', async () => {
+    const [line] = await record('left', {}, new Date('2026-10-02T03:10:00.000Z'));
+    assert.equal(line.plannedF, 79);
+    assert.equal(line.offsetMin, 310);
+  });
+
+  it('stores a converted target as a whole degree', async () => {
+    const [line] = await record('left', { targetF: 78.8, fromF: 81.6 });
+    assert.equal(line.targetF, 79);
+    assert.equal(line.fromF, 82);
+  });
+
+  it('marks a change made while the 12 hour override holds', async () => {
+    settingsDB.data.left.scheduleOverrides.temperatureSchedules = { disabled: true, expiresAt: '2099-01-01T00:00:00Z' };
+    const [line] = await record('left');
+    assert.equal(line.held, true);
+  });
+
+  it('records an away side\'s change under the side the bed follows, with that side\'s readings', async () => {
+    settingsDB.data.left.awayMode = true;
+    const [line] = await record('left', { fromF: 81 });
+    assert.equal(line.side, 'right');
+    assert.equal(line.fromF, 81);
+  });
+
+  for (const [name, setup, over] of [
+    ['with the feature off', () => { settingsDB.data.features.rhythmSuggestions = false; }, {}],
+    ['without a time zone', () => { settingsDB.data.timeZone = '' as typeof settingsDB.data.timeZone; }, {}],
+    ['when both sides are away', () => { settingsDB.data.left.awayMode = true; settingsDB.data.right.awayMode = true; }, {}],
+    ['while paused', () => { settingsDB.data.left.scheduleOverrides.pause = { active: true, expiresAt: '' }; }, {}],
+    ['under the weekly engine', () => { setEngineActivation({ active: false, reason: 'flag-off' }); }, {}],
+    ['for a side known to be off', () => {}, { on: false }],
+    ['for the power button sending the plan with the power-on', () => {}, { targetF: 82, setsOn: true }],
+  ] as const) {
+    it(`writes nothing ${name}`, async () => {
+      setup();
+      assert.deepEqual(await record('left', over), []);
+    });
+  }
+
+  it('writes nothing outside a Rhythms sleep', async () => {
+    assert.deepEqual(await record('left', {}, new Date('2026-10-02T12:00:00.000Z')), []);
+  });
+
+  it('keeps a change back to the plan when it does not turn the side on', async () => {
+    assert.equal((await record('left', { targetF: 82, fromF: 79 })).length, 1);
+    assert.equal((await record('left', { targetF: 82, on: null })).length, 2);
+  });
+
+  describe('on a Smart Schedule night', () => {
+    beforeEach(() => { useRhythm(SMART); });
+
+    it('takes the curve level, the night level, the phase and the hold', async () => {
+      const sleep = sleepAt(IN_NIGHT);
+      const points = sleep.smartCurve!.points;
+      const { levelAt, levelToF, phaseAt } = await import('../../db/smartCurve.js');
+      const night = points.find(point => point.phase === 'hold') ?? points.filter(point => point.phase === 'cooldown').at(-1)!;
+      smart.holdUntil = new Date(IN_NIGHT.getTime() + 60_000);
+      const [line] = await record('left', { targetF: 74 });
+      assert.equal(line.mode, 'smart');
+      assert.equal(line.plannedF, levelToF(levelAt(points, IN_NIGHT)!));
+      assert.equal(line.holdF, levelToF(night.level));
+      assert.equal(line.phase, phaseAt(points, IN_NIGHT));
+      assert.equal(line.held, true);
+      assert.equal(line.planKey, notes.rhythmPlanKey(SMART));
+    });
+
+    it('measures against the base while the bed is held at the base', async () => {
+      smart.gate = 'base';
+      const [line] = await record('left', { targetF: 74 });
+      assert.equal(line.plannedF, 83);
+    });
+
+    it('follows a cool-down the controller moved later', async () => {
+      const early = new Date('2026-10-01T22:20:00.000Z');
+      const { levelAt, levelToF } = await import('../../db/smartCurve.js');
+      const [clock] = await record('left', { targetF: 70 }, early);
+      smart.coolStart = new Date('2026-10-01T23:30:00.000Z');
+      const moved = sleepAt(early);
+      const [, delayed] = await record('left', { targetF: 70 }, early);
+      assert.equal(delayed.plannedF, levelToF(levelAt(moved.smartCurve!.points, early)!));
+      assert.ok(clock.plannedF !== delayed.plannedF || clock.phase !== delayed.phase, 'the moved cool-down changed nothing');
+    });
+
+    it('drops the power button\'s curve value even while the gate sends the base', async () => {
+      smart.gate = 'base';
+      const { levelAt, levelToF } = await import('../../db/smartCurve.js');
+      const curveF = levelToF(levelAt(sleepAt(IN_NIGHT).smartCurve!.points, IN_NIGHT)!);
+      assert.notEqual(curveF, 83, 'pick a time when the curve is off the base');
+      assert.deepEqual(await record('left', { targetF: curveF, setsOn: true }), []);
+    });
+  });
+});
