@@ -21,7 +21,7 @@ STARTUP_GRACE=120
 lock_held() {
   local key
   [ -e "$LOCK" ] || return 1
-  key=$(python3 -c 'import os, sys; s = os.stat(sys.argv[1]); print("%02x:%02x:%d" % (os.major(s.st_dev), os.minor(s.st_dev), s.st_ino))' "$LOCK" 2>/dev/null) \
+  key=$(python3 -I -c 'import os, sys; s = os.stat(sys.argv[1]); print("%02x:%02x:%d" % (os.major(s.st_dev), os.minor(s.st_dev), s.st_ino))' "$LOCK" 2>/dev/null) \
     || key=":$(ls -i "$LOCK" 2>/dev/null | awk '{ print $1 }')"
   if [ "$key" != : ] && [ -r "$PROC_LOCKS" ]; then
     awk -v key="$key" '{ for (i = 1; i <= NF; i++) if (split($i, part, ":") == 3 && ($i == key || ":" part[3] == key)) found = 1 }
@@ -31,7 +31,7 @@ lock_held() {
   if command -v flock >/dev/null 2>&1; then
     ! flock -n "$LOCK" true
   else
-    ! python3 -c 'import fcntl, sys; fcntl.flock(open(sys.argv[1]), fcntl.LOCK_EX | fcntl.LOCK_NB)' "$LOCK" 2>/dev/null
+    ! python3 -I -c 'import fcntl, sys; fcntl.flock(open(sys.argv[1]), fcntl.LOCK_EX | fcntl.LOCK_NB)' "$LOCK" 2>/dev/null
   fi
 }
 

@@ -200,7 +200,7 @@ take_operation_lock() {
   if command -v flock >/dev/null 2>&1; then
     flock -n 9 || return 2
   else
-    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null || return 2
+    python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null || return 2
   fi
   export NIGHTSTAND_OPERATION_OWNER=$$
 }

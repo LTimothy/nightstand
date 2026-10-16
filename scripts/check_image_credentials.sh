@@ -13,7 +13,7 @@ confirm() {
 
 is_image_profile() {
   [ -f "$1" ] || return 1
-  python3 - "$1" <<'PY'
+  python3 -I - "$1" <<'PY'
 import configparser
 import sys
 profile = configparser.ConfigParser(interpolation=None)
@@ -31,7 +31,7 @@ PY
 }
 
 has_shared_password() {
-  python3 - "$1" <<'PY'
+  python3 -I - "$1" <<'PY'
 import sys
 try:
     with open('/etc/shadow') as handle:

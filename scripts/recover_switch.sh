@@ -42,7 +42,7 @@ if [ -e "$OPERATION_LOCK" ]; then
 else
   exec 9>>"$OPERATION_LOCK"
 fi
-python3 - <<'PY'
+python3 -I - <<'PY'
 import fcntl, sys
 try:
     fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)

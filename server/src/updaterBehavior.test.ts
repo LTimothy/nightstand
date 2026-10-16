@@ -601,7 +601,7 @@ function withExitHandling(file: string, swap: string) {
 const stubs = [
   'close_wan() { :; }',
   'record_result() { printf "%s" "${RESULT_REASON:-}" > "$FIXTURE/marker"; printf "%s" "${RESULT_PHASE:-}" > "$FIXTURE/phase"; }',
-  'python3() { [ "$1" != -c ] || command python3 "$@"; }', 'ZIP="$FIXTURE/zip"; STAGE="$FIXTURE/stage"',
+  'python3() { case "$1" in -I|-c) command python3 "$@";; esac; }', 'ZIP="$FIXTURE/zip"; STAGE="$FIXTURE/stage"',
 ].join('\n');
 const staged = 'STAGE="$FIXTURE/stage"; mkdir -p "$STAGE/server"; echo staged > "$STAGE/version"';
 for (const [file, from, to, setup, liveAfterMove] of [
@@ -939,7 +939,7 @@ systemctl() { [ "$* $(cat "$LIVE/version" 2>/dev/null)" != "${call} ${tree}" ] |
 const settingsFile = '"$FIXTURE/persistent/free-sleep-data/lowdb/settingsDB.json"';
 const switchSettings = `DATA_CHANGED=no; RESTORE_ATTEMPTED=no; ARCHIVE_WAS_ACTIVE=inactive
 echo original > ${settingsFile}; echo original > "$FIXTURE/persistent/free-sleep-data/lowdb/schedulesDB.json"
-python3() { case "$1" in -c) command python3 "$@";; *prepare-upstream.py) echo converted > "$2/settingsDB.json";; esac; }
+python3() { case "$1" in -I|-c) command python3 "$@";; *prepare-upstream.py) echo converted > "$2/settingsDB.json";; esac; }
 eval "inner_$(declare -f systemctl)"
 systemctl() { [ "$*" != "start free-sleep" ] || echo "start on $(cat ${settingsFile})" >> "$FIXTURE/ssh"; inner_systemctl "$@"; }`;
 

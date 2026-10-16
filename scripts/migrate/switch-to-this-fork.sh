@@ -231,8 +231,8 @@ say "Stage 2: identifying the pod's current install"
 
 DEVICE_STATUS=$(curl -sf --max-time 5 "http://$POD_IP:3000/api/deviceStatus") \
   || fail "could not reach http://$POD_IP:3000/api/deviceStatus"
-RUNNING_VERSION=$(printf '%s' "$DEVICE_STATUS" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("freeSleep",{}).get("version","unknown"))' 2>/dev/null || echo unknown)
-RUNNING_BRANCH=$(printf '%s' "$DEVICE_STATUS" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("freeSleep",{}).get("branch","unknown"))' 2>/dev/null || echo unknown)
+RUNNING_VERSION=$(printf '%s' "$DEVICE_STATUS" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("freeSleep",{}).get("version","unknown"))' 2>/dev/null || echo unknown)
+RUNNING_BRANCH=$(printf '%s' "$DEVICE_STATUS" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("freeSleep",{}).get("branch","unknown"))' 2>/dev/null || echo unknown)
 
 # No fork serves an explicit "which fork am I" field over HTTP today:
 # serverInfo.json (which has one) is fetched by the BROWSER directly from
@@ -301,7 +301,7 @@ free_mb() { { df -kP "$1" 2>/dev/null || true; } | awk 'NR == 2 { print int($4 /
 size_mb() { { du -sk "$@" 2>/dev/null || true; } | awk '{ kb += $1 } END { print int((kb + 1023) / 1024) }'; }
 # The Node version a tree pins for Volta, empty when it pins none.
 node_pin() {
-  python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("volta", {}).get("node", ""))' \
+  python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1])).get("volta", {}).get("node", ""))' \
     "$1/server/package.json" 2>/dev/null || true
 }
 # Volta fetches a pinned Node the first time npm or npx runs under it. For
@@ -362,7 +362,7 @@ LAPTOP_FREE_KB=$(df -Pk . | awk 'NR==2{print $4}')
 # through --assume-model. Keep that glob only as a fallback for a fork whose
 # deviceStatus somehow omits coverVersion.
 say "Detecting pod generation..."
-COVER_VERSION=$(printf '%s' "$DEVICE_STATUS" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("coverVersion",""))' 2>/dev/null || echo "")
+COVER_VERSION=$(printf '%s' "$DEVICE_STATUS" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("coverVersion",""))' 2>/dev/null || echo "")
 case "$COVER_VERSION" in
   *5*) DETECTED_MODEL="pod5" ;;
   *4*|*3*) DETECTED_MODEL="pod3or4" ;;
@@ -397,8 +397,8 @@ if [ "$BASELINE_ACTIVE" != "active" ] && [ "$MIGRATE_ANYWAY" != yes ]; then
 fi
 
 # Bed-in-use check.
-LEFT_ON=$(printf '%s' "$DEVICE_STATUS" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("left",{}).get("isOn",False))' 2>/dev/null)
-RIGHT_ON=$(printf '%s' "$DEVICE_STATUS" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("right",{}).get("isOn",False))' 2>/dev/null)
+LEFT_ON=$(printf '%s' "$DEVICE_STATUS" | python3 -I -c 'import json,sys;d=json.load(sys.stdin);print(d.get("left",{}).get("isOn",False))' 2>/dev/null)
+RIGHT_ON=$(printf '%s' "$DEVICE_STATUS" | python3 -I -c 'import json,sys;d=json.load(sys.stdin);print(d.get("right",{}).get("isOn",False))' 2>/dev/null)
 if [ "$LEFT_ON" = "True" ] || [ "$RIGHT_ON" = "True" ]; then
   echo "One or both sides currently show as powered on, someone may be in bed."
   read -r -p "Type 'bed-in-use-ok' to proceed anyway: " BED_ACK
@@ -465,7 +465,7 @@ if [ -n "$FOREIGN_REPORT" ]; then
 fi
 REMOVE_FOREIGN=no
 
-NEWEST_VERSION=$(curl -fsSL --max-time 20 "$RELEASES_URL" | python3 -c "
+NEWEST_VERSION=$(curl -fsSL --max-time 20 "$RELEASES_URL" | python3 -I -c "
 import json, sys
 data = json.load(sys.stdin)
 print(data['releases'][0]['version'] if data['releases'] else '')
@@ -560,11 +560,11 @@ ssh_cmd "$SSH_PORT" "
     if command -v sqlite3 >/dev/null 2>&1; then
       low_priority sqlite3 /persistent/free-sleep-data/free-sleep.db \".backup '\$STAGE/free-sleep-data/free-sleep.db'\" || exit 1
     else
-      low_priority python3 -c 'import sqlite3,sys; source=sqlite3.connect(sys.argv[1]); target=sqlite3.connect(sys.argv[2]); source.backup(target); target.close(); source.close()' /persistent/free-sleep-data/free-sleep.db \"\$STAGE/free-sleep-data/free-sleep.db\"
+      low_priority python3 -I -c 'import sqlite3,sys; source=sqlite3.connect(sys.argv[1]); target=sqlite3.connect(sys.argv[2]); source.backup(target); target.close(); source.close()' /persistent/free-sleep-data/free-sleep.db \"\$STAGE/free-sleep-data/free-sleep.db\"
     fi
   fi
   if [ -f \"\$STAGE/free-sleep-data/free-sleep.db\" ]; then
-    low_priority python3 -c 'import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); result=db.execute(\"PRAGMA integrity_check\").fetchall(); db.close(); sys.exit(0 if result==[(\"ok\",)] else 1)' \"\$STAGE/free-sleep-data/free-sleep.db\"
+    low_priority python3 -I -c 'import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); result=db.execute(\"PRAGMA integrity_check\").fetchall(); db.close(); sys.exit(0 if result==[(\"ok\",)] else 1)' \"\$STAGE/free-sleep-data/free-sleep.db\"
     mkdir -p /persistent/free-sleep-database-backups
     low_priority cp \"\$STAGE/free-sleep-data/free-sleep.db\" '/persistent/free-sleep-database-backups/migrate-${TS}.db'
     chmod 600 '/persistent/free-sleep-database-backups/migrate-${TS}.db'
@@ -585,7 +585,7 @@ LOCAL_SIZE=$(stat -f%z "$LOCAL_BACKUP_TARBALL" 2>/dev/null || stat -c%s "$LOCAL_
 say "Backup verified in both places. Pod: $REMOTE_BACKUP_TARBALL, Laptop: $LOCAL_BACKUP_TARBALL"
 
 # Baseline temperatures, written for pod-installer.sh's post-swap comparison.
-BASELINE_JSON=$(printf '%s' "$BASELINE_STATUS" | python3 -c '
+BASELINE_JSON=$(printf '%s' "$BASELINE_STATUS" | python3 -I -c '
 import json, sys
 d = json.load(sys.stdin)
 out = {}
@@ -638,7 +638,7 @@ while [ "$ATTEMPTS" -lt 200 ]; do
         # The installer can publish its outcome and exit between these probes.
         STATUS_JSON=$(ssh_cmd "$SSH_PORT" "if [ -f '$STATUS_FILE_REMOTE' ]; then cat '$STATUS_FILE_REMOTE'; fi") \
           || { say "  (reconnecting...)"; continue; }
-        FINAL_OUTCOME=$(printf '%s' "$STATUS_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("outcome",""))' 2>/dev/null || true)
+        FINAL_OUTCOME=$(printf '%s' "$STATUS_JSON" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("outcome",""))' 2>/dev/null || true)
         case "$FINAL_OUTCOME" in
           success|restored|failed|refused|restore_failed) ;;
           *) fail "installer is no longer running; check the migration log and sentinel recovery before retrying" ;;
@@ -646,8 +646,8 @@ while [ "$ATTEMPTS" -lt 200 ]; do
       }
   fi
   [ -n "$STATUS_JSON" ] || continue
-  OUTCOME=$(printf '%s' "$STATUS_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("outcome",""))' 2>/dev/null)
-  STAGE_NAME=$(printf '%s' "$STATUS_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("stage",""))' 2>/dev/null)
+  OUTCOME=$(printf '%s' "$STATUS_JSON" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("outcome",""))' 2>/dev/null)
+  STAGE_NAME=$(printf '%s' "$STATUS_JSON" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("stage",""))' 2>/dev/null)
   say "  [$STAGE_NAME] $OUTCOME"
   case "$OUTCOME" in
     success|restored|failed|refused|restore_failed)
@@ -678,7 +678,7 @@ AFTERCARE
       fail "migration and automatic restore failed. SSH recovery is required; inspect the original tree and migration log on the pod."
       ;;
     restored|failed|refused)
-      fail "migration did not succeed (outcome: $OUTCOME). Your original install has been restored automatically. Details: $(printf '%s' "$STATUS_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("message",""))' 2>/dev/null)"
+      fail "migration did not succeed (outcome: $OUTCOME). Your original install has been restored automatically. Details: $(printf '%s' "$STATUS_JSON" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("message",""))' 2>/dev/null)"
       ;;
   esac
 done

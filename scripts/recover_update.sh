@@ -27,7 +27,7 @@ fail() {
 
 clear_marker() {
   sync
-  python3 - "$MARKER" <<'PY'
+  python3 -I - "$MARKER" <<'PY'
 import os, sys
 path = sys.argv[1]
 if os.path.exists(path):
@@ -42,7 +42,7 @@ PY
 
 case "${1:-}" in
   --arm)
-    python3 - "$MARKER" "$LIVE" "${2:-inactive}" "${3:-}" <<'PY'
+    python3 -I - "$MARKER" "$LIVE" "${2:-inactive}" "${3:-}" <<'PY'
 import json, os, sys
 path, live, stream, target = sys.argv[1:]
 stream = "active" if stream == "active" else "inactive"
@@ -83,14 +83,14 @@ if [ "${SETTLE_RESTORED:-no}" != yes ] || [ "${NIGHTSTAND_OPERATION_OWNER:-}" !=
       sleep 2
     done
   else
-    until python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null; do
+    until python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null; do
       [ "$SECONDS" -lt "$LOCK_DEADLINE" ] || fail "another operation is running (or lock unavailable)"
       sleep 2
     done
   fi
 fi
 [ -f "$MARKER" ] || exit 0
-STREAM_WAS_ACTIVE=$(python3 - "$MARKER" 2>/dev/null <<'PY'
+STREAM_WAS_ACTIVE=$(python3 -I - "$MARKER" 2>/dev/null <<'PY'
 import json, sys
 marker = json.load(open(sys.argv[1]))
 assert isinstance(marker["device"], int) and isinstance(marker["inode"], int)
@@ -101,12 +101,12 @@ print(marker["stream"])
 PY
 ) || fail "unreadable swap marker; manual recovery required"
 
-RECOVERY_FROM=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$MARKER")
-RECOVERY_TO=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("toVersion") or "")' "$MARKER")
+RECOVERY_FROM=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$MARKER")
+RECOVERY_TO=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1])).get("toVersion") or "")' "$MARKER")
 
 # The original tree may already be live if recovery itself was interrupted.
 matches_marker() {
-  python3 - "$MARKER" "$1" 2>/dev/null <<'PYMARKER'
+  python3 -I - "$MARKER" "$1" 2>/dev/null <<'PYMARKER'
 import json, os, sys
 marker = json.load(open(sys.argv[1]))
 info = os.stat(sys.argv[2])
@@ -123,7 +123,7 @@ trap 'rm -f "$HBODY"' EXIT
 healthy_live() {
   [ -d "$LIVE" ] || return 1
   local version code attempts=${1:-3}
-  version=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' \
+  version=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' \
     "$LIVE/server/src/serverInfo.json" 2>/dev/null) || return 1
   for _ in $(seq 1 "$attempts"); do
     [ "$SECONDS" -lt "$RECOVERY_DEADLINE" ] || return 1
@@ -131,7 +131,7 @@ healthy_live() {
     code=$(curl -s -o "$HBODY" -w '%{http_code}' --max-time 2 \
       http://127.0.0.1:3000/api/deviceStatus 2>/dev/null) || continue
     [ "$code" = 200 ] || continue
-    python3 - "$HBODY" "$version" <<'PY' || continue
+    python3 -I - "$HBODY" "$version" <<'PY' || continue
 import json, sys
 try:
     status = json.load(open(sys.argv[1]))
@@ -145,7 +145,7 @@ PY
       code=$(curl -s -o "$HBODY" -w '%{http_code}' --max-time 2 \
         http://127.0.0.1:3000/api/serverStatus 2>/dev/null) || continue
       [ "$code" = 200 ] || continue
-      python3 - "$HBODY" <<'PYDATABASE' || continue
+      python3 -I - "$HBODY" <<'PYDATABASE' || continue
 import json, sys
 try:
     status = json.load(open(sys.argv[1]))

@@ -46,7 +46,7 @@ if [ -f "$SWAP_MARKER" ]; then
     [ -s "$file" ] || warn "armed recovery file is missing: $file"
   done
 elif [ -f "$COPY/scripts/recover_update.sh" ]; then
-  if python3 - "$COPY" "$RECOVERY_DIR" "$SYSTEMD_DIR" <<'PYRECOVERY'
+  if python3 -I - "$COPY" "$RECOVERY_DIR" "$SYSTEMD_DIR" <<'PYRECOVERY'
 import os, sys, tempfile
 repo, recovery, systemd = sys.argv[1:]
 os.makedirs(recovery, exist_ok=True)
@@ -91,7 +91,7 @@ if [ -n "${NIGHTSTAND_RECOVERY_DIR:-}" ] && [ -z "${NIGHTSTAND_SWITCH_RECOVERY_D
 fi
 TRANSACTION_ROOT="${NIGHTSTAND_TRANSACTION_ROOT:-/persistent/free-sleep-maintenance/nightstand-transactions}"
 if [ -f "$COPY/scripts/recover_switch.sh" ] && [ ! -f "$SWAP_MARKER" ]; then
-  if python3 - "$COPY" "$SWITCH_RECOVERY_DIR" "$SYSTEMD_DIR" "$TRANSACTION_ROOT" <<'PYSWITCHRECOVERY'
+  if python3 -I - "$COPY" "$SWITCH_RECOVERY_DIR" "$SYSTEMD_DIR" "$TRANSACTION_ROOT" <<'PYSWITCHRECOVERY'
 import os, shlex, sys, time
 from pathlib import Path
 repo, recovery, systemd, root = sys.argv[1:]

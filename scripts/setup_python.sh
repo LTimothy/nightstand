@@ -23,7 +23,7 @@ TARGET_DIR=$(mkdir -p "$SYSTEM_DIR" && mktemp -d "$SYSTEM_DIR/.download.XXXXXX")
 trap 'rm -rf "$TARGET_DIR"' EXIT
 ZIP_FILE="$TARGET_DIR/cpython_lib.zip"
 
-PYTHON_LIB_DIR=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')
+PYTHON_LIB_DIR=$(python3 -I -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')
 
 # --- 1. Download and Unzip ---
 

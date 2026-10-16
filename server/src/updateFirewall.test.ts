@@ -411,7 +411,8 @@ fail "download failed"`)], { env: f.env, encoding: 'utf8', timeout: 10000 });
 }
 
 it('switch-to-upstream.sh puts a time limit on the biometrics package install', () => {
-  assert.match(read('scripts/switch-to-upstream.sh'), /run_limited 600 "\$\{PIP_RUNNER\[@\]\}" \/home\/dac\/venv\/bin\/python -m pip install/);
+  assert.match(read('scripts/switch-to-upstream.sh'),
+    /run_limited 600 "\$\{PIP_RUNNER\[@\]\}" \/home\/dac\/venv\/bin\/python -I -m pip install/);
 });
 
 // An updater killed outright never runs its cleanup; the units' ExecStopPost

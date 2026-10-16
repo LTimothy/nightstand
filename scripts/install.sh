@@ -15,7 +15,7 @@ if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
   if command -v flock >/dev/null 2>&1; then
     flock -n 9 || { echo "Another update, rollback, switch, install or reset is already running"; exit 1; }
   else
-    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
+    python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
       || { echo "Another operation is already running (or lock unavailable)"; exit 1; }
   fi
   export NIGHTSTAND_OPERATION_OWNER=$$
@@ -50,7 +50,7 @@ case "$WANTED_CHANNEL" in
 esac
 if [ -z "$WANTED_CHANNEL" ]; then
   # The old settings path wins, as it is moved over the new one below.
-  WANTED_CHANNEL=$(python3 - /home/dac/free-sleep-database/settingsDB.json /persistent/free-sleep-data/lowdb/settingsDB.json <<'PY' || true
+  WANTED_CHANNEL=$(python3 -I - /home/dac/free-sleep-database/settingsDB.json /persistent/free-sleep-data/lowdb/settingsDB.json <<'PY' || true
 import json, os, sys
 for path in sys.argv[1:]:
     if os.path.exists(path):
@@ -68,7 +68,7 @@ fi
 RELEASES_URL="https://raw.githubusercontent.com/LTimothy/nightstand/main/releases.json"
 RELEASES_JSON=$(curl -fsSL --max-time 20 "$RELEASES_URL") \
   || { echo "Could not choose a release from releases.json"; exit 1; }
-PICK=$(printf '%s' "$RELEASES_JSON" | python3 -c '
+PICK=$(printf '%s' "$RELEASES_JSON" | python3 -I -c '
 import json, re, sys
 wanted = sys.argv[1]
 try:
@@ -87,7 +87,7 @@ except (KeyError, TypeError, ValueError, AttributeError):
   || { echo "Could not choose a release from releases.json"; exit 1; }
 read -r VERSION CHANNEL EXPECTED_DIGEST <<< "$PICK"
 EXPECTED_DIGEST="${EXPECTED_DIGEST:-}"
-if ! python3 -c '
+if ! python3 -I -c '
 import sys
 parse = lambda version: tuple(int(part) for part in version.split("."))
 sys.exit(parse(sys.argv[1]) < parse(sys.argv[2]))' "$VERSION" "$MIN_INSTALL_VERSION"; then
@@ -141,7 +141,7 @@ else
   echo "v$VERSION matches its published checksum"
 fi
 # Like the updater, refuses a tree whose own version is not the one chosen.
-STAGED_VERSION=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' \
+STAGED_VERSION=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' \
   "$SRC_DIR/server/src/serverInfo.json" 2>/dev/null) \
   || { rm -rf "$UNZIP_DIR"; echo "staged tree has no readable serverInfo.json"; exit 1; }
 if [ "$STAGED_VERSION" != "$VERSION" ]; then
@@ -304,7 +304,7 @@ done
 # have none, or when NIGHTSTAND_CHANNEL was given. Otherwise an owner's
 # earlier choice stands. Runs after old settings are moved into place, so
 # that move cannot overwrite it.
-python3 - /persistent/free-sleep-data/lowdb/settingsDB.json "$CHANNEL" "${NIGHTSTAND_CHANNEL:+given}" <<'PY' \
+python3 -I - /persistent/free-sleep-data/lowdb/settingsDB.json "$CHANNEL" "${NIGHTSTAND_CHANNEL:+given}" <<'PY' \
   || echo "WARNING: could not save the update channel"
 import json, os, sys
 path, channel, given = sys.argv[1], sys.argv[2], sys.argv[3] == "given"
@@ -451,7 +451,7 @@ serves_version() {
     say "  health attempt: HTTP $code"
     [ "$code" = 200 ] || continue
     body=$(cat "$HBODY" 2>/dev/null) || continue
-    ok=$(printf '%s' "$body" | python3 -c "
+    ok=$(printf '%s' "$body" | python3 -I -c "
 import json, sys
 try:
     d = json.load(sys.stdin)

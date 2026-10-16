@@ -92,7 +92,7 @@ record_result() {
       esac
     fi
   fi
-  python3 -c "$RESULT_PY" "$RESULT_FILE" "$RESULT_OPERATION" "$outcome" \
+  python3 -I -c "$RESULT_PY" "$RESULT_FILE" "$RESULT_OPERATION" "$outcome" \
     "${CUR_VERSION:-}" "${EXPECTED_VERSION:-${TARGET_VERSION:-${STAGED_VERSION:-}}}" "$RESULT_REASON" >/dev/null 2>&1 || true
 }
 
@@ -193,7 +193,7 @@ RECHECK_IN_USE=no
 IN_USE_REASON="the bed came into use while it was getting ready"
 read_request() {
   [ -f "$REQUEST_FILE" ] || return 0
-  RECHECK_IN_USE=$(python3 -c '
+  RECHECK_IN_USE=$(python3 -I -c '
 import json, os, sys, time
 try:
     if time.time() - os.path.getmtime(sys.argv[1]) > 600:
@@ -208,7 +208,7 @@ except Exception:
 recheck_in_use() {
   [ "$RECHECK_IN_USE" = yes ] || return 0
   local reasons
-  reasons=$(curl -fsS --max-time 20 http://127.0.0.1:3000/api/update/in-use 2>/dev/null | python3 -c '
+  reasons=$(curl -fsS --max-time 20 http://127.0.0.1:3000/api/update/in-use 2>/dev/null | python3 -I -c '
 import json, sys
 reasons = json.load(sys.stdin)["reasons"]
 assert isinstance(reasons, list)
@@ -223,7 +223,7 @@ print(" ".join(str(reason) for reason in reasons))' 2>/dev/null) || reasons=stat
 # release published before digests existed has none, and installs as before.
 verify_tree() {
   local expected actual tree=$1
-  expected=$(printf '%s' "${RELEASES_JSON:-}" | python3 -c '
+  expected=$(printf '%s' "${RELEASES_JSON:-}" | python3 -I -c '
 import json, sys
 for release in json.load(sys.stdin).get("releases", []):
     if release.get("version") == sys.argv[1]:
@@ -253,7 +253,7 @@ free_mb() { { df -kP "$1" 2>/dev/null || true; } | awk 'NR == 2 { print int($4 /
 size_mb() { { du -sk "$@" 2>/dev/null || true; } | awk '{ kb += $1 } END { print int((kb + 1023) / 1024) }'; }
 # The Node version a tree pins for Volta, empty when it pins none.
 node_pin() {
-  python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("volta", {}).get("node", ""))' \
+  python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1])).get("volta", {}).get("node", ""))' \
     "$1/server/package.json" 2>/dev/null || true
 }
 # Volta fetches a pinned Node the first time npm or npx runs under it. For
@@ -287,7 +287,7 @@ if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
   if command -v flock >/dev/null 2>&1; then
     flock -n 9 || fail "another update, rollback or switch is already running"
   else
-    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
+    python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
       || fail "another update, rollback or switch is already running (or lock unavailable)"
   fi
   export NIGHTSTAND_OPERATION_OWNER=$$
@@ -316,8 +316,8 @@ ALLOW_DOWNGRADE=no
 if [ -f "$TARGET_FILE" ]; then
   TARGET_JSON=$(cat "$TARGET_FILE")
   rm -f "$TARGET_FILE"
-  TARGET_VERSION=$(printf '%s' "$TARGET_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("version",""))' 2>/dev/null) || TARGET_VERSION=""
-  ALLOW_DOWNGRADE_RAW=$(printf '%s' "$TARGET_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("allowDowngrade",False))' 2>/dev/null) || ALLOW_DOWNGRADE_RAW=False
+  TARGET_VERSION=$(printf '%s' "$TARGET_JSON" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("version",""))' 2>/dev/null) || TARGET_VERSION=""
+  ALLOW_DOWNGRADE_RAW=$(printf '%s' "$TARGET_JSON" | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("allowDowngrade",False))' 2>/dev/null) || ALLOW_DOWNGRADE_RAW=False
   [ "$ALLOW_DOWNGRADE_RAW" = True ] && ALLOW_DOWNGRADE=yes
   [ -n "$TARGET_VERSION" ] && say "Target-version request: v$TARGET_VERSION (allowDowngrade=$ALLOW_DOWNGRADE)"
 fi
@@ -327,7 +327,7 @@ fi
 
 # --- preflight ---------------------------------------------------------------
 [ -d "$LIVE" ] || fail "no live install at $LIVE"
-CUR_VERSION=$(python3 -c 'import json;print(json.load(open("'"$LIVE"'/server/src/serverInfo.json"))["version"])' 2>/dev/null) \
+CUR_VERSION=$(python3 -I -c 'import json;print(json.load(open("'"$LIVE"'/server/src/serverInfo.json"))["version"])' 2>/dev/null) \
   || fail "cannot read current version"
 
 # Room for what this run writes, sized from the install it replaces. On /:
@@ -379,7 +379,7 @@ else
 
 
 if [ -n "$TARGET_VERSION" ]; then
-  FLOOR_OK=$(python3 -c '
+  FLOOR_OK=$(python3 -I -c '
 import sys
 def parts(v): return [int(x) for x in v.split(".")]
 print("yes" if parts(sys.argv[1]) >= parts(sys.argv[2]) else "no")' "$TARGET_VERSION" "$FLOOR_VERSION")
@@ -389,7 +389,7 @@ fi
 # --- resolve what to install --------------------------------------------------
 if [ -z "$TARGET_VERSION" ]; then
   # Older settings files have no channel; they use the stable default.
-  UPDATE_CHANNEL=$(python3 -c '
+  UPDATE_CHANNEL=$(python3 -I -c '
 import json, sys
 try:
     with open(sys.argv[1]) as settings_file:
@@ -407,7 +407,7 @@ if [ -n "$TARGET_VERSION" ]; then
   say "Resolving requested v$TARGET_VERSION against releases.json..."
   RELEASES_JSON=$(curl -fsSL --max-time 20 "$RELEASES_URL") \
     || fail "could not fetch releases.json (check internet access and DNS)"
-  MANIFEST_CHECK=$(printf '%s' "$RELEASES_JSON" | python3 -c "
+  MANIFEST_CHECK=$(printf '%s' "$RELEASES_JSON" | python3 -I -c "
 import json, sys
 target = '$TARGET_VERSION'
 data = json.load(sys.stdin)
@@ -416,7 +416,7 @@ print('known' if target in versions else 'missing')
 " 2>/dev/null) || fail "could not parse releases.json"
   [ "$MANIFEST_CHECK" = missing ] && fail "v$TARGET_VERSION is not a known release (checked releases.json)"
 
-  IS_DOWNGRADE=$(python3 -c '
+  IS_DOWNGRADE=$(python3 -I -c '
 import sys
 def parts(v): return [int(x) for x in v.split(".")]
 print("yes" if parts(sys.argv[1]) < parts(sys.argv[2]) else "no")' "$TARGET_VERSION" "$CUR_VERSION")
@@ -432,7 +432,7 @@ else
   say "Checking GitHub for the newest $UPDATE_CHANNEL release..."
   # Kept for the checksum check once the release is staged.
   RELEASES_JSON=$(curl -fsSL --max-time 20 "$RELEASES_URL") || RELEASES_JSON=""
-  REMOTE_VERSION=$(printf '%s' "$RELEASES_JSON" | python3 -c '
+  REMOTE_VERSION=$(printf '%s' "$RELEASES_JSON" | python3 -I -c '
 import json, re, sys
 channel = sys.argv[1]
 releases = json.load(sys.stdin)["releases"]
@@ -447,7 +447,7 @@ else:
     sys.exit("no release on the selected channel")' "$UPDATE_CHANNEL") \
     || fail "could not resolve a release for $UPDATE_CHANNEL (check releases.json and internet access)"
 
-  NEWER=$(python3 -c '
+  NEWER=$(python3 -I -c '
 import sys
 cur = [int(x) for x in sys.argv[1].split(".")]
 pub = [int(x) for x in sys.argv[2].split(".")]
@@ -493,7 +493,7 @@ fi
 # the pod runs prebuilt code; refuse anything missing its build output
 [ -f "$STAGE/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"
 [ -f "$STAGE/server/public/index.html" ] || fail "staged tree is missing server/public/index.html"
-STAGED_VERSION=$(python3 -c 'import json;print(json.load(open("'"$STAGE"'/server/src/serverInfo.json"))["version"])') \
+STAGED_VERSION=$(python3 -I -c 'import json;print(json.load(open("'"$STAGE"'/server/src/serverInfo.json"))["version"])') \
   || fail "staged tree has no readable serverInfo.json"
 if [ -n "$TARGET_VERSION" ] && [ "$STAGED_VERSION" != "$TARGET_VERSION" ]; then
   fail "staged tree reports v$STAGED_VERSION but v$TARGET_VERSION was requested; refusing a mislabeled release"
@@ -728,7 +728,7 @@ serves_version() {
     say "  health attempt: HTTP $code"
     [ "$code" = 200 ] || continue
     body=$(cat "$HBODY" 2>/dev/null) || continue
-    ok=$(printf '%s' "$body" | python3 -c "
+    ok=$(printf '%s' "$body" | python3 -I -c "
 import json, sys
 try:
     d = json.load(sys.stdin)

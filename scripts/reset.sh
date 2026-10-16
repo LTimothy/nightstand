@@ -33,7 +33,7 @@ if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
   if command -v flock >/dev/null 2>&1; then
     flock -n 9 || { echo "Another update, rollback, switch, install or reset is already running"; exit 1; }
   else
-    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
+    python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
       || { echo "Another operation is already running (or lock unavailable)"; exit 1; }
   fi
   export NIGHTSTAND_OPERATION_OWNER=$$

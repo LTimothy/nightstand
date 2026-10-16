@@ -82,7 +82,7 @@ cd "$(dirname "$0")/.."
 git cat-file -e HEAD:server/dist/server.js 2>/dev/null || die "server/dist/server.js missing from HEAD - commit a build first"
 git cat-file -e HEAD:server/public/index.html 2>/dev/null || die "server/public/index.html missing from HEAD - commit an app build first"
 
-VERSION=$(git show HEAD:server/src/serverInfo.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')
+VERSION=$(git show HEAD:server/src/serverInfo.json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["version"])')
 COMMIT=$(git rev-parse --short HEAD)
 
 if [ -n "$(git status --porcelain)" ] && [ "$FORCE" -ne 1 ]; then
@@ -115,7 +115,7 @@ fi
 say "Preflight: pod state"
 # Quoted, so nothing below expands here; it runs as is on the pod with the
 # install path and the Node version HEAD pins as its arguments.
-NODE_PIN=$(git show HEAD:server/package.json | python3 -c 'import json, sys; print(json.load(sys.stdin).get("volta", {}).get("node", ""))')
+NODE_PIN=$(git show HEAD:server/package.json | python3 -I -c 'import json, sys; print(json.load(sys.stdin).get("volta", {}).get("node", ""))')
 SSH "bash -s -- $LIVE $NODE_PIN" <<'PREFLIGHT' || die "pod preflight failed"
 LIVE=$1
 [ -d "$LIVE" ] || { echo 'NO_LIVE_INSTALL'; exit 1; }
@@ -130,7 +130,7 @@ free_mb() { { df -kP "$1" 2>/dev/null || true; } | awk 'NR == 2 { print int($4 /
 size_mb() { { du -sk "$@" 2>/dev/null || true; } | awk '{ kb += $1 } END { print int((kb + 1023) / 1024) }'; }
 # The Node version a tree pins for Volta, empty when it pins none.
 node_pin() {
-  python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("volta", {}).get("node", ""))' \
+  python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1])).get("volta", {}).get("node", ""))' \
     "$1/server/package.json" 2>/dev/null || true
 }
 # Volta fetches a pinned Node the first time npm or npx runs under it. For
@@ -164,8 +164,8 @@ echo "disk ok (/ ${ROOT_FREE}M free, ${ROOT_NEED}M needed; /persistent ${PERS_FR
 PREFLIGHT
 
 STATUS_JSON=$(curl -sf --max-time 10 "http://$POD_IP:3000/api/deviceStatus") || die "current server not answering; investigate before deploying (ops/rollback.sh or journalctl -u free-sleep)"
-POD_VERSION=$(printf '%s' "$STATUS_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["freeSleep"]["version"])')
-BED_IN_USE=$(printf '%s' "$STATUS_JSON" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("yes" if d["left"]["isOn"] or d["right"]["isOn"] else "no")')
+POD_VERSION=$(printf '%s' "$STATUS_JSON" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["freeSleep"]["version"])')
+BED_IN_USE=$(printf '%s' "$STATUS_JSON" | python3 -I -c 'import json,sys; d=json.load(sys.stdin); print("yes" if d["left"]["isOn"] or d["right"]["isOn"] else "no")')
 say "Pod is running v$POD_VERSION; deploying v$VERSION ($COMMIT); bed in use: $BED_IN_USE"
 if [ "$BED_IN_USE" = "yes" ] && [ "$FORCE" -ne 1 ]; then
   die "a bed side is ON - schedules/alarms pause during deploy. Re-run with --force to proceed anyway."
@@ -438,7 +438,7 @@ for i in $(seq 1 30); do
   echo "  health attempt $i: HTTP $CODE"
   [ "$CODE" = "200" ] || continue
   R=$(cat "$HBODY" 2>/dev/null) || continue
-  OK=$(printf '%s' "$R" | python3 -c "
+  OK=$(printf '%s' "$R" | python3 -I -c "
 import json,sys
 try:
     d=json.load(sys.stdin)

@@ -14,7 +14,7 @@ check_nats_python_package() {
     return 0
   fi
 
-  if /home/dac/venv/bin/python -c 'import sys; sys.path.append(sys.argv[1]); import vendored, nats' \
+  if /home/dac/venv/bin/python -I -c 'import sys; sys.path.append(sys.argv[1]); import vendored, nats' \
     /home/dac/free-sleep/biometrics >/dev/null 2>&1; then
     echo "nats-py is available."
   else

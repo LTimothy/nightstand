@@ -9,7 +9,7 @@ SERVICES_DB=/persistent/free-sleep-data/lowdb/servicesDB.json
 
 # The stream starts again only while Biometrics is on in the app.
 biometrics_on() {
-  python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1]))["biometrics"]["enabled"] is True else 1)' "$SERVICES_DB" 2>/dev/null
+  python3 -I -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1]))["biometrics"]["enabled"] is True else 1)' "$SERVICES_DB" 2>/dev/null
 }
 start_services() {
   systemctl start free-sleep

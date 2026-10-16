@@ -5,7 +5,7 @@ SERVICES_DB=/persistent/free-sleep-data/lowdb/servicesDB.json
 # The app's Biometrics switch, which enables and starts or stops and disables
 # the stream. A restart follows it, so the stream is not back at boot either.
 biometrics_on() {
-  python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1]))["biometrics"]["enabled"] is True else 1)' "$SERVICES_DB" 2>/dev/null
+  python3 -I -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1]))["biometrics"]["enabled"] is True else 1)' "$SERVICES_DB" 2>/dev/null
 }
 installed() { systemctl list-unit-files | grep -q "^$1.service"; }
 

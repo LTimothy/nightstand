@@ -42,7 +42,7 @@ record_result() {
       esac
     fi
   fi
-  python3 -c "$RESULT_PY" "$RESULT_FILE" "$RESULT_OPERATION" "$outcome" \
+  python3 -I -c "$RESULT_PY" "$RESULT_FILE" "$RESULT_OPERATION" "$outcome" \
     "${CUR_VERSION:-}" "${EXPECTED_VERSION:-${TARGET_VERSION:-${STAGED_VERSION:-}}}" "$RESULT_REASON" >/dev/null 2>&1 || true
 }
 
@@ -61,7 +61,7 @@ if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
   if command -v flock >/dev/null 2>&1; then
     flock -n 9 || fail "another update, rollback or switch is already running"
   else
-    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
+    python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
       || fail "another update, rollback or switch is already running (or lock unavailable)"
   fi
   export NIGHTSTAND_OPERATION_OWNER=$$
@@ -83,7 +83,7 @@ RECHECK_IN_USE=no
 IN_USE_REASON="the bed came into use while it was getting ready"
 read_request() {
   [ -f "$REQUEST_FILE" ] || return 0
-  RECHECK_IN_USE=$(python3 -c '
+  RECHECK_IN_USE=$(python3 -I -c '
 import json, os, sys, time
 try:
     if time.time() - os.path.getmtime(sys.argv[1]) > 600:
@@ -98,7 +98,7 @@ except Exception:
 recheck_in_use() {
   [ "$RECHECK_IN_USE" = yes ] || return 0
   local reasons
-  reasons=$(curl -fsS --max-time 20 http://127.0.0.1:3000/api/update/in-use 2>/dev/null | python3 -c '
+  reasons=$(curl -fsS --max-time 20 http://127.0.0.1:3000/api/update/in-use 2>/dev/null | python3 -I -c '
 import json, sys
 reasons = json.load(sys.stdin)["reasons"]
 assert isinstance(reasons, list)
@@ -169,9 +169,9 @@ finish_interrupted_swap() {
 # --- preflight ---------------------------------------------------------------
 [ -d "$LIVE" ] || fail "no live install at $LIVE"
 [ -d "$PREV" ] || fail "no previous install at $PREV; nothing to roll back to"
-TARGET_VERSION=$(python3 -c 'import json;print(json.load(open("'"$PREV"'/server/src/serverInfo.json"))["version"])' 2>/dev/null) \
+TARGET_VERSION=$(python3 -I -c 'import json;print(json.load(open("'"$PREV"'/server/src/serverInfo.json"))["version"])' 2>/dev/null) \
   || fail "$PREV has no readable serverInfo.json; refusing to swap to an unknown tree"
-CUR_VERSION=$(python3 -c 'import json;print(json.load(open("'"$LIVE"'/server/src/serverInfo.json"))["version"])' 2>/dev/null) \
+CUR_VERSION=$(python3 -I -c 'import json;print(json.load(open("'"$LIVE"'/server/src/serverInfo.json"))["version"])' 2>/dev/null) \
   || fail "cannot read the running version"
 say "Rolling back v$CUR_VERSION -> v$TARGET_VERSION"
 # Before the archive timer below stops, the first service this run stops.
@@ -275,7 +275,7 @@ for _ in $(seq 1 30); do
   say "  health attempt: HTTP $CODE"
   [ "$CODE" = 200 ] || continue
   R=$(cat "$HBODY" 2>/dev/null) || continue
-  OK=$(printf '%s' "$R" | python3 -c "
+  OK=$(printf '%s' "$R" | python3 -I -c "
 import json, sys
 try:
     d = json.load(sys.stdin)

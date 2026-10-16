@@ -120,7 +120,7 @@ MISSING_UNITS=""" + ('0' if existing else '1'))
 mkdir -p "$FIXTURE/data"
 echo damaged > "$FIXTURE/data/free-sleep.db"
 python3() {
-  if [ "$1" = -c ]; then [ "$BIOMETRICS" = on ]; return "$?"; fi
+  if [ "$2" = -c ]; then [ "$BIOMETRICS" = on ]; return "$?"; fi
   [ "$FAILURE" != sqlite_module ] && [ "$2" != "$FAILURE" ]
 }
 su() { echo su >> "$FIXTURE/services"; [ "$FAILURE" != migration ]; }
@@ -138,7 +138,7 @@ cp() { [ "$FAILURE" != copy ] && command cp "$@"; }
                 with self.subTest(failure=failure, biometrics=biometrics):
                     setup = self.RESET_STUBS + '\nFAILURE=' + failure + '\nBIOMETRICS=' + biometrics
                     if failure == 'copy':
-                        setup += '\npython3() { [ "$1" = -c ] && [ "$BIOMETRICS" = on ]; }'
+                        setup += '\npython3() { [ "$2" = -c ] && [ "$BIOMETRICS" = on ]; }'
                     result, log = self.run_shell(self.reset_script(), setup)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn('start free-sleep\n', log)
@@ -169,7 +169,7 @@ cat "$FIXTURE"/backups/*-reset-raw.db
 mkdir -p "$FIXTURE/venv/bin"
 cat > "$FIXTURE/venv/bin/python" <<'STUB'
 #!/bin/bash
-if [ "$1" = -c ]; then exit "$WRITABLE_STATUS"; fi
+if [ "$2" = -c ]; then exit "$WRITABLE_STATUS"; fi
 printf '%s %s\\n' "${RUN_AS:-root}" "$*"
 STUB
 chmod +x "$FIXTURE/venv/bin/python"
@@ -180,7 +180,7 @@ export WRITABLE_STATUS=""" + ('0' if writable else '1')
                 result, _ = self.run_shell(block.replace('/home/dac/venv', '$FIXTURE/venv'), setup)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 expected_owner = 'fixture_owner' if writable else 'root'
-                self.assertIn(expected_owner + ' -m pip install sentry-sdk==2.71.0', result.stdout)
+                self.assertIn(expected_owner + ' -I -m pip install sentry-sdk==2.71.0', result.stdout)
 
     def test_finished_migration_is_read_after_failed_liveness_probe(self):
         script = read('migrate/switch-to-this-fork.sh')

@@ -17,7 +17,7 @@ FIXTURES = json.loads((Path(__file__).parent / 'fixtures/upstream_targets.json')
 class TargetTests(unittest.TestCase):
     def test_legacy_selector_ignores_v2(self):
         script = (Path(__file__).resolve().parents[1] / 'switch-to-upstream.sh').read_text()
-        selector = script.split("SWITCH_PIN=$(printf '%s' \"$SWITCH_MANIFEST\" | python3 -c '\n", 1)[1].split("' 2>/dev/null)", 1)[0]
+        selector = script.split("SWITCH_PIN=$(printf '%s' \"$SWITCH_MANIFEST\" | python3 -I -c '\n", 1)[1].split("' 2>/dev/null)", 1)[0]
         for case in FIXTURES:
             with self.subTest(case=case['name']):
                 output = io.StringIO()

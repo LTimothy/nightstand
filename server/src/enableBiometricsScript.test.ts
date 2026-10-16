@@ -31,7 +31,7 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
   }
   const executable = (file: string, body: string) => { writeFileSync(file, `#!/bin/sh\n${body}\n`); chmodSync(file, 0o755); };
   for (const tool of ['iptables', 'ip6tables']) executable(path.join(bin, tool), `echo "\${0##*/} $*" >> "${calls}"`);
-  const python = `echo "python $*" >> "${calls}"\n[ "$1" = -c ] && exit ${natsImports ? 0 : 1}\nexit ${calibrationFails ? 1 : 0}`;
+  const python = `echo "python $*" >> "${calls}"\n[ "$2" = -c ] && exit ${natsImports ? 0 : 1}\nexit ${calibrationFails ? 1 : 0}`;
   executable(path.join(home, 'venv', 'bin', 'python'), python);
   // refuseOn: the server cannot turn the stream on yet (its sudo rule is
   // missing), so it answers 500 to a body that turns Biometrics on.
@@ -100,7 +100,7 @@ describe('enable_biometrics.sh', () => {
     it(`never downloads nats-py or opens the firewall for it (imports: ${natsImports})`, () => {
       const result = run({ installed: true, natsImports });
       assert.equal(result.status, 0, result.stdout + result.stderr);
-      assert.ok(result.log.some(line => line.startsWith('python -c') && line.endsWith('/free-sleep/biometrics')), result.log.join('\n'));
+      assert.ok(result.log.some(line => line.startsWith('python -I -c') && line.endsWith('/free-sleep/biometrics')), result.log.join('\n'));
       assert.ok(!result.log.some(line => /pip|internet_access/.test(line)), result.log.join('\n'));
       assert.match(result.stdout, natsImports ? /nats-py is available/ : /reads the RAW files instead/);
       assert.ok(result.log.some(turnsOn), result.log.join('\n'));
@@ -163,9 +163,9 @@ describe('enable_biometrics.sh', () => {
 
   it('finds the bundled nats-py with the venv check, without site-packages', () => {
     const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8');
-    const code = script.match(/venv\/bin\/python -c '([^']*import vendored, nats)'/);
+    const code = script.match(/venv\/bin\/python -I -c '([^']*import vendored, nats)'/);
     assert.ok(code, 'the nats check');
-    const args = ['-S', '-c', `${code[1]}; print(nats.__file__)`, path.join(repoRoot, 'biometrics')];
+    const args = ['-I', '-S', '-c', `${code[1]}; print(nats.__file__)`, path.join(repoRoot, 'biometrics')];
     const result = spawnSync('python3', args, { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(result.stdout.startsWith(path.join(repoRoot, 'biometrics', 'vendor', 'nats')), result.stdout);

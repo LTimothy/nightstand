@@ -93,6 +93,15 @@ function pythonOffenders(file: string, text: string) {
     })
     .map(({ at, line }) => `${at}: ${line.trim()}`);
 }
+// With -c, -m or a script on stdin Python puts the working directory on its
+// path, and the working directory may be the server user's. -I leaves it off.
+function unisolatedOffenders(file: string, text: string) {
+  return text.split('\n').map((line, index) => ({ line, at: `${file}:${index + 1}` }))
+    .filter(({ line }) => !/^\s*#/.test(line) && /(?:^|[\s;&|(/'"])python3?((?:\s+-[A-Za-z]+)*)\s+-(?:c|m|)(?=\s|$)/.test(line)
+      && [...line.matchAll(/(?:^|[\s;&|(/'"])python3?((?:\s+-[A-Za-z]+)*)\s+-(?:c|m|)(?=\s|$)/g)]
+        .some(match => !/\s-[A-Za-z]*[IP]/.test(match[1])))
+    .map(({ at, line }) => `${at}: ${line.trim()}`);
+}
 const env = (system: string) => ({ ...process.env, NIGHTSTAND_SYSTEM_DIR: system });
 
 function tree(dir: string, version: string, note = '') {
@@ -141,6 +150,17 @@ describe('root runs nothing from the server user\'s folders', () => {
       "        subprocess.run(['bash', '-c', 'source \"$1\"', 'x', str(live / 'scripts/restore_helpers.sh')])",
     ]) {
       assert.notDeepEqual(pythonOffenders('scripts/switch_installation.py', `${runner}\n${probe}\n`), [], probe);
+    }
+  });
+
+  it('runs inline Python as root only in isolated mode', () => {
+    assert.deepEqual(ROOT_RUN.flatMap(file => unisolatedOffenders(file, read(file))), []);
+    for (const probe of ["python3 -c 'import json'", 'python3 - "$1" <<\'PY\'', 'x=$(printf x | python3 -c "', 'python3 -B -c pass',
+      'python3 -m json.tool', '/home/dac/venv/bin/python -c pass', 'ok && python3 -I -c pass; python3 -c pass']) {
+      assert.notDeepEqual(unisolatedOffenders('scripts/x.sh', probe), [], probe);
+    }
+    for (const fine of ['python3 -I -c pass', 'python3 -B -I - "$1" <<\'PY\'', 'python3 -B "$COPY/scripts/x.py"', 'python3 -IB -c pass']) {
+      assert.deepEqual(unisolatedOffenders('scripts/x.sh', fine), [], fine);
     }
   });
 

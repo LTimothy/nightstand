@@ -87,7 +87,7 @@ if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
   fi
   if [ -e "$OPERATION_LOCK" ]; then exec 9<"$OPERATION_LOCK"; else exec 9>>"$OPERATION_LOCK"; fi \
     || exit 1
-  python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' \
+  python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' \
     || { write_status preflight refused "another maintenance operation holds the lock"; exit 1; }
   export NIGHTSTAND_OPERATION_OWNER="$$"
 fi
@@ -138,7 +138,7 @@ free_mb() { { df -kP "$1" 2>/dev/null || true; } | awk 'NR == 2 { print int($4 /
 size_mb() { { du -sk "$@" 2>/dev/null || true; } | awk '{ kb += $1 } END { print int((kb + 1023) / 1024) }'; }
 # The Node version a tree pins for Volta, empty when it pins none.
 node_pin() {
-  python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("volta", {}).get("node", ""))' \
+  python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1])).get("volta", {}).get("node", ""))' \
     "$1/server/package.json" 2>/dev/null || true
 }
 # Volta fetches a pinned Node the first time npm or npx runs under it. For
@@ -160,7 +160,7 @@ write_status "resolve" "in_progress" "resolving the newest release"
 say "Resolving the newest release from releases.json..."
 RELEASES_JSON=$(curl -fsSL --max-time 20 "$RELEASES_URL") \
   || fail "could not fetch releases.json, check the pod's WAN access"
-PICK=$(printf '%s' "$RELEASES_JSON" | python3 -c "
+PICK=$(printf '%s' "$RELEASES_JSON" | python3 -I -c "
 import json, sys
 data = json.load(sys.stdin)
 if data['releases']:
@@ -223,16 +223,16 @@ chown -R dac:dac "$STAGE"
 
 [ -f "$STAGE/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"
 [ -f "$STAGE/server/public/index.html" ] || fail "staged tree is missing server/public/index.html"
-STAGED_FORK=$(python3 -c 'import json;print(json.load(open("'"$STAGE"'/server/src/serverInfo.json"))["fork"])' 2>/dev/null) \
+STAGED_FORK=$(python3 -I -c 'import json;print(json.load(open("'"$STAGE"'/server/src/serverInfo.json"))["fork"])' 2>/dev/null) \
   || fail "staged tree has no readable serverInfo.json"
 [ "$STAGED_FORK" = "LTimothy/nightstand" ] || fail "staged tree's fork field is '$STAGED_FORK', not this fork, refusing"
-STAGED_VERSION=$(python3 -c 'import json;print(json.load(open("'"$STAGE"'/server/src/serverInfo.json"))["version"])')
+STAGED_VERSION=$(python3 -I -c 'import json;print(json.load(open("'"$STAGE"'/server/src/serverInfo.json"))["version"])')
 [ "$STAGED_VERSION" = "$TARGET_VERSION" ] || fail "staged tree reports v$STAGED_VERSION but v$TARGET_VERSION was requested"
 
 say "Verifying artifact hashes against releases.json..."
 # releases.json is passed via stdin (not interpolated into the python source)
 # so nothing in it can break bash or python quoting.
-ARTIFACT_CHECK=$(printf '%s' "$RELEASES_JSON" | STAGE_DIR="$STAGE" TARGET_VER="$TARGET_VERSION" python3 -c "
+ARTIFACT_CHECK=$(printf '%s' "$RELEASES_JSON" | STAGE_DIR="$STAGE" TARGET_VER="$TARGET_VERSION" python3 -I -c "
 import json, hashlib, sys, os
 data = json.load(sys.stdin)
 head = data['releases'][0]
@@ -431,7 +431,7 @@ sudo -u dac bash -c "cd '$LIVE/server' && '$NPX' dotenv -e .env.pod -- npx prism
 
 # A fork moving here has no update channel yet; follow the release installed.
 # The file keeps its owner and mode, since the server runs as dac.
-python3 - /persistent/free-sleep-data/lowdb/settingsDB.json "$TARGET_CHANNEL" <<'PY' || say "WARNING: could not save the update channel"
+python3 -I - /persistent/free-sleep-data/lowdb/settingsDB.json "$TARGET_CHANNEL" <<'PY' || say "WARNING: could not save the update channel"
 import json, os, sys
 path, channel = sys.argv[1], sys.argv[2]
 if channel not in ("stable", "beta"):
@@ -493,7 +493,7 @@ for _ in $(seq 1 30); do
   say "  health attempt: HTTP $CODE"
   [ "$CODE" = 200 ] || continue
   R=$(cat "$HBODY" 2>/dev/null) || continue
-  OK=$(printf '%s' "$R" | python3 -c "
+  OK=$(printf '%s' "$R" | python3 -I -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -508,7 +508,7 @@ done
 # the swap but hasn't repopulated one yet, so a real regression is still visible
 # in the log without failing an otherwise-healthy migration.
 if [ "$HEALTHY" = yes ]; then
-  TEMP_LAGGING=$(cat "$HBODY" 2>/dev/null | BASELINE_FILE="$BASELINE_FILE" python3 -c "
+  TEMP_LAGGING=$(cat "$HBODY" 2>/dev/null | BASELINE_FILE="$BASELINE_FILE" python3 -I -c "
 import json, sys, os
 try:
     d = json.load(sys.stdin)

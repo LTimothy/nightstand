@@ -75,7 +75,7 @@ print_json_if_exists() {
 
   if [ -f "$file_path" ]; then
     print_green "- $file_path"
-    python3 -m json.tool "$file_path" \
+    python3 -I -m json.tool "$file_path" \
       | sed 's/^/      /' \
       | sed $'s/^/\033[0;90m/' \
       | sed $'s/$/\033[0m/'
@@ -96,7 +96,7 @@ check_local_server() {
     print_green "  - Fetching $device_status_url ..."
     # Print and indent JSON nicely if python3 is available
     if command -v python3 >/dev/null 2>&1; then
-      curl -fs "$device_status_url" | python3 -m json.tool | sed 's/^/      /' | sed 's/^/\x1b[0;90m/' | sed 's/$/\x1b[0m/'
+      curl -fs "$device_status_url" | python3 -I -m json.tool | sed 's/^/      /' | sed 's/^/\x1b[0;90m/' | sed 's/$/\x1b[0m/'
     else
       curl -fs "$device_status_url" | sed 's/^/      /' | sed 's/^/\x1b[0;90m/' | sed 's/$/\x1b[0m/'
     fi
@@ -104,7 +104,7 @@ check_local_server() {
     print_green "  - Fetching $server_status_url ..."
     # Print and indent JSON nicely if python3 is available
     if command -v python3 >/dev/null 2>&1; then
-      curl -fs "$server_status_url" | python3 -m json.tool | sed 's/^/      /' | sed 's/^/\x1b[0;90m/' | sed 's/$/\x1b[0m/'
+      curl -fs "$server_status_url" | python3 -I -m json.tool | sed 's/^/      /' | sed 's/^/\x1b[0;90m/' | sed 's/$/\x1b[0m/'
     else
       curl -fs "$server_status_url" | sed 's/^/      /' | sed 's/^/\x1b[0;90m/' | sed 's/$/\x1b[0m/'
     fi

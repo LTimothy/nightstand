@@ -134,7 +134,7 @@ done < "$PAYLOAD/MANIFEST"
 
 # Patch 1: register the update route. Two lines is the whole difference.
 ROUTES="$FRESH/server/src/setup/routes.ts"
-python3 - "$ROUTES" <<'PY' || fail "routes.ts patch failed"
+python3 -I - "$ROUTES" <<'PY' || fail "routes.ts patch failed"
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -155,7 +155,7 @@ grep -q "app.use('/api/', update);" "$ROUTES" || fail "routes.ts registration pa
 
 # Patch 2: the test script entry. The agent carries the first test files this
 # install has ever had, and upstream free-sleep has no runner entry to run them with.
-python3 - "$FRESH/server/package.json" "$PAYLOAD/test-script" <<'PY' || fail "package.json patch failed"
+python3 -I - "$FRESH/server/package.json" "$PAYLOAD/test-script" <<'PY' || fail "package.json patch failed"
 import json, sys
 pkg_path, script_path = sys.argv[1], sys.argv[2]
 pkg = json.load(open(pkg_path))
