@@ -9,7 +9,7 @@ const folder = mkdtempSync(path.join(tmpdir(), 'nightstand-alarm-activity-'));
 mkdirSync(path.join(folder, 'lowdb'));
 process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
-const { nightAlarmPending, resetAlarmActivity, rhythmNightAlarms, trackAlarm } = await import('./alarmActivity.js');
+const { nightAlarmPending, resetAlarmActivity, rhythmNightAlarms, trackAlarm, waitForNightAlarms } = await import('./alarmActivity.js');
 const { setRebuilding } = await import('./rebuildState.js');
 after(() => rmSync(folder, { recursive: true, force: true }));
 
@@ -54,5 +54,29 @@ describe('nightAlarmPending', () => {
     setRebuilding(true);
     assert.equal(Object.keys(schedule.scheduledJobs).length, 0);
     assert.equal(nightAlarmPending('left', inMinutes(30), NIGHT), true);
+  });
+});
+
+describe('waitForNightAlarms', () => {
+  it('leaves no listener behind on the shutdown signal', async () => {
+    // Node does not warn for an AbortSignal here, so count the abort listeners.
+    const proto = EventTarget.prototype;
+    const { addEventListener, removeEventListener } = proto;
+    let open = 0;
+    proto.addEventListener = function (type: string, ...rest: [never]) {
+      if (type === 'abort') open++;
+      return addEventListener.call(this, type, ...rest);
+    };
+    proto.removeEventListener = function (type: string, ...rest: [never]) {
+      if (type === 'abort') open--;
+      return removeEventListener.call(this, type, ...rest);
+    };
+    try {
+      for (let i = 0; i < 20; i++) await waitForNightAlarms('left', new Date(), NIGHT);
+    } finally {
+      proto.addEventListener = addEventListener;
+      proto.removeEventListener = removeEventListener;
+    }
+    assert.equal(open, 0);
   });
 });
