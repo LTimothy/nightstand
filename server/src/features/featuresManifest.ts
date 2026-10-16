@@ -1022,4 +1022,22 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'Always on: accepts an existing tap setting and reads firmware dismissals so the server can '
       + 'clear a stale ringing record. A tap set to anything else behaves as before, and older versions keep the setting.',
   },
+  {
+    id: 'tap-gestures',
+    title: 'Tap gestures',
+    description: 'Each side\'s double, triple and quad tap actions, edited in Settings > Bed and sides. '
+      + 'A tap can also set its side to a chosen temperature and turn it on.',
+    category: 'ui',
+    version: '3.7.0',
+    flag: null,
+    default: true,
+    touchpoints: ['server/src/8sleep/frankenMonitor.ts', 'server/src/db/settingsSchema.ts'],
+    depends_on: [],
+    reversible: true,
+    tests: ['server/src/8sleep/frankenMonitor.test.ts', 'server/src/db/tapCompat.test.ts'],
+    upstream_offer: false,
+    rationale: 'Always on: it edits settings that already existed, and nothing changes until someone picks an action. '
+      + 'The set temperature action is its own tap type, which releases before 3.7.0 skip, so a rollback leaves that '
+      + 'gesture doing nothing instead of stepping the bed.',
+  },
 ];

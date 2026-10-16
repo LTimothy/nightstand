@@ -307,6 +307,32 @@ describe('FrankenMonitor gesture handling', () => {
     assert.equal(updateCalls, 2, 'expected both sides to be attempted');
     assert.deepEqual(seen, []);
   });
+
+  it('sets the temperature and turns the side on for a set temperature tap', async () => {
+    settingsDB.data.left.taps.doubleTap = { type: 'set_temperature', temperatureF: 75 };
+    await settingsDB.write();
+    const previous = deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 });
+    const next = deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 });
+    previous.left.isOn = false;
+    next.left.isOn = false;
+    const seen = await runGestureTick(previous, next);
+
+    assert.deepEqual(updatedStatus, { left: { isOn: true, targetTemperatureF: 75 } });
+    assert.deepEqual(seen, []);
+  });
+
+  it('does nothing for a tap action this release does not know', async () => {
+    (settingsDB.data.left.taps as Record<string, unknown>).doubleTap = { type: 'future_action' };
+    await settingsDB.write();
+    const seen = await runGestureTick(
+      deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 }),
+      deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 }),
+    );
+
+    assert.equal(updateCalls, 0);
+    assert.deepEqual(seen, []);
+    assert.equal(serverStatus.status.frankenMonitor.status, 'healthy');
+  });
 });
 
 // Two gestures can land in one 2 s read: on a Pod 4 hub with a Pod 5 cover
@@ -335,6 +361,14 @@ describe('FrankenMonitor gestures in one read', () => {
     await runGestureTick(deviceStatus(taps(1, 1)), deviceStatus(taps(2, 2)));
 
     assert.deepEqual(writtenLeftTargets, [80, 90]);
+  });
+
+  it('steps a later gesture from the temperature a set tap wrote', async () => {
+    settingsDB.data.left.taps.doubleTap = { type: 'set_temperature', temperatureF: 75 };
+    await settingsDB.write();
+    await runGestureTick(deviceStatus(taps(1, 1)), deviceStatus(taps(2, 2)));
+
+    assert.deepEqual(writtenLeftTargets, [75, 85]);
   });
 
   it('writes the gestures of one read one after another', async () => {

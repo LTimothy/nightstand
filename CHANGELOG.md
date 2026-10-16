@@ -10,6 +10,9 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Cover taps
 
+- A tap can now set its side to a chosen temperature and turn it on
+  (`set_temperature` in `taps`). Releases before 3.7.0 skip a gesture set this
+  way, so after a rollback it does nothing.
 - `POST /api/settings` now replaces a tap gesture whole, as the API guide says.
   Before, fields of the gesture's previous action stayed in the stored
   settings.
