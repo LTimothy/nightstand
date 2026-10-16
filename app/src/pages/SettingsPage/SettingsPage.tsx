@@ -25,6 +25,7 @@ import ErrorBoundary from '@components/ErrorBoundary.tsx';
 import TimeZoneSelector from './DeviceSettingsSection/TimeZoneSelector.tsx';
 import TemperatureFormatSelector from './DeviceSettingsSection/TemperatureFormatSelector.tsx';
 import ThemePicker from './ThemePicker.tsx';
+import TapGestures from './TapGestures.tsx';
 import LedBrightnessSlider from './DeviceSettingsSection/LedBrightnessSlider.tsx';
 import { friendlyTimeZone } from '../../lib/timeZone';
 import DeviceInfo from './DeviceSettingsSection/DeviceInfo.tsx';
@@ -132,6 +133,13 @@ export default function SettingsPage() {
                 Away mode pauses that side's schedules and mirrors the active side. If both sides are away, neither
                 schedule runs.
               </Typography>
+            </Section>
+          </ErrorBoundary>
+          <ErrorBoundary componentName="Tap gestures">
+            <Section title="Tap gestures">
+              <TapGestures
+                settings={ settings }
+                updateSettings={ updateSettings }/>
             </Section>
           </ErrorBoundary>
           <ErrorBoundary componentName="Bed preferences">

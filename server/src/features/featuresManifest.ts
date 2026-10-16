@@ -1031,10 +1031,16 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     version: '3.7.0',
     flag: null,
     default: true,
-    touchpoints: ['server/src/8sleep/frankenMonitor.ts', 'server/src/db/settingsSchema.ts'],
+    touchpoints: [
+      'server/src/8sleep/frankenMonitor.ts', 'server/src/db/settingsSchema.ts',
+      'app/src/pages/SettingsPage/TapGestures.tsx', 'app/src/pages/SettingsPage/tapActions.ts',
+    ],
     depends_on: [],
     reversible: true,
-    tests: ['server/src/8sleep/frankenMonitor.test.ts', 'server/src/db/tapCompat.test.ts'],
+    tests: [
+      'server/src/8sleep/frankenMonitor.test.ts', 'server/src/db/tapCompat.test.ts',
+      'app/src/pages/SettingsPage/TapGestures.test.tsx', 'app/src/pages/SettingsPage/tapActions.test.ts',
+    ],
     upstream_offer: false,
     rationale: 'Always on: it edits settings that already existed, and nothing changes until someone picks an action. '
       + 'The set temperature action is its own tap type, which releases before 3.7.0 skip, so a rollback leaves that '

@@ -46,6 +46,7 @@ it('keeps optional toggles together and bed maintenance with the sides', async (
   unmount();
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings/bed' });
   expect(await screen.findByRole('switch', { name: 'Left away mode' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Tap gestures' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Priming' })).toBeInTheDocument();
   expect(screen.queryByRole('switch', { name: 'Biometrics' })).not.toBeInTheDocument();
 });

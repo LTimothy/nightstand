@@ -243,7 +243,7 @@ generic message; the details go to the server log.
   drops the check.
   Skipped alarms do not ring late.
 - `taps` maps each gesture (`doubleTap`, `tripleTap`, `quadTap`) to an
-  action. The app has no editor for them. The actions are:
+  action. Settings > Bed and sides > Tap gestures edits them. The actions are:
   - `{ "type": "temperature", "change": "increment" | "decrement", "amount": 0 to 10 }`
   - `{ "type": "base_control", "behavior": "toggle_preset" }`, which moves
     an adjustable base between its `relax` and `flat` presets

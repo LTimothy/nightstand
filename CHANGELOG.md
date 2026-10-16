@@ -13,6 +13,11 @@ is a hard fork; for the history of the projects it descends from, see
 - A tap can now set its side to a chosen temperature and turn it on
   (`set_temperature` in `taps`). Releases before 3.7.0 skip a gesture set this
   way, so after a rollback it does nothing.
+- Settings > Bed and sides has a Tap gestures section for what a double,
+  triple or quad tap does on each side: warmer or cooler by a chosen step, a
+  set temperature, snooze or stop an alarm, or switch the base position when
+  a base is set up. Level users pick the step in whole levels. Before, taps
+  could only be changed through the API.
 - `POST /api/settings` now replaces a tap gesture whole, as the API guide says.
   Before, fields of the gesture's previous action stayed in the stored
   settings.

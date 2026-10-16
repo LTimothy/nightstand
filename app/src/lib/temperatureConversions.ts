@@ -78,7 +78,8 @@ export function formatTemperatureChange(deltaF: number, format: TemperatureForma
   if (format === 'celsius') return `${round(deltaF * 5 / 9)}°C`;
   if (format === 'level') {
     const levels = round(deltaF / F_PER_LEVEL);
-    return `${levels} ${levels === 1 ? 'level' : 'levels'}`;
+    const text = `${levels} ${levels === 1 ? 'level' : 'levels'}`;
+    return Math.abs(deltaF / F_PER_LEVEL - Math.round(deltaF / F_PER_LEVEL)) < 1e-9 ? text : `${round(deltaF)}°F (${text})`;
   }
   return `${round(deltaF)}°F`;
 }

@@ -54,7 +54,21 @@ it('lists a stored Fahrenheit step as its nearest level in level mode', async ()
     disabled={ false }
     onChange={ vi.fn() }/>);
   const select = screen.getByRole('combobox', { name: 'Step' });
-  expect(select).toHaveTextContent('0.7 levels');
+  expect(select).toHaveTextContent('2°F (0.7 levels)');
   await userEvent.click(select);
   expect(screen.getAllByRole('option')).toHaveLength(4);
+});
+
+it('names the select with a prefix element when given one', () => {
+  renderWithProviders(<>
+    <h3 id="side">Left</h3>
+    <TemperatureChangeSelect
+      label="Step"
+      labelPrefixId="side"
+      valueF={ 2 }
+      format="fahrenheit"
+      disabled={ false }
+      onChange={ vi.fn() }/>
+  </>);
+  expect(screen.getByRole('combobox', { name: 'Left Step' })).toBeVisible();
 });
