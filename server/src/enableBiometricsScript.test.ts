@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 // Runs scripts/enable_biometrics.sh with its helper scripts, the venv python
@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 // leave Biometrics reading off in the app while the stream ran.
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-function run({ installed = false, calibrationFails = false, refuseOn = false, natsImports = true } = {}) {
+function run({ installed = false, calibrationFails = false, refuseOn = false, natsImports = true, pipFails = false,
+  lock = '', shell = '', logTimeout = false } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-enable-biometrics-'));
   const home = path.join(dir, 'home');
   const scripts = path.join(home, 'free-sleep', 'scripts');
@@ -22,11 +23,14 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
   mkdirSync(path.join(home, 'venv', 'bin'), { recursive: true });
   mkdirSync(bin);
   writeFileSync(path.join(scripts, 'is_biometrics_installed.py'), `import sys\nsys.exit(${installed ? 1 : 0})\n`);
+  writeFileSync(path.join(scripts, 'restore_helpers.sh'), readFileSync(path.join(repoRoot, 'scripts/restore_helpers.sh'), 'utf8'));
   for (const name of ['unblock_internet_access.sh', 'block_internet_access.sh', 'setup_python.sh',
     'install_python_packages.sh', 'setup_streamer_service.sh']) {
-    writeFileSync(path.join(scripts, name), `echo "${name}" >> "${calls}"\n`);
+    const fails = pipFails && name === 'install_python_packages.sh';
+    writeFileSync(path.join(scripts, name), `echo "${name}" >> "${calls}"\n${fails ? 'exit 1\n' : ''}`);
   }
   const executable = (file: string, body: string) => { writeFileSync(file, `#!/bin/sh\n${body}\n`); chmodSync(file, 0o755); };
+  for (const tool of ['iptables', 'ip6tables']) executable(path.join(bin, tool), `echo "\${0##*/} $*" >> "${calls}"`);
   const python = `echo "python $*" >> "${calls}"\n[ "$1" = -c ] && exit ${natsImports ? 0 : 1}\nexit ${calibrationFails ? 1 : 0}`;
   executable(path.join(home, 'venv', 'bin', 'python'), python);
   // refuseOn: the server cannot turn the stream on yet (its sudo rule is
@@ -36,11 +40,19 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
     `body=$(echo "$last" | tr -d ' \\n'); echo "curl $body" >> "${calls}"`,
     refuseOn ? 'case "$body" in *\'"enabled":true\'*) exit 22 ;; esac' : ':',
   ].join('\n'));
+  if (logTimeout) executable(path.join(bin, 'timeout'), `echo "timeout $*" >> "${calls}"\nshift\nexec "$@"`);
   executable(path.join(bin, 'systemctl'), `echo "systemctl $*" >> "${calls}"`);
   const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8').replaceAll('/home/dac', home);
-  const result = spawnSync('bash', ['-c', script], {
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8', timeout: 10_000,
-  });
+  const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_OPERATION_LOCK: lock || path.join(dir, 'operation.lock'),
+    NIGHTSTAND_OPERATION_OWNER: '' };
+  let result;
+  if (shell) {
+    const file = path.join(dir, 'enable_biometrics.sh');
+    writeFileSync(file, script);
+    result = spawnSync(shell, [file], { env, encoding: 'utf8', timeout: 10_000 });
+  } else {
+    result = spawnSync('bash', ['-c', script], { env, encoding: 'utf8', timeout: 10_000 });
+  }
   const log = existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n') : [];
   rmSync(dir, { recursive: true, force: true });
   return { ...result, log };
@@ -93,6 +105,60 @@ describe('enable_biometrics.sh', () => {
       assert.ok(result.log.some(turnsOn), result.log.join('\n'));
     });
   }
+
+  const firewall = (log: string[]) => log.filter(line => /^ip6?tables /.test(line));
+
+  it('lets only HTTPS and DNS out for the downloads and never flushes the firewall', () => {
+    const result = run();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(!result.log.includes('unblock_internet_access.sh'), result.log.join('\n'));
+    assert.ok(!firewall(result.log).some(line => / -[FXZ]( |$)/.test(line)), firewall(result.log).join('\n'));
+    const opened = result.log.findIndex(line => /^iptables .*-I OUTPUT 1 -p tcp --dport 443 -j ACCEPT$/.test(line));
+    assert.ok(result.log.some(line => /^ip6tables .*-I OUTPUT 1 -p tcp --dport 443 -j REJECT/.test(line)), result.log.join('\n'));
+    assert.ok(opened >= 0 && opened < result.log.indexOf('setup_python.sh'), result.log.join('\n'));
+    assert.ok(result.log.indexOf('install_python_packages.sh') < result.log.indexOf('block_internet_access.sh'), result.log.join('\n'));
+  });
+
+  it('bounds both downloads to 900 seconds so the firewall window cannot stay open', () => {
+    const result = run({ logTimeout: true });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    for (const name of ['setup_python.sh', 'install_python_packages.sh']) {
+      assert.ok(result.log.some(line => new RegExp(`^timeout 900 bash \\S*/scripts/${name}$`).test(line)), result.log.join('\n'));
+    }
+  });
+
+  it('closes the window and reports the failure when a download fails', () => {
+    const result = run({ pipFails: true });
+    assert.notEqual(result.status, 0);
+    assert.ok(result.log.indexOf('block_internet_access.sh') > result.log.indexOf('install_python_packages.sh'), result.log.join('\n'));
+    assert.ok(result.log.some(line => line.startsWith('curl') && line.includes('"status":"failed"')), result.log.join('\n'));
+    assert.ok(!result.log.some(turnsOn), result.log.join('\n'));
+  });
+
+  it('changes nothing while an update, rollback or switch holds the lock', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-enable-lock-'));
+    const lock = path.join(dir, 'operation.lock');
+    const holder = spawn('python3', ['-c',
+      'import fcntl, sys, time\nf = open(sys.argv[1], "a")\nfcntl.flock(f, fcntl.LOCK_EX)\nprint("held", flush=True)\ntime.sleep(30)', lock]);
+    try {
+      await new Promise(resolve => holder.stdout.once('data', resolve));
+      const result = run({ lock });
+      assert.notEqual(result.status, 0);
+      assert.deepEqual(firewall(result.log).filter(line => !/ -S /.test(line)), []);
+      assert.ok(!result.log.includes('setup_python.sh'), result.log.join('\n'));
+      assert.match(result.stdout, /is running/);
+    } finally {
+      holder.kill();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  const dash = spawnSync('sh', ['-c', 'command -v dash']).stdout?.toString().trim();
+  it('runs when started with a shell that is not bash', { skip: dash ? false : 'dash is not installed' }, () => {
+    const result = run({ shell: dash });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(result.log.some(turnsOn), result.log.join('\n'));
+  });
 
   it('finds the bundled nats-py with the venv check, without site-packages', () => {
     const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8');
