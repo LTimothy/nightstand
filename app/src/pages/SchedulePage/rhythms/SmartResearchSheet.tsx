@@ -3,7 +3,8 @@
 import { useId, useState } from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, Stack, Typography } from '@mui/material';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import { palette, radius, weight } from '@design/tokens';
+import { palette, weight } from '@design/tokens';
+import { SCROLL_SHEET } from './sheetStyles';
 
 type Source = { cite: string; title: string; href: string; tested: string };
 type Phase = { heading: string; does: string; why: string; sources: Source[] };
@@ -123,8 +124,7 @@ export default function SmartResearchSheet({ onClose }: { onClose: () => void })
     fullWidth
     maxWidth="sm"
     scroll="paper"
-    sx={ { '& .MuiDialog-container': { alignItems: 'flex-end' },
-      '& .MuiDialog-paper': { m: 0, width: '100%', maxHeight: '90%', borderRadius: `${radius.base}px ${radius.base}px 0 0` } } }>
+    sx={ SCROLL_SHEET }>
     <DialogTitle id={ titleId }>The research behind it</DialogTitle>
     <DialogContent dividers>
       <Typography variant="body2" color="text.secondary">
