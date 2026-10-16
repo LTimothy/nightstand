@@ -21,8 +21,6 @@ model sleep_records {
   not_present_intervals String
 
   @@unique([side, entered_bed_at])
-  // Create an index on 'side' and 'entered_bed_at'
-  @@index([side, entered_bed_at])
 }
 
 model vitals {
@@ -43,7 +41,6 @@ model vitals {
   estimator      Int?
 
   @@unique([side, timestamp]) // Ensure no duplicate intervals
-  @@index([side, timestamp])
 }
 
 
@@ -55,7 +52,6 @@ model movement {
   // writes; Float reads them as stored. Deliberately no migration.
   total_movement  Float
   @@unique([side, timestamp]) // Ensure no duplicate intervals
-  @@index([side, timestamp])
 }
 
 model calibration_profiles {

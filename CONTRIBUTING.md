@@ -239,7 +239,9 @@ or table that an older, still-installable release reads.
 New SQLite migrations must use one `BEGIN; ... COMMIT;` transaction. Never
 edit a shipped migration: tests pin its checksum. The compatibility check
 allows new tables, non-unique indexes, and additive columns; a required column
-on an existing table needs a non-null default. Drops, renames, new constraints
+on an existing table needs a non-null default. It also allows dropping a
+non-unique `_idx` index that duplicates a unique one, since older code reads
+the same rows through the unique index. Other drops, renames, new constraints
 on existing tables, and table rebuilds are refused. Test an upgrade and an
 older reader against a copy of the resulting database before release.
 

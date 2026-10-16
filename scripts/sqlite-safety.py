@@ -101,6 +101,9 @@ def atomic_additive(sql):
             if re.search(r'\b(?:UNIQUE|PRIMARY|REFERENCES|CHECK)\b', command, re.I):
                 raise ValueError('New constraints on existing tables need compatibility review')
             continue
+        if re.fullmatch(r'DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?"?\w+_idx"?\s*;', command, re.I):
+            # A non-unique index only: older code reads the same rows through the unique one.
+            continue
         raise ValueError('Only new tables, non-unique indexes, and additive columns are allowed')
 
 

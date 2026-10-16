@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import json
+import re
 import signal
 from pathlib import Path
 import shutil
@@ -13,6 +14,25 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 HELPER = ROOT / 'scripts/sqlite-safety.py'
+
+def dropped_index_problems(migrations):
+    """Dropped *_idx indexes must duplicate a unique index created earlier."""
+    plain, unique, problems = {}, set(), []
+    cols = lambda text: tuple(re.findall(r'"([^"]+)"', text))
+    for sql_file in sorted(Path(migrations).glob('*/migration.sql')):
+        for stmt in sql_file.read_text().split(';'):
+            m = re.search(r'CREATE\s+(UNIQUE\s+)?INDEX\s+"(\w+)"\s+ON\s+"(\w+)"\s*\(([^)]*)\)', stmt, re.I)
+            if m:
+                key = (m[3], cols(m[4]))
+                if m[1]:
+                    unique.add(key)
+                else:
+                    plain[m[2]] = key
+            d = re.search(r'DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?"(\w+)"', stmt, re.I)
+            if d and d[1].endswith('_idx') and plain.get(d[1]) not in unique:
+                problems.append(f'{sql_file.parent.name}: {d[1]} does not duplicate a unique index')
+    return problems
+
 
 class DatabaseSafety(unittest.TestCase):
     def setUp(self):
@@ -150,11 +170,24 @@ while True:
             'CREATE TABLE new_vitals (value TEXT);',
             'INSERT INTO vitals SELECT * FROM other;',
             'COMMIT; BEGIN;',
+            'DROP INDEX "vitals_side_timestamp_key";',
         ]:
             with self.assertRaises(ValueError, msg=unsafe):
                 module.atomic_additive('BEGIN; ' + unsafe + ' COMMIT;')
         module.atomic_additive('BEGIN; ALTER TABLE vitals ADD COLUMN source TEXT NOT NULL DEFAULT "pod"; COMMIT;')
         module.atomic_additive('BEGIN; CREATE TABLE future (value TEXT NOT NULL); COMMIT;')
+        module.atomic_additive('BEGIN; DROP INDEX IF EXISTS "vitals_side_timestamp_idx"; COMMIT;')
+
+    def test_dropped_indexes_duplicate_a_unique_one(self):
+        migrations = ROOT / 'server/prisma/migrations'
+        self.assertEqual(dropped_index_problems(migrations), [])
+        with tempfile.TemporaryDirectory() as scratch:
+            copy = Path(scratch) / 'migrations'
+            shutil.copytree(migrations, copy)
+            (copy / '20990101000000_bad').mkdir()
+            (copy / '20990101000000_bad/migration.sql').write_text(
+                'BEGIN;\nDROP INDEX IF EXISTS "calibration_runs_side_started_at_idx";\nCOMMIT;\n')
+            self.assertEqual(len(dropped_index_problems(copy)), 1)
 
     def test_no_gate_compares_the_prisma_schema_with_migrations(self):
         # movement.total_movement is Float in schema.prisma over the INTEGER
