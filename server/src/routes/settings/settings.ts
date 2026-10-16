@@ -70,7 +70,12 @@ router.post('/settings', async (req: Request, res: Response) => {
     res.status(400).json({ error: rejected.error });
     return;
   }
-  for (const side of resumed) await resumeSchedule(side, resumedAt);
+  // A resume can wait minutes for the Pod; the save is done, so answer now.
+  for (const side of resumed) {
+    void resumeSchedule(side, resumedAt).catch((error: unknown) => {
+      logger.error(`Failed to resume the ${side} schedule: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
   res.status(200).json(saved);
 });
 

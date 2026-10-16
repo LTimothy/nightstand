@@ -71,10 +71,8 @@ async function rebuildJobs() {
     }
 
     logger.info('Scheduling jobs...');
-    // Clearing a pause that ended while the server was down writes settings,
-    // which triggers another rebuild.
-    await schedulePauseResume(settingsData, 'left');
-    await schedulePauseResume(settingsData, 'right');
+    schedulePauseResume(settingsData, 'left');
+    schedulePauseResume(settingsData, 'right');
     scheduleAlarmOverride(settingsData, 'left', engine.active ? rhythmSleepAt('left') : undefined);
     scheduleAlarmOverride(settingsData, 'right', engine.active ? rhythmSleepAt('right') : undefined);
     if (settingsData.features.oneOffAlarms) {

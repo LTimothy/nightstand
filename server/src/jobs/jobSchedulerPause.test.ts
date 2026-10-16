@@ -22,24 +22,43 @@ mock.module('chokidar', { defaultExport: { watch: () => ({ on: () => undefined }
 mock.module(new URL('../routes/deviceStatus/updateDeviceStatus.js', import.meta.url).href, {
   namedExports: { updateDeviceStatus: async () => {} },
 });
+// A resume that waits on the Pod for as long as the test runs.
+const resumes: string[] = [];
+const releases: Array<() => void> = [];
+mock.module(new URL('./resumeSchedule.js', import.meta.url).href, {
+  namedExports: {
+    resumeSchedule: (side: string) => {
+      resumes.push(side);
+      return new Promise<void>(resolve => releases.push(resolve));
+    },
+    stopScheduleResumes: () => {},
+  },
+});
 
-after(async () => {
-  await schedule.gracefulShutdown();
+after(() => {
+  releases.forEach(release => release());
+  Object.keys(schedule.scheduledJobs).forEach(name => schedule.cancelJob(name));
   rmSync(folder, { recursive: true, force: true });
 });
 
-it('clears an ended pause at startup and arms the resume job for a running one', async () => {
-  const { default: status } = await import('../serverStatus.js');
-  await import('./jobScheduler.js');
+const until = async (done: () => boolean, what: string) => {
   const deadline = Date.now() + 5000;
-  while (status.status.jobs.status !== 'healthy' && status.status.jobs.status !== 'failed') {
-    assert.ok(Date.now() < deadline, 'scheduler did not finish');
+  while (!done()) {
+    assert.ok(Date.now() < deadline, what);
     await new Promise(resolve => setTimeout(resolve, 5));
   }
+};
+
+it('plans every job before an ended pause is cleared and resumed', async () => {
+  const { default: status } = await import('../serverStatus.js');
+  await import('./jobScheduler.js');
+  await until(() => status.status.jobs.status === 'healthy' || status.status.jobs.status === 'failed', 'scheduler did not finish');
   assert.equal(status.status.jobs.status, 'healthy');
-  const saved = JSON.parse(readFileSync(path.join(folder, 'lowdb', 'settingsDB.json'), 'utf8'));
-  assert.deepEqual(saved.left.scheduleOverrides.pause, { active: false, expiresAt: '' });
-  assert.deepEqual(saved.right.scheduleOverrides.pause, { active: true, expiresAt: running });
-  assert.equal(schedule.scheduledJobs['left-pause-resume'], undefined);
   assert.equal(schedule.scheduledJobs['right-pause-resume']?.nextInvocation()?.getTime(), Date.parse(running) + 60 * 1000);
+  const settings = () => JSON.parse(readFileSync(path.join(folder, 'lowdb', 'settingsDB.json'), 'utf8'));
+  await until(() => settings().left.scheduleOverrides.pause.active === false, 'the ended pause was not cleared');
+  assert.deepEqual(settings().left.scheduleOverrides.pause, { active: false, expiresAt: '' });
+  assert.deepEqual(settings().right.scheduleOverrides.pause, { active: true, expiresAt: running });
+  await until(() => resumes.length === 1, 'the side was not resumed');
+  assert.deepEqual(resumes, ['left']);
 });

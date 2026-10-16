@@ -268,6 +268,8 @@ for (const engine of ['weekly', 'rhythms']) {
     const res = { status(value: number) { code = value; return this; }, json() {} };
     await handler({ body: { left: { scheduleOverrides: { pause: { active: false, expiresAt: '' } } } } } as Request, res as Response, () => {});
     assert.equal(code, 200);
+    // The route answers before the resume finishes.
+    for (let spin = 0; spin < 400 && updates.length < 1; spin++) await new Promise(resolve => setTimeout(resolve, 5));
     assert.equal(updates.length, 1);
     assert.equal(resumeCalls.length, 1);
     assert.equal(resumeCalls[0][0], 'left');

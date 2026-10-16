@@ -231,6 +231,7 @@ generic message; the details go to the server log.
   including Resume schedule in the app, turns an off side on if its scheduled
   night is in progress. It runs the engine's scheduled power-on job at that
   moment, with its power-on temperature, manual hold rules and scheduled off time.
+  The save answers as soon as the pause is stored; the side comes on a moment later.
   When I get up can extend the night under its usual rules. An away side or
   a side already on is left alone.
   When a scheduled start is due within two minutes, resume waits for it and
