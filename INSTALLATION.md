@@ -58,7 +58,7 @@ for your model. On a Pod 5 there is no tested way back.
   non-interactive run warns and changes neither. Keep your SSH session open
   and configure your own Wi-Fi before
   removing EyePhone. To run the check later, use
-  `bash /home/dac/free-sleep/scripts/check_image_credentials.sh` as root.
+  `bash /usr/local/lib/nightstand/live/scripts/check_image_credentials.sh` as root.
 - Pod 3 without an SD card (FCC ID 2AYXT61100001, printed on the back of the
   Pod where the water tubes plug in) and Pod 4: supported by upstream
   free-sleep.
@@ -337,7 +337,7 @@ the first 10 minutes after boot or during an install, update, rollback, reset
 or fork switch. Whether a restart brings Wi-Fi back isn't confirmed yet.
 
 To turn the watchdog off, run
-`bash /home/dac/free-sleep/scripts/setup_watchdog.sh --remove`. It stays off
+`bash /usr/local/lib/nightstand/live/scripts/setup_watchdog.sh --remove`. It stays off
 through updates and reinstalls until you run the same command without
 `--remove`. On some Pods it turns off only at the next restart.
 
@@ -400,7 +400,7 @@ This lets you reach the Pod over the network instead of the cable. The script:
   `.pub` (such as `~/.ssh/id_ed25519.pub`), never the one without it.
 
 ```bash
-sh /home/dac/free-sleep/scripts/setup_ssh.sh
+sh /usr/local/lib/nightstand/live/scripts/setup_ssh.sh
 ```
 
 Afterward, connect with `ssh root@<POD_IP> -p 8822`. If you're running this
@@ -424,13 +424,13 @@ and SSH, leaving the cable as the only way back in.
 Run this on the Pod:
 
 ```bash
-sh /home/dac/free-sleep/scripts/block_internet_access.sh
+sh /usr/local/lib/nightstand/live/scripts/block_internet_access.sh
 ```
 
 To undo the rules:
 
 ```bash
-sh /home/dac/free-sleep/scripts/unblock_internet_access.sh
+sh /usr/local/lib/nightstand/live/scripts/unblock_internet_access.sh
 ```
 
 Undoing them lasts until the next reboot, when the saved rules load again, or
@@ -530,7 +530,7 @@ copy it back if there is a copy, remove the replacement if there is an
 | Firewall rules replaced | step 19 (`block_internet_access.sh`) | `iptables.rules` and `ip6tables.rules` are live snapshots from `iptables-save` and `ip6tables-save`; `*.rules.file` saves the rules files from /etc/iptables/ | Use `iptables-restore` and `ip6tables-restore` with the live snapshots. Restore the rules files under /etc/iptables/ from `*.rules.file` or their markers as described above. |
 | Time sync servers changed | step 19 | `timesyncd.conf` | Restore it under /etc/systemd/ as described above and restart systemd-timesyncd. |
 | Wi-Fi profile UUIDs rewritten | step 12 | `/persistent/system-connections.stock/` (only if you made the copy in step 12) | Copy the files back to /persistent/system-connections/ and restart NetworkManager. |
-| Hardware watchdog enabled where the script's Pod 5 checks pass | step 13 (`setup_watchdog.sh`) | not needed | Before removing /home/dac/free-sleep, run `bash /home/dac/free-sleep/scripts/setup_watchdog.sh --remove` as root. It removes /etc/systemd/system.conf.d/10-nightstand-watchdog.conf and the trial copy under /run/systemd/system.conf.d/, and leaves a note so later installs and updates keep it off. If the kernel cannot stop the running watchdog, or systemd cannot reload the setting, it turns off only after a restart. |
+| Hardware watchdog enabled where the script's Pod 5 checks pass | step 13 (`setup_watchdog.sh`) | not needed | Before removing /home/dac/free-sleep, run `bash /usr/local/lib/nightstand/live/scripts/setup_watchdog.sh --remove` as root. It removes /etc/systemd/system.conf.d/10-nightstand-watchdog.conf and the trial copy under /run/systemd/system.conf.d/, and leaves a note so later installs and updates keep it off. If the kernel cannot stop the running watchdog, or systemd cannot reload the setting, it turns off only after a restart. |
 | Nightstand's services, timers, sudoers rules and memory limits added | step 13 | not needed | Stop and disable Nightstand's services and timers before removing the free-sleep units and their drop-ins under /etc/systemd/system/, /etc/sudoers.d/dac and /home/dac/free-sleep. Run `systemctl daemon-reload` after removing the units. |
 
 On Pod 5, undoing all of this has not been tried, and there is no checked

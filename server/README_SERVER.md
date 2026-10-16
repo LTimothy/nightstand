@@ -112,21 +112,17 @@ hand once.
 
 The update, rollback and switch services, their sudoers rules, the
 Biometrics switch rule, and the health check and network watchdog timers
-come from one script, which is safe to run again. As root on the Pod, after
-the deploy:
+come from `scripts/setup_services.sh`. Run `ops/deploy.sh` once: it
+publishes the root-owned copy of the scripts and runs `setup_services.sh`
+on it. Running the script by hand on the server user's folder is refused.
 
-```bash
-bash /home/dac/free-sleep/scripts/setup_services.sh /home/dac/free-sleep
-```
-
-The RAW archive timer is installed separately:
+The RAW archive timer is installed separately. Its service runs
+`archive-raw.sh` from the root-owned copy, so only the units need copying:
 
 ```bash
 # From your computer, in the repo root:
-scp -P 8822 scripts/archive-raw.sh root@<POD_IP>:/home/dac/free-sleep/scripts/
 scp -P 8822 scripts/systemd/free-sleep-archive-raw.{service,timer} root@<POD_IP>:/etc/systemd/system/
-ssh -p 8822 root@<POD_IP> 'chmod +x /home/dac/free-sleep/scripts/archive-raw.sh \
-  && systemctl daemon-reload \
+ssh -p 8822 root@<POD_IP> 'systemctl daemon-reload \
   && systemctl enable --now free-sleep-archive-raw.timer'
 ```
 
