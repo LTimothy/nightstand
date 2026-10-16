@@ -73,7 +73,14 @@ for src in "$PERSIST"/*.RAW; do
     newest=$src
   fi
   dst="$ARCHIVE/$base"
-  [ -e "$dst" ] && continue
+  if [ -e "$dst" ]; then
+    [ "$src" -ef "$dst" ] && continue
+    # The firmware reuses names after its sequence restarts; the older night
+    # moves aside under a name the loaders still read.
+    n=1
+    while [ -e "$ARCHIVE/${base%.RAW}.$n.RAW" ]; do n=$((n + 1)); done
+    mv -- "$dst" "$ARCHIVE/${base%.RAW}.$n.RAW" || continue
+  fi
   if ln "$src" "$dst" 2>/dev/null; then
     linked=$((linked + 1))
   fi
