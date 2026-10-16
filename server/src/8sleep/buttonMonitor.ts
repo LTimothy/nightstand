@@ -15,7 +15,7 @@ import { DeviceStatus, MIN_TEMPERATURE_F, MAX_TEMPERATURE_F } from '../routes/de
 import { connectFrankenWithin } from './frankenServer.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import { markManualTempChange } from '../jobs/scheduleOverride.js';
-import { activeAlarms, hasSnooze } from '../jobs/activeAlarms.js';
+import { activeAlarms, alarmEndedAt, hasSnooze } from '../jobs/activeAlarms.js';
 import { handleAlarmTap } from './tapAlarm.js';
 import { ButtonEventMachine, ButtonEvent, ButtonName } from './buttonEvents.js';
 
@@ -276,8 +276,8 @@ export class ButtonMonitor {
     return events;
   }
 
-  // Clicks apply 15 to 25 s late, so repeats of the logo click that stopped an
-  // alarm must not fall through to the favorite temperature.
+  // Clicks apply 15 to 25 s late, so a logo click made while an alarm rang,
+  // or a repeat of the one that stopped it, must not set the favorite.
   private logoStoppedAlarmAt: Partial<Record<Side, number>> = {};
 
   private async dispatch(event: ButtonEvent): Promise<void> {
@@ -291,7 +291,8 @@ export class ButtonMonitor {
           logger.info(`[buttonMonitor] ${side} logo button: stopping the alarm`);
           await handleAlarmTap(side, { type: 'alarm', behavior: 'dismiss', snoozeDuration: 60, inactiveAlarmBehavior: 'none' });
           this.logoStoppedAlarmAt[side] = event.at;
-        } else if (Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS) {
+        } else if (Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS
+          && (alarmEndedAt.get(side) ?? -Infinity) <= event.at) {
           await this.setFavorite(side, buttons.favoriteTemperatureF, event.at);
         }
         return;

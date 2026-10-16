@@ -87,9 +87,10 @@ let serverStatus: typeof import('../serverStatus.js')['default'];
 let activeAlarms: typeof import('../jobs/activeAlarms.js')['activeAlarms'];
 let setSnooze: typeof import('../jobs/activeAlarms.js')['setSnooze'];
 let cancelSnooze: typeof import('../jobs/activeAlarms.js')['cancelSnooze'];
+let forgetActiveAlarm: typeof import('../jobs/activeAlarms.js')['forgetActiveAlarm'];
 before(async () => {
   ({ ButtonMonitor } = await import('./buttonMonitor.js'));
-  ({ activeAlarms, setSnooze, cancelSnooze } = await import('../jobs/activeAlarms.js'));
+  ({ activeAlarms, setSnooze, cancelSnooze, forgetActiveAlarm } = await import('../jobs/activeAlarms.js'));
   ({ default: settingsDB } = await import('../db/settings.js'));
   ({ default: serverStatus } = await import('../serverStatus.js'));
 });
@@ -379,6 +380,15 @@ describe('ButtonMonitor', () => {
     }
     assert.deepEqual(alarmTaps.length, 1);
     assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 80 } }]);
+  });
+
+  it('does not set the favorite for a logo click made while an alarm that has since ended was ringing', async () => {
+    const at = Date.now() - 20_000;
+    activeAlarms.set('left', { vibrationIntensity: 50, duration: 30, vibrationPattern: 'rise' });
+    forgetActiveAlarm('left');
+    await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at });
+    assert.deepEqual(alarmTaps, []);
+    assert.deepEqual(updates, []);
   });
 
   it('uses the default options when a side has no buttons settings', async () => {
