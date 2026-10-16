@@ -32,12 +32,12 @@ a fork switch and every update turn it on) and blocks the download, so turn
 it off for now:
 
 ```bash
-sh /home/dac/free-sleep/scripts/unblock_internet_access.sh
+sh /usr/local/lib/nightstand/live/scripts/unblock_internet_access.sh
 ```
 
 If you stop before step 5, stop Tailscale if you started it (see
 [Removing Tailscale](#removing-tailscale)), then turn the firewall back on
-with `sh /home/dac/free-sleep/scripts/block_internet_access.sh`.
+with `sh /usr/local/lib/nightstand/live/scripts/block_internet_access.sh`.
 
 Check for the tun device, and set `VERSION` to the newest arm64 version on
 [pkgs.tailscale.com](https://pkgs.tailscale.com/stable/#static) (edit that
@@ -183,7 +183,7 @@ The firewall script adds Tailscale's exceptions only if Tailscale is running
 when it runs. Check that `tailscale status` works, then:
 
 ```bash
-sh /home/dac/free-sleep/scripts/block_internet_access.sh
+sh /usr/local/lib/nightstand/live/scripts/block_internet_access.sh
 ```
 
 It should print `tailscaled active: allowing its control-plane/DERP/STUN egress`.
@@ -241,7 +241,7 @@ systemctl disable --now tailscaled
 sed -i '/^Environment=ALLOWED_ORIGIN=/d' /etc/systemd/system/free-sleep.service
 systemctl daemon-reload
 systemctl restart free-sleep
-sh /home/dac/free-sleep/scripts/block_internet_access.sh
+sh /usr/local/lib/nightstand/live/scripts/block_internet_access.sh
 ```
 
 Then remove the Pod from your tailnet in the Tailscale admin console. The

@@ -55,7 +55,7 @@ for profile in /etc/NetworkManager/system-connections/EyePhone.nmconnection \
         echo "WARNING: could not remove the EyePhone profile"
       fi
     else
-      echo "EyePhone profile kept. To review this check interactively, run bash /home/dac/free-sleep/scripts/check_image_credentials.sh"
+      echo "EyePhone profile kept. To review this check interactively, run bash /usr/local/lib/nightstand/live/scripts/check_image_credentials.sh"
     fi
   fi
 done

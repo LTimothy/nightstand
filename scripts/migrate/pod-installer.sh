@@ -39,7 +39,7 @@ DB_PREFLIGHT=""
 STATUS_FILE=/persistent/free-sleep-data/migration-status.json
 IPTABLES_SNAPSHOT=/home/dac/free-sleep-migrate-iptables-snapshot.rules
 RESTORE_SCRIPT_SRC="$REPO_DIR_SELF/migrate/restore-original-fork.sh"
-RESTORE_SCRIPT_DEST=/home/dac/restore-original-fork.sh
+RESTORE_SCRIPT_DEST=/usr/local/lib/nightstand/restore-original-fork.sh
 BASELINE_FILE=/home/dac/free-sleep-migrate-baseline.json
 SENTINEL_SERVICE=free-sleep-migrate-sentinel.service
 SENTINEL_TIMER=free-sleep-migrate-sentinel.timer
@@ -211,6 +211,10 @@ STAGE_INNER=$(find "$STAGE.unzip" -mindepth 1 -maxdepth 1 -type d | head -n1)
 [ -n "$STAGE_INNER" ] || fail "unexpected zip layout; their server was never touched"
 mv "$STAGE_INNER" "$STAGE" && rm -rf "$STAGE.unzip"
 rm -f "$ZIP"
+# Copied for root before the stage is handed to the server user. Root runs
+# this copy from here on.
+COPY=$(python3 -B "$STAGE/scripts/system_scripts.py" publish "$STAGE") \
+  || fail "could not copy the scripts root runs; their server was never touched"
 chown -R dac:dac "$STAGE"
 
 [ -f "$STAGE/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"
@@ -252,7 +256,7 @@ ROOT_FREE=$(free_mb /)
   || fail "low disk on / (${ROOT_FREE:-unknown}M free, ${DEPS_NEED}M needed for the new dependencies); their server was never touched"
 
 say "Ensuring Node/Volta toolchain (shared with install.sh)..."
-bash "$STAGE/scripts/ensure-node.sh" dac || fail "node/volta bootstrap failed; their server was never touched"
+bash "$COPY/scripts/ensure-node.sh" dac || fail "node/volta bootstrap failed; their server was never touched"
 
 say "Installing dependencies in staging (always, lockfiles differ across forks)..."
 sudo -u dac bash -c "cd '$STAGE/server' && '$NPM' install --no-audit --no-fund" \
@@ -263,8 +267,8 @@ node --check "$STAGE/server/dist/server.js" \
   || fail "staged server.js failed a syntax check; their server was never touched"
 
 say "Data-compatibility dry run (report-only, nothing is written)..."
-if [ -f "$STAGE/scripts/migrate/data-compat-check.mjs" ]; then
-  if ! node "$STAGE/scripts/migrate/data-compat-check.mjs"; then
+if [ -f "$COPY/scripts/migrate/data-compat-check.mjs" ]; then
+  if ! node "$COPY/scripts/migrate/data-compat-check.mjs"; then
     fail "data-compat dry run found destructive changes to your settings/schedules; their server was never touched. See the report above."
   fi
 else
@@ -276,14 +280,14 @@ fi
 # moved or the live migration ledger is changed.
 say "Database compatibility preflight on an isolated snapshot..."
 DATABASE=/persistent/free-sleep-data/free-sleep.db
-[ -f "$STAGE/scripts/sqlite-safety.py" ] || fail "staged release lacks the database safety helper"
+[ -f "$COPY/scripts/sqlite-safety.py" ] || fail "staged release lacks the database safety helper"
 if [ -f "$DATABASE" ]; then
   DATABASE_BACKUP="/persistent/free-sleep-database-backups/$(date -u +%Y%m%dT%H%M%SZ)-$$-migration.db"
-  python3 "$STAGE/scripts/sqlite-safety.py" backup "$DATABASE" "$DATABASE_BACKUP" \
+  python3 "$COPY/scripts/sqlite-safety.py" backup "$DATABASE" "$DATABASE_BACKUP" \
     || fail "database snapshot failed; original install was not changed"
   DB_PREFLIGHT=$(mktemp -d "$STAGE/.database-preflight.XXXXXX") \
     || fail "could not create database preflight directory"
-  python3 "$STAGE/scripts/sqlite-safety.py" backup "$DATABASE_BACKUP" "$DB_PREFLIGHT/check.db" \
+  python3 "$COPY/scripts/sqlite-safety.py" backup "$DATABASE_BACKUP" "$DB_PREFLIGHT/check.db" \
     || fail "could not prepare database preflight snapshot"
   chown -R dac:dac "$DB_PREFLIGHT" || fail "could not set database preflight ownership"
   sudo -u dac bash -c "cd '$STAGE/server' && DATABASE_URL='file:$DB_PREFLIGHT/check.db' '$NPX' prisma migrate deploy" \
@@ -294,12 +298,12 @@ if [ -f "$DATABASE" ]; then
 fi
 
 # A transactional return preserves the current upstream calibration and updater.
-if [ -f "$STAGE/scripts/switch_installation.py" ]; then
-  RETURN_COMPANION=$(python3 -B "$STAGE/scripts/switch_installation.py" return-companion)
+if [ -f "$COPY/scripts/switch_installation.py" ]; then
+  RETURN_COMPANION=$(python3 -B "$COPY/scripts/switch_installation.py" return-companion)
   COMPANION_STATUS=$?
   if [ "$COMPANION_STATUS" -eq 0 ]; then
     write_status swap in_progress "returning with retained companion state"
-    NIGHTSTAND_MIGRATION_CLEANUP="$REMOVE_FOREIGN" python3 -B "$STAGE/scripts/switch_installation.py" return --stage "$STAGE" --retained "$RETURN_COMPANION"
+    NIGHTSTAND_MIGRATION_CLEANUP="$REMOVE_FOREIGN" python3 -B "$COPY/scripts/switch_installation.py" return --stage "$STAGE" --retained "$RETURN_COMPANION"
     RETURN_STATUS=$?
     if [ "$RETURN_STATUS" -eq 0 ]; then
       write_status install success "returned to Nightstand with companion state; upstream retained for rollback"
@@ -383,7 +387,7 @@ if systemctl cat free-sleep-stream >/dev/null 2>&1; then
     || { restore_and_report "could not stop original streamer"; exit 1; }
 fi
 if [ -f "$DATABASE" ]; then
-  python3 "$STAGE/scripts/sqlite-safety.py" checkpoint "$DATABASE" \
+  python3 "$COPY/scripts/sqlite-safety.py" checkpoint "$DATABASE" \
     || { restore_and_report "database checkpoint failed before swap"; exit 1; }
 fi
 
@@ -412,7 +416,7 @@ mv "$STAGE" "$LIVE" || {
 chown -R dac:dac "$LIVE"
 
 say "Installing the RAW-archive timer units..."
-cp "$LIVE/scripts/systemd/free-sleep-archive-raw.service" "$LIVE/scripts/systemd/free-sleep-archive-raw.timer" /etc/systemd/system/ 2>/dev/null || true
+cp "$COPY/scripts/systemd/free-sleep-archive-raw.service" "$COPY/scripts/systemd/free-sleep-archive-raw.timer" /etc/systemd/system/ 2>/dev/null || true
 systemctl daemon-reload
 
 say "Running prisma migrate deploy (additive by standing rule)..."
@@ -537,15 +541,13 @@ say "Health check passed on v$STAGED_VERSION."
 # so a failed install restores their fork without any of it. The memory limits
 # apply from the service's next restart.
 say "Installing the updater, rollback, and revert services and their sudoers rules..."
-bash "$LIVE/scripts/setup_services.sh" "$LIVE" \
+bash "$COPY/scripts/setup_services.sh" "$COPY" \
   || say "WARNING: some services or sudoers rules could not be installed; the next in-app update retries them"
-bash "$LIVE/scripts/setup_resource_limits.sh" >/dev/null 2>&1 \
+bash "$COPY/scripts/setup_resource_limits.sh" >/dev/null 2>&1 \
   || say "WARNING: could not install the service memory limits"
-bash "$LIVE/scripts/add_shortcuts.sh" >/dev/null 2>&1 \
-  || say "WARNING: could not install the fs-* shell shortcuts"
 
 say "Applying this fork's WAN policy..."
-sh "$LIVE/scripts/block_internet_access.sh" >/dev/null 2>&1 \
+sh "$COPY/scripts/block_internet_access.sh" >/dev/null 2>&1 \
   || say "WARNING: could not apply block_internet_access.sh, check manually"
 
 disarm_sentinel
@@ -562,6 +564,6 @@ say "SUCCESS: migrated to v$STAGED_VERSION. Their original install is kept at $P
 
 # Last: its first arming can reset the Pod, so the migration is already
 # recorded as a success and the sentinel is disarmed before it runs.
-if [ -f "$LIVE/scripts/setup_watchdog.sh" ]; then
-  bash "$LIVE/scripts/setup_watchdog.sh" --auto || say "WARNING: the hardware watchdog could not be turned on; see above"
+if [ -f "$COPY/scripts/setup_watchdog.sh" ]; then
+  bash "$COPY/scripts/setup_watchdog.sh" --auto || say "WARNING: the hardware watchdog could not be turned on; see above"
 fi

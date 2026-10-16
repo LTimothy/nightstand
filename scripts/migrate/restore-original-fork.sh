@@ -1,7 +1,7 @@
 #!/bin/bash
 # Puts a migration target's original install back exactly the way it was
 # found. This is the fork-switch tool's safety net: it's copied to
-# /home/dac/restore-original-fork.sh BEFORE the swap
+# /usr/local/lib/nightstand/restore-original-fork.sh BEFORE the swap
 # so it survives regardless of what state either tree ends up in, and it's
 # called from two places:
 #
@@ -32,14 +32,14 @@ set -uo pipefail
 TRANSACTION_ROOT="${NIGHTSTAND_TRANSACTION_ROOT:-/persistent/free-sleep-maintenance/nightstand-transactions}"
 RESTORE_HELPER_SOURCE="$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh"
 [ -f "$RESTORE_HELPER_SOURCE" ] || RESTORE_HELPER_SOURCE="$(dirname "${BASH_SOURCE[0]}")/../restore_helpers.sh"
-[ -f "$RESTORE_HELPER_SOURCE" ] || RESTORE_HELPER_SOURCE=/home/dac/migrate/restore_helpers.sh
+[ -f "$RESTORE_HELPER_SOURCE" ] || RESTORE_HELPER_SOURCE=/usr/local/lib/nightstand/migrate/restore_helpers.sh
 source "$RESTORE_HELPER_SOURCE" || exit 1
 if has_switch_journal "$TRANSACTION_ROOT"; then
-  SWITCH_RECOVERY=/home/dac/free-sleep-switch-recovery/recover_switch.sh
+  SWITCH_RECOVERY=/usr/local/lib/nightstand/switch-recovery/recover_switch.sh
   [ -f "$SWITCH_RECOVERY" ] || { echo "Switch recovery helper is missing" >&2; exit 1; }
-  PENDING_SWITCH=$(python3 -B /home/dac/free-sleep-switch-recovery/recover_switch.py --root "$TRANSACTION_ROOT" pending) || exit 1
+  PENDING_SWITCH=$(python3 -B /usr/local/lib/nightstand/switch-recovery/recover_switch.py --root "$TRANSACTION_ROOT" pending) || exit 1
   if [ "${NIGHTSTAND_OPERATION_OWNER:-}" = "$PPID" ]; then
-    restore_switch_offline /home/dac/free-sleep-switch-recovery "$TRANSACTION_ROOT" || exit 1
+    restore_switch_offline /usr/local/lib/nightstand/switch-recovery "$TRANSACTION_ROOT" || exit 1
   else
     bash "$SWITCH_RECOVERY" || exit 1
   fi
@@ -87,7 +87,7 @@ restore_iptables() {
 
 restore_legacy_artifacts() {
   [ -f /home/dac/free-sleep-migrate-artifacts/pending ] || return 0
-  bash /home/dac/migrate/fork-artifacts.sh restore || {
+  bash /usr/local/lib/nightstand/migrate/fork-artifacts.sh restore || {
     say "WARNING: legacy artifact restore failed; keeping the sentinel for another attempt"
     return 1
   }

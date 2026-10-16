@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { UpdateResultSchema } from './routes/update/updateSchema.js';
@@ -28,6 +28,7 @@ function fixture() {
     mkdirSync(path.join(dir, 'scripts'), { recursive: true });
     writeFileSync(path.join(dir, 'server/src/serverInfo.json'), JSON.stringify({ version }));
     writeFileSync(path.join(dir, 'server/package-lock.json'), lock);
+    writeFileSync(path.join(dir, 'scripts/version'), version);
     writeFileSync(path.join(dir, 'scripts/block_internet_access.sh'), `echo firewall >> '${calls}'\n`);
     if (modules) {
       mkdirSync(path.join(dir, 'server/node_modules'));
@@ -39,6 +40,8 @@ function fixture() {
   writeFileSync(helper, readFileSync(path.join(repo, 'scripts/restore_helpers.sh')));
   const script = source().replaceAll('/home/dac/', `${root}/`).replaceAll('/persistent/', `${root}/persistent/`);
   writeFileSync(path.join(root, 'write_result.py'), readFileSync(path.join(repo, 'scripts/write_result.py')));
+  writeFileSync(path.join(root, 'system_scripts.py'), readFileSync(path.join(repo, 'scripts/system_scripts.py')));
+  writeFileSync(path.join(root, 'block_internet_access.sh'), `echo firewall >> '${calls}'\n`);
   const recoveryFile = path.join(root, 'recover_update.sh');
   writeFileSync(recoveryFile, script);
   type Options = { healthy?: boolean; stuck?: boolean; locked?: boolean;
@@ -101,7 +104,8 @@ while [ ! -f '${root}/locked' ]; do command sleep 0.01; done
 export -f systemctl curl sleep sync chown
 ${snippet ?? `source '${recoveryFile}' "$@"`}`, 'recovery', ...args], {
       encoding: 'utf8', timeout: options.lockSeconds !== undefined ? 45000 : 20000,
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_OPERATION_LOCK: path.join(root, 'lock') },
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_OPERATION_LOCK: path.join(root, 'lock'),
+        NIGHTSTAND_SYSTEM_DIR: path.join(root, 'system') },
     });
   };
   const arm = () => {
@@ -120,10 +124,46 @@ ${snippet ?? `source '${recoveryFile}' "$@"`}`, 'recovery', ...args], {
     readFileSync(path.join(dir, 'server/src/serverInfo.json'), 'utf8'),
   ) as { version: string }).version;
   return { root, recoveryFile, live, prev, failed, stage, marker, calls, run, tree, arm, prepare, version,
+    system: path.join(root, 'system'),
     dispose: () => rmSync(root, { recursive: true, force: true }) };
 }
 
 describe('interrupted update recovery', () => {
+  const tool = path.join(repo, 'scripts/system_scripts.py');
+  const publishTree = (system: string, dir: string) => spawnSync('python3', ['-B', tool, 'publish', dir],
+    { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: system }, encoding: 'utf8' }).stdout.trim();
+  const pointTo = (system: string, copy: string) => spawnSync('python3', ['-B', tool, 'point', copy],
+    { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: system } });
+
+  for (const healthy of [true, false]) {
+    it(`after a power cut, root runs the copy of the tree recovery ${healthy ? 'kept' : 'restored'}`, () => {
+      const box = fixture();
+      try {
+        const original = publishTree(box.system, box.live);
+        box.prepare();
+        const target = publishTree(box.system, box.live);
+        pointTo(box.system, target);
+        const result = box.run([], { healthy });
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        assert.equal(readlinkSync(path.join(box.system, 'live')), `copies/${path.basename(healthy ? target : original)}`);
+      } finally { box.dispose(); }
+    });
+  }
+
+  it('after a power cut back to a release without a copy, root keeps the new copy and recovery still settles', () => {
+    const box = fixture();
+    try {
+      box.prepare();
+      const target = publishTree(box.system, box.live);
+      pointTo(box.system, target);
+      const result = box.run([], { healthy: false });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.equal(box.version(box.live), '3.6.0');
+      assert.equal(readlinkSync(path.join(box.system, 'live')), `copies/${path.basename(target)}`);
+      assert.ok(!existsSync(box.marker));
+    } finally { box.dispose(); }
+  });
+
   for (const serviceFailure of ['server', 'stream'] as const) {
     it(`records a failed recovery when the ${serviceFailure} ${serviceFailure === 'server' ? 'start' : 'restart'} fails`, () => {
       const box = fixture();
@@ -461,7 +501,7 @@ ${update}`], {
           mkdirSync(path.join(tree, 'scripts/systemd'));
           writeFileSync(path.join(tree, 'scripts/recover_update.sh'), source()
             .replaceAll('/home/dac/', `${box.root}/`).replaceAll('/persistent/', `${box.root}/persistent/`));
-          for (const file of ['setup_services.sh', 'restore_helpers.sh', 'write_result.py',
+          for (const file of ['setup_services.sh', 'restore_helpers.sh', 'write_result.py', 'system_scripts.py',
             'systemd/free-sleep-recover-update.service', 'systemd/free-sleep-recover-update.timer']) {
             writeFileSync(path.join(tree, 'scripts', file), readFileSync(path.join(repo, 'scripts', file), 'utf8'));
           }
@@ -474,8 +514,11 @@ ${update}`], {
 set -uo pipefail
 LIVE="$FIXTURE/free-sleep"; PREV="$FIXTURE/free-sleep-prev"; STAGE="$FIXTURE/free-sleep-staging"; FAILED="$FIXTURE/free-sleep-failed"
 SWAP_MARKER="$FIXTURE/persistent/free-sleep-data/update-swap.json"
-RECOVERY_HELPER="$FIXTURE/recovery/recover_update.sh"; RECOVERY_SOURCE="$LIVE"
+RECOVERY_HELPER="$FIXTURE/recovery/recover_update.sh"; SYSTEM_DIR="$FIXTURE/system"
 CUR_VERSION=3.6.0; STAGED_VERSION=3.7.0; IS_DOWNGRADE=no; LOCK_SAME=yes; BK=backup
+RUNNING=$(python3 -B "$LIVE/scripts/system_scripts.py" publish "$LIVE")
+NEW_COPY=$(python3 -B "$STAGE/scripts/system_scripts.py" publish "$STAGE")
+source "$RUNNING/scripts/restore_helpers.sh"
 RESULT_REASON=; RESTORE_TREE=; SWAP_NEW=; NPX=npx
 say() { echo "$*"; }; fail() { echo "$*"; exit 1; }; recheck_in_use() { :; }
 systemctl() {
@@ -505,7 +548,8 @@ ${helpers}
 ${swap}`, 'update'], {
           encoding: 'utf8', timeout: 20000,
           env: { ...process.env, FIXTURE: box.root, NIGHTSTAND_SYSTEMD_DIR: systemd,
-            NIGHTSTAND_SUDOERS_FILE: path.join(box.root, 'sudoers'), NIGHTSTAND_RECOVERY_DIR: recovery },
+            NIGHTSTAND_SUDOERS_FILE: path.join(box.root, 'sudoers'), NIGHTSTAND_RECOVERY_DIR: recovery,
+            NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
         });
         assert.equal(result.status, healthy ? 0 : 1, result.stdout + result.stderr);
         assert.equal(box.version(box.live), healthy ? '3.7.0' : '3.6.0');
@@ -528,7 +572,7 @@ ${swap}`, 'update'], {
 set -uo pipefail
 LIVE="$FIXTURE/free-sleep"; PREV="$FIXTURE/free-sleep-prev"; STAGE="$FIXTURE/free-sleep-staging"
 SWAP_MARKER="$FIXTURE/persistent/free-sleep-data/update-swap.json"
-RECOVERY_SOURCE="$FIXTURE/source"; RECOVERY_HELPER="$FIXTURE/helper.sh"
+NIGHTSTAND_SCRIPTS="$FIXTURE/source/scripts"; RECOVERY_HELPER="$FIXTURE/helper.sh"
 CUR_VERSION=3.6.0; STAGED_VERSION=3.7.0; IS_DOWNGRADE=no
 say() { :; }; fail() { echo "$*"; exit 1; }; recheck_in_use() { :; }
 systemctl() { echo inactive; }; stop_writer() { :; }; stop_late_stream() { :; }; sync() { :; }
@@ -626,9 +670,11 @@ kill -TERM $$`);
       const upstream = readFileSync(path.join(repo, 'scripts/switch-to-upstream.sh'), 'utf8');
       const begin = upstream.indexOf('if [ "$HEALTHY" = yes ]; then');
       const block = upstream.slice(begin, upstream.indexOf('# --- automatic rollback', begin))
-        .replaceAll('/etc/systemd/system/', `${units}/`).replaceAll('/home/dac/free-sleep-recovery', recovery)
+        .replaceAll('/etc/systemd/system/', `${units}/`).replaceAll('/usr/local/lib/nightstand/recovery', recovery)
+        .replaceAll('/usr/local/lib/nightstand/', `${box.root}/system/`).replaceAll('/home/dac/', `${box.root}/`)
         .replaceAll('/persistent/', `${box.root}/persistent/`);
-      const result = box.run([], {}, `HEALTHY=yes; LIVE='${box.live}'; PREV='${box.prev}'; STAGED_VERSION=upstream; BK=backup; ${block}`);
+      const result = box.run([], {}, `HEALTHY=yes; LIVE='${box.live}'; PREV='${box.prev}'; STAGED_VERSION=upstream; BK=backup;
+NIGHTSTAND_SCRIPTS='${box.root}/running/scripts'; ${block}`);
       assert.equal(result.status, 0, result.stdout + result.stderr);
       assert.ok(!existsSync(box.marker));
       for (const file of ['free-sleep-recover-update.service', 'free-sleep-recover-update.timer']) {
@@ -651,7 +697,7 @@ kill -TERM $$`);
       box.arm();
       const result = spawnSync('bash', [path.join(repo, 'scripts/setup_services.sh'), repo, '--recovery-only'], {
         encoding: 'utf8', env: { ...process.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
-          NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker },
+          NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker, NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
       });
       assert.equal(result.status, 0, result.stdout + result.stderr);
       for (const file of ['free-sleep-recover-update.service', 'free-sleep-recover-update.timer']) {
@@ -676,7 +722,7 @@ systemctl() { :; }
 export -f systemctl
 bash "$1" "$2" --recovery-only`, 'setup', path.join(repo, 'scripts/setup_services.sh'), repo], {
         encoding: 'utf8', env: { ...process.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
-          NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker },
+          NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker, NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
       });
       assert.equal(result.status, 0, result.stdout + result.stderr);
       const resultFile = path.join(box.root, 'result.json');
@@ -700,6 +746,7 @@ bash "$1" "$2" --recovery-only`, 'setup', path.join(repo, 'scripts/setup_service
       writeFileSync(unit, 'complete previous unit');
       const result = spawnSync('bash', ['-c', `
 python3() {
+  if [ "$1" = -B ]; then command python3 "$@"; return; fi
   command python3 -c '
 import os, sys
 sys.argv = sys.argv[1:]
@@ -715,7 +762,7 @@ systemctl() { :; }
 export -f python3 systemctl
 command bash "$1" "$2" --recovery-only`, 'setup', path.join(repo, 'scripts/setup_services.sh'), repo], {
         encoding: 'utf8', env: { ...process.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
-          NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker },
+          NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker, NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
       });
       assert.equal(result.status, 1, result.stdout + result.stderr);
       assert.equal(readFileSync(unit, 'utf8'), 'complete previous unit');

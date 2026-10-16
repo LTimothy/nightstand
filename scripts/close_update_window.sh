@@ -5,9 +5,6 @@
 # are and apply the block again. When neither family has a final DROP or REJECT,
 # internet access was opened on purpose, so only the download rules go.
 # Saves recovered rules only when both families also have INPUT DROP.
-LIVE=/home/dac/free-sleep
-PREV=/home/dac/free-sleep-prev
-
 source "$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh" || exit 1
 init_update_firewall
 
@@ -67,8 +64,7 @@ fi
 echo "Removed the download rules an interrupted update left open"
 if fw4 -C OUTPUT -j REJECT 2>/dev/null || fw4 -C OUTPUT -j DROP 2>/dev/null ||
    fw6 -C OUTPUT -j REJECT 2>/dev/null || fw6 -C OUTPUT -j DROP 2>/dev/null; then
-  sh "$LIVE/scripts/block_internet_access.sh" >/dev/null 2>&1 \
-    || sh "$PREV/scripts/block_internet_access.sh" >/dev/null 2>&1 \
+  sh "$NIGHTSTAND_SCRIPTS/block_internet_access.sh" >/dev/null 2>&1 \
     || echo "WARNING: could not apply the block script again"
 fi
 restore_closed_output_policy

@@ -45,7 +45,7 @@ export count
         self.assertEqual(len(calls), 2, result.stdout)
         self.assertIn('--property=ExecStopPost=-/bin/systemctl restart --no-block free-sleep-recover-switch.service', calls[0])
         self.assertEqual(calls[1], ['--unit=free-sleep-migrate', '--collect', 'bash',
-                                   '/home/dac/migrate/pod-installer.sh', 'yes'])
+                                   '/usr/local/lib/nightstand/migrate/pod-installer.sh', 'yes'])
 
     def test_supported_systemd_launches_once_and_failure_of_both_attempts_is_reported(self):
         result = self.launch(0)
@@ -95,6 +95,7 @@ class InstallerCompletionTests(unittest.TestCase):
                 systemd = root / 'systemd'
                 systemd.mkdir()
                 replacements = {'/home/dac/': str(root) + '/', '/persistent/': str(root / 'persistent') + '/',
+                                '/usr/local/lib/nightstand/': str(root) + '/',
                                 '/etc/systemd/system': str(systemd), '/usr/local/bin/': str(root / 'local-bin') + '/',
                                 '/tmp/free-sleep-migrate-health': str(root / 'health')}
                 def localize(text):
@@ -185,7 +186,7 @@ class LegacySwitchCleanupTests(unittest.TestCase):
                     (gate.parent / 'custom.conf').write_text('custom setting\n')
                 recovery_unit = systemd / 'free-sleep-recover-switch.service'
                 recovery_unit.write_text('recovery unit\n')
-                recovery = root / 'home/dac/free-sleep-switch-recovery'
+                recovery = root / 'usr/local/lib/nightstand/switch-recovery'
                 recovery.mkdir(parents=True)
                 (recovery / 'recover_switch.sh').write_text('retained recovery\n')
                 transactions = root / 'transactions'
@@ -193,6 +194,7 @@ class LegacySwitchCleanupTests(unittest.TestCase):
                     (transactions / 'switch').mkdir(parents=True)
                     (transactions / 'switch/journal.json').symlink_to(transactions / 'missing')
                 localized = block.replace('/etc/systemd/system', str(systemd)).replace('/home/dac/', str(root / 'home/dac') + '/')
+                localized = localized.replace('/usr/local/lib/nightstand/', str(root / 'usr/local/lib/nightstand') + '/')
                 localized = localized.replace('/persistent/', str(root / 'persistent') + '/')
                 shell = 'set -uo pipefail\nsource ' + shlex.quote(str(SCRIPTS / 'restore_helpers.sh')) + '\n' + r'''
 HEALTHY=yes; STAGED_VERSION=2.0.0; PREV=/missing-fixture; BK=fixture

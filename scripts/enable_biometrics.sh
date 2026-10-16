@@ -1,8 +1,9 @@
 #!/bin/bash
 # Started as "sh enable_biometrics.sh" too; the rest needs bash.
 [ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
+SCRIPTS=/usr/local/lib/nightstand/live/scripts
 
-python3 /home/dac/free-sleep/scripts/is_biometrics_installed.py
+python3 "$SCRIPTS/is_biometrics_installed.py"
 result=$?
 
 # The live stream uses an installed nats-py first, else the copy bundled in
@@ -60,11 +61,9 @@ set -u  # Treat unset variables as errors
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-LIVE=/home/dac/free-sleep
-PREV=/home/dac/free-sleep-prev
 WAN_OPEN=no
 say() { echo "$*"; }
-source "$LIVE/scripts/restore_helpers.sh"
+source "$SCRIPTS/restore_helpers.sh"
 if ! take_operation_lock; then
   echo "An update, rollback, switch or install is running. Run this again when it has finished."
   exit 1
@@ -98,10 +97,10 @@ trap '
 
 # Only HTTPS and DNS go out, and only while Python and its packages download.
 open_wan || true
-run_limited 900 bash "$LIVE/scripts/setup_python.sh" || exit 1
-run_limited 900 bash "$LIVE/scripts/install_python_packages.sh" || exit 1
+run_limited 900 bash "$SCRIPTS/setup_python.sh" || exit 1
+run_limited 900 bash "$SCRIPTS/install_python_packages.sh" || exit 1
 close_wan || true
-bash "$LIVE/scripts/setup_streamer_service.sh"
+bash "$SCRIPTS/setup_streamer_service.sh"
 
 # Mark the installation status as healthy
 curl -X POST http://127.0.0.1:3000/api/services \

@@ -262,3 +262,18 @@ describe('deploy.sh refuses stale bundles', () => {
     assert.match(src, /scripts\/check-bundles\.sh/);
   });
 });
+
+describe('deploy.sh runs root-owned copies', () => {
+  it('deploy.sh copies the scripts for root before the stage changes owner, and runs only that copy', () => {
+    const src = readFileSync(path.join(repoRoot, 'ops/deploy.sh'), 'utf8');
+    const publish = src.indexOf('COPY=$(SSH "python3 -B $STAGE/scripts/system_scripts.py publish $STAGE")');
+    assert.ok(publish > 0 && publish < src.indexOf('SSH "chown -R dac:dac $STAGE"'));
+    assert.match(src, /bash \$COPY\/scripts\/close_update_window\.sh/);
+    assert.match(src, /sh "\$COPY\/scripts\/block_internet_access\.sh"/);
+    assert.match(src, /bash \$COPY\/scripts\/setup_resource_limits\.sh/);
+    const start = src.indexOf('if [ "$HEALTHY" = "yes" ]; then\n  # Root runs the new copy');
+    const healthy = src.slice(start, src.indexOf('# --- automatic rollback'));
+    assert.match(healthy, /SSH "bash \$COPY\/scripts\/setup_services\.sh \$COPY"/);
+    assert.doesNotMatch(src.slice(src.indexOf('# --- automatic rollback')), /setup_services|system_scripts\.py (?:publish|point)/);
+  });
+});

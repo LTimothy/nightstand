@@ -233,8 +233,8 @@ describe('free-sleep-health units', () => {
     // A rollback to an older release keeps the units but not the script.
     const src = read('free-sleep-health.service');
     assert.match(src, /Type=oneshot/);
-    assert.match(src, /\[ -f \/home\/dac\/free-sleep\/scripts\/health_check\.sh \] \|\| exit 0/);
-    assert.match(src, /exec \/bin\/bash \/home\/dac\/free-sleep\/scripts\/health_check\.sh/);
+    assert.match(src, /\[ -f \/usr\/local\/lib\/nightstand\/live\/scripts\/health_check\.sh \] \|\| exit 0/);
+    assert.match(src, /exec \/bin\/bash \/usr\/local\/lib\/nightstand\/live\/scripts\/health_check\.sh/);
   });
 
   it('the timer runs every minute and starts well after boot', () => {

@@ -178,7 +178,7 @@ python3() {
   else echo 'unexpected transaction return' >&2; return 99; fi
 }
 ''' + block + '\necho legacy-migration'],
-                    env=dict(os.environ, STAGE=str(self.stage), LIVE=str(self.system.live),
+                    env=dict(os.environ, STAGE=str(self.stage), COPY=str(self.stage), LIVE=str(self.system.live),
                              REMOVE_FOREIGN='no', NIGHTSTAND_TRANSACTION_ROOT=str(self.system.store.root)),
                     capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -499,6 +499,9 @@ bash "$TEST_ROLLBACK"
         shutil.move(str(self.stage), str(self.system.live))
         next_stage = self.system.live.parent / 'return-stage'
         create_tree(next_stage, 'LTimothy/nightstand', '3.7.0')
+        # The installer copies the stage's scripts for root before the return.
+        subprocess.run([sys.executable, '-B', str(SCRIPTS / 'system_scripts.py'), 'publish', str(next_stage)], check=True,
+                       capture_output=True, env=dict(os.environ, NIGHTSTAND_SYSTEM_DIR=str(self.system.config.system)))
         schedules = (self.system.data / 'schedulesDB.json').read_bytes()
         transaction = self.runner.install(self.system, next_stage, operation='free-sleep-migrate.service')
         self.assertFalse((self.system.data / 'left_cap_baseline.json').exists())
@@ -553,7 +556,7 @@ bash "$TEST_ROLLBACK"
         self.assertIn(['start', '--no-block', 'free-sleep-archive-raw.timer'], self.system.calls)
         self.assertIn(['iptables-restore'], self.system.calls)
         self.assertIn(['ip6tables-restore'], self.system.calls)
-        policy = ['sh', str(self.system.live / 'scripts/block_internet_access.sh')]
+        policy = ['sh', str(self.system.config.system / 'live/scripts/block_internet_access.sh')]
         self.assertLess(self.system.calls.index(policy), self.system.calls.index(['iptables-restore']))
 
     def test_failed_return_restores_new_upstream_calibration_updater_and_environment(self):

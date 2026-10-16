@@ -16,6 +16,7 @@ import shlex
 import subprocess
 import tempfile
 
+import system_scripts
 from switch_transaction import TransactionStore, durable_directory, fsync_directory, publish
 
 FORK_UNITS = tuple('free-sleep-' + name + suffix for name, suffixes in (
@@ -35,6 +36,7 @@ class Configuration:
     def __init__(self, root=Path('/'), live=Path('/home/dac/free-sleep')):
         self.root = Path(root).absolute()
         self.live = Path(live).absolute()
+        self.system = self.root / 'usr/local/lib/nightstand'
         self.systemd = self.root / 'etc/systemd/system'
         self.maintenance = self.root / 'persistent/free-sleep-maintenance'
         self.guard = self.maintenance / 'update_service.sh'
@@ -52,7 +54,7 @@ class Configuration:
                   self.root / 'persistent/free-sleep-data/watchdog-trial',
                   self.root / 'etc/systemd/timesyncd.conf',
                   self.root / 'etc/tmpfiles.d/free-sleep-operation.conf'] + list(self.firewall_files)
-        paths += [self.root / ('home/dac/free-sleep-recovery/' + name)
+        paths += [self.system / ('recovery/' + name)
                   for name in ('recover_update.sh', 'restore_helpers.sh')]
         paths += [self.systemd / 'free-sleep.service.d/10-nightstand-limits.conf',
                   self.systemd / 'free-sleep.service.d/20-nightstand-restart.conf',
@@ -133,25 +135,36 @@ def verify_updater(config):
         raise ValueError('Effective upstream updater has an invalid executable or stop hook')
 
 
+def nightstand_scripts(config):
+    """Root-owned scripts for the Nightstand tree at config.live, never the tree."""
+    try:
+        copy = config.system / 'copies' / system_scripts.digest(str(config.live))
+    except SystemExit:
+        copy = None
+    return (copy if copy and copy.is_dir() else config.system / 'live') / 'scripts'
+
+
 def apply(store, transaction, config, direction):
     journal, captured = record(store, transaction, config)
     if journal['phase'] != 'installing' or direction not in ('upstream', 'nightstand'):
         raise ValueError('Reconciliation requires an installing transaction and known fork')
     store.intent(transaction, 'reconcile-system', dict(direction=direction))
     if direction == 'nightstand':
+        scripts = nightstand_scripts(config)
         remove(config.systemd / 'free-sleep-update.service.d/sqlite-maintenance.conf')
         environment = dict(os.environ, NIGHTSTAND_SYSTEMD_DIR=str(config.systemd),
+                           NIGHTSTAND_SYSTEM_DIR=str(config.system),
                            NIGHTSTAND_SUDOERS_FILE=str(config.sudoers),
                            NIGHTSTAND_TMPFILES_DIR=str(config.root / 'etc/tmpfiles.d'),
-                           NIGHTSTAND_RECOVERY_DIR=str(config.root / 'home/dac/free-sleep-recovery'),
-                           NIGHTSTAND_SWITCH_RECOVERY_DIR=str(config.root / 'home/dac/free-sleep-switch-recovery'),
+                           NIGHTSTAND_RECOVERY_DIR=str(config.system / 'recovery'),
+                           NIGHTSTAND_SWITCH_RECOVERY_DIR=str(config.system / 'switch-recovery'),
                            NIGHTSTAND_TRANSACTION_ROOT=str(store.root))
-        execute(['bash', str(config.live / 'scripts/setup_services.sh'), str(config.live)], env=environment)
+        execute(['bash', str(scripts / 'setup_services.sh'), str(scripts.parent)], env=environment)
         for unit in ('free-sleep-archive-raw.service', 'free-sleep-archive-raw.timer'):
-            source = config.live / 'scripts/systemd' / unit
+            source = scripts / 'systemd' / unit
             if source.is_file():
                 write(config.systemd / unit, source.read_bytes())
-        limits = config.live / 'scripts/setup_resource_limits.sh'
+        limits = scripts / 'setup_resource_limits.sh'
         if limits.is_file():
             execute(['bash', str(limits)], env=environment)
     else:
@@ -189,7 +202,9 @@ def apply(store, transaction, config, direction):
     execute(['systemctl', 'daemon-reload'])
     if direction == 'upstream':
         verify_updater(config)
-    execute(['sh', str(config.live / 'scripts/block_internet_access.sh')])
+    # Upstream runs its own firewall script; Nightstand runs its root-owned copy.
+    block = (nightstand_scripts(config) if direction == 'nightstand' else config.live / 'scripts') / 'block_internet_access.sh'
+    execute(['sh', str(block)])
     for family in ('iptables', 'ip6tables'):
         try:
             execute([family, '-C', 'OUTPUT', '-j', 'REJECT'])

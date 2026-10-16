@@ -233,6 +233,10 @@ trap 'rm -f "$SHIP_TAR"' EXIT
 git archive HEAD -o "$SHIP_TAR"
 ship_to_stage "$SHIP_TAR" || die "staging ship failed after $SHIP_ATTEMPTS attempts; nothing was changed on the pod"
 rm -f "$SHIP_TAR"; trap - EXIT
+# Root runs a root-owned copy of these scripts, taken before the stage is
+# handed to the server user.
+COPY=$(SSH "python3 -B $STAGE/scripts/system_scripts.py publish $STAGE") \
+  || die "could not copy the scripts root runs on the pod; live install untouched"
 SSH "chown -R dac:dac $STAGE"
 
 # --- dependencies (while old server still runs) ------------------------------
@@ -242,7 +246,7 @@ SSH "chown -R dac:dac $STAGE"
 # first time npm runs under it, so that happens here too rather than at the
 # first start after the swap.
 deps_failed() {
-  SSH "bash $STAGE/scripts/close_update_window.sh" ||
+  SSH "bash $COPY/scripts/close_update_window.sh" ||
     echo "WARNING: could not reach the pod to close the download window; run scripts/close_update_window.sh on it"
   SSH "rm -rf $STAGE"
   die "dependency download failed; staging discarded, live untouched, internet blocked again"
@@ -251,8 +255,8 @@ LOCK_SAME=$(SSH "cmp -s $LIVE/server/package-lock.json $STAGE/server/package-loc
 NODE_MISSING=$(SSH "[ -n '$NODE_PIN' ] && [ ! -d /home/dac/.volta/tools/image/node/$NODE_PIN ] && echo yes || echo no")
 if [ "$LOCK_SAME" = "no" ] || [ "$NODE_MISSING" = "yes" ]; then
   say "Downloading dependencies in staging (HTTPS and DNS allowed out meanwhile)"
-  SSH "bash -s -- $STAGE $NPM $LOCK_SAME" <<'DEPS' || deps_failed
-STAGE=$1; NPM=$2; LOCK_SAME=$3
+  SSH "bash -s -- $STAGE $NPM $LOCK_SAME $COPY" <<'DEPS' || deps_failed
+STAGE=$1; NPM=$2; LOCK_SAME=$3; COPY=$4
 WAN_RULES=("-p tcp --dport 443 -j ACCEPT" "-p udp --dport 53 -j ACCEPT" "-p tcp --dport 53 -j ACCEPT")
 WAN_RULE6="-p tcp --dport 443 -j REJECT --reject-with tcp-reset"
 # iptables 1.6.0 added "-w SECONDS"; older builds take a bare -w or no flag.
@@ -320,7 +324,7 @@ close_window() {
   trap '' HUP INT TERM
   strip_top fw4 "${WAN_RULES[@]}" >/dev/null
   strip_top fw6 "$WAN_RULE6" >/dev/null
-  sh "$STAGE/scripts/block_internet_access.sh" >/dev/null 2>&1 || echo "WARNING: could not apply the block script again"
+  sh "$COPY/scripts/block_internet_access.sh" >/dev/null 2>&1 || echo "WARNING: could not apply the block script again"
   restore_output_policy
 }
 trap close_window EXIT
@@ -402,7 +406,7 @@ elif [ "$SCHEMA_CHANGED" = "yes" ]; then
 fi
 
 # Same as update.sh: before the start below, so the limits apply to it.
-SSH "[ ! -f $LIVE/scripts/setup_resource_limits.sh ] || bash $LIVE/scripts/setup_resource_limits.sh" \
+SSH "[ ! -f $COPY/scripts/setup_resource_limits.sh ] || bash $COPY/scripts/setup_resource_limits.sh" \
   || say "WARNING: failed to install service memory limits"
 
 SSH "systemctl start free-sleep"
@@ -452,6 +456,9 @@ if [ "$MIGRATION_FAILED" = "yes" ]; then
 fi
 
 if [ "$HEALTHY" = "yes" ]; then
+  # Root runs the new copy from now on, with the units and rules it needs.
+  SSH "bash $COPY/scripts/setup_services.sh $COPY" \
+    || say "WARNING: some services or sudoers rules could not be installed; the next in-app update retries them"
   say "SUCCESS: pod is serving v$VERSION ($COMMIT). Previous version kept at $PREV; backup at $BK"
   exit 0
 fi

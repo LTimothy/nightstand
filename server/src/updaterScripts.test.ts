@@ -43,7 +43,7 @@ describe('updater shell scripts', () => {
     // The archive's top dir is named after the repo, so it must be resolved
     // dynamically, never hardcoded to a repo name that a rename would break.
     assert.doesNotMatch(src, /free-sleep-main|nightstand-main/, 'must not hardcode the archive dir name');
-    assert.match(src, /find "\$STAGE\.unzip".*-type d/, 'must resolve the staged archive dir dynamically');
+    assert.match(src, /find "\$WORK\/tree".*-type d/, 'must resolve the staged archive dir dynamically');
   });
 
   // nats-py ships in the release tree, so an update downloads only the release.
@@ -65,7 +65,7 @@ describe('updater shell scripts', () => {
 
   it('the update unit runs the script via bash (immune to lost exec bits)', () => {
     const src = readFileSync(path.join(repoRoot, 'scripts/setup_services.sh'), 'utf8');
-    assert.match(src, /ExecStart=\/bin\/bash \/home\/dac\/free-sleep\/scripts\/update_service\.sh/);
+    assert.match(src, /ExecStart=\/bin\/bash \/usr\/local\/lib\/nightstand\/live\/scripts\/update_service\.sh/);
   });
 
   // install.sh is the from-scratch bootstrap, and it installs this fork. The
@@ -97,7 +97,7 @@ describe('updater shell scripts', () => {
 
   it('install.sh bootstraps node through the shared ensure-node.sh', () => {
     const src = readFileSync(path.join(repoRoot, 'scripts/install.sh'), 'utf8');
-    assert.match(src, /bash "\$REPO_DIR\/scripts\/ensure-node\.sh" "\$USERNAME"/);
+    assert.match(src, /bash "\$COPY\/scripts\/ensure-node\.sh" "\$USERNAME"/);
   });
 
   // Regression coverage: disable_biometrics.sh existed but was never granted
@@ -109,13 +109,13 @@ describe('updater shell scripts', () => {
     const src = readFileSync(path.join(repoRoot, 'scripts/setup_services.sh'), 'utf8');
     assert.match(
       src,
-      /ALL=\(ALL\) NOPASSWD: \/bin\/sh \/home\/dac\/free-sleep\/scripts\/disable_biometrics\.sh/
+      /ALL=\(ALL\) NOPASSWD: \/bin\/sh \/usr\/local\/lib\/nightstand\/live\/scripts\/disable_biometrics\.sh/
     );
   });
 
   it('update.sh re-runs setup_services.sh so existing pods pick up missing rules', () => {
     const src = readFileSync(path.join(repoRoot, 'scripts/update.sh'), 'utf8');
-    assert.match(src, /bash "\$LIVE\/scripts\/setup_services\.sh" "\$LIVE"/);
+    assert.match(src, /bash "\$NEW_COPY\/scripts\/setup_services\.sh" "\$NEW_COPY"/);
   });
 
   // Target-version protocol: the server writes update-target.json before
@@ -272,21 +272,21 @@ describe('update.sh hands the rest of an update to the version it installs', () 
 
   it('only hands off to a copy that carries the marker', () => {
     assertOrder([
-      'grep -Fxq "$HANDOFF_MARKER" "$STAGE/scripts/update.sh"',
-      'exec bash "$STAGE/scripts/update.sh"',
+      'grep -Fxq "$HANDOFF_MARKER" "$NEW_COPY/scripts/update.sh"',
+      'exec bash "$NEW_COPY/scripts/update.sh"',
     ], 'marker-gates-exec');
   });
 
   it('hands off only after the internet is blocked again and before anything is backed up', () => {
     assertOrder([
       'close_wan',
-      'exec bash "$STAGE/scripts/update.sh"',
+      'exec bash "$NEW_COPY/scripts/update.sh"',
       'Backing up code + data',
     ], 'handoff-between-download-and-backup');
   });
 
   it('clears the cleanup trap first, since it deletes the stage the new updater needs', () => {
-    assertOrder(['trap - EXIT', 'exec bash "$STAGE/scripts/update.sh"'], 'trap-cleared');
+    assertOrder(['trap - EXIT', 'exec bash "$NEW_COPY/scripts/update.sh"'], 'trap-cleared');
   });
 
   it('passes the two values the rest of the update depends on', () => {
@@ -301,14 +301,14 @@ describe('update.sh hands the rest of an update to the version it installs', () 
       'if [ "$HANDOFF" = 1 ]; then',
       'TARGET_VERSION="${NIGHTSTAND_HANDOFF_TARGET:-}"',
       'else',
-      'curl -fL --max-time 300 -o "$ZIP"',
+      'curl -fL --max-time 300 -o "$WORK/release.zip"',
     ], 'handed-off-run-skips-fetch');
   });
 
   it('never hands off twice', () => {
     assertOrder([
       'if [ "$HANDOFF" != 1 ]; then',
-      'exec bash "$STAGE/scripts/update.sh"',
+      'exec bash "$NEW_COPY/scripts/update.sh"',
     ], 'no-handoff-loop');
   });
 
@@ -352,7 +352,7 @@ describe('the hardware watchdog is turned on only after a successful install or 
     const update = read('scripts/update.sh');
     const fn = update.slice(update.indexOf('arm_watchdog() {'), update.indexOf('\n}\n', update.indexOf('arm_watchdog() {')));
     assert.match(fn, /bash "\$script" --auto /);
-    assert.match(read('scripts/install.sh'), /bash "\$REPO_DIR\/scripts\/setup_watchdog\.sh" --auto /);
+    assert.match(read('scripts/install.sh'), /bash "\$COPY\/scripts\/setup_watchdog\.sh" --auto /);
   });
 
   it('setup_services.sh never arms it, since it runs before the update is checked', () => {

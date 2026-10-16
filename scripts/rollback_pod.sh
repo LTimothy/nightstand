@@ -125,7 +125,7 @@ fix_shared_node_modules() {
 }
 
 restart_services() {
-  restore_restart_services best-effort sh "$LIVE/scripts/block_internet_access.sh"
+  restore_restart_services best-effort sh "$NIGHTSTAND_SCRIPTS/block_internet_access.sh"
 }
 
 # Stops a service that writes the data and confirms it is not running.
@@ -179,8 +179,8 @@ recheck_in_use
 
 # Cross-fork rollback requires companion state only for a recorded retained tree.
 # With no published switch journal, the switch helper is never consulted.
-if [ -f "$LIVE/scripts/switch_installation.py" ] && has_switch_journal; then
-  COMPANION_RECORDED=$(python3 -B "$LIVE/scripts/switch_installation.py" companion-recorded --stage "$PREV") \
+if [ -f "$NIGHTSTAND_SCRIPTS/switch_installation.py" ] && has_switch_journal; then
+  COMPANION_RECORDED=$(python3 -B "$NIGHTSTAND_SCRIPTS/switch_installation.py" companion-recorded --stage "$PREV") \
     || fail "cannot read the retained tree's switch records"
   if [ "$COMPANION_RECORDED" = yes ]; then
     recheck_in_use
@@ -201,10 +201,9 @@ fi
 TARGET_IS_NIGHTSTAND=no
 [ -f "$PREV/scripts/archive-raw.sh" ] && TARGET_IS_NIGHTSTAND=yes
 ARCHIVE_WAS_ACTIVE=$(systemctl is-active free-sleep-archive-raw.timer 2>/dev/null || true)
-if [ "$TARGET_IS_NIGHTSTAND" = yes ]; then
-  python3 "$LIVE/scripts/prepare-downgrade.py" "$PREV/scripts/archive-raw.sh" /persistent/free-sleep-data/raw-archive.conf \
-    || fail "could not preserve archive retention; rollback cancelled before the swap"
-else
+# The archiver root runs is a root-owned copy from a release that reads the
+# retention setting, so a Nightstand target needs nothing changed.
+if [ "$TARGET_IS_NIGHTSTAND" != yes ]; then
   systemctl stop free-sleep-archive-raw.timer free-sleep-archive-raw.service >/dev/null 2>&1 || true
 fi
 
@@ -298,11 +297,14 @@ if [ "$HEALTHY" = yes ]; then
       /etc/systemd/system/free-sleep-network-watchdog.service /etc/systemd/system/free-sleep-network-watchdog.timer \
       /etc/systemd/system/free-sleep.service.d/10-nightstand-limits.conf \
       /etc/systemd/system/free-sleep-stream.service.d/10-nightstand-limits.conf
+    # That fork runs its own updater from its tree, as it did before this one.
+    sed -i 's#/usr/local/lib/nightstand/live/scripts/#/home/dac/free-sleep/scripts/#g' /etc/systemd/system/free-sleep-update.service
     systemctl daemon-reload
-    if [ -f "$PREV/scripts/setup_watchdog.sh" ]; then
-      bash "$PREV/scripts/setup_watchdog.sh" --remove --switching || say "WARNING: could not remove the hardware watchdog setting"
+    if [ -f "$NIGHTSTAND_SCRIPTS/setup_watchdog.sh" ]; then
+      bash "$NIGHTSTAND_SCRIPTS/setup_watchdog.sh" --remove --switching || say "WARNING: could not remove the hardware watchdog setting"
     fi
   fi
+  follow_scripts
   say "SUCCESS: pod is serving v$TARGET_VERSION (rolled back from v$CUR_VERSION)"
   exit 0
 fi

@@ -5,7 +5,7 @@ ConditionPathExists=/persistent/free-sleep-data/update-swap.json
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash /home/dac/free-sleep-recovery/recover_update.sh
+ExecStart=/bin/bash /usr/local/lib/nightstand/recovery/recover_update.sh
 User=root
 Group=root
 TimeoutStartSec=60

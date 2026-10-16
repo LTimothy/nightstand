@@ -468,9 +468,10 @@ describe('network_watchdog.sh', () => {
       ['/bin/bash', '/home/dac/free-sleep/scripts/update_service.sh'],
       ['bash', '/home/dac/free-sleep/scripts/switch-to-upstream.sh'],
       ['bash', '/home/dac/free-sleep/scripts/revert-to-stock.sh'],
-      ['bash', '/home/dac/migrate/pod-installer.sh'],
-      ['bash', '/home/dac/migrate/agent-bootstrap-installer.sh'],
-      ['/bin/bash', '/home/dac/restore-original-fork.sh', '--sentinel'],
+      ['bash', '/usr/local/lib/nightstand/migrate/pod-installer.sh'],
+      ['bash', '/usr/local/lib/nightstand/migrate/agent-bootstrap-installer.sh'],
+      ['/bin/bash', '/usr/local/lib/nightstand/restore-original-fork.sh', '--sentinel'],
+      ['/bin/bash', '/usr/local/lib/nightstand/live/scripts/update_service.sh'],
     ];
     const t = pod({ kernel: WLAN_OOPS, state: DOWN_AN_HOUR });
     for (const argv of running) {
@@ -751,8 +752,8 @@ describe('free-sleep-network-watchdog units', () => {
     // A rollback to an older release keeps the units but not the script.
     const src = read('free-sleep-network-watchdog.service');
     assert.match(src, /Type=oneshot/);
-    assert.match(src, /\[ -f \/home\/dac\/free-sleep\/scripts\/network_watchdog\.sh \] \|\| exit 0/);
-    assert.match(src, /exec \/bin\/bash \/home\/dac\/free-sleep\/scripts\/network_watchdog\.sh/);
+    assert.match(src, /\[ -f \/usr\/local\/lib\/nightstand\/live\/scripts\/network_watchdog\.sh \] \|\| exit 0/);
+    assert.match(src, /exec \/bin\/bash \/usr\/local\/lib\/nightstand\/live\/scripts\/network_watchdog\.sh/);
     assert.match(src, /User=root/);
   });
 

@@ -42,7 +42,8 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
   ].join('\n'));
   if (logTimeout) executable(path.join(bin, 'timeout'), `echo "timeout $*" >> "${calls}"\nshift\nexec "$@"`);
   executable(path.join(bin, 'systemctl'), `echo "systemctl $*" >> "${calls}"`);
-  const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8').replaceAll('/home/dac', home);
+  const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8')
+    .replaceAll('/usr/local/lib/nightstand/live/scripts', scripts).replaceAll('/home/dac', home);
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_OPERATION_LOCK: lock || path.join(dir, 'operation.lock'),
     NIGHTSTAND_OPERATION_OWNER: '' };
   let result;

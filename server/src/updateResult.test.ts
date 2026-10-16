@@ -454,8 +454,8 @@ wait $!
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-transaction-result-'));
     try {
       copyFileSync(path.join(repoRoot, 'scripts/write_result.py'), path.join(dir, 'write_result.py'));
-      mkdirSync(path.join(dir, 'live/scripts'), { recursive: true });
-      writeFileSync(path.join(dir, 'live/scripts/switch_installation.py'), '');
+      // Beside the harness, where the root-owned scripts the run started from would be.
+      writeFileSync(path.join(dir, 'switch_installation.py'), '');
       mkdirSync(path.join(dir, 'transactions/recorded'), { recursive: true });
       if (journal) writeFileSync(path.join(dir, 'transactions/recorded/journal.json'), '{}');
       writeFileSync(path.join(dir, 'harness.sh'), `set -uo pipefail
@@ -539,7 +539,7 @@ fail "transaction fell through to the legacy swap"
     const src = read(file);
     const start = src.indexOf(from);
     assert.ok(start >= 0, `missing ${from}`);
-    const section = src.slice(start, src.indexOf('RESULT_PHASE=swapped\nMOVED_MODULES', start));
+    const section = src.slice(start, src.indexOf('RESULT_PHASE=swapped\n', start));
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-swap-'));
     try {
       copyFileSync(path.join(repoRoot, 'scripts/write_result.py'), path.join(dir, 'write_result.py'));
@@ -606,6 +606,7 @@ fail() { say "FATAL: $*"; [ -n "\${RESULT_REASON:-}" ] || RESULT_REASON="$*"; ex
 trap 'record_result $?' EXIT
 CUR_VERSION=3.6.0; EXPECTED_VERSION=3.5.1; STAGED_VERSION=1.0.0; TARGET_VERSION=3.5.1
 LIVE=live; PREV=prev; TMP=tmp; FAILED=failed; STAGE=stage; BK=bk; MOVED_MODULES=no; STREAM_WAS_ACTIVE=no
+SYSTEM_DIR=system; NIGHTSTAND_SCRIPTS=scripts; follow_scripts() { :; }
 RESULT_PHASE=swapped
 systemctl() { :; }; stop_writer() { :; }; rm() { :; }; mv() { :; }; sh() { :; }; tail() { :; }
 restore_switch_data_or_fail() { :; }; restart_services() { :; }; fix_shared_node_modules() { :; }

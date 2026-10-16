@@ -235,7 +235,7 @@ Biometrics is off by default. Install it once on the Pod with the command
 below, then turn it on in Settings > Features.
 
 ```bash
-sh /home/dac/free-sleep/scripts/enable_biometrics.sh
+sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh
 ```
 
 Nightstand keeps its sleep data on the Pod ([server/API.md](server/API.md));

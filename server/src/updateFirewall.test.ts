@@ -155,10 +155,13 @@ function closeScript(dir: string) {
     .replaceAll('/home/dac/free-sleep', `${dir}/live`);
 }
 
-function fixture(tailscale = false, blockScripts: 'live' | 'prev' | 'none' = 'live', unblocked = false): Fixture {
+// The helpers sit in the root-owned scripts folder, so the block script root
+// runs again is the one beside them ('root'), or there is none ('none').
+function fixture(tailscale = false, blockScripts: 'root' | 'none' = 'root', unblocked = false): Fixture {
   const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-update-firewall-'));
   writeFileSync(path.join(dir, 'restore_helpers.sh'), read('scripts/restore_helpers.sh')
     .replaceAll('/etc/iptables/', `${dir}/`));
+  writeFileSync(path.join(dir, 'system_scripts.py'), read('scripts/system_scripts.py'));
   const bin = path.join(dir, 'bin');
   mkdirSync(bin);
   const tools: Array<[string, string]> = [
@@ -177,16 +180,16 @@ function fixture(tailscale = false, blockScripts: 'live' | 'prev' | 'none' = 'li
     .replaceAll('/run/systemd/resolve/resolv.conf', `${dir}/resolved.conf`)
     .replaceAll('/etc/systemd/timesyncd.conf', `${dir}/timesyncd.conf`)
     .replaceAll('/etc/iptables/', `${dir}/`);
-  for (const tree of ['live', 'prev']) {
-    mkdirSync(path.join(dir, tree, 'scripts'), { recursive: true });
-    if (blockScripts === tree) writeFileSync(path.join(dir, tree, 'scripts/block_internet_access.sh'), block);
-  }
-  mkdirSync(path.join(dir, 'stage/scripts'), { recursive: true });
+  if (blockScripts === 'root') writeFileSync(path.join(dir, 'block_internet_access.sh'), block);
+  for (const tree of ['live', 'prev', 'stage', 'copy']) mkdirSync(path.join(dir, tree, 'scripts'), { recursive: true });
+  writeFileSync(path.join(dir, 'live/scripts/block_internet_access.sh'), block);
   writeFileSync(path.join(dir, 'stage/scripts/block_internet_access.sh'), block);
-  writeFileSync(path.join(dir, 'stage/scripts/close_update_window.sh'), closeScript(dir));
+  // ops/deploy.sh's copy of the shipped stage.
+  writeFileSync(path.join(dir, 'copy/scripts/block_internet_access.sh'), block);
+  writeFileSync(path.join(dir, 'copy/scripts/close_update_window.sh'), closeScript(dir));
   const env = {
     ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_FW: path.join(dir, 'fw'),
-    FAKE_TAILSCALE: tailscale ? 'yes' : 'no', F: dir,
+    FAKE_TAILSCALE: tailscale ? 'yes' : 'no', F: dir, NIGHTSTAND_SYSTEM_DIR: path.join(dir, 'system'),
   };
   // The Pod's normal state before an update: the block script has run.
   writeFileSync(path.join(dir, 'block.sh'), block);
@@ -208,7 +211,7 @@ function driver(file: string, body: string) {
     .replace('$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh', '$F/restore_helpers.sh');
   return `set -uo pipefail
 LIVE="$F/live"; PREV="$F/prev"; STAGE="$F/stage"; ZIP="$F/download.zip"; BK="$F/backup"
-SWAP_MARKER="$F/swap-marker"
+SWAP_MARKER="$F/swap-marker"; SYSTEM_DIR="$F/system"; NEW_COPY="$F/copy"
 say() { echo "$*"; }
 restore_switch_data() { :; }
 snapshot() {
@@ -373,15 +376,19 @@ close_wan`)], { env: f.env, encoding: 'utf8', timeout: 10000 });
       }
     });
 
-    it('falls back to the previous block script', () => {
-      const f = fixture(false, 'prev');
+    it('blocks again with the root-owned block script, never a tree\'s', () => {
+      const f = fixture();
       try {
+        for (const tree of ['live', 'prev']) {
+          writeFileSync(path.join(f.dir, tree, 'scripts/block_internet_access.sh'), `touch "$F/ran-${tree}"\n`);
+        }
         const result = spawnSync('bash', ['-c', driver(file, `open_wan
 snapshot
 fail "download failed"`)], { env: f.env, encoding: 'utf8', timeout: 10000 });
         assert.equal(result.status, 1, result.stdout + result.stderr);
         assert.equal(rules(f.dir), f.before);
         assert.match(readFileSync(path.join(f.dir, 'fw/calls'), 'utf8'), /iptables -F OUTPUT/);
+        for (const tree of ['live', 'prev']) assert.ok(!existsSync(path.join(f.dir, `ran-${tree}`)), tree);
       } finally {
         cleanup(f);
       }
@@ -504,9 +511,15 @@ describe('legacy rollback OUTPUT policy recovery', () => {
           const liveBlock = path.join(f.dir, 'live/scripts/block_internet_access.sh');
           writeFileSync(liveBlock, `export FAKE_FAIL_TAIL='${failed}'\n${readFileSync(liveBlock, 'utf8')}`);
           writeFileSync(path.join(f.dir, 'recover.sh'), '#!/bin/sh\nexit 0\n');
+          // Both versions have root-owned copies, and root runs the new one after the swap.
+          const tool = (...args: string[]) => spawnSync('python3', ['-B', path.join(repoRoot, 'scripts/system_scripts.py'), ...args],
+            { env: f.env, encoding: 'utf8' }).stdout.trim();
+          const newCopy = tool('publish', path.join(f.dir, 'live'));
+          tool('publish', path.join(f.dir, 'prev'));
+          tool('point', newCopy);
           const src = read('scripts/update.sh');
           const result = spawnSync('bash', ['-c', driver('scripts/update.sh', `
-FAILED="$F/failed"; RECOVERY_HELPER="$F/recover.sh"
+FAILED="$F/failed"; RECOVERY_HELPER="$F/recover.sh"; NEW_COPY='${newCopy}'
 CUR_VERSION=3.6.1; STAGED_VERSION=3.7.0; HEALTHY=yes
 MOVED_MODULES=no; STREAM_WAS_ACTIVE=inactive
 stop_writer() { return 0; }
@@ -573,10 +586,12 @@ ${src.slice(src.indexOf('# The first arming of the hardware watchdog')).replaceA
           assertPolicies(f);
           const log = calls(f);
           if (mode !== 'with live ACCEPT policies') {
+            // Removing download rules reapplies root's own block script, which ends OUTPUT with REJECT.
+            const terminal = mode === 'with download rules' ? 'REJECT' : 'DROP';
             const reset = log.indexOf('iptables -P OUTPUT ACCEPT');
             for (const tool of ['iptables', 'ip6tables']) {
-              const verified = log.indexOf(`${tool} -C OUTPUT -j DROP`);
-              assert.ok(verified >= 0 && verified < reset);
+              const verified = log.indexOf(`${tool} -C OUTPUT -j ${terminal}`);
+              assert.ok(verified >= 0 && verified < reset, `${tool} ${terminal}`);
             }
           }
           if (mode !== 'with download rules') assert.doesNotMatch(log, / -F | -A | -I | -D /);
@@ -800,7 +815,7 @@ exit 0`)], { env: { ...f.env, FAKE_IPT_W: mode }, encoding: 'utf8', timeout: 100
 }
 
 describe('after the update or revert unit stops', () => {
-  const STOP_POST = 'ExecStopPost=-/bin/bash /home/dac/free-sleep/scripts/close_update_window.sh';
+  const STOP_POST = 'ExecStopPost=-/bin/bash /usr/local/lib/nightstand/live/scripts/close_update_window.sh';
 
   it('reapplies the block when an older release ends OUTPUT with DROP', () => {
     const f = fixture();
@@ -858,7 +873,7 @@ describe('after the update or revert unit stops', () => {
     }
 
     it(`only removes the window ${file} left when internet was unblocked on purpose`, () => {
-      const f = fixture(false, 'live', true);
+      const f = fixture(false, 'root', true);
       try {
         killInWindow(file, f);
         const result = runCloseScript(f);
@@ -926,7 +941,7 @@ describe('after the update or revert unit stops', () => {
   }
 
   it('removes a window left below another rule when internet was unblocked on purpose', () => {
-    const f = fixture(false, 'live', true);
+    const f = fixture(false, 'root', true);
     try {
       killInWindow('scripts/update.sh', f);
       insertAbove(f);
@@ -1057,7 +1072,7 @@ describe('ops/deploy.sh dependency window', () => {
     const section = between(src, '# --- dependencies (while old server still runs)', '# --- atomic swap')
       .replaceAll('/home/dac/.volta', `${f.dir}/volta`);
     return spawnSync('bash', ['-c', `set -uo pipefail
-LIVE="$F/live"; STAGE="$F/stage"; NPM=npm; NODE_PIN=24.12.0
+LIVE="$F/live"; STAGE="$F/stage"; COPY="$F/copy"; NPM=npm; NODE_PIN=24.12.0
 say() { echo "$*"; }
 die() { echo "FATAL: $*"; exit 1; }
 SSH() {
@@ -1111,7 +1126,7 @@ echo finished`], { env: { ...f.env, ...opts.env }, encoding: 'utf8', timeout: 20
       const f = fixture();
       try {
         const setPolicy = failed.split(' ').map(tool => `${tool} -P OUTPUT DROP`).join('\n');
-        writeFileSync(path.join(f.dir, 'stage/scripts/block_internet_access.sh'), `#!/bin/sh\n${setPolicy}\n`);
+        writeFileSync(path.join(f.dir, 'copy/scripts/block_internet_access.sh'), `#!/bin/sh\n${setPolicy}\n`);
         const result = deploy(f);
         assert.equal(result.status, 0, result.stdout + result.stderr);
         assert.equal(rules(f.dir), f.before);
@@ -1151,7 +1166,7 @@ echo finished`], { env: { ...f.env, ...opts.env }, encoding: 'utf8', timeout: 20
   it('leaves Tailscale\'s own rules alone when the window rule is already gone', () => {
     const f = fixture(true);
     try {
-      rmSync(path.join(f.dir, 'stage/scripts/block_internet_access.sh'));
+      rmSync(path.join(f.dir, 'copy/scripts/block_internet_access.sh'));
       const result = deploy(f, { env: { FAKE_DROP_WINDOW: 'yes' } });
       assert.equal(result.status, 0, result.stdout + result.stderr);
       assert.equal(rules(f.dir), f.before);

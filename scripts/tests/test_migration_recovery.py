@@ -44,6 +44,7 @@ class MigrationRecovery(unittest.TestCase):
             local_bin = base / 'local-bin'
             local_bin.mkdir()
             replacements = {'/home/dac/': str(base) + '/', '/persistent/': str(base) + '/persistent/',
+                            '/usr/local/lib/nightstand/': str(base) + '/',
                             '/etc/systemd/system': str(systemd), '/usr/local/bin/': str(local_bin) + '/',
                             '/etc/sysctl.conf': str(base / 'sysctl.conf'),
                             '/tmp/free-sleep-migrate-health': str(base / 'health')}
@@ -62,7 +63,7 @@ class MigrationRecovery(unittest.TestCase):
             recovery = installer[installer.index('disarm_sentinel() {'):installer.index('# ==============================================================================\n# Swap')]
             swap_section = installer[installer.index('write_status "swap"'):installer.index('# A fork moving here has no update channel yet')]
             runner = migrate / 'pod-installer.sh'
-            runner.write_text(localize(prefix + '\nDATABASE=""\n' + recovery + swap_section))
+            runner.write_text(localize(prefix + '\nDATABASE=""\nCOPY="%s"\n' % (base / 'copy') + recovery + swap_section))
             live = base / 'free-sleep'
             prev = base / 'free-sleep-prev'
             older = base / 'free-sleep-prev-preexisting'
@@ -208,6 +209,7 @@ bash "$TEST_SCRIPT" yes
                 migrate.mkdir()
                 (migrate / 'restore_helpers.sh').write_text((ROOT / 'scripts/restore_helpers.sh').read_text())
                 replacements = {'/home/dac/': str(base) + '/', '/persistent/': str(base) + '/persistent/',
+                                '/usr/local/lib/nightstand/': str(base) + '/',
                                 '/etc/systemd/system': str(systemd), '/tmp/free-sleep-migrate-health': str(base / 'health')}
                 for name, target in (('restore-original-fork.sh', base / 'restore.sh'), ('fork-artifacts.sh', migrate / 'fork-artifacts.sh')):
                     source = (ROOT / 'scripts/migrate' / name).read_text()
@@ -337,12 +339,12 @@ bash "$TEST_BASE/restore.sh"
                 units.write_text(unit_text)
             script = base / 'helper.sh'
             script.write_text(helper.read_text().replace('/etc/systemd/system', str(systemd))
-                .replace('/home/dac/', str(base) + '/')
+                .replace('/home/dac/', str(base) + '/').replace('/usr/local/lib/nightstand/', str(base) + '/')
                 .replace('/usr/local/bin/', str(base) + '/local-bin/')
                 .replace('/etc/sysctl.conf', str(base / 'sysctl.conf')))
             restore_script = base / 'restore.sh'
             restore_script.write_text((ROOT / 'scripts/migrate/restore-original-fork.sh').read_text()
-                .replace('/home/dac/', str(base) + '/')
+                .replace('/home/dac/', str(base) + '/').replace('/usr/local/lib/nightstand/', str(base) + '/')
                 .replace('/persistent/', str(base) + '/persistent/')
                 .replace('/etc/systemd/system', str(systemd)))
             migrate_dir = base / 'migrate'

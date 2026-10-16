@@ -98,7 +98,7 @@ describe('switch-to-upstream.sh', () => {
     assert.match(rest, /\/etc\/systemd\/system\/free-sleep-network-watchdog\.timer/);
     // The fork's tree is at $PREV by then; $LIVE is upstream's.
     // --switching records no owner choice, so a later install turns it on.
-    assert.match(rest, /bash "\$PREV\/scripts\/setup_watchdog\.sh" --remove --switching /);
+    assert.match(rest, /bash "\$NIGHTSTAND_SCRIPTS\/setup_watchdog\.sh" --remove --switching /);
   });
 
   it('never rewrites /persistent/free-sleep-data other than a backup copy', () => {
@@ -116,7 +116,8 @@ describe('switch-to-upstream.sh', () => {
     const full = path.join(repoRoot, UNIT);
     assert.equal(existsSync(full), true, `${UNIT} is missing`);
     const src = readFileSync(full, 'utf8');
-    assert.match(src, /^ExecStart=\/bin\/bash -c '[^'\n]*exec \/bin\/bash \/home\/dac\/free-sleep\/scripts\/switch-to-upstream\.sh;/m);
+    assert.match(src,
+      /^ExecStart=\/bin\/bash -c '[^'\n]*exec \/bin\/bash \/usr\/local\/lib\/nightstand\/live\/scripts\/switch-to-upstream\.sh;/m);
   });
 
   it('keeps the old name working as a shim', () => {
@@ -155,7 +156,7 @@ describe('switch-to-upstream.sh', () => {
       try {
         mkdirSync(path.join(dir, 'scripts'));
         for (const name of names) writeFileSync(path.join(dir, 'scripts', name), `echo ${name}\n`);
-        const run = spawnSync('bash', ['-c', command.replaceAll('/home/dac/free-sleep', dir)], { encoding: 'utf8' });
+        const run = spawnSync('bash', ['-c', command.replaceAll('/usr/local/lib/nightstand/live', dir)], { encoding: 'utf8' });
         assert.equal(run.stdout, `${names[0]}\n`);
       } finally {
         rmSync(dir, { recursive: true, force: true });

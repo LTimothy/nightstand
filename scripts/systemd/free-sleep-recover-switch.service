@@ -8,7 +8,7 @@ Before=free-sleep.service free-sleep-stream.service free-sleep-update.service fr
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /home/dac/free-sleep-switch-recovery/recover_switch.sh
+ExecStart=/bin/bash /usr/local/lib/nightstand/switch-recovery/recover_switch.sh
 User=root
 Group=root
 TimeoutStartSec=120

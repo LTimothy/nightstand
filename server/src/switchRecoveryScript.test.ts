@@ -408,7 +408,7 @@ with open(sys.argv[1], 'a') as lock:
       const result = spawnSync('bash', [path.join(repo, 'scripts/setup_services.sh'), repo, '--recovery-only'], {
         encoding: 'utf8', env: { ...box.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
           NIGHTSTAND_RECOVERY_DIR: path.join(box.root, 'update-recovery'), NIGHTSTAND_SWITCH_RECOVERY_DIR: recovery,
-          NIGHTSTAND_SWAP_MARKER: path.join(box.root, 'update-swap.json') },
+          NIGHTSTAND_SWAP_MARKER: path.join(box.root, 'update-swap.json'), NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
       });
       assert.equal(result.status, 0, result.stdout + result.stderr);
       const unit = readFileSync(path.join(systemd, 'free-sleep-recover-switch.service'), 'utf8');
@@ -440,10 +440,11 @@ with open(sys.argv[1], 'a') as lock:
       box.arm();
       writeFileSync(path.join(recovery, 'recover_switch.sh'), 'retained helper');
       copyFileSync(path.join(repo, 'scripts/setup_services.sh'), path.join(box.root, 'setup.sh'));
+      copyFileSync(path.join(repo, 'scripts/system_scripts.py'), path.join(box.root, 'system_scripts.py'));
       const again = spawnSync('bash', [path.join(box.root, 'setup.sh'), repo, '--recovery-only'], {
         encoding: 'utf8', env: { ...box.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
           NIGHTSTAND_RECOVERY_DIR: path.join(box.root, 'update-recovery'), NIGHTSTAND_SWITCH_RECOVERY_DIR: recovery,
-          NIGHTSTAND_SWAP_MARKER: path.join(box.root, 'update-swap.json') },
+          NIGHTSTAND_SWAP_MARKER: path.join(box.root, 'update-swap.json'), NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
       });
       assert.equal(again.status, 0, again.stdout + again.stderr);
       assert.equal(readFileSync(path.join(recovery, 'recover_switch.sh'), 'utf8'), 'retained helper');

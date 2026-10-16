@@ -195,7 +195,7 @@ replacing the example snapshot path:
 set -e
 DB=/persistent/free-sleep-data/free-sleep.db
 SNAPSHOT=/persistent/free-sleep-database-backups/<chosen-snapshot>.db
-SAFETY=/home/dac/free-sleep/scripts/sqlite-safety.py
+SAFETY=/usr/local/lib/nightstand/live/scripts/sqlite-safety.py
 test -f "$SNAPSHOT"
 test -f "$SAFETY"
 python3 -c 'import sqlite3'
@@ -227,7 +227,7 @@ database snapshot as above, and run the trusted helper (adjusting its path
 if Nightstand is no longer installed):
 
 ```bash
-python3 /home/dac/free-sleep/scripts/sqlite-safety.py recoverable-migrations \
+python3 /usr/local/lib/nightstand/live/scripts/sqlite-safety.py recoverable-migrations \
   /persistent/free-sleep-data/free-sleep.db \
   /home/dac/free-sleep/server/prisma/migrations
 ```
@@ -310,7 +310,7 @@ auto-off switch.
   watchdog that does not work resets the Pod once rather than at every boot,
   and a failed trial is recorded so later runs do not try again. A deploy
   does not run it.
-  `bash /home/dac/free-sleep/scripts/setup_watchdog.sh --remove` turns it
+  `bash /usr/local/lib/nightstand/live/scripts/setup_watchdog.sh --remove` turns it
   off, and it stays off through updates and reinstalls until the script is
   run again without arguments. On some Pods it turns off only at the next
   restart. I checked setup, removal, persistence across a reboot and

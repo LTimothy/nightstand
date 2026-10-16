@@ -30,11 +30,11 @@ PREV=/home/dac/free-sleep-prev
 PREEXISTING_PREV=/home/dac/free-sleep-prev-preexisting
 SWAP_MARKER=/home/dac/free-sleep-migrate-swapped
 STAGE=/home/dac/free-sleep-agent-staging
-PAYLOAD=/home/dac/free-sleep-agent-payload
+PAYLOAD=/usr/local/lib/nightstand/migrate/agent-payload
 LOCK_FILE=/home/dac/free-sleep-agent-bootstrap.lock
 STATUS_FILE=/persistent/free-sleep-data/migration-status.json
 RESTORE_SCRIPT_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/restore-original-fork.sh"
-RESTORE_SCRIPT_DEST=/home/dac/restore-original-fork.sh
+RESTORE_SCRIPT_DEST=/usr/local/lib/nightstand/restore-original-fork.sh
 SENTINEL_SERVICE=free-sleep-migrate-sentinel.service
 SENTINEL_TIMER=free-sleep-migrate-sentinel.timer
 SENTINEL_MINUTES=12
@@ -159,6 +159,10 @@ PY
 
 [ -f "$STAGE/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"
 [ -f "$STAGE/server/public/index.html" ] || fail "staged tree is missing server/public/index.html"
+# Copied for root before the stage is handed to the server user. Root runs
+# this copy from here on.
+COPY=$(python3 -B "$STAGE/scripts/system_scripts.py" publish "$STAGE") \
+  || fail "could not copy the scripts root runs; their server was never touched"
 chown -R dac:dac "$STAGE"
 write_status "stage" "ok" "agent applied to a copy of upstream free-sleep"
 
@@ -253,7 +257,7 @@ fi
 # and rules. Install them after the health check so a failed overlay restores
 # the original install before any of these changes.
 say "Installing the updater, rollback, and revert services and their sudoers rules..."
-bash "$LIVE/scripts/setup_services.sh" "$LIVE" \
+bash "$COPY/scripts/setup_services.sh" "$COPY" \
   || say "WARNING: some services or sudoers rules could not be installed; the next in-app update retries them"
 
 rm -f "$SWAP_MARKER"

@@ -163,6 +163,7 @@ PYDATABASE
 if [ "${SETTLE_RESTORED:-no}" = yes ]; then
   matches_marker "$LIVE" || fail "the original tree was not restored; marker kept"
   healthy_live 15 || fail "the restored install did not pass its health check; marker kept"
+  follow_scripts
   clear_marker
   exit 0
 fi
@@ -175,6 +176,7 @@ if healthy_live; then
     record_recovery success "The update was interrupted. The target install passed boot recovery checks." \
       || fail "could not record recovery; marker kept"
   fi
+  follow_scripts
   clear_marker
   say "The live install is healthy; cleared the interrupted update marker"
   exit 0
@@ -212,6 +214,7 @@ restore_restart_services strict || fail "${RESTORE_SERVICE_ERROR:-could not rest
 if healthy_live 15; then
   record_recovery rolled-back "The update was interrupted. Boot recovery restored the previous install." \
     || fail "could not record recovery; marker kept"
+  follow_scripts
   clear_marker
   say "Restored the previous install after an interrupted update"
 else

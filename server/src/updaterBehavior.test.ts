@@ -23,12 +23,17 @@ function run(script: string, setup = '') {
     writeFileSync(path.join(dir, tree, 'version'), tree === 'live' ? 'failed' : 'restored');
   }
   mkdirSync(path.join(dir, 'persistent/free-sleep-data/lowdb'), { recursive: true });
+  // The root-owned scripts the run started from, stubbed.
+  mkdirSync(path.join(dir, 'scripts'));
+  writeFileSync(path.join(dir, 'scripts/system_scripts.py'),
+    'import os, sys\nopen(os.environ["FIXTURE"] + "/system-scripts", "a").write(" ".join(sys.argv[1:]) + "\\n")\n');
   const env = { ...process.env, FIXTURE: dir };
   const fixtureScript = script.replaceAll('/home/dac/free-sleep', `${dir}/live`)
     .replaceAll('/persistent/', `${dir}/persistent/`);
   const result = spawnSync('bash', ['-c', `set -uo pipefail
 LIVE="$FIXTURE/live"; PREV="$FIXTURE/prev"; FAILED="$FIXTURE/failed"; TMP="$FIXTURE/tmp"; STAGE="$FIXTURE/stage"
-RECOVERY_SOURCE="$FIXTURE/recovery-source"; RECOVERY_HELPER="$FIXTURE/recovery-helper"
+NIGHTSTAND_SCRIPTS="$FIXTURE/scripts"; NEW_COPY="$FIXTURE/copy"; SYSTEM_DIR="$FIXTURE/system"
+RECOVERY_HELPER="$FIXTURE/recovery-helper"
 SWAP_MARKER="$FIXTURE/swap-marker"
 BK=backup; CUR_VERSION=3.0.0; TARGET_VERSION=3.1.0; MOVED_MODULES=no; STREAM_WAS_ACTIVE=active
 NPM=npm; NPX=npx; SSH_PORT=22; DRY_RUN=yes
@@ -37,7 +42,7 @@ fail() { echo "$*"; exit 1; }
 sleep() { :; }
 sync() { :; }
 bash() {
-  case "$1" in "$RECOVERY_SOURCE/scripts/setup_services.sh"|"$RECOVERY_HELPER") return 0;; esac
+  case "$1" in "$NIGHTSTAND_SCRIPTS/setup_services.sh"|"$RECOVERY_HELPER") return 0;; esac
   command bash "$@"
 }
 chown() { :; }
@@ -51,7 +56,7 @@ restore_and_report() { echo restored > "$FIXTURE/restored"; }
 fix_shared_node_modules() { :; }
 restore_switch_data() { :; }
 restore_switch_data_or_fail() { restore_switch_data || fail "$*"; }
-${readFileSync(path.join(root, 'scripts/restore_helpers.sh'), 'utf8')}
+${readFileSync(path.join(root, 'scripts/restore_helpers.sh'), 'utf8').replace(/^NIGHTSTAND_SCRIPTS=.*$/m, '')}
 ${section('scripts/rollback_pod.sh', 'restart_services() {', '# --- preflight')}
 ${setup}
 ${fixtureScript}`], { env, encoding: 'utf8', input: 'y\n', timeout: 5000 });
@@ -895,7 +900,7 @@ it('update.sh carries the request across the handoff, and an older updater means
   const src = readFileSync(path.join(root, 'scripts/update.sh'), 'utf8');
   const handoff = src.slice(src.indexOf('if [ "$HANDOFF" = 1 ]; then'), src.indexOf('else', src.indexOf('if [ "$HANDOFF" = 1 ]; then')));
   assert.match(handoff, /RECHECK_IN_USE="\$\{NIGHTSTAND_HANDOFF_RECHECK_IN_USE:-no\}"/);
-  assert.match(src, /export NIGHTSTAND_HANDOFF_RECHECK_IN_USE="\$RECHECK_IN_USE"\n\s*exec bash "\$STAGE\/scripts\/update\.sh"/);
+  assert.match(src, /export NIGHTSTAND_HANDOFF_RECHECK_IN_USE="\$RECHECK_IN_USE"\n\s*exec bash "\$NEW_COPY\/scripts\/update\.sh"/);
   const consume = src.slice(src.indexOf('# --- consume the target-version request file'), src.indexOf('# --- preflight'));
   assert.match(consume, /^read_request$/m);
 });
@@ -1059,8 +1064,7 @@ it('refuses cross-fork rollback without companion state before executing a trans
   const helper = section('scripts/restore_helpers.sh', 'restore_cross_fork_rollback() {');
   for (const available of [false, true]) {
     const result = run(helper + '\nrestore_cross_fork_rollback\n', `
-mkdir -p "$LIVE/scripts"
-touch "$LIVE/scripts/switch_installation.py"
+touch "$NIGHTSTAND_SCRIPTS/switch_installation.py"
 python3() {
   printf '%s\\n' "$*" >> "$FIXTURE/marker"
   if [ "$3" = companion ]; then return ${available ? 0 : 1}; fi

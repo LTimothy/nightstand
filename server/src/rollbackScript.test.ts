@@ -33,7 +33,7 @@ describe('rollback_pod.sh', () => {
   it('applies the restored firewall without opening a download window', () => {
     const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
     assert.doesNotMatch(src, /unblock_internet_access/);
-    assert.match(src, /sh "\$LIVE\/scripts\/block_internet_access\.sh"/);
+    assert.match(src, /sh "\$NIGHTSTAND_SCRIPTS\/block_internet_access\.sh"/);
   });
 
   it('restores the running version if the post-swap health check fails', () => {
@@ -66,7 +66,7 @@ describe('rollback_pod.sh', () => {
     assert.match(otherFork, /\/etc\/systemd\/system\/free-sleep-network-watchdog\.timer/);
     // After the swap, $PREV holds the Nightstand tree that was running.
     // --switching records no owner choice, so a later install turns it on.
-    assert.match(otherFork, /bash "\$PREV\/scripts\/setup_watchdog\.sh" --remove --switching /);
+    assert.match(otherFork, /bash "\$NIGHTSTAND_SCRIPTS\/setup_watchdog\.sh" --remove --switching /);
     assert.equal(success.match(/setup_watchdog/g)?.length, 2, 'a Nightstand target keeps the watchdog');
   });
 
@@ -74,7 +74,7 @@ describe('rollback_pod.sh', () => {
     const full = path.join(repoRoot, UNIT);
     assert.equal(existsSync(full), true, `${UNIT} is missing`);
     const src = readFileSync(full, 'utf8');
-    assert.match(src, /ExecStart=\/bin\/bash \/home\/dac\/free-sleep\/scripts\/rollback_pod\.sh/);
+    assert.match(src, /ExecStart=\/bin\/bash \/usr\/local\/lib\/nightstand\/live\/scripts\/rollback_pod\.sh/);
   });
 
   it('setup_services.sh installs the rollback service and its sudoers rule', () => {
@@ -86,7 +86,7 @@ describe('rollback_pod.sh', () => {
   it('install.sh and update.sh both run setup_services.sh', () => {
     for (const script of ['scripts/install.sh', 'scripts/update.sh']) {
       const src = readFileSync(path.join(repoRoot, script), 'utf8');
-      assert.match(src, /bash "\$(REPO_DIR|LIVE)\/scripts\/setup_services\.sh"/, script);
+      assert.match(src, /bash "\$(COPY|NEW_COPY)\/scripts\/setup_services\.sh"/, script);
     }
   });
 });

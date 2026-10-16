@@ -601,12 +601,12 @@ printf '%s' "$BASELINE_JSON" | ssh_cmd "$SSH_PORT" "cat > /home/dac/free-sleep-m
 # Stage 5, push pod-installer.sh, start it detached, poll status
 # ==============================================================================
 say "Stage 5: pushing the installer and starting it (detached, safe if this laptop disconnects)"
-ssh_cmd "$SSH_PORT" "mkdir -p /home/dac/migrate"
-scp_to_pod "$SSH_PORT" "$SCRIPT_DIR/pod-installer.sh" "/home/dac/migrate/pod-installer.sh"
-scp_to_pod "$SSH_PORT" "$SCRIPT_DIR/restore-original-fork.sh" "/home/dac/migrate/restore-original-fork.sh"
-scp_to_pod "$SSH_PORT" "$SCRIPT_DIR/fork-artifacts.sh" "/home/dac/migrate/fork-artifacts.sh"
-scp_to_pod "$SSH_PORT" "$RESTORE_HELPER_LOCAL" "/home/dac/migrate/restore_helpers.sh"
-ssh_cmd "$SSH_PORT" "chmod +x /home/dac/migrate/pod-installer.sh /home/dac/migrate/restore-original-fork.sh"
+ssh_cmd "$SSH_PORT" "mkdir -p /usr/local/lib/nightstand/migrate && chmod 755 /usr/local/lib/nightstand /usr/local/lib/nightstand/migrate"
+scp_to_pod "$SSH_PORT" "$SCRIPT_DIR/pod-installer.sh" "/usr/local/lib/nightstand/migrate/pod-installer.sh"
+scp_to_pod "$SSH_PORT" "$SCRIPT_DIR/restore-original-fork.sh" "/usr/local/lib/nightstand/migrate/restore-original-fork.sh"
+scp_to_pod "$SSH_PORT" "$SCRIPT_DIR/fork-artifacts.sh" "/usr/local/lib/nightstand/migrate/fork-artifacts.sh"
+scp_to_pod "$SSH_PORT" "$RESTORE_HELPER_LOCAL" "/usr/local/lib/nightstand/migrate/restore_helpers.sh"
+ssh_cmd "$SSH_PORT" "chmod +x /usr/local/lib/nightstand/migrate/pod-installer.sh /usr/local/lib/nightstand/migrate/restore-original-fork.sh"
 # Push the Stage 2 (pre-consent) iptables snapshot rather than letting
 # pod-installer.sh take a fresh one later, every abort path must restore
 # the state the pod was actually in when the user typed "switch", not
@@ -617,11 +617,11 @@ ssh_cmd "$SSH_PORT" "
   rm -f /persistent/free-sleep-data/migration-status.json
   if command -v systemd-run >/dev/null 2>&1; then
     systemd-run --unit=free-sleep-migrate --collect --property=KillMode=control-group \
-      --property=ExecStopPost='-/bin/systemctl restart --no-block free-sleep-recover-switch.service' bash /home/dac/migrate/pod-installer.sh \"$REMOVE_FOREIGN\" \
-      || systemd-run --unit=free-sleep-migrate --collect bash /home/dac/migrate/pod-installer.sh \"$REMOVE_FOREIGN\"
+      --property=ExecStopPost='-/bin/systemctl restart --no-block free-sleep-recover-switch.service' bash /usr/local/lib/nightstand/migrate/pod-installer.sh \"$REMOVE_FOREIGN\" \
+      || systemd-run --unit=free-sleep-migrate --collect bash /usr/local/lib/nightstand/migrate/pod-installer.sh \"$REMOVE_FOREIGN\"
   else
     command -v setsid >/dev/null || exit 1
-    nohup setsid bash /home/dac/migrate/pod-installer.sh \"$REMOVE_FOREIGN\" >/home/dac/migrate/installer.out 2>&1 & disown
+    nohup setsid bash /usr/local/lib/nightstand/migrate/pod-installer.sh \"$REMOVE_FOREIGN\" >/usr/local/lib/nightstand/migrate/installer.out 2>&1 & disown
   fi
 " || fail "could not start the installer on the pod"
 

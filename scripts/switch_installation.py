@@ -562,7 +562,7 @@ def main():
             pending = any(journal['phase'] not in recover_switch.TERMINAL for journal in recover_switch.journals(system.store))
             committed = [journal['id'] for journal in recover_switch.journals(system.store)
                          if journal['id'] not in prior_ids and journal['phase'] in ('committed', 'cleaned')]
-            recover_switch.restore(system.store, Path('/home/dac/free-sleep-switch-recovery/restore_helpers.sh'))
+            recover_switch.restore(system.store, Path('/usr/local/lib/nightstand/switch-recovery/restore_helpers.sh'))
             if len(committed) == 1 and system.store.load(committed[0])['phase'] == 'cleaned':
                 print(committed[0])
                 return

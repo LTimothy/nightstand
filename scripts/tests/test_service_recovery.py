@@ -83,6 +83,7 @@ systemctl() { [ "$1" != is-active ] || { echo inactive; return 3; }; echo "$*" >
             with self.subTest(failure=failure):
                 setup = '''
 SRC_DIR="$FIXTURE/stage"
+COPY="$FIXTURE/copy"
 mkdir -p "$FIXTURE/data"
 touch "$FIXTURE/data/free-sleep.db"
 python3() {

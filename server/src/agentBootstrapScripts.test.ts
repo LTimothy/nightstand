@@ -99,12 +99,12 @@ describe('the agent bootstrap scripts', () => {
   it('installs the rollback and revert units and their sudoers rules only after a passed health check', () => {
     const pod = read(POD);
     assert.ok(
-      pod.indexOf('bash "$LIVE/scripts/setup_services.sh"') > pod.indexOf('if [ "$HEALTHY" != "1" ]; then'),
+      pod.indexOf('bash "$COPY/scripts/setup_services.sh"') > pod.indexOf('if [ "$HEALTHY" != "1" ]; then'),
       'setup_services.sh must not run before the health check',
     );
     assertOrder(pod, [
       'if [ "$HEALTHY" != "1" ]; then',
-      'bash "$LIVE/scripts/setup_services.sh" "$LIVE"',
+      'bash "$COPY/scripts/setup_services.sh" "$COPY"',
       'rm -f "$SWAP_MARKER"',
     ], 'services-after-health');
   });

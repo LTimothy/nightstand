@@ -3,7 +3,7 @@ Description=Hardlink RAW piezo files into local archive before firmware truncate
 
 [Service]
 Type=oneshot
-ExecStart=/home/dac/free-sleep/scripts/archive-raw.sh
+ExecStart=/bin/bash /usr/local/lib/nightstand/live/scripts/archive-raw.sh
 # Runs as root: hardlinks of root-owned RAW files in /persistent/ require
 # either ownership or root, due to fs.protected_hardlinks=1 on this kernel.
 User=root

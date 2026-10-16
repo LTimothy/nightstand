@@ -47,8 +47,19 @@ DATABASE_BACKUPS=/persistent/free-sleep-database-backups
 SQLITE_SAFETY="$(dirname "${BASH_SOURCE[0]}")/sqlite-safety.py"
 PRUNE_SNAPSHOTS="$(dirname "${BASH_SOURCE[0]}")/prune_db_snapshots.sh"
 SWAP_MARKER=/persistent/free-sleep-data/update-swap.json
-RECOVERY_HELPER=/home/dac/free-sleep-recovery/recover_update.sh
-RECOVERY_SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Root runs only root-owned copies of these scripts; see system_scripts.py.
+SYSTEM_DIR=/usr/local/lib/nightstand
+RECOVERY_HELPER=$SYSTEM_DIR/recovery/recover_update.sh
+RECOVERY_SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# Started by hand from the server user's tree: run the root-owned copy.
+case "$RECOVERY_SOURCE" in
+  "$SYSTEM_DIR"/copies/*) ;;
+  *) if [ "${NIGHTSTAND_UPDATE_HANDOFF:-}" != 1 ] && [ -z "${NIGHTSTAND_FROM_TREE:-}" ] \
+       && [ -f "$SYSTEM_DIR/live/scripts/update.sh" ]; then
+       export NIGHTSTAND_FROM_TREE=1
+       exec bash "$SYSTEM_DIR/live/scripts/update.sh"
+     fi ;;
+esac
 KEEP_BACKUPS=5
 NPM=/home/dac/.volta/bin/npm
 NPX=/home/dac/.volta/bin/npx
@@ -138,6 +149,7 @@ finish_interrupted_swap() {
     mv "$RESTORE_TREE" "$LIVE" || { say "Could not move $RESTORE_TREE back to $LIVE; manual recovery required"; return 0; }
     moved=yes
   fi
+  [ "$moved" = no ] || follow_scripts
   if [ "${MOVED_MODULES:-no}" = yes ] && [ ! -d "$LIVE/server/node_modules" ] && [ -d "$modules_from/server/node_modules" ]; then
     mv "$modules_from/server/node_modules" "$LIVE/server/node_modules"
   fi
@@ -164,7 +176,7 @@ cleanup() {
   finish_interrupted_swap
   # A marked swap may still need dependencies from the stage at boot.
   [ -f "$SWAP_MARKER" ] || rm -rf "$STAGE"
-  rm -rf "$STAGE.unzip" "$STAGE.health" "$STAGE.migrate.log" "$ZIP"
+  rm -rf "$STAGE.unzip" "$STAGE.health" "$STAGE.migrate.log" "$ZIP" "${WORK:-}"
   record_result "$status"
 }
 
@@ -211,7 +223,7 @@ print(" ".join(str(reason) for reason in reasons))' 2>/dev/null) || reasons=stat
 # using the installed copy of the digest script, never the downloaded one. A
 # release published before digests existed has none, and installs as before.
 verify_tree() {
-  local expected actual
+  local expected actual tree=$1
   expected=$(printf '%s' "${RELEASES_JSON:-}" | python3 -c '
 import json, sys
 for release in json.load(sys.stdin).get("releases", []):
@@ -222,11 +234,11 @@ for release in json.load(sys.stdin).get("releases", []):
     say "No published checksum for v$EXPECTED_VERSION; installing without one"
     return 0
   fi
-  if [ ! -f "$LIVE/scripts/tree_digest.py" ]; then
+  if [ ! -f "$NIGHTSTAND_SCRIPTS/tree_digest.py" ]; then
     say "This install cannot check checksums yet; installing without one"
     return 0
   fi
-  actual=$(python3 "$LIVE/scripts/tree_digest.py" "$STAGE") || fail "could not compute the checksum of v$EXPECTED_VERSION; live install untouched"
+  actual=$(python3 "$NIGHTSTAND_SCRIPTS/tree_digest.py" "$tree") || fail "could not compute the checksum of v$EXPECTED_VERSION; live install untouched"
   [ "$actual" = "$expected" ] || fail "the download of v$EXPECTED_VERSION does not match its published checksum; live install untouched"
   say "v$EXPECTED_VERSION matches its published checksum"
 }
@@ -352,6 +364,15 @@ if [ "$HANDOFF" = 1 ]; then
   RECHECK_IN_USE="${NIGHTSTAND_HANDOFF_RECHECK_IN_USE:-no}"
   unset NIGHTSTAND_UPDATE_HANDOFF NIGHTSTAND_HANDOFF_TARGET NIGHTSTAND_HANDOFF_IS_DOWNGRADE NIGHTSTAND_HANDOFF_RECHECK_IN_USE
   [ -d "$STAGE" ] || fail "handed off without a staged tree at $STAGE"
+  case "$RECOVERY_SOURCE" in
+    "$SYSTEM_DIR"/copies/*) NEW_COPY=$RECOVERY_SOURCE ;;
+    # An updater from before root-owned copies hands off from the stage.
+    *) NEW_COPY=$(python3 -B "$RECOVERY_SOURCE/scripts/system_scripts.py" publish "$STAGE") \
+         || fail "could not copy the new version's scripts for root; live install untouched" ;;
+  esac
+  NIGHTSTAND_SCRIPTS="$NEW_COPY/scripts"
+  SQLITE_SAFETY="$NIGHTSTAND_SCRIPTS/sqlite-safety.py"
+  PRUNE_SNAPSHOTS="$NIGHTSTAND_SCRIPTS/prune_db_snapshots.sh"
   say "Continuing with the new version's updater (running v$CUR_VERSION)"
 else
 # Left unindented to the matching fi: the steps below carry inline python that
@@ -444,18 +465,30 @@ print("yes" if pub > cur else "no")' "$CUR_VERSION" "$REMOTE_VERSION")
 fi
 
 # --- download + stage --------------------------------------------------------
+# Downloaded, checked and copied for root where only root can write, before
+# the server user can reach any of it.
 say "Downloading v$EXPECTED_VERSION..."
-curl -fL --max-time 300 -o "$ZIP" "$RESOLVED_ZIP_URL" || fail "download failed"
-rm -rf "$STAGE" "$STAGE.unzip"
-unzip -q "$ZIP" -d "$STAGE.unzip" || fail "unzip failed"
+mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
+  || fail "could not create a download folder in $SYSTEM_DIR; live install untouched"
+curl -fL --max-time 300 -o "$WORK/release.zip" "$RESOLVED_ZIP_URL" || fail "download failed"
+unzip -q "$WORK/release.zip" -d "$WORK/tree" || fail "unzip failed"
 # GitHub names the archive's top dir after the repo and ref (repo-name + "-" +
 # branch or tag), so resolve it dynamically rather than hardcoding it.
-STAGED_DIR=$(find "$STAGE.unzip" -mindepth 1 -maxdepth 1 -type d | head -n1)
+STAGED_DIR=$(find "$WORK/tree" -mindepth 1 -maxdepth 1 -type d | head -n1)
 [ -d "$STAGED_DIR" ] || fail "unexpected zip layout"
-mv "$STAGED_DIR" "$STAGE" && rm -rf "$STAGE.unzip"
-rm -f "$ZIP"
+verify_tree "$STAGED_DIR"
+# Preserve archive retention before installing a version that ignores the config.
+if [ "$IS_DOWNGRADE" = yes ]; then
+  python3 "$NIGHTSTAND_SCRIPTS/prepare-downgrade.py" \
+    "$STAGED_DIR/scripts/archive-raw.sh" /persistent/free-sleep-data/raw-archive.conf \
+    || fail "could not preserve archive retention; downgrade cancelled before the swap"
+fi
+NEW_COPY=$(python3 -B "$NIGHTSTAND_SCRIPTS/system_scripts.py" publish "$STAGED_DIR") \
+  || fail "could not copy the new version's scripts for root; live install untouched"
+rm -rf "$STAGE"
+mv "$STAGED_DIR" "$STAGE" || fail "could not stage v$EXPECTED_VERSION"
+rm -rf "$WORK"
 chown -R dac:dac "$STAGE"
-verify_tree
 fi
 
 # the pod runs prebuilt code; refuse anything missing its build output
@@ -504,7 +537,7 @@ if [ "$HANDOFF" != 1 ]; then
   # target request already consumed and install the latest release instead of
   # the one asked for, so a downgrade would quietly become an upgrade. Without
   # the marker this script finishes the update itself, as before.
-  if [ "$IS_DOWNGRADE" != yes ] && grep -Fxq "$HANDOFF_MARKER" "$STAGE/scripts/update.sh" 2>/dev/null; then
+  if [ "$IS_DOWNGRADE" != yes ] && grep -Fxq "$HANDOFF_MARKER" "$NEW_COPY/scripts/update.sh" 2>/dev/null; then
     say "Handing the rest of the update to the v$STAGED_VERSION updater"
     # exec replaces this process, so the cleanup trap would never run anyway;
     # cleared explicitly because it deletes the stage the new updater needs.
@@ -513,15 +546,8 @@ if [ "$HANDOFF" != 1 ]; then
     export NIGHTSTAND_HANDOFF_TARGET="$TARGET_VERSION"
     export NIGHTSTAND_HANDOFF_IS_DOWNGRADE="$IS_DOWNGRADE"
     export NIGHTSTAND_HANDOFF_RECHECK_IN_USE="$RECHECK_IN_USE"
-    exec bash "$STAGE/scripts/update.sh"
+    exec bash "$NEW_COPY/scripts/update.sh"
   fi
-fi
-
-# Preserve archive retention before installing a version that ignores the config.
-if [ "$IS_DOWNGRADE" = yes ]; then
-  python3 "$(dirname "${BASH_SOURCE[0]}")/prepare-downgrade.py" \
-    "$STAGE/scripts/archive-raw.sh" /persistent/free-sleep-data/raw-archive.conf \
-    || fail "could not preserve archive retention; downgrade cancelled before the swap"
 fi
 
 # --- backup ------------------------------------------------------------------
@@ -542,7 +568,7 @@ ls -1dt "$BACKUPS"/*/ | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm -rf
 
 # --- atomic swap ---------------------------------------------------------------
 recheck_in_use
-bash "$RECOVERY_SOURCE/scripts/setup_services.sh" "$RECOVERY_SOURCE" --recovery-only \
+bash "$NIGHTSTAND_SCRIPTS/setup_services.sh" "$(dirname "$NIGHTSTAND_SCRIPTS")" --recovery-only \
   || fail "could not install boot recovery; live install untouched"
 say "Installing v$STAGED_VERSION (service stops now)"
 # The running server hands back what the next version may not continue. A
@@ -593,6 +619,8 @@ mv "$STAGE" "$LIVE" || {
   fail "swap failed; previous version restored"
 }
 RESULT_PHASE=swapped
+python3 -B "$NIGHTSTAND_SCRIPTS/system_scripts.py" point "$NEW_COPY" \
+  || say "WARNING: root still runs the previous version's scripts until the next update"
 MOVED_MODULES=no
 if [ "$LOCK_SAME" = yes ]; then
   MOVED_MODULES=yes
@@ -621,8 +649,8 @@ elif ! sudo -u dac bash -c "cd '$LIVE/server' && '$NPX' dotenv -e .env.pod -- np
     say "prisma migrate attempt $attempt failed"
     if grep -q P3009 "$STAGE.migrate.log"; then
       [ "$RESOLVED_FAILED" = no ] || break
-      MIGRATION_HELPER="$LIVE/scripts/sqlite-safety.py"
-      [ -f "$MIGRATION_HELPER" ] || MIGRATION_HELPER="$PREV/scripts/sqlite-safety.py"
+      MIGRATION_HELPER="$NEW_COPY/scripts/sqlite-safety.py"
+      [ -f "$MIGRATION_HELPER" ] || MIGRATION_HELPER="$NIGHTSTAND_SCRIPTS/sqlite-safety.py"
       FAILED_NAMES=$(python3 "$MIGRATION_HELPER" recoverable-migrations \
         /persistent/free-sleep-data/free-sleep.db "$LIVE/server/prisma/migrations") || {
         say "Failed migration needs manual recovery. Do not reset the database; preserve the backup and inspect the migration log."
@@ -655,8 +683,8 @@ elif [ "$SCHEMA_CHANGED" = yes ]; then
 fi
 
 # Before the start below, so the limits apply to the processes it starts.
-if [ -f "$LIVE/scripts/setup_resource_limits.sh" ]; then
-  bash "$LIVE/scripts/setup_resource_limits.sh" \
+if [ -f "$NEW_COPY/scripts/setup_resource_limits.sh" ]; then
+  bash "$NEW_COPY/scripts/setup_resource_limits.sh" \
     || say "WARNING: failed to install service memory limits; the services run unbounded until the next successful update"
 fi
 
@@ -668,8 +696,7 @@ if [ "$MIGRATION_FAILED" != yes ]; then
 fi
 
 say "Ensuring RAW-archive retention timer is installed"
-if chmod +x "$LIVE/scripts/archive-raw.sh" \
-  && cp "$LIVE/scripts/systemd/free-sleep-archive-raw.service" "$LIVE/scripts/systemd/free-sleep-archive-raw.timer" /etc/systemd/system/ \
+if cp "$NEW_COPY/scripts/systemd/free-sleep-archive-raw.service" "$NEW_COPY/scripts/systemd/free-sleep-archive-raw.timer" /etc/systemd/system/ \
   && systemctl daemon-reload \
   && systemctl enable --now free-sleep-archive-raw.timer; then
   :
@@ -682,11 +709,9 @@ fi
 # or sudoers rule, so the matching button would fail. Idempotent, so every
 # update re-runs it.
 say "Ensuring the updater, rollback, and revert services and sudoers rules are installed"
-if [ -f "$LIVE/scripts/setup_services.sh" ]; then
-  bash "$LIVE/scripts/setup_services.sh" "$LIVE" \
+if [ -f "$NEW_COPY/scripts/setup_services.sh" ]; then
+  bash "$NEW_COPY/scripts/setup_services.sh" "$NEW_COPY" \
     || say "WARNING: some services or sudoers rules could not be installed; the matching controls may not work until the next successful update"
-else
-  chmod +x "$LIVE"/scripts/update.sh "$LIVE"/scripts/update_service.sh 2>/dev/null || true
 fi
 
 # --- health check --------------------------------------------------------------
@@ -739,7 +764,7 @@ fi
 # once the update has succeeded. Older trees carry a hand-run copy of the
 # script without the trial, which must not run on its own.
 arm_watchdog() {
-  local script="$LIVE/scripts/setup_watchdog.sh"
+  local script="$NEW_COPY/scripts/setup_watchdog.sh"
   grep -q NIGHTSTAND_WATCHDOG_TRIAL "$script" 2>/dev/null || return 0
   bash "$script" --auto || say "WARNING: the hardware watchdog could not be turned on; see above"
 }
@@ -748,11 +773,11 @@ if [ "$HEALTHY" = yes ]; then
   RESTORE_TREE=
   SWAP_NEW=
   for FIREWALL_ATTEMPT in 1 2; do
-    sh "$LIVE/scripts/block_internet_access.sh" || say "WARNING: firewall script reported an error; checking rules"
+    sh "$NEW_COPY/scripts/block_internet_access.sh" || say "WARNING: firewall script reported an error; checking rules"
     # Older downgrade targets intentionally restore their historical firewall.
     EXPECT_RESET=yes
     if [ "${IS_DOWNGRADE:-no}" = yes ] &&
-      ! grep -q -- '--dport 1337.*--reject-with tcp-reset' "$LIVE/scripts/block_internet_access.sh"; then
+      ! grep -q -- '--dport 1337.*--reject-with tcp-reset' "$NEW_COPY/scripts/block_internet_access.sh"; then
       EXPECT_RESET=no
     fi
     # Older releases end OUTPUT with DROP.
@@ -829,6 +854,7 @@ mv "$PREV" "$LIVE" || {
   fail "could not restore previous tree; attempted to restart the tree at $LIVE; manual recovery required"
 }
 RESULT_PHASE=restored
+follow_scripts
 if [ "$MOVED_MODULES" = yes ]; then
   mv "$FAILED/server/node_modules" "$LIVE/server/node_modules"
 fi
@@ -837,7 +863,7 @@ if [ "$STREAM_WAS_ACTIVE" = active ]; then
   systemctl restart free-sleep-stream 2>/dev/null || true
 fi
 RESTORE_TREE=
-sh "$LIVE/scripts/block_internet_access.sh" || say "WARNING: restored firewall could not be applied"
+sh "$SYSTEM_DIR/live/scripts/block_internet_access.sh" || say "WARNING: restored firewall could not be applied"
 restore_output_policy save
 if restored_version_answers; then
   bash "$RECOVERY_HELPER" --clear || fail "could not clear the update swap marker"

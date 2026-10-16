@@ -314,7 +314,7 @@ if [ -n "$CONFIRMED_TARGET" ]; then
     || fail "the confirmed upstream target is no longer available; live install untouched"
   case "$SWITCH_PIN" in
     v2\ *)
-      [ -f "$LIVE/scripts/switch_installation.py" ] || fail "the transactional switch runner is missing; live install untouched"
+      [ -f "$NIGHTSTAND_SCRIPTS/switch_installation.py" ] || fail "the transactional switch runner is missing; live install untouched"
       TRANSACTIONAL_SWITCH=yes ;;
   esac
 else
@@ -362,11 +362,11 @@ chown -R dac:dac "$STAGE"
 if [ -n "$SWITCH_COMMIT" ]; then
   if [ -z "$SWITCH_DIGEST" ]; then
     say "No published checksum for upstream commit $SWITCH_COMMIT; installing without one"
-  elif [ ! -f "$LIVE/scripts/tree_digest.py" ]; then
+  elif [ ! -f "$NIGHTSTAND_SCRIPTS/tree_digest.py" ]; then
     [ -z "$CONFIRMED_TARGET" ] || fail "cannot verify the confirmed upstream checksum; live install untouched"
     say "This install cannot check checksums yet; installing without one"
   else
-    SWITCH_ACTUAL=$(python3 "$LIVE/scripts/tree_digest.py" "$STAGE") \
+    SWITCH_ACTUAL=$(python3 "$NIGHTSTAND_SCRIPTS/tree_digest.py" "$STAGE") \
       || fail "could not compute the checksum of upstream free-sleep; live install untouched"
     [ "$SWITCH_ACTUAL" = "$SWITCH_DIGEST" ] \
       || fail "the download of upstream free-sleep does not match its published checksum; live install untouched"
@@ -410,7 +410,7 @@ if [ "$TRANSACTIONAL_SWITCH" = yes ]; then
     || fail "the confirmed V2 artifact could not be verified; live install untouched"
   recheck_in_use
   RESULT_PHASE=swapping
-  python3 -B "$LIVE/scripts/switch_installation.py" forward --stage "$STAGE" \
+  python3 -B "$NIGHTSTAND_SCRIPTS/switch_installation.py" forward --stage "$STAGE" \
     --target-json "$CONFIRMED_TARGET" --artifact-digest "$SWITCH_ACTUAL" --recheck-in-use "$RECHECK_IN_USE"
   SWITCH_STATUS=$?
   if [ "$SWITCH_STATUS" -eq 0 ]; then
@@ -569,9 +569,9 @@ if [ "$HEALTHY" = yes ]; then
       free-sleep-update.service free-sleep-rollback.service free-sleep-revert.service free-sleep-migrate.service; do
       rm -f "/etc/systemd/system/$unit.d/nightstand-switch-recovery.conf"
     done
-    rm -rf /home/dac/free-sleep-switch-recovery
+    rm -rf /usr/local/lib/nightstand/switch-recovery /home/dac/free-sleep-switch-recovery
   fi
-  rm -rf /home/dac/free-sleep-recovery
+  rm -rf /usr/local/lib/nightstand/recovery /home/dac/free-sleep-recovery
   rm -f /persistent/free-sleep-data/update-swap.json
   sync
   # Upstream free-sleep never installs these. They take effect at the next service start.
@@ -580,8 +580,8 @@ if [ "$HEALTHY" = yes ]; then
     /etc/systemd/system/free-sleep-stream.service.d/10-nightstand-limits.conf
   systemctl daemon-reload >/dev/null 2>&1 || true
   # Upstream never turns on the hardware watchdog; take Nightstand's setting out.
-  if [ -f "$PREV/scripts/setup_watchdog.sh" ]; then
-    bash "$PREV/scripts/setup_watchdog.sh" --remove --switching || say "WARNING: could not remove the hardware watchdog setting"
+  if [ -f "$NIGHTSTAND_SCRIPTS/setup_watchdog.sh" ]; then
+    bash "$NIGHTSTAND_SCRIPTS/setup_watchdog.sh" --remove --switching || say "WARNING: could not remove the hardware watchdog setting"
   fi
   exit 0
 fi
@@ -643,7 +643,7 @@ if [ "$MOVED_MODULES" = yes ]; then
   mv "$FAILED/server/node_modules" "$LIVE/server/node_modules"
 fi
 restore_switch_data_or_fail "could not restore settings from $BK/lowdb"
-sh "$LIVE/scripts/block_internet_access.sh" || say "WARNING: restored firewall could not be applied"
+sh "$NIGHTSTAND_SCRIPTS/block_internet_access.sh" || say "WARNING: restored firewall could not be applied"
 systemctl start free-sleep
 if [ "$STREAM_WAS_ACTIVE" = active ]; then
   systemctl restart free-sleep-stream 2>/dev/null || true

@@ -4,7 +4,7 @@ Description=Restart the Pod if its Wi-Fi driver has died
 [Service]
 Type=oneshot
 # An older release without the script makes this a no-op.
-ExecStart=/bin/bash -c '[ -f /home/dac/free-sleep/scripts/network_watchdog.sh ] || exit 0; exec /bin/bash /home/dac/free-sleep/scripts/network_watchdog.sh'
+ExecStart=/bin/bash -c '[ -f /usr/local/lib/nightstand/live/scripts/network_watchdog.sh ] || exit 0; exec /bin/bash /usr/local/lib/nightstand/live/scripts/network_watchdog.sh'
 TimeoutStartSec=2min
 User=root
 Group=root

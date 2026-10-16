@@ -1,6 +1,18 @@
 #!/bin/bash
 # Shared restore steps, sourced before either application tree moves.
 
+# The root-owned scripts this run started from. The install trees belong to
+# the server user, so root runs nothing from them.
+NIGHTSTAND_SCRIPTS=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+
+# Makes the copy that matches the tree now at LIVE the one root runs. A tree
+# without one, from a release before copies or edited since, keeps the
+# current copy.
+follow_scripts() {
+  python3 -B "$NIGHTSTAND_SCRIPTS/system_scripts.py" follow "$LIVE" \
+    || say "WARNING: could not check which scripts root runs for $LIVE"
+}
+
 has_switch_journal() {
   local root="${1:-${NIGHTSTAND_TRANSACTION_ROOT:-/persistent/free-sleep-maintenance/nightstand-transactions}}" journal
   for journal in "$root"/*/journal.json; do
@@ -42,7 +54,7 @@ restore_restart_services() {
     if [ "$#" -gt 0 ]; then
       "$@" || say "WARNING: restored firewall could not be applied"
     else
-      sh "$LIVE/scripts/block_internet_access.sh" || say "WARNING: restored firewall could not be applied"
+      sh "$NIGHTSTAND_SCRIPTS/block_internet_access.sh" || say "WARNING: restored firewall could not be applied"
     fi
   fi
   systemctl start free-sleep || {
@@ -63,7 +75,7 @@ restore_restart_services() {
 
 # Cross-fork swaps require the retained installation's companion state.
 restore_cross_fork_rollback() {
-  local runner="$LIVE/scripts/switch_installation.py"
+  local runner="$NIGHTSTAND_SCRIPTS/switch_installation.py"
   [ -f "$runner" ] || return 1
   python3 -B "$runner" companion --stage "$PREV" >/dev/null || return 1
   python3 -B "$runner" rollback --stage "$PREV" --recheck-in-use "${RECHECK_IN_USE:-no}"
@@ -104,7 +116,7 @@ restore_output_policy() {
 # the firewall. Nothing is flushed, so the inbound rules, the reset on the
 # firmware's upload port and anything Tailscale added stay in place. IPv6
 # stays blocked, with HTTPS refused rather than dropped so clients move to
-# IPv4 at once. Callers set LIVE, PREV and WAN_OPEN=no, define say, and run
+# IPv4 at once. Callers set WAN_OPEN=no, define say, and run
 # init_update_firewall first.
 WAN_RULES=("-p tcp --dport 443 -j ACCEPT" "-p udp --dport 53 -j ACCEPT" "-p tcp --dport 53 -j ACCEPT")
 WAN_RULE6="-p tcp --dport 443 -j REJECT --reject-with tcp-reset"
@@ -147,8 +159,7 @@ close_wan() {
   say "Closing internet access again"
   strip_top fw4 "${WAN_RULES[@]}" >/dev/null
   strip_top fw6 "$WAN_RULE6" >/dev/null
-  sh "$LIVE/scripts/block_internet_access.sh" >/dev/null 2>&1 \
-    || sh "$PREV/scripts/block_internet_access.sh" >/dev/null 2>&1 || true
+  sh "$NIGHTSTAND_SCRIPTS/block_internet_access.sh" >/dev/null 2>&1 || true
   restore_output_policy
   WAN_OPEN=no
 }

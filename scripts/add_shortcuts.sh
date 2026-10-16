@@ -8,11 +8,11 @@ if [ ! -f "$PROFILE_FILE_PATH" ]; then
 fi
 
 SHORTCUTS=(
-  "alias fs-debug='bash /home/dac/free-sleep/scripts/debug.sh'"
-  "alias fs-restart='bash /home/dac/free-sleep/scripts/restart.sh'"
-  "alias fs-reset='bash /home/dac/free-sleep/scripts/reset.sh'"
-  "alias fs-reset-db='bash /home/dac/free-sleep/scripts/reset_db.sh'"
-  "alias fs-update='bash /home/dac/free-sleep/scripts/update.sh'"
+  "alias fs-debug='bash /usr/local/lib/nightstand/live/scripts/debug.sh'"
+  "alias fs-restart='bash /usr/local/lib/nightstand/live/scripts/restart.sh'"
+  "alias fs-reset='bash /usr/local/lib/nightstand/live/scripts/reset.sh'"
+  "alias fs-reset-db='bash /usr/local/lib/nightstand/live/scripts/reset_db.sh'"
+  "alias fs-update='bash /usr/local/lib/nightstand/live/scripts/update.sh'"
   "alias fs-dev-server='systemctl stop free-sleep && su - dac -c \"cd /home/dac/free-sleep/server && /home/dac/.volta/bin/npm run dev\"'"
 )
 

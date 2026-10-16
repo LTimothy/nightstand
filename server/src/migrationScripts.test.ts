@@ -100,7 +100,7 @@ describe('fork-switch tool scripts', () => {
 
     it('starts the installer detached (systemd-run, falling back to nohup)', () => {
       assert.match(src, /systemd-run --unit=free-sleep-migrate/);
-      assert.match(src, /nohup setsid bash \/home\/dac\/migrate\/pod-installer\.sh/);
+      assert.match(src, /nohup setsid bash \/usr\/local\/lib\/nightstand\/migrate\/pod-installer\.sh/);
     });
 
     it('the pod-generation gate matrix refuses Pod 1/2 with no override', () => {
@@ -161,7 +161,7 @@ describe('fork-switch tool scripts', () => {
         'cp "$RESTORE_SCRIPT_SRC" "$RESTORE_SCRIPT_DEST"',
         'Stopping their service',
       ], 'pod-installer.sh');
-      assert.match(src, /RESTORE_SCRIPT_DEST=\/home\/dac\/restore-original-fork\.sh/);
+      assert.match(src, /RESTORE_SCRIPT_DEST=\/usr\/local\/lib\/nightstand\/restore-original-fork\.sh/);
     });
 
     it('arms the dead-man sentinel before stopping their service, and only disarms after a passed health check', () => {
@@ -184,12 +184,12 @@ describe('fork-switch tool scripts', () => {
     // without any of it.
     it('installs the app-control units and sudoers rules only after the health check passes', () => {
       assert.ok(
-        src.indexOf('bash "$LIVE/scripts/setup_services.sh"') > src.indexOf('if [ "$HEALTHY" != yes ]'),
+        src.indexOf('bash "$COPY/scripts/setup_services.sh"') > src.indexOf('if [ "$HEALTHY" != yes ]'),
         'setup_services.sh must not run before the health check',
       );
       assertOrder(src, [
         'Health check passed',
-        'bash "$LIVE/scripts/setup_services.sh" "$LIVE"',
+        'bash "$COPY/scripts/setup_services.sh" "$COPY"',
         'block_internet_access.sh',
         'disarm_sentinel',
       ], 'pod-installer.sh');
@@ -202,7 +202,7 @@ describe('fork-switch tool scripts', () => {
     it('turns on the hardware watchdog only after the sentinel is disarmed', () => {
       const success = src.slice(src.indexOf('Health check passed'));
       const disarm = success.indexOf('\ndisarm_sentinel\n');
-      const arm = success.indexOf('bash "$LIVE/scripts/setup_watchdog.sh"');
+      const arm = success.indexOf('bash "$COPY/scripts/setup_watchdog.sh"');
       assert.ok(disarm > 0, 'expected the sentinel to be disarmed on success');
       assert.ok(arm > disarm, 'setup_watchdog.sh must run after disarm_sentinel');
       // A reset during the trial must not leave a healthy migration recorded
@@ -211,7 +211,7 @@ describe('fork-switch tool scripts', () => {
       assert.ok(arm > success.indexOf('say "SUCCESS: migrated'), 'arm after the SUCCESS line');
       assert.ok(arm > success.indexOf('rm -f "$SWAP_MARKER"'), 'arm after the swap marker is cleared');
       assert.equal(src.split('setup_watchdog.sh').length - 1, 2, 'one guard and one call, both after the swap succeeded');
-      assert.match(success, /bash "\$LIVE\/scripts\/setup_watchdog\.sh" --auto /, 'an owner\'s --remove stays in force');
+      assert.match(success, /bash "\$COPY\/scripts\/setup_watchdog\.sh" --auto /, 'an owner\'s --remove stays in force');
     });
 
     it('applies this fork\'s WAN policy only after the health check succeeds', () => {
@@ -508,5 +508,18 @@ describe('the fork-switch tool names the app\'s real rollback path', () => {
   it('uses labels the app shows', () => {
     assert.match(readScript('app/src/pages/SettingsPage/settingsCategories.ts'), /key: 'versions', title: 'Software'/);
     assert.match(readScript('app/src/pages/SettingsPage/VersionsPage/VersionsPage.tsx'), />Recovery<\/AccordionSummary>/);
+  });
+});
+
+describe('the fork switch runs root-owned copies', () => {
+  it('runs the fork switch from the root-owned folder and copies the stage for root before it changes owner', () => {
+    const tool = readScript('scripts/migrate/switch-to-this-fork.sh');
+    assert.match(tool, /bash \/usr\/local\/lib\/nightstand\/migrate\/pod-installer\.sh/);
+    for (const file of ['scripts/migrate/pod-installer.sh', 'scripts/migrate/agent-bootstrap-installer.sh']) {
+      const src = readScript(file);
+      const publish = src.indexOf('COPY=$(python3 -B "$STAGE/scripts/system_scripts.py" publish "$STAGE")');
+      assert.ok(publish > 0 && publish < src.indexOf('chown -R dac:dac "$STAGE"'), file);
+      assert.match(src, /bash "\$COPY\/scripts\/setup_services\.sh" "\$COPY"/, file);
+    }
   });
 });

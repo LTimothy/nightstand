@@ -68,7 +68,7 @@ describe('install.sh prebuilt-image credential check', () => {
           `#!/bin/bash\necho checked\nexit ${helperStatus}\n`);
       }
       const section = between('# Optional on older releases', '# Finish');
-      const result = spawnSync('bash', ['-c', `set -euo pipefail\nREPO_DIR="$FIXTURE"\n${section}\necho continued`], {
+      const result = spawnSync('bash', ['-c', `set -euo pipefail\nCOPY="$FIXTURE"\n${section}\necho continued`], {
         encoding: 'utf8', env: envWith({ FIXTURE: folder }),
       });
       assert.equal(result.status, 0, result.stderr);
@@ -108,6 +108,7 @@ function verify(expected: (digest: string) => string, withScript = true, staged:
   if (staged !== null) writeFileSync(path.join(tree, 'server/src/serverInfo.json'), JSON.stringify({ version: staged }));
   const script = path.join(tree, 'scripts/tree_digest.py');
   copyFileSync(path.join(repoRoot, 'scripts/tree_digest.py'), script);
+  copyFileSync(path.join(repoRoot, 'scripts/system_scripts.py'), path.join(tree, 'scripts/system_scripts.py'));
   const digest = spawnSync('python3', [script, tree], { encoding: 'utf8' }).stdout.trim();
   if (!withScript) rmSync(script);
   const result = spawnSync('bash', ['-c', `set -euo pipefail
@@ -117,7 +118,8 @@ SRC_DIR="$TEST_TREE"
 EXPECTED_DIGEST="$TEST_DIGEST"
 ${between('# Checks the download', '# Stop both database writers')}
 echo continued`], {
-    env: envWith({ TEST_UNZIP: unzip, TEST_TREE: tree, TEST_DIGEST: expected(digest) }), encoding: 'utf8',
+    env: envWith({ TEST_UNZIP: unzip, TEST_TREE: tree, TEST_DIGEST: expected(digest), NIGHTSTAND_SYSTEM_DIR: path.join(unzip, 'system') }),
+    encoding: 'utf8',
   });
   const unzipKept = existsSync(unzip);
   rmSync(unzip, { recursive: true, force: true });
@@ -396,6 +398,7 @@ function replaceTree({ live = true, nodeFails = true, started = [] as string[], 
   const result = spawnSync('bash', ['-c', `set -euo pipefail
 REPO_DIR="$FIXTURE/free-sleep"; PREV_DIR="$FIXTURE/free-sleep-prev"; FAILED_DIR="$FIXTURE/free-sleep-failed"
 UNZIP_DIR="$FIXTURE/unzip"; SRC_DIR="$UNZIP_DIR/nightstand"; USERNAME=dac
+COPY="$FIXTURE/copy"; mkdir -p "$COPY"; cp -R "$SRC_DIR/scripts" "$COPY/"
 systemctl() {
   local unit state stuck
   case "$1" in
@@ -517,6 +520,7 @@ function reinstall({
   const result = spawnSync('bash', ['-c', `set -euo pipefail
 REPO_DIR="$FIXTURE/free-sleep"; PREV_DIR="$FIXTURE/free-sleep-prev"; FAILED_DIR="$FIXTURE/free-sleep-failed"
 UNZIP_DIR="$FIXTURE/unzip"; SRC_DIR="$UNZIP_DIR/nightstand"; USERNAME=dac; SERVER_DIR="$REPO_DIR/server"
+COPY="$FIXTURE/copy"; mkdir -p "$COPY"; cp -R "$SRC_DIR/scripts" "$COPY/"
 VERSION=${NEXT}; STAGED_VERSION=${NEXT}; DEST="$FIXTURE/backup.db"
 systemctl() {
   local unit state
@@ -739,4 +743,27 @@ PY
       assert.equal(result.lockReleased, true);
     });
   }
+});
+
+describe('install.sh root-owned copy', () => {
+  it('copies the scripts for root before the tree moves or changes owner, and runs only that copy', () => {
+    const publish = src.indexOf('COPY=$(python3 -B "$SRC_DIR/scripts/system_scripts.py" publish "$SRC_DIR")');
+    const move = src.indexOf('mv "$SRC_DIR" "$REPO_DIR"');
+    const owner = src.indexOf('chown -R "$USERNAME":"$USERNAME" "$REPO_DIR"');
+    assert.ok(publish > 0 && publish < move && move < owner, `${publish} ${move} ${owner}`);
+    assert.match(src, /bash "\$COPY\/scripts\/setup_services\.sh" "\$COPY"/);
+    const unzip = mkdtempSync(path.join(tmpdir(), 'nightstand-install-copy-'));
+    try {
+      const tree = path.join(unzip, 'nightstand-3.7.0');
+      mkdirSync(path.join(tree, 'scripts'), { recursive: true });
+      copyFileSync(path.join(repoRoot, 'scripts/system_scripts.py'), path.join(tree, 'scripts/system_scripts.py'));
+      const result = spawnSync('bash', ['-c', `set -euo pipefail
+UNZIP_DIR="$1"; SRC_DIR="$2"
+${between('# Copied for root while only root', '# Report legacy')}
+echo "COPY=$COPY"`, 'install', unzip, tree], { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: path.join(unzip, 'system') }, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      const copy = /COPY=(.*)/.exec(result.stdout)?.[1] ?? '';
+      assert.ok(existsSync(path.join(copy, 'scripts/system_scripts.py')), result.stdout);
+    } finally { rmSync(unzip, { recursive: true, force: true }); }
+  });
 });

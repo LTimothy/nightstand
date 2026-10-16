@@ -7,5 +7,5 @@ sleep 3
 
 export PATH="/usr/sbin:/sbin:/usr/bin:/bin"
 
-bash /home/dac/free-sleep/scripts/update.sh
+bash "$(dirname "${BASH_SOURCE[0]}")/update.sh"
 

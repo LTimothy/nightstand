@@ -4,7 +4,7 @@ After=free-sleep.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash /home/dac/free-sleep/scripts/rollback_pod.sh
+ExecStart=/bin/bash /usr/local/lib/nightstand/live/scripts/rollback_pod.sh
 ExecStopPost=-/bin/systemctl restart --no-block free-sleep-recover-switch.service
 User=root
 Group=root

@@ -4,7 +4,7 @@
 # Shared by install.sh, update.sh, and the fork-switch and agent installers
 # so every install path sets up the same controls. Idempotent.
 #
-# Usage: setup_services.sh [repo_dir] [--recovery-only]   (run as root, default /home/dac/free-sleep)
+# Usage: setup_services.sh [copy_or_tree] [--recovery-only]   (run as root, default /home/dac/free-sleep)
 # Exits non-zero if any piece could not be installed; callers treat that as a
 # warning, since a pod without these still controls the bed.
 #
@@ -19,9 +19,20 @@ SYSTEMD_DIR="${NIGHTSTAND_SYSTEMD_DIR:-/etc/systemd/system}"
 SUDOERS_FILE="${NIGHTSTAND_SUDOERS_FILE:-/etc/sudoers.d/$USERNAME}"
 TMPFILES_DIR="${NIGHTSTAND_TMPFILES_DIR:-/etc/tmpfiles.d}"
 STATUS=0
-RECOVERY_DIR="${NIGHTSTAND_RECOVERY_DIR:-/home/dac/free-sleep-recovery}"
+SYSTEM_DIR="${NIGHTSTAND_SYSTEM_DIR:-/usr/local/lib/nightstand}"
+TOOL="$(dirname "${BASH_SOURCE[0]}")/system_scripts.py"
+RECOVERY_DIR="${NIGHTSTAND_RECOVERY_DIR:-$SYSTEM_DIR/recovery}"
 
 warn() { echo "WARNING: $*"; STATUS=1; }
+
+# Root runs only root-owned copies. Older callers pass the install tree,
+# which they already run as root, so it is copied first.
+case "$REPO_DIR" in
+  "$SYSTEM_DIR"/copies/*) COPY=$REPO_DIR ;;
+  *) COPY=$(python3 -B "$TOOL" publish "$REPO_DIR") \
+       || { echo "WARNING: could not copy $REPO_DIR's scripts for root"; exit 1; } ;;
+esac
+REPO_DIR=$COPY
 
 SWAP_MARKER="${NIGHTSTAND_SWAP_MARKER:-/persistent/free-sleep-data/update-swap.json}"
 
@@ -38,11 +49,12 @@ repo, recovery, systemd = sys.argv[1:]
 os.makedirs(recovery, exist_ok=True)
 files = [("recover_update.sh", recovery, 0o755), ("restore_helpers.sh", recovery, 0o644),
          ("write_result.py", recovery, 0o644),
+         ("system_scripts.py", recovery, 0o644), ("block_internet_access.sh", recovery, 0o755),
          ("systemd/free-sleep-recover-update.service", systemd, 0o644),
          ("systemd/free-sleep-recover-update.timer", systemd, 0o644)]
 for source, directory, mode in files:
     with open(repo + "/scripts/" + source) as handle:
-        content = handle.read().replace("/home/dac/free-sleep-recovery", recovery)
+        content = handle.read().replace("/usr/local/lib/nightstand/recovery", recovery)
     descriptor, temporary = tempfile.mkstemp(dir=directory, prefix=".recovery-")
     try:
         with os.fdopen(descriptor, "w") as handle:
@@ -70,7 +82,7 @@ PYRECOVERY
 elif [ "${2:-}" = --recovery-only ]; then
   warn "the updater has no recovery script"
 fi
-SWITCH_RECOVERY_DIR="${NIGHTSTAND_SWITCH_RECOVERY_DIR:-/home/dac/free-sleep-switch-recovery}"
+SWITCH_RECOVERY_DIR="${NIGHTSTAND_SWITCH_RECOVERY_DIR:-$SYSTEM_DIR/switch-recovery}"
 if [ -n "${NIGHTSTAND_RECOVERY_DIR:-}" ] && [ -z "${NIGHTSTAND_SWITCH_RECOVERY_DIR:-}" ]; then
   SWITCH_RECOVERY_DIR="$RECOVERY_DIR-switch"
 fi
@@ -84,7 +96,8 @@ sys.path.insert(0, repo + '/scripts')
 from switch_transaction import publish, durable_directory, TransactionStore
 from recover_switch import journals, TERMINAL, WRITERS, OPERATIONS
 files = [(name, Path(recovery) / name, 0o755 if name.endswith('.sh') else 0o644)
-         for name in ('recover_switch.sh', 'recover_switch.py', 'switch_transaction.py', 'switch_services.py', 'restore_helpers.sh')]
+         for name in ('recover_switch.sh', 'recover_switch.py', 'switch_transaction.py', 'switch_services.py', 'restore_helpers.sh',
+                      'system_scripts.py')]
 files.append(('systemd/free-sleep-recover-switch.service', Path(systemd) / 'free-sleep-recover-switch.service', 0o644))
 gates = [(Path(systemd) / (unit + '.d') / 'nightstand-switch-recovery.conf')
          for unit in WRITERS + OPERATIONS]
@@ -101,7 +114,7 @@ else:
     for source, destination, mode in files:
         durable_directory(destination.parent)
         content = ((Path(repo) / 'scripts' / source).read_text()
-                   .replace('/home/dac/free-sleep-switch-recovery', recovery)
+                   .replace('/usr/local/lib/nightstand/switch-recovery', recovery)
                    .replace('/persistent/free-sleep-maintenance/nightstand-transactions', root))
         stamp = time.time_ns()
         metadata = dict(uid=os.geteuid(), gid=os.getegid(), mode=mode, atimeNs=stamp, mtimeNs=stamp)
@@ -131,6 +144,12 @@ PYSWITCHRECOVERY
 fi
 if [ "${2:-}" = --recovery-only ]; then
   exit "$STATUS"
+fi
+
+python3 -B "$TOOL" point "$COPY" || warn "root still runs the scripts it ran before; the next update retries"
+python3 -B "$TOOL" prune || warn "could not remove old copies of the scripts"
+if [ -f "$COPY/scripts/add_shortcuts.sh" ]; then
+  bash "$COPY/scripts/add_shortcuts.sh" >/dev/null 2>&1 || warn "could not update the fs-* shell shortcuts"
 fi
 
 # Upstream's persistent guard overrides the updater restored below.
@@ -163,9 +182,9 @@ After=free-sleep.service
 Type=oneshot
 # Run via bash so the updater still works if the script's exec bit is lost
 # (systemd fails with 203/EXEC before writing anything to the log otherwise).
-ExecStart=/bin/bash /home/dac/free-sleep/scripts/update_service.sh
+ExecStart=/bin/bash /usr/local/lib/nightstand/live/scripts/update_service.sh
 # Closes the download window even when the updater was killed outright.
-ExecStopPost=-/bin/bash /home/dac/free-sleep/scripts/close_update_window.sh
+ExecStopPost=-/bin/bash /usr/local/lib/nightstand/live/scripts/close_update_window.sh
 User=root
 Group=root
 KillMode=process
@@ -211,8 +230,7 @@ RULES=(
   "$USERNAME ALL=(root) NOPASSWD: /bin/systemctl start free-sleep-update.service --no-block"
   "$USERNAME ALL=(root) NOPASSWD: /bin/systemctl start free-sleep-rollback.service --no-block"
   "$USERNAME ALL=(root) NOPASSWD: /bin/systemctl start free-sleep-revert.service --no-block"
-  "$USERNAME ALL=(ALL) NOPASSWD: /bin/sh /home/dac/free-sleep/scripts/enable_biometrics.sh"
-  "$USERNAME ALL=(ALL) NOPASSWD: /bin/sh /home/dac/free-sleep/scripts/disable_biometrics.sh"
+  "$USERNAME ALL=(ALL) NOPASSWD: /bin/sh /usr/local/lib/nightstand/live/scripts/disable_biometrics.sh"
   # The app's Biometrics switch turns the stream on with exactly this command.
   "$USERNAME ALL=(root) NOPASSWD: /bin/systemctl enable --now free-sleep-stream.service"
 )
@@ -220,8 +238,17 @@ RULES=(
 # Build the new file beside the old one and check it before it goes live: a
 # sudoers file with a syntax error disables sudo for every rule in it.
 CANDIDATE=$(mktemp)
-[ -f "$SUDOERS_FILE" ] && cat "$SUDOERS_FILE" > "$CANDIDATE"
 CHANGED=no
+# Older releases granted these, naming files in the server user's own tree.
+OLD_SCRIPTS=/home/dac/free-sleep/scripts
+DROPPED=(
+  "$USERNAME ALL=(ALL) NOPASSWD: /bin/sh $OLD_SCRIPTS/enable_biometrics.sh"
+  "$USERNAME ALL=(ALL) NOPASSWD: /bin/sh $OLD_SCRIPTS/disable_biometrics.sh"
+)
+if [ -f "$SUDOERS_FILE" ]; then
+  grep -Fxv -f <(printf '%s\n' "${DROPPED[@]}") "$SUDOERS_FILE" > "$CANDIDATE"
+  cmp -s "$SUDOERS_FILE" "$CANDIDATE" || CHANGED=yes
+fi
 for rule in "${RULES[@]}"; do
   if ! grep -Fxq "$rule" "$CANDIDATE"; then
     echo "$rule" >> "$CANDIDATE"

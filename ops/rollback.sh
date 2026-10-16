@@ -62,6 +62,7 @@ if [ "${1:-}" = "--from" ]; then
     mv $PREV/server/node_modules $LIVE/server/node_modules
     chown -R dac:dac $LIVE
     systemctl start free-sleep
+    python3 -B /usr/local/lib/nightstand/live/scripts/system_scripts.py follow $LIVE >/dev/null 2>&1 || true
     if [ \"\$STREAM_WAS_ACTIVE\" = active ]; then
       systemctl restart free-sleep-stream 2>/dev/null || true
     fi
@@ -78,6 +79,7 @@ else
     mv $PREV $LIVE
     [ -d $LIVE/server/node_modules ] || mv /home/dac/free-sleep-failed/server/node_modules $LIVE/server/node_modules
     systemctl start free-sleep
+    python3 -B /usr/local/lib/nightstand/live/scripts/system_scripts.py follow $LIVE >/dev/null 2>&1 || true
     if [ \"\$STREAM_WAS_ACTIVE\" = active ]; then
       systemctl restart free-sleep-stream 2>/dev/null || true
     fi

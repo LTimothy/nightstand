@@ -106,6 +106,7 @@ class SwitchScriptContractTests(unittest.TestCase):
 SWITCH_RELEASES_URL=fixture
 UPSTREAM_ZIP_URL=main
 LIVE=/missing-switch-fixture
+NIGHTSTAND_SCRIPTS=/missing-switch-fixture/scripts
 say() { echo "$*"; }
 fail() { echo "$*" >&2; exit 1; }
 curl() { cat "$MANIFEST_FIXTURE"; }

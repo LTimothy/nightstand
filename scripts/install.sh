@@ -43,7 +43,7 @@ USERNAME="dac"
 # commit turns [Unreleased] in CHANGELOG.md into the version, and from then
 # on installScript.test.ts fails while this is newer than the version in
 # server/src/serverInfo.json.
-MIN_INSTALL_VERSION="3.6.0"
+MIN_INSTALL_VERSION="3.7.0"
 WANTED_CHANNEL="${NIGHTSTAND_CHANNEL:-}"
 case "$WANTED_CHANNEL" in
   ""|stable|beta) ;;
@@ -143,9 +143,13 @@ if [ "$STAGED_VERSION" != "$VERSION" ]; then
   echo "staged tree reports v$STAGED_VERSION but releases.json lists v$VERSION; refusing a mislabeled release"
   exit 1
 fi
+# Copied for root while only root has touched the download. Root runs this
+# copy from here on, never the tree the server user will own.
+COPY=$(python3 -B "$SRC_DIR/scripts/system_scripts.py" publish "$SRC_DIR") \
+  || { rm -rf "$UNZIP_DIR"; echo "Could not copy the scripts root runs. Nothing was installed."; exit 1; }
 # Report legacy firewall jobs without editing the root crontab.
-if [ -f "$SRC_DIR/scripts/migrate/fork-artifacts.sh" ]; then
-  bash "$SRC_DIR/scripts/migrate/fork-artifacts.sh" warn-cron || true
+if [ -f "$COPY/scripts/migrate/fork-artifacts.sh" ]; then
+  bash "$COPY/scripts/migrate/fork-artifacts.sh" warn-cron || true
 elif command -v crontab >/dev/null 2>&1; then
   # Older release trees do not carry the inspection helper.
   LEGACY_CRON=$(crontab -u root -l 2>/dev/null | awk '
@@ -222,12 +226,12 @@ for service in free-sleep free-sleep-stream; do
 done
 SRC="/persistent/free-sleep-data/free-sleep.db"
 if [ -f "$SRC" ]; then
-  python3 "$SRC_DIR/scripts/sqlite-safety.py" checkpoint "$SRC"
+  python3 "$COPY/scripts/sqlite-safety.py" checkpoint "$SRC"
   mkdir -p /persistent/free-sleep-database-backups
   DEST="/persistent/free-sleep-database-backups/$(date -u +%Y%m%dT%H%M%SZ)-$$-install.db"
-  python3 "$SRC_DIR/scripts/sqlite-safety.py" backup "$SRC" "$DEST"
+  python3 "$COPY/scripts/sqlite-safety.py" backup "$SRC" "$DEST"
   echo "Database backup saved to $DEST"
-  bash "$SRC_DIR/scripts/prune_db_snapshots.sh" /persistent/free-sleep-database-backups "$DEST" || true
+  bash "$COPY/scripts/prune_db_snapshots.sh" /persistent/free-sleep-database-backups "$DEST" || true
 fi
 # The previous install is kept until the new server passes its health check,
 # and becomes the rollback slot after that.
@@ -240,12 +244,12 @@ mv "$SRC_DIR" "$REPO_DIR"
 rm -rf "$UNZIP_DIR"
 
 chown -R "$USERNAME":"$USERNAME" "$REPO_DIR"
-bash "$REPO_DIR/scripts/record_stock.sh" units || true
+bash "$COPY/scripts/record_stock.sh" units || true
 
 # --------------------------------------------------------------------------------
 # Install or update Volta + Node (shared with the fork-switch tool's
 # pod-installer.sh, see scripts/ensure-node.sh)
-bash "$REPO_DIR/scripts/ensure-node.sh" "$USERNAME"
+bash "$COPY/scripts/ensure-node.sh" "$USERNAME"
 
 # --------------------------------------------------------------------------------
 # Setup /persistent/free-sleep-data (migrate old configs, logs, etc.)
@@ -422,7 +426,7 @@ EOF
 echo "Reloading systemd daemon and enabling the service..."
 systemctl daemon-reload
 systemctl enable free-sleep.service
-bash "$REPO_DIR/scripts/setup_resource_limits.sh" || echo "WARNING: failed to install service memory limits"
+bash "$COPY/scripts/setup_resource_limits.sh" || echo "WARNING: failed to install service memory limits"
 
 say() { echo "$*"; }
 # Waits up to 90 s for the server to answer as version $1, and with a sensor
@@ -485,9 +489,8 @@ echo ""
 # server/README_SERVER.md for the mechanism. Idempotent: safe to re-run.
 
 echo "Installing RAW-archive retention timer..."
-chmod +x "$REPO_DIR/scripts/archive-raw.sh"
-cp "$REPO_DIR/scripts/systemd/free-sleep-archive-raw.service" /etc/systemd/system/
-cp "$REPO_DIR/scripts/systemd/free-sleep-archive-raw.timer" /etc/systemd/system/
+cp "$COPY/scripts/systemd/free-sleep-archive-raw.service" /etc/systemd/system/
+cp "$COPY/scripts/systemd/free-sleep-archive-raw.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now free-sleep-archive-raw.timer
 echo ""
@@ -498,7 +501,7 @@ echo ""
 # the migration installers)
 
 echo "Installing the updater, rollback, and revert services and their sudoers rules..."
-bash "$REPO_DIR/scripts/setup_services.sh" "$REPO_DIR" \
+bash "$COPY/scripts/setup_services.sh" "$COPY" \
   || echo -e "\033[33mWARNING: some updater services or sudoers rules could not be installed; see above\033[0m"
 echo ""
 
@@ -515,11 +518,10 @@ else
 fi
 
 echo ""
-sh /home/dac/free-sleep/scripts/add_shortcuts.sh
 
 # Optional on older releases, which do not ship this check.
-if [ -f "$REPO_DIR/scripts/check_image_credentials.sh" ]; then
-  bash "$REPO_DIR/scripts/check_image_credentials.sh" \
+if [ -f "$COPY/scripts/check_image_credentials.sh" ]; then
+  bash "$COPY/scripts/check_image_credentials.sh" \
     || echo "WARNING: the prebuilt-image credential check could not finish; see INSTALLATION.md"
 fi
 
@@ -532,6 +534,6 @@ echo -e "\033[0;32mInstallation complete! The Nightstand server is running and w
 echo -e "\033[0;32mSee logs with: journalctl -u free-sleep --no-pager --output=cat\033[0m"
 
 # Last, since its first arming can reset the Pod.
-if [ -f "$REPO_DIR/scripts/setup_watchdog.sh" ]; then
-  bash "$REPO_DIR/scripts/setup_watchdog.sh" --auto || echo "WARNING: the hardware watchdog could not be turned on; see above"
+if [ -f "$COPY/scripts/setup_watchdog.sh" ]; then
+  bash "$COPY/scripts/setup_watchdog.sh" --auto || echo "WARNING: the hardware watchdog could not be turned on; see above"
 fi

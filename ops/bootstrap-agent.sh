@@ -126,19 +126,19 @@ fi
 # Stage 3: ship it and run the pod-side half detached
 # ==============================================================================
 say "Sending the payload"
-ssh_pod "rm -rf /home/dac/free-sleep-agent-payload && mkdir -p /home/dac/free-sleep-agent-payload" \
+ssh_pod "rm -rf /usr/local/lib/nightstand/migrate/agent-payload && mkdir -p /usr/local/lib/nightstand/migrate/agent-payload && chmod 755 /usr/local/lib/nightstand /usr/local/lib/nightstand/migrate" \
   || fail "could not prepare the payload directory on the pod"
-scp -q -P "$SSH_PORT" -r "$PAYLOAD/." "root@$POD_IP:/home/dac/free-sleep-agent-payload/" \
+scp -q -P "$SSH_PORT" -r "$PAYLOAD/." "root@$POD_IP:/usr/local/lib/nightstand/migrate/agent-payload/" \
   || fail "could not send the payload"
 scp -q -P "$SSH_PORT" \
   "$REPO_ROOT/scripts/migrate/agent-bootstrap-installer.sh" \
   "$REPO_ROOT/scripts/migrate/restore-original-fork.sh" \
-  "root@$POD_IP:/home/dac/" || fail "could not send the installer"
+  "root@$POD_IP:/usr/local/lib/nightstand/migrate/" || fail "could not send the installer"
 
 say "Starting the installer detached (a dropped connection from here changes nothing)"
-ssh_pod "chmod +x /home/dac/agent-bootstrap-installer.sh /home/dac/restore-original-fork.sh && \
-  (systemd-run --unit=free-sleep-agent-bootstrap --same-dir /bin/bash /home/dac/agent-bootstrap-installer.sh \
-   || nohup /bin/bash /home/dac/agent-bootstrap-installer.sh >/dev/null 2>&1 &)" \
+ssh_pod "chmod +x /usr/local/lib/nightstand/migrate/agent-bootstrap-installer.sh /usr/local/lib/nightstand/migrate/restore-original-fork.sh && \
+  (systemd-run --unit=free-sleep-agent-bootstrap --same-dir /bin/bash /usr/local/lib/nightstand/migrate/agent-bootstrap-installer.sh \
+   || nohup /bin/bash /usr/local/lib/nightstand/migrate/agent-bootstrap-installer.sh >/dev/null 2>&1 &)" \
   || fail "could not start the installer on the pod"
 
 say "Started. It stages, swaps, health-checks and restores on failure by itself."

@@ -76,7 +76,7 @@ class PortabilityTests(unittest.TestCase):
             body = text[text.index('# Other forks'):text.index('# --- swap')]
             success = text[text.index('if [ "$HEALTHY" = yes ]; then'):text.index('# --- swap back')]
             body += '\nHEALTHY=yes; TARGET_VERSION=3.0.0; CUR_VERSION=3.4.0; say() { :; }; rm() { echo delete; };\n' + success
-            result = subprocess.run(['/bin/bash', '-c', 'set -eu\nPREV="$1"; LIVE="$1"; systemctl() { echo "$*"; }; python3() { :; }; fail() { exit 1; };\n' + body, 'fixture', tmp], text=True, capture_output=True)
+            result = subprocess.run(['/bin/bash', '-c', 'set -eu\nPREV="$1"; LIVE="$1"; NIGHTSTAND_SCRIPTS="$1/scripts"; systemctl() { echo "$*"; }; python3() { :; }; follow_scripts() { :; }; fail() { exit 1; };\n' + body, 'fixture', tmp], text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertNotIn('stop free-sleep-archive', result.stdout)
             self.assertNotIn('delete', result.stdout)

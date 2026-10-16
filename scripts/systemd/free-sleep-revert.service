@@ -5,9 +5,9 @@ After=free-sleep.service
 [Service]
 Type=oneshot
 # A tree rolled back to a release from before the rename has only the old name.
-ExecStart=/bin/bash -c 'test -f /home/dac/free-sleep/scripts/switch-to-upstream.sh && exec /bin/bash /home/dac/free-sleep/scripts/switch-to-upstream.sh; exec /bin/bash /home/dac/free-sleep/scripts/revert-to-stock.sh'
+ExecStart=/bin/bash -c 'test -f /usr/local/lib/nightstand/live/scripts/switch-to-upstream.sh && exec /bin/bash /usr/local/lib/nightstand/live/scripts/switch-to-upstream.sh; exec /bin/bash /usr/local/lib/nightstand/live/scripts/revert-to-stock.sh'
 # Closes the download window even when the updater was killed outright.
-ExecStopPost=-/bin/bash /home/dac/free-sleep/scripts/close_update_window.sh
+ExecStopPost=-/bin/bash /usr/local/lib/nightstand/live/scripts/close_update_window.sh
 # Recovery runs outside this operation and both replaceable trees.
 ExecStopPost=-/bin/systemctl restart --no-block free-sleep-recover-switch.service
 User=root
