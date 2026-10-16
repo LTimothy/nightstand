@@ -405,7 +405,10 @@ with open(sys.argv[1], 'a') as lock:
       const systemd = path.join(box.root, 'systemd');
       const recovery = path.join(box.root, 'recovery');
       mkdirSync(systemd);
-      const result = spawnSync('bash', [path.join(repo, 'scripts/setup_services.sh'), repo, '--recovery-only'], {
+      // setup_services.sh takes only a root-owned copy.
+      const copy = spawnSync('python3', ['-B', path.join(repo, 'scripts/system_scripts.py'), 'publish', repo],
+        { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') }, encoding: 'utf8' }).stdout.trim();
+      const result = spawnSync('bash', [path.join(repo, 'scripts/setup_services.sh'), copy, '--recovery-only'], {
         encoding: 'utf8', env: { ...box.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
           NIGHTSTAND_RECOVERY_DIR: path.join(box.root, 'update-recovery'), NIGHTSTAND_SWITCH_RECOVERY_DIR: recovery,
           NIGHTSTAND_SWAP_MARKER: path.join(box.root, 'update-swap.json'), NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
@@ -441,7 +444,7 @@ with open(sys.argv[1], 'a') as lock:
       writeFileSync(path.join(recovery, 'recover_switch.sh'), 'retained helper');
       copyFileSync(path.join(repo, 'scripts/setup_services.sh'), path.join(box.root, 'setup.sh'));
       copyFileSync(path.join(repo, 'scripts/system_scripts.py'), path.join(box.root, 'system_scripts.py'));
-      const again = spawnSync('bash', [path.join(box.root, 'setup.sh'), repo, '--recovery-only'], {
+      const again = spawnSync('bash', [path.join(box.root, 'setup.sh'), copy, '--recovery-only'], {
         encoding: 'utf8', env: { ...box.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
           NIGHTSTAND_RECOVERY_DIR: path.join(box.root, 'update-recovery'), NIGHTSTAND_SWITCH_RECOVERY_DIR: recovery,
           NIGHTSTAND_SWAP_MARKER: path.join(box.root, 'update-swap.json'), NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },

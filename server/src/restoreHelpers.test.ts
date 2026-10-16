@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +39,23 @@ it('takes the shared operation lock, and refuses while another run holds it', as
     } finally {
       holder.kill();
     }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it('blocks the internet again after a restore even when the restored tree lost its block script', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-restore-block-'));
+  try {
+    mkdirSync(path.join(dir, 'copy/scripts'), { recursive: true });
+    mkdirSync(path.join(dir, 'live/scripts'), { recursive: true });
+    copyFileSync(path.join(repoRoot, HELPERS), path.join(dir, 'copy/scripts/restore_helpers.sh'));
+    writeFileSync(path.join(dir, 'copy/scripts/block_internet_access.sh'), `echo blocked > '${dir}/blocked'\n`);
+    const result = spawnSync('bash', ['-c', `say() { echo "$*"; }; systemctl() { :; }
+LIVE="$1"; STREAM_WAS_ACTIVE=inactive; source "$2"; restore_restart_services best-effort`,
+    'restore', path.join(dir, 'live'), path.join(dir, 'copy/scripts/restore_helpers.sh')], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(existsSync(path.join(dir, 'blocked')), result.stdout + result.stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

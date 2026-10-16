@@ -50,7 +50,7 @@ restore_restart_services() {
   if [ "${ARCHIVE_WAS_ACTIVE:-inactive}" = active ] && [ -f "$LIVE/scripts/archive-raw.sh" ]; then
     systemctl start free-sleep-archive-raw.timer >/dev/null 2>&1 || true
   fi
-  if [ -f "$LIVE/scripts/block_internet_access.sh" ]; then
+  if [ -f "$NIGHTSTAND_SCRIPTS/block_internet_access.sh" ]; then
     if [ "$#" -gt 0 ]; then
       "$@" || say "WARNING: restored firewall could not be applied"
     else

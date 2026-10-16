@@ -272,15 +272,16 @@ describe('install.sh release choice', () => {
 describe('install.sh download', () => {
   it('says plainly when the release cannot be downloaded, and cleans up', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-download-'));
-    const zip = path.join(dir, 'free-sleep.zip');
+    const system = path.join(dir, 'system');
     const result = spawnSync('bash', ['-c', `set -euo pipefail
 VERSION=3.6.0
-ZIP_FILE="$TEST_ZIP"
+SYSTEM_DIR="$TEST_SYSTEM"
 REPO_URL=https://example.invalid/v3.6.0.zip
 curl() { : > "$3"; return 22; }
 ${between('# Download the repository', 'echo "Unzipping the repository..."')}
-echo continued`], { env: envWith({ TEST_ZIP: zip }), encoding: 'utf8' });
-    const zipKept = existsSync(zip);
+echo continued`], { env: envWith({ TEST_SYSTEM: system }), encoding: 'utf8' });
+    // Downloaded into a private folder in the root-owned one, never the working directory.
+    const zipKept = readdirSync(system).some(name => existsSync(path.join(system, name, 'release.zip')));
     rmSync(dir, { recursive: true, force: true });
     assert.notEqual(result.status, 0);
     assert.match(result.stdout, /^Could not download v3\.6\.0 from GitHub\. Nothing was installed\.$/m);

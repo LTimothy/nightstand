@@ -202,9 +202,11 @@ def apply(store, transaction, config, direction):
     execute(['systemctl', 'daemon-reload'])
     if direction == 'upstream':
         verify_updater(config)
-    # Upstream runs its own firewall script; Nightstand runs its root-owned copy.
-    block = (nightstand_scripts(config) if direction == 'nightstand' else config.live / 'scripts') / 'block_internet_access.sh'
-    execute(['sh', str(block)])
+    if direction == 'nightstand':
+        execute(['sh', str(nightstand_scripts(config) / 'block_internet_access.sh')])
+    else:
+        # Upstream gets its own firewall script back, as before Nightstand.
+        execute(['sh', str(config.live / 'scripts/block_internet_access.sh')])
     for family in ('iptables', 'ip6tables'):
         try:
             execute([family, '-C', 'OUTPUT', '-j', 'REJECT'])

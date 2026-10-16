@@ -32,7 +32,8 @@ PREEXISTING_PREV=/home/dac/free-sleep-prev-preexisting
 SWAP_MARKER=/home/dac/free-sleep-migrate-swapped
 RESTORE_STATE=/home/dac/free-sleep-migrate-restore-state
 STAGE=/home/dac/free-sleep-migrate-staging
-ZIP=/home/dac/free-sleep-migrate.zip
+SYSTEM_DIR=/usr/local/lib/nightstand
+WORK=""
 LOCK_FILE=/home/dac/free-sleep-migrate.lock
 PID_FILE=/home/dac/free-sleep-migrate.pid
 DB_PREFLIGHT=""
@@ -105,8 +106,9 @@ fi
 : > "$LOCK_FILE"
 echo "$$" > "$PID_FILE"
 cleanup_lock() {
-  rm -f "$LOCK_FILE" "$PID_FILE" "$ZIP" /tmp/free-sleep-migrate-health
-  rm -rf "$STAGE" "$STAGE.unzip"
+  rm -f "$LOCK_FILE" "$PID_FILE" /tmp/free-sleep-migrate-health
+  rm -rf "$STAGE"
+  if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
   if [ -n "$DB_PREFLIGHT" ]; then rm -rf "$DB_PREFLIGHT"; fi
 }
 trap cleanup_lock EXIT
@@ -203,18 +205,20 @@ PERS_FREE=$(free_mb /persistent)
   || fail "low disk on /persistent (${PERS_FREE:-unknown}M free, ${PERS_NEED}M needed), aborting before touching anything; old snapshots in /persistent/free-sleep-database-backups/ can be removed to make room"
 
 say "Downloading v$TARGET_VERSION (the tip of main)..."
-curl -fL --max-time 300 -o "$ZIP" "$MAIN_ZIP_URL" \
+# Downloaded, unpacked and copied for root where only root can write. Root
+# runs this copy from here on, never the stage the server user will own.
+mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
+  || fail "could not create a download folder in $SYSTEM_DIR; their server was never touched"
+curl -fL --max-time 300 -o "$WORK/release.zip" "$MAIN_ZIP_URL" \
   || fail "download failed; their server was never touched"
-rm -rf "$STAGE" "$STAGE.unzip"
-unzip -q "$ZIP" -d "$STAGE.unzip" || fail "unzip failed; their server was never touched"
-STAGE_INNER=$(find "$STAGE.unzip" -mindepth 1 -maxdepth 1 -type d | head -n1)
-[ -n "$STAGE_INNER" ] || fail "unexpected zip layout; their server was never touched"
-mv "$STAGE_INNER" "$STAGE" && rm -rf "$STAGE.unzip"
-rm -f "$ZIP"
-# Copied for root before the stage is handed to the server user. Root runs
-# this copy from here on.
-COPY=$(python3 -B "$STAGE/scripts/system_scripts.py" publish "$STAGE") \
+unzip -q "$WORK/release.zip" -d "$WORK/tree" || fail "unzip failed; their server was never touched"
+FRESH=$(find "$WORK/tree" -mindepth 1 -maxdepth 1 -type d | head -n1)
+[ -n "$FRESH" ] || fail "unexpected zip layout; their server was never touched"
+COPY=$(python3 -B "$FRESH/scripts/system_scripts.py" publish "$FRESH") \
   || fail "could not copy the scripts root runs; their server was never touched"
+rm -rf "$STAGE"
+mv "$FRESH" "$STAGE" || fail "could not stage v$TARGET_VERSION; their server was never touched"
+rm -rf "$WORK"
 chown -R dac:dac "$STAGE"
 
 [ -f "$STAGE/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"

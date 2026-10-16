@@ -1,4 +1,5 @@
 """Root-owned copies of the scripts root runs."""
+import importlib.util
 import os
 from pathlib import Path
 import stat
@@ -6,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / 'scripts' / 'system_scripts.py'
@@ -93,7 +95,8 @@ class SystemScriptsTests(unittest.TestCase):
             self.skipTest('root reads files without read permission')
         tree = self.tree('a', {'update.sh': ('echo a\n', 0o755), 'unreadable.sh': ('echo b\n', 0o000)})
         self.assertNotEqual(self.tool('publish', tree).returncode, 0)
-        self.assertEqual(list((self.system / 'copies').iterdir()), [])
+        copies = self.system / 'copies'
+        self.assertEqual(list(copies.iterdir()) if copies.exists() else [], [])
 
     def test_refuses_a_folder_other_users_can_write(self):
         self.system.mkdir()
@@ -111,6 +114,90 @@ class SystemScriptsTests(unittest.TestCase):
         self.assertEqual(self.tool('prune').returncode, 0)
         self.assertEqual(sorted(path.name for path in (self.system / 'copies').iterdir()),
                          sorted(copy.name for copy in [copies[0]] + copies[3:]))
+
+
+    def test_re_publishing_a_copy_keeps_it_from_being_pruned_first(self):
+        trees = [self.tree('t%d' % index, {'update.sh': ('echo %d\n' % index, 0o755)}) for index in range(5)]
+        copies = []
+        for index, tree in enumerate(trees):
+            copies.append(self.publish(tree))
+            os.utime(str(copies[-1]), (1000 + index, 1000 + index))
+        self.tool('point', copies[4])
+        self.assertEqual(self.publish(trees[0]), copies[0])
+        self.assertEqual(self.tool('prune').returncode, 0)
+        self.assertIn(copies[0].name, [path.name for path in (self.system / 'copies').iterdir()])
+
+    def test_never_copies_what_a_symlink_points_at(self):
+        secret = self.base / 'secret'
+        secret.write_text('root only\n')
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755)})
+        (tree / 'scripts/link.sh').symlink_to(secret)
+        (tree / 'scripts/sub').symlink_to(self.base)
+        copy = self.publish(tree)
+        found = sorted(str(path.relative_to(copy)) for path in copy.rglob('*') if path.is_file())
+        self.assertEqual(found, ['scripts/update.sh'])
+
+    def test_a_file_swapped_for_a_symlink_mid_publish_is_never_followed(self):
+        secret = self.base / 'secret'
+        secret.write_text('root only\n')
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755), 'swapped.sh': ('echo b\n', 0o755)})
+        target = str(tree / 'scripts/swapped.sh')
+        real_lstat = os.lstat
+        swapped = []
+
+        def racing_lstat(path, *args, **kwargs):
+            result = real_lstat(path, *args, **kwargs)
+            if str(path) == target and not swapped:
+                swapped.append(True)
+                os.unlink(target)
+                os.symlink(str(secret), target)
+            return result
+        spec = importlib.util.spec_from_file_location('system_scripts_under_test', str(TOOL))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.SYSTEM = str(self.system)
+        with patch.object(module.os, 'lstat', racing_lstat):
+            try:
+                copy = Path(module.publish(str(tree)))
+            except SystemExit:
+                return
+        for path in copy.rglob('*'):
+            if path.is_file():
+                self.assertNotIn('root only', path.read_text(), path)
+
+    def test_refuses_a_hard_link_to_a_file_outside_the_tree(self):
+        secret = self.base / 'secret'
+        secret.write_text('root only\n')
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755)})
+        os.link(str(secret), str(tree / 'scripts/linked.sh'))
+        result = self.tool('publish', tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.system / 'copies').is_dir() and any(
+            not path.name.startswith('.') for path in (self.system / 'copies').iterdir()))
+
+    def test_refuses_a_tree_other_users_can_change_unless_told_it_is_the_old_updaters_stage(self):
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755), 'sub/x.sh': ('echo x\n', 0o755)})
+        (tree / 'scripts/sub').chmod(0o777)
+        result = self.tool('publish', tree)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('refusing', result.stderr)
+        self.assertFalse((self.system / 'copies').is_dir() and any(
+            not path.name.startswith('.') for path in (self.system / 'copies').iterdir()))
+        handoff = self.tool('publish', '--any-owner', tree)
+        self.assertEqual(handoff.returncode, 0, handoff.stderr)
+        self.assertTrue((Path(handoff.stdout.strip()) / 'scripts/sub/x.sh').is_file())
+
+    def test_refuses_a_tree_another_user_owns(self):
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755)})
+        spec = importlib.util.spec_from_file_location('system_scripts_owner', str(TOOL))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.SYSTEM = str(self.system)
+        with patch.object(module.os, 'geteuid', lambda: os.getuid() + 1):
+            with self.assertRaises(SystemExit) as raised:
+                module.publish(str(tree))
+        self.assertIn('refusing', str(raised.exception))
+        self.assertFalse(self.system.exists())
 
 
 if __name__ == '__main__':

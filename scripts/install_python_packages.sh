@@ -27,9 +27,6 @@ fi
 echo "Creating new python venv..."
 python3 -m venv /home/dac/venv
 
-echo "Activating python venv..."
-source /home/dac/venv/bin/activate
-
 set -x
-/home/dac/venv/bin/python -m pip install -r /home/dac/free-sleep/scripts/python/requirements.txt
+/home/dac/venv/bin/python -m pip install -r "$BUNDLED/requirements.txt"
 set +x

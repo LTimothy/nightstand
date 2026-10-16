@@ -30,6 +30,8 @@ PREV=/home/dac/free-sleep-prev
 PREEXISTING_PREV=/home/dac/free-sleep-prev-preexisting
 SWAP_MARKER=/home/dac/free-sleep-migrate-swapped
 STAGE=/home/dac/free-sleep-agent-staging
+SYSTEM_DIR=/usr/local/lib/nightstand
+WORK=""
 PAYLOAD=/usr/local/lib/nightstand/migrate/agent-payload
 LOCK_FILE=/home/dac/free-sleep-agent-bootstrap.lock
 STATUS_FILE=/persistent/free-sleep-data/migration-status.json
@@ -57,7 +59,7 @@ if [ -e "$LOCK_FILE" ]; then
   exit 1
 fi
 : > "$LOCK_FILE"
-trap 'rm -f "$LOCK_FILE"' EXIT
+trap 'rm -f "$LOCK_FILE"; if [ -n "$WORK" ]; then rm -rf "$WORK"; fi' EXIT
 
 fail() {
   say "FATAL: $*"
@@ -96,14 +98,20 @@ ROOT_FREE=$(df -m / | awk 'NR==2{print $4}')
 # ==============================================================================
 write_status "stage" "in_progress" "copying the upstream free-sleep install"
 say "Copying the pod's own upstream free-sleep install to $STAGE (their tree stays untouched)"
-rm -rf "$STAGE"
-cp -a "$LIVE" "$STAGE" || fail "could not copy the upstream free-sleep install; nothing was touched"
+# Assembled and copied for root where only root can write. Root runs this
+# copy from here on, never the stage the server user will own.
+mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
+  || fail "could not create a work folder in $SYSTEM_DIR; nothing was touched"
+FRESH="$WORK/tree"
+cp -a "$LIVE" "$FRESH" || fail "could not copy the upstream free-sleep install; nothing was touched"
+chown -R root:root "$FRESH" && chmod -R go-w "$FRESH" \
+  || fail "could not take the copy of the upstream free-sleep install for root; nothing was touched"
 
 say "Applying the agent overlay to the copy"
 while IFS='|' read -r mode path; do
   [ -n "${path:-}" ] || continue
   src="$PAYLOAD/files/$path"
-  dest="$STAGE/$path"
+  dest="$FRESH/$path"
   case "$mode" in
     add)
       [ -e "$dest" ] && fail "manifest says add but $path already exists in upstream free-sleep; the base moved"
@@ -125,7 +133,7 @@ while IFS='|' read -r mode path; do
 done < "$PAYLOAD/MANIFEST"
 
 # Patch 1: register the update route. Two lines is the whole difference.
-ROUTES="$STAGE/server/src/setup/routes.ts"
+ROUTES="$FRESH/server/src/setup/routes.ts"
 python3 - "$ROUTES" <<'PY' || fail "routes.ts patch failed"
 import sys
 p = sys.argv[1]
@@ -147,7 +155,7 @@ grep -q "app.use('/api/', update);" "$ROUTES" || fail "routes.ts registration pa
 
 # Patch 2: the test script entry. The agent carries the first test files this
 # install has ever had, and upstream free-sleep has no runner entry to run them with.
-python3 - "$STAGE/server/package.json" "$PAYLOAD/test-script" <<'PY' || fail "package.json patch failed"
+python3 - "$FRESH/server/package.json" "$PAYLOAD/test-script" <<'PY' || fail "package.json patch failed"
 import json, sys
 pkg_path, script_path = sys.argv[1], sys.argv[2]
 pkg = json.load(open(pkg_path))
@@ -157,12 +165,13 @@ pkg.setdefault("scripts", {})["test"] = open(script_path).read().strip()
 open(pkg_path, "w").write(json.dumps(pkg, indent=2) + "\n")
 PY
 
-[ -f "$STAGE/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"
-[ -f "$STAGE/server/public/index.html" ] || fail "staged tree is missing server/public/index.html"
-# Copied for root before the stage is handed to the server user. Root runs
-# this copy from here on.
-COPY=$(python3 -B "$STAGE/scripts/system_scripts.py" publish "$STAGE") \
+[ -f "$FRESH/server/dist/server.js" ] || fail "staged tree is missing server/dist/server.js"
+[ -f "$FRESH/server/public/index.html" ] || fail "staged tree is missing server/public/index.html"
+COPY=$(python3 -B "$FRESH/scripts/system_scripts.py" publish "$FRESH") \
   || fail "could not copy the scripts root runs; their server was never touched"
+rm -rf "$STAGE"
+mv "$FRESH" "$STAGE" || fail "could not stage the agent; their server was never touched"
+rm -rf "$WORK"
 chown -R dac:dac "$STAGE"
 write_status "stage" "ok" "agent applied to a copy of upstream free-sleep"
 

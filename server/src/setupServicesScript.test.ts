@@ -64,7 +64,10 @@ function sandbox(opts: {
   chmodSync(path.join(bin, 'visudo'), 0o755);
   if (opts.existingSudoers !== undefined) writeFileSync(sudoers, opts.existingSudoers);
 
-  const run = (args: string[] = [repo]) => spawnSync('bash', [SCRIPT, ...args], {
+  // Callers copy the tree for root first and pass the copy.
+  const publish = () => spawnSync('python3', ['-B', path.join(repoRoot, 'scripts/system_scripts.py'), 'publish', repo],
+    { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: system }, encoding: 'utf8' }).stdout.trim();
+  const run = (args: string[] = [publish()]) => spawnSync('bash', [SCRIPT, ...args], {
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -78,7 +81,7 @@ function sandbox(opts: {
     },
   });
   const read = (file: string) => readFileSync(file, 'utf8');
-  return { run, read, systemd, sudoers, calls, tmpfiles, lock, tmpfilesCalls, system, repo };
+  return { run, publish, read, systemd, sudoers, calls, tmpfiles, lock, tmpfilesCalls, system, repo };
 }
 
 // Every command the server runs through sudo, read from its source.
@@ -267,7 +270,7 @@ describe('setup_services.sh', () => {
     assert.equal(box.read(box.sudoers), existing);
   });
 
-  it('copies a tree for root and runs every unit from the live copy', () => {
+  it('makes the copy it is given live and runs every unit from the live copy', () => {
     const box = sandbox();
     const result = box.run();
     assert.equal(result.status, 0, result.stdout + result.stderr);
@@ -280,6 +283,20 @@ describe('setup_services.sh', () => {
     }
     assert.match(box.read(path.join(box.systemd, 'free-sleep-update.service')),
       /^ExecStart=\/bin\/bash \/usr\/local\/lib\/nightstand\/live\/scripts\/update_service\.sh$/m);
+  });
+
+  it('refuses an install tree, or a path that only looks like a copy, and changes nothing', () => {
+    const box = sandbox();
+    mkdirSync(path.join(box.system, 'copies'), { recursive: true });
+    for (const given of [box.repo, path.join(box.system, 'copies/../../repo'), path.join(box.system, 'copies')]) {
+      for (const args of [[given], [given, '--recovery-only']]) {
+        const result = box.run(args);
+        assert.notEqual(result.status, 0, `${args.join(' ')}: ${result.stdout}`);
+        assert.equal(existsSync(path.join(box.system, 'live')), false, given);
+        assert.deepEqual(readdirSync(box.systemd), [], given);
+        assert.equal(existsSync(box.sudoers), false, given);
+      }
+    }
   });
 
   it('uses a copy it is given and makes no other', () => {
@@ -296,7 +313,7 @@ describe('setup_services.sh', () => {
     assert.equal(box.run().status, 0);
     const before = readlinkSync(path.join(box.system, 'live'));
     writeFileSync(path.join(box.repo, 'scripts/health_check.sh'), '# a newer version\n');
-    const result = box.run([box.repo, '--recovery-only']);
+    const result = box.run([box.publish(), '--recovery-only']);
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(readlinkSync(path.join(box.system, 'live')), before);
   });

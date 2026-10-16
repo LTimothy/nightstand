@@ -437,13 +437,25 @@ bash "$TEST_ROLLBACK"
         self.assertEqual(flush.call_count, 3)
         self.assertTrue(all(call.args == (self.system.data,) for call in flush.call_args_list))
 
+    def test_recovery_is_armed_from_the_runners_own_scripts_never_a_tree(self):
+        for tree in (self.system.live, self.stage):
+            (tree / 'scripts').mkdir(parents=True, exist_ok=True)
+            for name in ('recover_switch.sh', 'close_update_window.sh', 'setup_services.sh'):
+                (tree / 'scripts' / name).write_text('echo edited by the server user\n')
+        calls = []
+        with patch.object(subprocess, 'run', side_effect=lambda command, **kwargs: calls.append(command)):
+            self.runner.System.arm_recovery(self.system, self.stage)
+        self.assertEqual(calls, [['bash', str(SCRIPTS / 'close_update_window.sh')],
+                                 ['bash', str(SCRIPTS / 'setup_services.sh'), str(SCRIPTS.parent), '--recovery-only']])
+
     def test_return_retains_the_artifact_helper_before_cleanup_and_finishes_it_after_commit(self):
         retained = self.forward()
         next_stage = self.system.live.parent / 'return-stage'
         create_tree(next_stage, 'LTimothy/nightstand', '3.7.0')
         (next_stage / 'scripts/migrate').mkdir()
-        payload = b'#!/bin/bash\nexit 0\n'
-        (next_stage / 'scripts/migrate/fork-artifacts.sh').write_bytes(payload)
+        # Root runs the helper from the copy this runner started from, never the stage.
+        payload = (SCRIPTS / 'migrate/fork-artifacts.sh').read_bytes()
+        (next_stage / 'scripts/migrate/fork-artifacts.sh').write_bytes(b'#!/bin/bash\necho edited by the server user\n')
         calls = []
         def run(command, **kwargs):
             calls.append(command)

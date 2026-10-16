@@ -55,8 +55,9 @@ describe('the agent bootstrap scripts', () => {
     // ends up underneath the agent, and so the running tree is untouched until
     // the swap. Both halves of that are load-bearing.
     assertOrder(read(POD), [
-      'cp -a "$LIVE" "$STAGE"',
+      'cp -a "$LIVE" "$FRESH"',
       'Applying the agent overlay to the copy',
+      'mv "$FRESH" "$STAGE"',
       'systemctl stop free-sleep',
     ], 'stage-before-stop');
   });
@@ -149,8 +150,8 @@ describe('the agent bootstrap scripts', () => {
 
   it('applies the two patches to the pod\'s own files, not to shipped copies', () => {
     const pod = read(POD);
-    assert.match(pod, /\$STAGE\/server\/src\/setup\/routes\.ts/, 'routes.ts is not patched in the staged copy');
-    assert.match(pod, /\$STAGE\/server\/package\.json/, 'package.json is not patched in the staged copy');
+    assert.match(pod, /\$FRESH\/server\/src\/setup\/routes\.ts/, 'routes.ts is not patched in the staged copy');
+    assert.match(pod, /\$FRESH\/server\/package\.json/, 'package.json is not patched in the staged copy');
     // and the patch entries are skipped when copying files in
     assert.match(pod, /\[ "\$mode" = "patch" \]|patch\)/, 'the copy loop does not special-case patch entries');
   });

@@ -314,7 +314,7 @@ bash "$TEST_BASE/restore.sh"
         installer = (ROOT / 'scripts/migrate/pod-installer.sh').read_text()
         self.assertIn('ExecStart=/bin/bash $RESTORE_SCRIPT_DEST --sentinel', installer)
         self.assertIn('free-sleep-migrate.pid', installer)
-        self.assertIn('rm -rf "$STAGE" "$STAGE.unzip"', installer)
+        self.assertIn('rm -rf "$STAGE"\n  if [ -n "$WORK" ]; then rm -rf "$WORK"; fi', installer)
 
 
     def run_artifacts(self, mode, consent="no", cron_error=False, stop_error=False, empty=False, driver=None, missing_helper=False, restore_after=False, still_active=False, restore_driver=False, cron_text=None, unit_text=None, ambient_unit=True):
@@ -413,7 +413,7 @@ fail() { echo "$*" >&2; exit 1; }
             elif driver in ('install', 'update'):
                 source = (ROOT / f'scripts/{driver}.sh').read_text()
                 start = source.index('# Report legacy firewall jobs')
-                end = source.index('\nRESULT_OPERATION=', start) if driver == 'update' else source.index('\nfi', start) + 3
+                end = source.index('\n', source.index('warn-cron', start)) + 1 if driver == 'update' else source.index('\nfi', start) + 3
                 helper_dir = base / 'scripts/migrate'
                 helper_dir.mkdir(parents=True)
                 if not missing_helper:
@@ -422,7 +422,7 @@ fail() { echo "$*" >&2; exit 1; }
                 recovery_helper.parent.mkdir(parents=True)
                 recovery_helper.write_text(script.read_text())
                 wrapper = wrapper[:wrapper.index('bash "$TEST_SCRIPT"')] + r'''
-RECOVERY_SOURCE="$TEST_BASE/recovery-source"
+NIGHTSTAND_SCRIPTS="$TEST_BASE/recovery-source/scripts"
 SRC_DIR="$TEST_BASE"
 LIVE="$TEST_BASE"
 ''' + source[start:end]

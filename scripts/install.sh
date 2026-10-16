@@ -23,8 +23,7 @@ fi
 
 # --------------------------------------------------------------------------------
 # Variables
-ZIP_FILE="free-sleep.zip"
-UNZIP_DIR="free-sleep-unzip"
+SYSTEM_DIR="${NIGHTSTAND_SYSTEM_DIR:-/usr/local/lib/nightstand}"
 REPO_DIR="/home/dac/free-sleep"
 PREV_DIR="/home/dac/free-sleep-prev"
 FAILED_DIR="/home/dac/free-sleep-failed"
@@ -100,6 +99,12 @@ echo "Installing Nightstand v$VERSION from the $CHANNEL channel"
 
 # --------------------------------------------------------------------------------
 # Download the repository
+# Downloaded and unpacked where only root can write.
+mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
+  || { echo "Could not create a download folder in $SYSTEM_DIR. Nothing was installed."; exit 1; }
+ZIP_FILE="$WORK/release.zip"
+UNZIP_DIR="$WORK/tree"
+
 echo "Downloading the repository..."
 curl -fL -o "$ZIP_FILE" "$REPO_URL" \
   || { rm -f "$ZIP_FILE"; echo "Could not download v$VERSION from GitHub. Nothing was installed."; exit 1; }
@@ -242,6 +247,7 @@ if [ -d "$REPO_DIR" ]; then
 fi
 mv "$SRC_DIR" "$REPO_DIR"
 rm -rf "$UNZIP_DIR"
+rmdir "$(dirname "$UNZIP_DIR")" 2>/dev/null || true
 
 chown -R "$USERNAME":"$USERNAME" "$REPO_DIR"
 bash "$COPY/scripts/record_stock.sh" units || true

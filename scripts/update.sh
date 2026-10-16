@@ -66,9 +66,6 @@ NPX=/home/dac/.volta/bin/npx
 
 say() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
-# Report legacy firewall jobs without editing the root crontab.
-bash "$RECOVERY_SOURCE/scripts/migrate/fork-artifacts.sh" warn-cron || true
-
 RESULT_OPERATION=update
 
 # How this run ended, for the app to show. The writer is read now because the
@@ -104,6 +101,8 @@ record_result() {
 WAN_OPEN=no
 source "$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh" || exit 1
 init_update_firewall
+# Report legacy firewall jobs without editing the root crontab.
+bash "$NIGHTSTAND_SCRIPTS/migrate/fork-artifacts.sh" warn-cron || true
 # Stops a service that writes the data and confirms it is not running. Kept
 # identical in the update, rollback, switch, reset and install scripts.
 # systemd refuses to stop a unit that is not installed or does not load, even
@@ -365,9 +364,9 @@ if [ "$HANDOFF" = 1 ]; then
   unset NIGHTSTAND_UPDATE_HANDOFF NIGHTSTAND_HANDOFF_TARGET NIGHTSTAND_HANDOFF_IS_DOWNGRADE NIGHTSTAND_HANDOFF_RECHECK_IN_USE
   [ -d "$STAGE" ] || fail "handed off without a staged tree at $STAGE"
   case "$RECOVERY_SOURCE" in
-    "$SYSTEM_DIR"/copies/*) NEW_COPY=$RECOVERY_SOURCE ;;
+    "$SYSTEM_DIR"/copies/*) NEW_COPY=$(dirname "$NIGHTSTAND_SCRIPTS") ;;
     # An updater from before root-owned copies hands off from the stage.
-    *) NEW_COPY=$(python3 -B "$RECOVERY_SOURCE/scripts/system_scripts.py" publish "$STAGE") \
+    *) NEW_COPY=$(python3 -B "$NIGHTSTAND_SCRIPTS/system_scripts.py" publish --any-owner "$STAGE") \
          || fail "could not copy the new version's scripts for root; live install untouched" ;;
   esac
   NIGHTSTAND_SCRIPTS="$NEW_COPY/scripts"

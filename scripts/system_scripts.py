@@ -8,7 +8,11 @@ copy the units run. A tree whose scripts match a copy byte for byte uses that
 copy. A tree with none, from a release before copies or edited since, never
 runs as root.
 
-  system_scripts.py publish TREE   copy TREE/scripts and print the copy
+  system_scripts.py publish TREE   copy TREE/scripts and print the copy;
+                                   TREE must be this user's alone
+  system_scripts.py publish --any-owner TREE
+                                   the same for the stage an updater from
+                                   before copies hands off from
   system_scripts.py find TREE      print the copy matching TREE, or exit 1
   system_scripts.py point COPY     make COPY the one root runs
   system_scripts.py follow TREE    make TREE's copy the one root runs, if any
@@ -16,6 +20,7 @@ runs as root.
 
 Standard library only, for the Python versions Pods ship.
 """
+import errno
 import hashlib
 import os
 import shutil
@@ -44,19 +49,48 @@ def _sync_dir(path):
         os.close(descriptor)
 
 
-def _files(tree):
-    scripts = os.path.join(tree, 'scripts')
-    if not os.path.isdir(scripts) or os.path.islink(scripts):
+def _refuse(tree, why):
+    sys.exit('refusing %s: %s' % (tree, why))
+
+
+def _scripts(tree, owner=None):
+    """TREE/scripts as sorted (path, data, executable), read through descriptors
+    that never follow a symlink. With OWNER, refuse anything another user owns
+    or can change."""
+    def check(info, path):
+        if owner is not None and (info.st_uid != owner or info.st_mode & 0o002):
+            _refuse(tree, '%s is not owned and writable by this user alone' % path)
+
+    try:
+        top = os.open(tree, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
         sys.exit('no scripts folder in %s' % tree)
     found = []
-    for directory, dirs, names in os.walk(scripts):
-        dirs[:] = [name for name in dirs if name != '__pycache__'
-                   and not (directory == scripts and name == 'tests')
-                   and not os.path.islink(os.path.join(directory, name))]
-        for name in names:
-            path = os.path.join(directory, name)
-            if not name.endswith('.pyc') and stat.S_ISREG(os.lstat(path).st_mode):
-                found.append((os.path.relpath(path, tree).replace(os.sep, '/'), path))
+    try:
+        check(os.fstat(top), tree)
+        for directory, dirs, names, directory_fd in os.fwalk('scripts', dir_fd=top):
+            check(os.fstat(directory_fd), directory)
+            dirs[:] = [name for name in dirs if name != '__pycache__'
+                       and not (directory == 'scripts' and name == 'tests')]
+            for name in names:
+                if name.endswith('.pyc'):
+                    continue
+                try:
+                    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
+                except OSError as error:
+                    if error.errno == errno.ELOOP:
+                        continue
+                    raise
+                with os.fdopen(descriptor, 'rb') as handle:
+                    info = os.fstat(descriptor)
+                    if not stat.S_ISREG(info.st_mode):
+                        continue
+                    if info.st_nlink != 1:
+                        _refuse(tree, '%s/%s is a hard link' % (directory, name))
+                    check(info, directory + '/' + name)
+                    found.append((directory + '/' + name, handle.read(), info.st_mode & 0o111))
+    finally:
+        os.close(top)
     if not found:
         sys.exit('no scripts in %s' % tree)
     return sorted(found)
@@ -68,21 +102,19 @@ def _entry(rel, data):
 
 def digest(tree):
     outer = hashlib.sha256()
-    for rel, path in _files(tree):
-        with open(path, 'rb') as handle:
-            outer.update(_entry(rel, handle.read()))
+    for rel, data, _ in _scripts(tree):
+        outer.update(_entry(rel, data))
     return outer.hexdigest()
 
 
-def publish(tree):
+def publish(tree, any_owner=False):
+    # Only the old updater's handoff publishes a stage the server user owns.
+    scripts = _scripts(tree, None if any_owner else os.geteuid())
     copies = _owned_dir(os.path.join(_owned_dir(SYSTEM), 'copies'))
     work = tempfile.mkdtemp(prefix='.incoming-', dir=copies)
     try:
         outer = hashlib.sha256()
-        for rel, path in _files(tree):
-            with open(path, 'rb') as handle:
-                data = handle.read()
-                executable = os.fstat(handle.fileno()).st_mode & 0o111
+        for rel, data, executable in scripts:
             target = os.path.join(work, rel)
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with open(target, 'wb') as handle:
@@ -97,6 +129,7 @@ def publish(tree):
         final = os.path.join(copies, outer.hexdigest())
         if os.path.isdir(final):
             shutil.rmtree(work)
+            os.utime(final)
         else:
             os.rename(work, final)
             _sync_dir(copies)
@@ -109,7 +142,7 @@ def publish(tree):
 def find(tree):
     try:
         copy = os.path.join(SYSTEM, 'copies', digest(tree))
-    except SystemExit:
+    except (SystemExit, OSError):
         return None
     return copy if os.path.isdir(copy) else None
 
@@ -154,6 +187,8 @@ def main(argv):
     command, args = (argv[0], argv[1:]) if argv else ('', [])
     if command == 'publish' and len(args) == 1:
         print(publish(args[0]))
+    elif command == 'publish' and len(args) == 2 and args[0] == '--any-owner':
+        print(publish(args[1], any_owner=True))
     elif command == 'find' and len(args) == 1:
         copy = find(args[0])
         if copy is None:

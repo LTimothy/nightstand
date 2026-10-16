@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -169,5 +169,39 @@ describe('enable_biometrics.sh', () => {
     const result = spawnSync('python3', args, { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(result.stdout.startsWith(path.join(repoRoot, 'biometrics', 'vendor', 'nats')), result.stdout);
+  });
+});
+
+describe('setup_python.sh', () => {
+  it('unpacks the CPython sources in a folder only root can reach, and removes it', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-setup-python-'));
+    try {
+      const bin = path.join(dir, 'bin');
+      const temp = path.join(dir, 'tmp');
+      const stdlib = path.join(dir, 'stdlib');
+      const cwd = path.join(dir, 'cwd');
+      for (const folder of [bin, temp, stdlib, cwd, path.join(dir, 'zip/cpython-3.9.9/Lib/xml')]) mkdirSync(folder, { recursive: true });
+      writeFileSync(path.join(dir, 'zip/cpython-3.9.9/Lib/xml/new.py'), 'NEW = 1\n');
+      writeFileSync(path.join(stdlib, 'kept.py'), 'kept\n');
+      writeFileSync(path.join(dir, 'zip/cpython-3.9.9/Lib/kept.py'), 'replaced\n');
+      spawnSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
+        path.join(dir, 'cpython'), path.join(dir, 'zip')]);
+      writeFileSync(path.join(bin, 'python3'),
+        `#!/bin/sh\nif [ "$1" = --version ]; then echo "Python 3.9.9"; else echo '${stdlib}'; fi\n`);
+      writeFileSync(path.join(bin, 'curl'), `#!/bin/sh\nwhile [ "$1" != -o ]; do shift; done\ncp '${dir}/cpython.zip' "$2"\n`);
+      chmodSync(path.join(bin, 'python3'), 0o755);
+      chmodSync(path.join(bin, 'curl'), 0o755);
+      const result = spawnSync('bash', [path.join(repoRoot, 'scripts/setup_python.sh')],
+        { cwd, encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_SYSTEM_DIR: temp } });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.equal(readFileSync(path.join(stdlib, 'xml/new.py'), 'utf8'), 'NEW = 1\n');
+      assert.equal(readFileSync(path.join(stdlib, 'kept.py'), 'utf8'), 'kept\n');
+      assert.match(readFileSync(path.join(repoRoot, 'scripts/setup_python.sh'), 'utf8'), /mktemp -d/);
+      assert.doesNotMatch(readFileSync(path.join(repoRoot, 'scripts/setup_python.sh'), 'utf8'), /\/home\/dac/);
+      assert.deepEqual(readdirSync(temp), []);
+      assert.deepEqual(readdirSync(cwd), []);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

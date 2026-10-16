@@ -236,10 +236,9 @@ class System:
         return recover_switch.controller(*arguments)
 
     def arm_recovery(self, stage):
-        source = self.live if (self.live / 'scripts/recover_switch.sh').is_file() else stage
-        if (source / 'scripts/close_update_window.sh').is_file():
-            subprocess.run(['bash', str(source / 'scripts/close_update_window.sh')], check=True, timeout=60)
-        subprocess.run(['bash', str(source / 'scripts/setup_services.sh'), str(source), '--recovery-only'],
+        # Root runs only the root-owned copy this runner started from.
+        subprocess.run(['bash', str(HERE / 'close_update_window.sh')], check=True, timeout=60)
+        subprocess.run(['bash', str(HERE / 'setup_services.sh'), str(HERE.parent), '--recovery-only'],
                        check=True, timeout=60)
 
     def operation(self, unit):
@@ -301,7 +300,7 @@ class System:
         return prepare(stage, Path('/home/dac/free-sleep-envs'), transaction, self.venv, 'python3', 'dac', 600, direction=direction)
 
     def clean_foreign(self, transaction, stage):
-        source = stage / 'scripts/migrate/fork-artifacts.sh'
+        source = HERE / 'migrate/fork-artifacts.sh'
         if not source.is_file():
             raise ValueError('Migration artifact helper is missing')
         script = self.store.directory(transaction) / 'migration-artifacts.sh'

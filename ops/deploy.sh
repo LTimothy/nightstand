@@ -205,15 +205,19 @@ SSH "set -e
 # never reach the swap. Raise SHIP_RATE_KBIT on a wired link, where none of
 # this applies.
 SHIP_ATTEMPTS=4
-REMOTE_TAR=/tmp/nightstand-ship.tar
+# Shipped and unpacked where only root can write, so the server user cannot
+# swap the tree before root copies its scripts.
+SYSTEM_DIR=/usr/local/lib/nightstand
+SHIP_DIR=
 ship_to_stage() {
   local tarball="$1"
   attempt=1
   while [ "$attempt" -le "$SHIP_ATTEMPTS" ]; do
-    SSH "rm -rf $STAGE $REMOTE_TAR && mkdir -p $STAGE" || { attempt=$((attempt+1)); continue; }
-    if SCP_SHIP "$tarball" "$REMOTE_TAR"; then
-      if SSH "tar -x -C $STAGE -f $REMOTE_TAR && rm -f $REMOTE_TAR \
-              && [ -s $STAGE/server/dist/server.js ] && [ -s $STAGE/server/public/index.html ]"; then
+    [ -z "$SHIP_DIR" ] || SSH "rm -rf $SHIP_DIR"
+    SHIP_DIR=$(SSH "mkdir -p $SYSTEM_DIR && mktemp -d $SYSTEM_DIR/.download.XXXXXX") || { attempt=$((attempt+1)); continue; }
+    if SCP_SHIP "$tarball" "$SHIP_DIR/ship.tar"; then
+      if SSH "mkdir $SHIP_DIR/tree && tar -x -C $SHIP_DIR/tree -f $SHIP_DIR/ship.tar && rm -f $SHIP_DIR/ship.tar \
+              && [ -s $SHIP_DIR/tree/server/dist/server.js ] && [ -s $SHIP_DIR/tree/server/public/index.html ]"; then
         [ "$attempt" -gt 1 ] && say "staging ship succeeded on attempt $attempt"
         return 0
       fi
@@ -224,6 +228,7 @@ ship_to_stage() {
     attempt=$((attempt+1))
     [ "$attempt" -le "$SHIP_ATTEMPTS" ] && sleep 3
   done
+  [ -z "$SHIP_DIR" ] || SSH "rm -rf $SHIP_DIR"
   return 1
 }
 
@@ -233,11 +238,12 @@ trap 'rm -f "$SHIP_TAR"' EXIT
 git archive HEAD -o "$SHIP_TAR"
 ship_to_stage "$SHIP_TAR" || die "staging ship failed after $SHIP_ATTEMPTS attempts; nothing was changed on the pod"
 rm -f "$SHIP_TAR"; trap - EXIT
-# Root runs a root-owned copy of these scripts, taken before the stage is
-# handed to the server user.
-COPY=$(SSH "python3 -B $STAGE/scripts/system_scripts.py publish $STAGE") \
-  || die "could not copy the scripts root runs on the pod; live install untouched"
-SSH "chown -R dac:dac $STAGE"
+# Root runs a root-owned copy of these scripts, taken before the tree moves
+# to the stage the server user owns.
+COPY=$(SSH "python3 -B $SHIP_DIR/tree/scripts/system_scripts.py publish $SHIP_DIR/tree") \
+  || { SSH "rm -rf $SHIP_DIR"; die "could not copy the scripts root runs on the pod; live install untouched"; }
+SSH "rm -rf $STAGE && mv $SHIP_DIR/tree $STAGE && rm -rf $SHIP_DIR && chown -R dac:dac $STAGE" \
+  || die "could not move the shipped tree to $STAGE; live install untouched"
 
 # --- dependencies (while old server still runs) ------------------------------
 # As in scripts/update.sh, only HTTPS and name lookups go out while npm and

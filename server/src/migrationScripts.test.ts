@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, existsSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, existsSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -512,14 +512,55 @@ describe('the fork-switch tool names the app\'s real rollback path', () => {
 });
 
 describe('the fork switch runs root-owned copies', () => {
-  it('runs the fork switch from the root-owned folder and copies the stage for root before it changes owner', () => {
+  it('runs the fork switch from the root-owned folder and copies the fresh tree for root before the stage exists', () => {
     const tool = readScript('scripts/migrate/switch-to-this-fork.sh');
     assert.match(tool, /bash \/usr\/local\/lib\/nightstand\/migrate\/pod-installer\.sh/);
     for (const file of ['scripts/migrate/pod-installer.sh', 'scripts/migrate/agent-bootstrap-installer.sh']) {
       const src = readScript(file);
-      const publish = src.indexOf('COPY=$(python3 -B "$STAGE/scripts/system_scripts.py" publish "$STAGE")');
-      assert.ok(publish > 0 && publish < src.indexOf('chown -R dac:dac "$STAGE"'), file);
+      const work = src.indexOf('WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX")');
+      const publish = src.indexOf('COPY=$(python3 -B "$FRESH/scripts/system_scripts.py" publish "$FRESH")');
+      const stage = src.indexOf('mv "$FRESH" "$STAGE"');
+      assert.ok(work > 0 && work < publish && publish < stage && stage < src.indexOf('chown -R dac:dac "$STAGE"'), file);
+      assert.doesNotMatch(src, /\$STAGE\/scripts\/system_scripts\.py/, file);
       assert.match(src, /bash "\$COPY\/scripts\/setup_services\.sh" "\$COPY"/, file);
+    }
+  });
+
+  it('downloads, unpacks and copies the release where the server user cannot reach it', () => {
+    const src = readScript('scripts/migrate/pod-installer.sh');
+    const start = src.indexOf('say "Downloading v$TARGET_VERSION');
+    const end = src.indexOf('chown -R dac:dac "$STAGE"', start);
+    assert.ok(start > 0 && end > start);
+    const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-migrate-stage-'));
+    try {
+      const release = path.join(dir, 'release/nightstand-main/scripts');
+      mkdirSync(release, { recursive: true });
+      writeFileSync(path.join(release, 'system_scripts.py'),
+        'import os, sys\nrecord = os.path.abspath(__file__) + " " + " ".join(sys.argv[1:])\n'
+        + 'open(os.environ["FIXTURE"] + "/published", "w").write(record)\nprint("/copy")\n');
+      execFileSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
+        path.join(dir, 'release'), path.join(dir, 'release')]);
+      const result = spawnSync('bash', ['-c', `set -uo pipefail
+SYSTEM_DIR="$FIXTURE/system"; STAGE="$FIXTURE/home/free-sleep-migrate-staging"
+TARGET_VERSION=3.7.0; MAIN_ZIP_URL=https://example.invalid/main.zip
+mkdir -p "$FIXTURE/home" "$STAGE/old"
+say() { :; }
+fail() { echo "FAIL $*"; exit 1; }
+curl() { while [ "$1" != -o ]; do shift; done; cp "$FIXTURE/release.zip" "$2"; }
+${src.slice(start, end)}
+echo "COPY=$COPY"`], { encoding: 'utf8', env: { ...process.env, FIXTURE: dir } });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /^COPY=\/copy$/m);
+      const [tool, command, tree] = readFileSync(path.join(dir, 'published'), 'utf8').split(' ');
+      const system = path.join(dir, 'system');
+      assert.equal(command, 'publish');
+      assert.match(tree, new RegExp(`^${system}/\\.download\\.[^/]+/tree/nightstand-main$`));
+      assert.equal(tool, path.join(tree, 'scripts/system_scripts.py'));
+      assert.ok(existsSync(path.join(dir, 'home/free-sleep-migrate-staging/scripts/system_scripts.py')));
+      assert.ok(!existsSync(path.join(dir, 'home/free-sleep-migrate-staging/old')));
+      assert.deepEqual(readdirSync(system), []);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

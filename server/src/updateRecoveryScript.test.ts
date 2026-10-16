@@ -128,6 +128,10 @@ ${snippet ?? `source '${recoveryFile}' "$@"`}`, 'recovery', ...args], {
     dispose: () => rmSync(root, { recursive: true, force: true }) };
 }
 
+// setup_services.sh takes only a root-owned copy, so these tests publish the repository's scripts first.
+const copyOf = (root: string) => spawnSync('python3', ['-B', path.join(repo, 'scripts/system_scripts.py'), 'publish', repo],
+  { env: { ...process.env, NIGHTSTAND_SYSTEM_DIR: path.join(root, 'system') }, encoding: 'utf8' }).stdout.trim();
+
 describe('interrupted update recovery', () => {
   const tool = path.join(repo, 'scripts/system_scripts.py');
   const publishTree = (system: string, dir: string) => spawnSync('python3', ['-B', tool, 'publish', dir],
@@ -695,7 +699,7 @@ NIGHTSTAND_SCRIPTS='${box.root}/running/scripts'; ${block}`);
       }
       for (const file of ['recover_update.sh', 'restore_helpers.sh']) writeFileSync(path.join(recovery, file), 'complete original helper');
       box.arm();
-      const result = spawnSync('bash', [path.join(repo, 'scripts/setup_services.sh'), repo, '--recovery-only'], {
+      const result = spawnSync('bash', [path.join(repo, 'scripts/setup_services.sh'), copyOf(box.root), '--recovery-only'], {
         encoding: 'utf8', env: { ...process.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
           NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker, NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
       });
@@ -720,7 +724,7 @@ describe('durable recovery installation', () => {
       const result = spawnSync('bash', ['-c', `
 systemctl() { :; }
 export -f systemctl
-bash "$1" "$2" --recovery-only`, 'setup', path.join(repo, 'scripts/setup_services.sh'), repo], {
+bash "$1" "$2" --recovery-only`, 'setup', path.join(repo, 'scripts/setup_services.sh'), copyOf(box.root)], {
         encoding: 'utf8', env: { ...process.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
           NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker, NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
       });
@@ -760,11 +764,12 @@ exec(sys.stdin.read())' "$@"
 }
 systemctl() { :; }
 export -f python3 systemctl
-command bash "$1" "$2" --recovery-only`, 'setup', path.join(repo, 'scripts/setup_services.sh'), repo], {
+command bash "$1" "$2" --recovery-only`, 'setup', path.join(repo, 'scripts/setup_services.sh'), copyOf(box.root)], {
         encoding: 'utf8', env: { ...process.env, NIGHTSTAND_SYSTEMD_DIR: systemd,
           NIGHTSTAND_RECOVERY_DIR: recovery, NIGHTSTAND_SWAP_MARKER: box.marker, NIGHTSTAND_SYSTEM_DIR: path.join(box.root, 'system') },
       });
       assert.equal(result.status, 1, result.stdout + result.stderr);
+      assert.doesNotMatch(result.stdout, /not a root-owned copy/);
       assert.equal(readFileSync(unit, 'utf8'), 'complete previous unit');
     } finally { box.dispose(); }
   });

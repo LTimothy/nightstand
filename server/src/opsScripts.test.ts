@@ -79,7 +79,7 @@ describe('deploy.sh survives a stalled upload', () => {
   it('verifies the staged tree arrived whole before anything is swapped', () => {
     assert.match(
       src,
-      /STAGE\/server\/dist\/server\.js/,
+      /SHIP_DIR\/tree\/server\/dist\/server\.js/,
       'a retried, truncatable transfer must be checked for completeness, not assumed',
     );
   });
@@ -266,8 +266,16 @@ describe('deploy.sh refuses stale bundles', () => {
 describe('deploy.sh runs root-owned copies', () => {
   it('deploy.sh copies the scripts for root before the stage changes owner, and runs only that copy', () => {
     const src = readFileSync(path.join(repoRoot, 'ops/deploy.sh'), 'utf8');
-    const publish = src.indexOf('COPY=$(SSH "python3 -B $STAGE/scripts/system_scripts.py publish $STAGE")');
-    assert.ok(publish > 0 && publish < src.indexOf('SSH "chown -R dac:dac $STAGE"'));
+    // Shipped, unpacked and copied in a folder only root can write; the stage
+    // under /home/dac only ever receives the finished tree.
+    const ship = src.slice(src.indexOf('ship_to_stage() {'), src.indexOf('# --- dependencies'));
+    assert.match(ship, /SHIP_DIR=\$\(SSH "mkdir -p \$SYSTEM_DIR && mktemp -d \$SYSTEM_DIR\/\.download\.XXXXXX"\)/);
+    assert.match(ship, /SCP_SHIP "\$tarball" "\$SHIP_DIR\/ship\.tar"/);
+    assert.doesNotMatch(ship, /\/tmp\/|-C \$STAGE /);
+    const publish = src.indexOf('COPY=$(SSH "python3 -B $SHIP_DIR/tree/scripts/system_scripts.py publish $SHIP_DIR/tree")');
+    const stage = src.indexOf('mv $SHIP_DIR/tree $STAGE');
+    assert.ok(publish > 0 && publish < stage && stage < src.indexOf('chown -R dac:dac $STAGE'));
+    assert.doesNotMatch(src, /\$STAGE\/scripts\/system_scripts\.py/);
     assert.match(src, /bash \$COPY\/scripts\/close_update_window\.sh/);
     assert.match(src, /sh "\$COPY\/scripts\/block_internet_access\.sh"/);
     assert.match(src, /bash \$COPY\/scripts\/setup_resource_limits\.sh/);

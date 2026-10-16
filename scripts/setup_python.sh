@@ -16,7 +16,12 @@ fi
 
 
 REPO_URL="https://github.com/python/cpython/archive/refs/tags/v${MAJOR_MINOR_INCREMENTAL_VERSION}.zip"
-TARGET_DIR="/home/dac/python-modules"
+# Root copies from here into the system Python, so only root may reach it.
+SYSTEM_DIR="${NIGHTSTAND_SYSTEM_DIR:-/usr/local/lib/nightstand}"
+TARGET_DIR=$(mkdir -p "$SYSTEM_DIR" && mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
+  || { echo "Error: could not create a private work folder in $SYSTEM_DIR"; exit 1; }
+trap 'rm -rf "$TARGET_DIR"' EXIT
+ZIP_FILE="$TARGET_DIR/cpython_lib.zip"
 
 PYTHON_LIB_DIR=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')
 
@@ -24,7 +29,7 @@ PYTHON_LIB_DIR=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdl
 
 echo "Downloading CPython Lib for version ${MAJOR_MINOR_INCREMENTAL_VERSION}..."
 echo "Using URL: $REPO_URL"
-curl -L -o cpython_lib.zip "$REPO_URL"
+curl -L -o "$ZIP_FILE" "$REPO_URL"
 
 # Check if download was successful
 if [ $? -ne 0 ]; then
@@ -34,7 +39,7 @@ fi
 
 
 echo "Unzipping..."
-unzip -o -q cpython_lib.zip -d "$TARGET_DIR"
+unzip -o -q "$ZIP_FILE" -d "$TARGET_DIR/tree"
 
 # Check if unzip was successful
 if [ $? -ne 0 ]; then
@@ -43,14 +48,14 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Removing zip file..."
-rm cpython_lib.zip
+rm "$ZIP_FILE"
 
 # --- 2. Copy Files (No Overwrite) ---
 
 echo "Copying new files to $PYTHON_LIB_DIR..."
 
 # Find the actual Lib directory (handle potential variations in the extracted folder name)
-ACTUAL_LIB_DIR=$(find "$TARGET_DIR" -type d -name "Lib" -print -quit)
+ACTUAL_LIB_DIR=$(find "$TARGET_DIR/tree" -type d -name "Lib" -print -quit)
 
 if [ -z "$ACTUAL_LIB_DIR" ]; then
     echo "Error: Could not find the Lib directory within $TARGET_DIR"

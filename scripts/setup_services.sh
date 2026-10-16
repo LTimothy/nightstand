@@ -4,7 +4,9 @@
 # Shared by install.sh, update.sh, and the fork-switch and agent installers
 # so every install path sets up the same controls. Idempotent.
 #
-# Usage: setup_services.sh [copy_or_tree] [--recovery-only]   (run as root, default /home/dac/free-sleep)
+# Usage: setup_services.sh COPY [--recovery-only]   (run as root)
+# COPY is a root-owned copy under /usr/local/lib/nightstand/copies, or that
+# folder's live link; see system_scripts.py.
 # Exits non-zero if any piece could not be installed; callers treat that as a
 # warning, since a pod without these still controls the bed.
 #
@@ -13,7 +15,7 @@
 # timers are the units this starts. The boot recovery timer is enabled without starting it.
 set -u
 
-REPO_DIR="${1:-/home/dac/free-sleep}"
+GIVEN="${1:-}"
 USERNAME=dac
 SYSTEMD_DIR="${NIGHTSTAND_SYSTEMD_DIR:-/etc/systemd/system}"
 SUDOERS_FILE="${NIGHTSTAND_SUDOERS_FILE:-/etc/sudoers.d/$USERNAME}"
@@ -25,14 +27,15 @@ RECOVERY_DIR="${NIGHTSTAND_RECOVERY_DIR:-$SYSTEM_DIR/recovery}"
 
 warn() { echo "WARNING: $*"; STATUS=1; }
 
-# Root runs only root-owned copies. Older callers pass the install tree,
-# which they already run as root, so it is copied first.
-case "$REPO_DIR" in
-  "$SYSTEM_DIR"/copies/*) COPY=$REPO_DIR ;;
-  *) COPY=$(python3 -B "$TOOL" publish "$REPO_DIR") \
-       || { echo "WARNING: could not copy $REPO_DIR's scripts for root"; exit 1; } ;;
-esac
-REPO_DIR=$COPY
+# Root runs only root-owned copies, never an install tree.
+COPY=$(cd "$GIVEN" 2>/dev/null && pwd -P) || COPY=
+COPIES=$(cd "$SYSTEM_DIR/copies" 2>/dev/null && pwd -P) || COPIES=
+NAME=$(basename "$COPY")
+if [ -z "$COPIES" ] || [ "$(dirname "$COPY")" != "$COPIES" ] || [ "${#NAME}" != 64 ] \
+  || [ -n "${NAME//[0-9a-f]/}" ] || [ ! -d "$COPY/scripts" ]; then
+  echo "WARNING: $GIVEN is not a root-owned copy in $SYSTEM_DIR/copies; nothing installed"
+  exit 1
+fi
 
 SWAP_MARKER="${NIGHTSTAND_SWAP_MARKER:-/persistent/free-sleep-data/update-swap.json}"
 
@@ -42,8 +45,8 @@ if [ -f "$SWAP_MARKER" ]; then
     "$SYSTEMD_DIR/free-sleep-recover-update.service" "$SYSTEMD_DIR/free-sleep-recover-update.timer"; do
     [ -s "$file" ] || warn "armed recovery file is missing: $file"
   done
-elif [ -f "$REPO_DIR/scripts/recover_update.sh" ]; then
-  if python3 - "$REPO_DIR" "$RECOVERY_DIR" "$SYSTEMD_DIR" <<'PYRECOVERY'
+elif [ -f "$COPY/scripts/recover_update.sh" ]; then
+  if python3 - "$COPY" "$RECOVERY_DIR" "$SYSTEMD_DIR" <<'PYRECOVERY'
 import os, sys, tempfile
 repo, recovery, systemd = sys.argv[1:]
 os.makedirs(recovery, exist_ok=True)
@@ -87,8 +90,8 @@ if [ -n "${NIGHTSTAND_RECOVERY_DIR:-}" ] && [ -z "${NIGHTSTAND_SWITCH_RECOVERY_D
   SWITCH_RECOVERY_DIR="$RECOVERY_DIR-switch"
 fi
 TRANSACTION_ROOT="${NIGHTSTAND_TRANSACTION_ROOT:-/persistent/free-sleep-maintenance/nightstand-transactions}"
-if [ -f "$REPO_DIR/scripts/recover_switch.sh" ] && [ ! -f "$SWAP_MARKER" ]; then
-  if python3 - "$REPO_DIR" "$SWITCH_RECOVERY_DIR" "$SYSTEMD_DIR" "$TRANSACTION_ROOT" <<'PYSWITCHRECOVERY'
+if [ -f "$COPY/scripts/recover_switch.sh" ] && [ ! -f "$SWAP_MARKER" ]; then
+  if python3 - "$COPY" "$SWITCH_RECOVERY_DIR" "$SYSTEMD_DIR" "$TRANSACTION_ROOT" <<'PYSWITCHRECOVERY'
 import os, shlex, sys, time
 from pathlib import Path
 repo, recovery, systemd, root = sys.argv[1:]
@@ -170,7 +173,7 @@ fi
 # Units exec these directly on older installs, and a missing exec bit fails a
 # unit with 203/EXEC before it can log anything.
 for script in update.sh update_service.sh rollback_pod.sh switch-to-upstream.sh revert-to-stock.sh; do
-  [ -f "$REPO_DIR/scripts/$script" ] && chmod 755 "$REPO_DIR/scripts/$script"
+  [ -f "$COPY/scripts/$script" ] && chmod 755 "$COPY/scripts/$script"
 done
 
 cat > "$SYSTEMD_DIR/free-sleep-update.service" <<EOF || warn "could not write free-sleep-update.service"
@@ -195,25 +198,25 @@ StandardError=append:/persistent/free-sleep-data/logs/free-sleep-update.log
 EOF
 
 for unit in free-sleep-rollback.service free-sleep-revert.service; do
-  cp "$REPO_DIR/scripts/systemd/$unit" "$SYSTEMD_DIR/" || warn "could not install $unit"
+  cp "$COPY/scripts/systemd/$unit" "$SYSTEMD_DIR/" || warn "could not install $unit"
 done
 
 # The health check restarts a server that is running but not answering. The
 # agent overlay does not carry it, so a tree without the script skips it.
 HEALTH=no
-if [ -f "$REPO_DIR/scripts/health_check.sh" ]; then
+if [ -f "$COPY/scripts/health_check.sh" ]; then
   HEALTH=yes
   for unit in free-sleep-health.service free-sleep-health.timer; do
-    cp "$REPO_DIR/scripts/systemd/$unit" "$SYSTEMD_DIR/" || { warn "could not install $unit"; HEALTH=no; }
+    cp "$COPY/scripts/systemd/$unit" "$SYSTEMD_DIR/" || { warn "could not install $unit"; HEALTH=no; }
   done
 fi
 
 # The network watchdog restarts the Pod when its Wi-Fi driver has died.
 NETWATCH=no
-if [ -f "$REPO_DIR/scripts/network_watchdog.sh" ]; then
+if [ -f "$COPY/scripts/network_watchdog.sh" ]; then
   NETWATCH=yes
   for unit in free-sleep-network-watchdog.service free-sleep-network-watchdog.timer; do
-    cp "$REPO_DIR/scripts/systemd/$unit" "$SYSTEMD_DIR/" || { warn "could not install $unit"; NETWATCH=no; }
+    cp "$COPY/scripts/systemd/$unit" "$SYSTEMD_DIR/" || { warn "could not install $unit"; NETWATCH=no; }
   done
 fi
 
