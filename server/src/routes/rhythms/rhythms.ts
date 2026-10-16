@@ -6,7 +6,10 @@ import schedulesDB from '../../db/schedules.js';
 import { SCHEDULE_SIDES } from '../../db/scheduleKeys.js';
 import { Side } from '../../db/schedulesSchema.js';
 import { loadRhythms, RhythmsLoad, RhythmsStateError, updateRhythms } from '../../db/rhythms.js';
-import { RhythmsLiveQuerySchema, RhythmsResponse, RhythmsSleepsQuerySchema, RhythmsUpdateSchema } from '../../db/rhythmsSchema.js';
+import {
+  NightExcludeSchema, RhythmsLiveQuerySchema, RhythmsResponse, RhythmsSleepsQuerySchema, RhythmsUpdateSchema, SuggestionsQuerySchema,
+  type SuggestionsResponse,
+} from '../../db/rhythmsSchema.js';
 import { activation } from '../../jobs/rhythms/activation.js';
 import { applyAlarmsEnabled, findOverlaps, resolveLegacySleeps, resolveSleeps } from '../../jobs/rhythms/resolve.js';
 import { pruneChanges, sideIssues } from '../../jobs/rhythms/validate.js';
@@ -14,6 +17,8 @@ import { z } from 'zod';
 import { enableRhythms } from '../../jobs/rhythms/enable.js';
 import { disableRhythms } from '../../jobs/rhythms/handoff.js';
 import { drivingSide } from '../../jobs/scheduleQueries.js';
+import { appendNoteLines, forgetHandChanges, readChanges, rhythmPlanKey } from '../../jobs/rhythms/handChanges.js';
+import { learnSuggestions } from '../../jobs/rhythms/learn.js';
 import { liveCurveState, smartResolveHooks } from '../../jobs/rhythms/curveController.js';
 
 const router = express.Router();
@@ -157,6 +162,68 @@ router.get('/rhythms/live', async (req: Request, res: Response) => {
   await settingsDB.read();
   const driver = drivingSide(settingsDB.data, parsed.data.side);
   res.json(driver ? liveCurveState(driver) : null);
+});
+
+const NO_SUGGESTIONS: SuggestionsResponse = { enabled: false, nights: {}, suggestions: [], dismissed: [], log: [] };
+const suggestionsOn = () => settingsDB.data.features?.rhythmSuggestions === true;
+
+// Suggestions from hand changes for one side's rhythms. An away side shows
+// its own rhythms' evidence from before it went away.
+router.get('/rhythms/suggestions', async (req: Request, res: Response) => {
+  const parsed = SuggestionsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Pass side' });
+    return;
+  }
+  const { result } = await currentRhythms();
+  if (!suggestionsOn() || !result.active) {
+    res.json(NO_SUGGESTIONS);
+    return;
+  }
+  const { side } = parsed.data;
+  const lines = (await readChanges()).filter(line => line.side === side);
+  const rhythms = Object.values(result.db[side].rhythms).map(rhythm => ({ rhythm, planKey: rhythmPlanKey(rhythm) }));
+  const body: SuggestionsResponse = { enabled: true, ...learnSuggestions(lines, rhythms, new Date()) };
+  res.json(body);
+});
+
+// The saved rhythm a note route names, or null once a refusal was sent.
+async function noteTarget(res: Response, side: Side, rhythmId: string) {
+  const { body, result } = await currentRhythms();
+  if (!suggestionsOn() || !result.active) {
+    res.status(409).json({ error: 'Suggestions from your changes is off' });
+    return null;
+  }
+  const rhythms = body.data?.[side].rhythms;
+  if (!rhythms || !Object.hasOwn(rhythms, rhythmId)) {
+    res.status(404).json({ error: 'This side has no such rhythm' });
+    return null;
+  }
+  return rhythms[rhythmId];
+}
+
+router.post('/rhythms/suggestions/exclude', async (req: Request, res: Response) => {
+  const parsed = NightExcludeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request data', details: parsed.error.errors });
+    return;
+  }
+  const { side, rhythmId, date, excluded } = parsed.data;
+  if (!await noteTarget(res, side, rhythmId)) return;
+  const noted = (await readChanges()).some(line => (line.kind === 'night' || line.kind === 'change')
+    && line.side === side && line.rhythmId === rhythmId && line.date === date);
+  if (!noted) {
+    res.status(400).json({ error: 'There are no notes for that night' });
+    return;
+  }
+  await appendNoteLines([{ v: 1, kind: 'exclude', at: new Date().toISOString(), side, rhythmId, date, excluded }]);
+  res.status(204).end();
+});
+
+// Works with the feature off, so notes can always be deleted.
+router.post('/rhythms/suggestions/forget', async (_req: Request, res: Response) => {
+  await forgetHandChanges();
+  res.status(204).end();
 });
 
 export default router;

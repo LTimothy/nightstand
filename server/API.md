@@ -631,6 +631,39 @@ instead of the weekly schedule.
   fresh: `{ "by": "<instant>" }`, the latest the side turns off.
 - Instants are ISO 8601 strings with an offset.
 
+### Suggestions from your changes
+
+Needs `features.rhythmSuggestions`. The Pod notes temperature changes made
+by hand during a Rhythms sleep in `rhythms-changes.jsonl`, next to the
+other Rhythms history. These routes never write `rhythmsDB.json` or
+`settingsDB.json`.
+
+#### GET `/api/rhythms/suggestions`
+
+- Query: `side` (`left` or `right`). A missing or unknown side is refused
+  with `400 { "error": "..." }`.
+- Returns `{ "enabled", "nights", "suggestions", "dismissed", "log" }`.
+  While the feature or Rhythms is off, `enabled` is `false` and the other
+  keys are empty (`{}` or `[]`).
+- `nights` has one entry per rhythm on the side: `counted`, `needed`,
+  `changed`, `earlier` and a `reason`. `log` lists the side's noted nights,
+  newest first, each with its changes and whether it is left out
+  (`excluded`).
+
+#### POST `/api/rhythms/suggestions/exclude`
+
+- Body: `{ "side", "rhythmId", "date", "excluded" }`. Marks a night as a
+  one-off, or counts it again.
+- `204`: saved.
+- `400`: invalid body, or the rhythm has no notes for that date on that side.
+- `404`: the side has no such rhythm.
+- `409`: the feature is off, or Rhythms is not active.
+
+#### POST `/api/rhythms/suggestions/forget`
+
+- Deletes all notes, for both sides. The body is ignored. Works while
+  the feature is off. Returns `204`.
+
 ### POST `/api/rhythms/enable`
 
 - Turns Rhythms on and rebuilds the Pod's jobs. The first time, it converts
