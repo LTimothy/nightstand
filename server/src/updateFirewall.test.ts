@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -555,6 +555,47 @@ ${src.slice(src.indexOf('# The first arming of the hardware watchdog')).replaceA
         } finally { cleanup(f); }
       });
     }
+
+    it(`never leaves ${label} open when the restored tree from before root-owned copies has none`, () => {
+      const f = fixture();
+      try {
+        // A 3.6.x tree: its own legacy firewall, and no copy, so root keeps the new copy after the rollback.
+        legacyFirewall(f, 'prev');
+        const liveBlock = path.join(f.dir, 'live/scripts/block_internet_access.sh');
+        writeFileSync(liveBlock, `export FAKE_FAIL_TAIL='${failed}'\n${readFileSync(liveBlock, 'utf8')}`);
+        writeFileSync(path.join(f.dir, 'recover.sh'), '#!/bin/sh\nexit 0\n');
+        const tool = (...args: string[]) => spawnSync('python3', ['-B', path.join(repoRoot, 'scripts/system_scripts.py'), ...args],
+          { env: f.env, encoding: 'utf8' });
+        const newCopy = tool('publish', path.join(f.dir, 'live')).stdout.trim();
+        assert.equal(tool('point', newCopy).status, 0);
+        assert.notEqual(tool('find', path.join(f.dir, 'prev')).status, 0);
+        const src = read('scripts/update.sh');
+        const result = spawnSync('bash', ['-c', driver('scripts/update.sh', `
+FAILED="$F/failed"; RECOVERY_HELPER="$F/recover.sh"; NEW_COPY='${newCopy}'
+CUR_VERSION=3.6.1; STAGED_VERSION=3.7.0; HEALTHY=yes
+MOVED_MODULES=no; STREAM_WAS_ACTIVE=inactive
+stop_writer() { return 0; }
+record_result() { :; }
+systemctl() { echo "$*" >> "$F/systemctl-calls"; }
+curl() { printf 200; }
+sleep() { :; }
+tail() { :; }
+${src.slice(src.indexOf('# The first arming of the hardware watchdog')).replaceAll('/etc/iptables/', '$F/')}`)], {
+          env: f.env, encoding: 'utf8', timeout: 20000,
+        });
+        assert.equal(result.status, 1, result.stdout + result.stderr);
+        assert.match(result.stdout, /rolling back to v3\.6\.1/);
+        assert.equal(readlinkSync(path.join(f.dir, 'system/live')), `copies/${path.basename(newCopy)}`);
+        assert.match(readFileSync(path.join(f.dir, 'systemctl-calls'), 'utf8'), /^start free-sleep$/m);
+        for (const family of ['iptables', 'ip6tables']) {
+          const table = rules(f.dir).split(`# ${family}\n`)[1].split('# ')[0];
+          const output = table.split('\n').filter(line => line.startsWith('-A OUTPUT '));
+          const terminal = /^-A OUTPUT -j (?:REJECT|DROP)\b/.test(output[output.length - 1] ?? '');
+          assert.ok(/^-P OUTPUT DROP$/m.test(table) || terminal, `${family} left open:\n${table}`);
+          for (const rule of OPENED) assert.ok(!output.includes(rule), `${family} kept a download rule: ${rule}`);
+        }
+      } finally { cleanup(f); }
+    });
 
     for (const mode of ['without download rules', 'with download rules', 'with live ACCEPT policies']) {
       it(`stop-post persists ${label} ACCEPT after older rollback ${mode} across saved-rule reload and older unblock`, () => {

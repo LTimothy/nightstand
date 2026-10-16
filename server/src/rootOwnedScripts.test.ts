@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,26 +14,85 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (file: string) => readFileSync(path.join(repoRoot, file), 'utf8');
 const TOOL = path.join(repoRoot, 'scripts/system_scripts.py');
-const ROOT_RUN = [
-  'scripts/update.sh', 'scripts/update_service.sh', 'scripts/rollback_pod.sh', 'scripts/recover_update.sh',
-  'scripts/close_update_window.sh', 'scripts/setup_services.sh', 'scripts/switch-to-upstream.sh', 'scripts/restore_helpers.sh',
-  'scripts/enable_biometrics.sh', 'scripts/install.sh', 'scripts/add_shortcuts.sh', 'scripts/migrate/pod-installer.sh',
-  'scripts/migrate/agent-bootstrap-installer.sh', 'scripts/migrate/restore-original-fork.sh',
-  'scripts/migrate/switch-to-this-fork.sh', 'ops/deploy.sh', 'ops/rollback.sh', 'ops/bootstrap-agent.sh',
-];
-// An interpreter, source or exec followed by a path in a tree or anywhere in /home/dac.
-const RUNS_FROM_TREE = new RegExp(String.raw`(?:^|[\s;&|(])(?:/(?:usr/)?bin/)?(?:bash|sh|python3(?: -B)?|node|source|exec(?: /bin/bash| bash)?)`
-  + String.raw`\s+["']?(?:\$\{?(?:LIVE|PREV|STAGE|FAILED|REPO_DIR|SRC_DIR|TMP)\}?|/home/dac)/`);
+// Every shell script root may run on the Pod: all of them but the tools run on
+// a developer's computer. ops/deploy.sh and friends run their pod side as root.
+const DEVELOPER_TOOLS = ['ops/build-agent.sh', 'scripts/check-bundles.sh', 'scripts/deploy-dev.sh',
+  'scripts/promote_release.sh', 'scripts/release_digest.sh'];
+const listed = (dir: string, ext: string) =>
+  readdirSync(path.join(repoRoot, dir)).filter(name => name.endsWith(ext)).map(name => `${dir}/${name}`);
+const ROOT_RUN = [...listed('scripts', '.sh'), ...listed('scripts/migrate', '.sh'), ...listed('ops', '.sh')]
+  .filter(file => !DEVELOPER_TOOLS.includes(file));
+// Python root runs: everything in scripts/ but the environment builder, which
+// runs its commands as the server user.
+const ROOT_RUN_PY = listed('scripts', '.py').filter(file => file !== 'scripts/prepare_upstream_env.py');
+// Names that hold an install tree. Any variable assigned one of these, or a
+// path under /home, is treated the same way in that file.
+const TREE_NAMES = ['LIVE', 'PREV', 'STAGE', 'FAILED', 'REPO_DIR', 'SRC_DIR', 'TMP', 'RECOVERY_SOURCE', 'STAGE_INNER',
+  'PREV_DIR', 'FAILED_DIR', 'SERVER_DIR', 'UNZIP_DIR', 'TARGET_DIR'];
 // install.sh checks the fresh download with that download's digest script before the copy exists, as it always has.
 const FROM: Record<string, string> = { 'scripts/install.sh': 'system_scripts.py" publish "$SRC_DIR"' };
-// The one step that makes the copy runs the fresh tree's own tool, before the server user can write it.
-const PUBLISH = /^COPY=\$\(python3 -B "\$(SRC_DIR|STAGE)\/scripts\/system_scripts\.py" publish "\$\1"\) \\$/;
-const codeLines = (file: string) => {
-  const lines = read(file).split('\n');
+// The one step that makes the copy runs the fresh tree's own tool, from a folder only root can write.
+const PUBLISH = /^COPY=\$\(python3 -B "\$(SRC_DIR|FRESH)\/scripts\/system_scripts\.py" publish "\$\1"\) \\$/;
+// The copy a publish prints is root's, whatever tree it was taken from.
+const MAKES_COPY = /^"?\$\((?:SSH ")?python3 -B "?\$\{?\w+\}?\/(?:scripts\/)?system_scripts\.py"? (?:publish|find)\b/;
+const ASSIGN = /(?:^|[;&|)]\s*)(?:local\s+|export\s+|readonly\s+)?([A-Za-z_]\w*)=(\S.*)?$/;
+const variable = (names: Set<string>) => String.raw`\$\{?(?:${[...names].join('|')})\}?(?![\w])`;
+
+function treeNames(text: string) {
+  const names = new Set(TREE_NAMES);
+  const lines = text.split('\n').filter(line => !/^\s*#/.test(line));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const line of lines) {
+      const match = ASSIGN.exec(line);
+      if (!match || names.has(match[1]) || MAKES_COPY.test(match[2] ?? '')) continue;
+      if (/\/home\//.test(match[2] ?? '') || new RegExp(variable(names)).test(match[2] ?? '')) {
+        names.add(match[1]);
+        grew = true;
+      }
+    }
+  }
+  return names;
+}
+
+// Shell lines where root runs, sources or copies into the system a file the
+// server user could have written.
+function shellOffenders(file: string, text: string) {
+  const tree = variable(treeNames(text));
+  const runs = new RegExp(String.raw`(?:^|[\s;&|(\x60])(?:/(?:usr/)?bin/)?(?:bash|sh|python3?|node|source|exec|\.)(?:\s+-[A-Za-z]+)*`
+    + String.raw`\s+["']?(?:${tree}|/home/)`);
+  const direct = new RegExp(String.raw`(?:^|[;&|]\s*|\b(?:then|do|else)\s+)["']?${tree}/[^\s"']+\.(?:sh|py)\b`);
+  const intoSystem = new RegExp(String.raw`\b(?:cp|install|rsync|ln)\s.*(?:${tree}|/home/).*\s["']?(?:/etc|/usr|/lib|/bin|/sbin|`
+    + String.raw`\$\{?(?:PYTHON_LIB_DIR|SYSTEMD_DIR|SUDOERS_FILE|TMPFILES_DIR)\b)`);
+  const lines = text.split('\n');
   const start = FROM[file] ? lines.findIndex(line => line.includes(FROM[file])) : 0;
   assert.ok(start >= 0, `${file}: missing ${FROM[file]}`);
-  return lines.map((line, index) => ({ line, at: `${file}:${index + 1}` })).slice(start).filter(({ line }) => !/^\s*#/.test(line));
-};
+  return lines.map((line, index) => ({ line, at: `${file}:${index + 1}` })).slice(start)
+    // Comments, commands run as the server user, quoted text such as sudoers lines, and the publish step.
+    .filter(({ line }) => !/^\s*#/.test(line) && !/\b(?:sudo|runuser) -u /.test(line) && !/^\s*"[^"]*"\s*$/.test(line)
+      && !PUBLISH.test(line.trim()))
+    .filter(({ line }) => runs.test(line) || direct.test(line) || intoSystem.test(line))
+    .map(({ at, line }) => `${at}: ${line.trim()}`);
+}
+
+// Python lines that start an interpreter on anything but the scripts beside
+// the running file (HERE) or a root-owned copy found for it.
+const TRUSTED_PY = ['HERE', 'scripts', 'script', 'limits', 'helper', 'nightstand_scripts'];
+// Switching to upstream free-sleep gives it back its own firewall script.
+const OTHER_FORK = ["execute(['sh', str(config.live / 'scripts/block_internet_access.sh')])"];
+function pythonOffenders(file: string, text: string) {
+  const interpreter = String.raw`\b(?:run|execute|Popen|call|check_call|check_output)\(\s*`
+    + String.raw`(?:\[\s*'(?:/(?:usr/)?bin/)?(?:bash|sh|python3?|node)'|\[\s*sys\.executable)\s*,\s*`;
+  const started = new RegExp(interpreter + String.raw`(?!'-)(?:str\(\s*)?([A-Za-z_][\w.]*)`);
+  const inline = /'-c'.*str\(\s*([A-Za-z_][\w.]*)/;
+  return text.split('\n').map((line, index) => ({ line, at: `${file}:${index + 1}` }))
+    .filter(({ line }) => {
+      if (OTHER_FORK.includes(line.trim())) return false;
+      const name = (started.exec(line) ?? (/\b(?:run|execute|Popen)\(/.test(line) ? inline.exec(line) : null))?.[1];
+      return name !== undefined && !TRUSTED_PY.includes(name);
+    })
+    .map(({ at, line }) => `${at}: ${line.trim()}`);
+}
 const env = (system: string) => ({ ...process.env, NIGHTSTAND_SYSTEM_DIR: system });
 
 function tree(dir: string, version: string, note = '') {
@@ -54,8 +115,33 @@ const scratch = () => mkdtempSync(path.join(tmpdir(), 'nightstand-root-scripts-'
 
 describe('root runs nothing from the server user\'s folders', () => {
   it('runs no script from an install tree or /home/dac', () => {
-    const offenders = ROOT_RUN.flatMap(codeLines).filter(({ line }) => RUNS_FROM_TREE.test(line) && !PUBLISH.test(line.trim()));
-    assert.deepEqual(offenders.map(({ at, line }) => `${at}: ${line.trim()}`), []);
+    assert.deepEqual(ROOT_RUN.flatMap(file => shellOffenders(file, read(file))), []);
+    assert.deepEqual(ROOT_RUN_PY.flatMap(file => pythonOffenders(file, read(file))), []);
+  });
+
+  it('catches each way a root-run script could run or install the server user\'s files', () => {
+    const rollback = read('scripts/rollback_pod.sh');
+    for (const probe of [
+      'bash "$RECOVERY_SOURCE/scripts/evil.sh"',
+      'D=/home/dac/free-sleep; bash "$D/scripts/evil.sh"',
+      'D=/home/dac/free-sleep\nE="$D/scripts"\nsource "$E/evil.sh"',
+      'D="$LIVE"; "$D/scripts/evil.sh"',
+      'cp /home/dac/x /etc/cron.d/x',
+      'install -m 755 "$STAGE/scripts/x" /usr/local/bin/x',
+      'rsync -a "$LIVE/scripts/python/" "$PYTHON_LIB_DIR/"',
+      'python3 -B "$STAGE_INNER/scripts/system_scripts.py" publish "$STAGE_INNER"',
+    ]) {
+      assert.notDeepEqual(shellOffenders('scripts/rollback_pod.sh', `${rollback}\n${probe}\n`), [], probe);
+    }
+    const runner = read('scripts/switch_installation.py');
+    for (const probe of [
+      "        subprocess.run(['bash', str(source / 'scripts/setup_services.sh'), str(source), '--recovery-only'])",
+      "        subprocess.run(['bash', str(stage / 'scripts/migrate/fork-artifacts.sh'), 'clean'])",
+      "        subprocess.run([sys.executable, str(self.live / 'scripts/x.py')])",
+      "        subprocess.run(['bash', '-c', 'source \"$1\"', 'x', str(live / 'scripts/restore_helpers.sh')])",
+    ]) {
+      assert.notDeepEqual(pythonOffenders('scripts/switch_installation.py', `${runner}\n${probe}\n`), [], probe);
+    }
   });
 
   it('keeps the recovery, restore and migration helpers out of /home/dac', () => {
@@ -194,8 +280,10 @@ echo "NEW_COPY=$NEW_COPY"`], { env: { ...env(path.join(dir, 'system')), FIXTURE:
     const stage = tree(path.join(dir, 'stage'), '3.7.0');
     copyFileSync(TOOL, path.join(stage, 'scripts/system_scripts.py'));
     const source = fromStage ? stage : publish(system, stage);
+    // The old updater gave its stage to the server user before handing off.
+    if (fromStage) chmodSync(path.join(stage, 'scripts'), 0o777);
     const result = spawnSync('bash', ['-c', `set -uo pipefail
-SYSTEM_DIR="$1"; STAGE="$2"; RECOVERY_SOURCE="$3"
+SYSTEM_DIR="$1"; STAGE="$2"; RECOVERY_SOURCE="$3"; NIGHTSTAND_SCRIPTS="$3/scripts"
 fail() { echo "FAIL $*"; exit 1; }
 ${between('  [ -d "$STAGE" ] || fail "handed off', '  say "Continuing with')}
 echo "NEW_COPY=$NEW_COPY"; echo "SCRIPTS=$NIGHTSTAND_SCRIPTS"`, 'handoff', system, stage, source], { env: env(system), encoding: 'utf8' });
