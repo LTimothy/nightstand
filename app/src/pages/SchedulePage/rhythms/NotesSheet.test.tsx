@@ -53,48 +53,64 @@ it('is titled by where it was opened from', () => {
   expect(screen.queryByRole('heading', { name: 'Night shift' })).not.toBeInTheDocument();
 });
 
-it('lists every night with its changes, tags and count', () => {
+it('lists every night under its date, with its changes and the count', () => {
   open({ forRhythm: 'off-days' });
-  expect(screen.getByText(
-    "2 nights since Off days' times or temperatures changed. Mark an unusual night as a one-off to leave it out.")).toBeInTheDocument();
+  expect(screen.getByText('2 nights so far.')).toBeInTheDocument();
+  expect(screen.getByText('Press Leave out on a night that should not count, such as a night away.')).toBeInTheDocument();
   expect(screen.getByText('Tonight: no change')).toBeInTheDocument();
-  expect(screen.getByText('Sat, Oct 10: 82°F to 79°F at 12:31 AM')).toBeInTheDocument();
-  expect(screen.getByText('79°F to 82°F at 4:00 AM (planned 82°F) (while holding) (cover)')).toBeInTheDocument();
-  expect(screen.getByText('Fri, Oct 9: no change')).toBeInTheDocument();
-  expect(screen.getByText('Thu, Oct 8: 80°F to 78°F at 12:10 AM (planned 82°F) (not counted)')).toBeInTheDocument();
+  expect(screen.getByText('Sat, Oct 10')).toBeInTheDocument();
+  expect(screen.getByText('82°F to 79°F at 12:31 AM')).toBeInTheDocument();
+  expect(screen.getByText('79°F to 82°F at 4:00 AM (cover)')).toBeInTheDocument();
+  expect(screen.getByText('Fri, Oct 9')).toBeInTheDocument();
+  expect(screen.getByText('no change')).toBeInTheDocument();
+  expect(screen.getByText('Thu, Oct 8, left out')).toBeInTheDocument();
+  expect(screen.getByText('80°F to 78°F at 12:10 AM (planned 82°F)')).toBeInTheDocument();
+  expect(document.body.textContent).not.toMatch(/while holding|one-off|not counted/i);
 });
 
-it('marks a night as a one-off with a toggle that keeps its name', async () => {
+it('leaves a night out with a toggle that keeps its name', async () => {
   const posted: unknown[] = [];
   server.use(http.post('*/rhythms/suggestions/exclude', async ({ request }) => {
     posted.push(await request.json());
     return new HttpResponse(null, { status: 204 });
   }));
   const { user } = open({ forRhythm: 'off-days' });
-  const toggle = screen.getByRole('button', { name: 'One-off, Sat, Oct 10' });
+  const toggle = screen.getByRole('button', { name: 'Leave out, Sat, Oct 10' });
   expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  expect(toggle).toHaveTextContent('One-off');
+  expect(toggle).toHaveTextContent('Leave out');
   await user.click(toggle);
-  expect(screen.getByRole('button', { name: 'One-off, Sat, Oct 10' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Leave out, Sat, Oct 10' })).toHaveAttribute('aria-pressed', 'true');
   await waitFor(() => expect(posted).toEqual([{ side: 'right', rhythmId: 'off-days', date: '2026-10-10', excluded: true }]));
-  expect(screen.getByText(/\(cover\) \(not counted\)$/)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'One-off, Thu, Oct 8' })).toHaveAttribute('aria-pressed', 'true');
-  expect(screen.queryByRole('button', { name: /^One-off, Sun, Oct 11/ })).not.toBeInTheDocument();
+  expect(screen.getByText('Sat, Oct 10, left out')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Leave out, Thu, Oct 8' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByRole('button', { name: /^Leave out, Sun, Oct 11/ })).not.toBeInTheDocument();
 });
 
 it('puts the toggle back and says so when the night could not be saved', async () => {
   server.use(http.post('*/rhythms/suggestions/exclude', () => HttpResponse.json({ error: 'nope' }, { status: 500 })));
   const { user } = open({ forRhythm: 'off-days' });
-  await user.click(screen.getByRole('button', { name: 'One-off, Fri, Oct 9' }));
+  await user.click(screen.getByRole('button', { name: 'Leave out, Fri, Oct 9' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not save that night. Try again.');
-  expect(screen.getByRole('button', { name: 'One-off, Fri, Oct 9' })).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.getByRole('button', { name: 'Leave out, Fri, Oct 9' })).toHaveAttribute('aria-pressed', 'false');
 });
 
-it('explains the rules, what counts, and an away side', () => {
-  open({ away: true });
+it('keeps the rules under How this works, and says when a side is away', async () => {
+  const { user } = open({ away: true });
   expect(screen.getByText('Away. Counting resumes when this side is back.')).toBeInTheDocument();
+  const how = screen.getByRole('button', { name: 'How this works' });
+  expect(how).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('heading', { name: 'How suggestions work' })).not.toBeInTheDocument();
+  await user.click(how);
+  expect(how).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByRole('heading', { name: 'How suggestions work' })).toBeInTheDocument();
-  expect(screen.getByText(/^After 5 nights, a change in the same direction/)).toBeInTheDocument();
+  expect(screen.getByText(/^A change you make the same way, within about 2 hours/)).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'What counts' })).toBeInTheDocument();
-  expect(screen.getByText(/^Only hand changes count/)).toBeInTheDocument();
+  // Night shift is a Smart rhythm, so the Smart sentence is there.
+  expect(screen.getByText(/^Changes you make by hand in this app/)).toHaveTextContent(/On a Smart Schedule rhythm/);
+});
+
+it('leaves the Smart sentence out when no Smart rhythm is on the sheet', async () => {
+  const { user } = open({ forRhythm: 'off-days' });
+  await user.click(screen.getByRole('button', { name: 'How this works' }));
+  expect(screen.getByText(/^Changes you make by hand in this app/)).not.toHaveTextContent(/Smart Schedule/);
 });

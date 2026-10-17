@@ -315,7 +315,7 @@ it('counts nights for suggestions after the rhythms and opens the notes', async 
     expect(headings.indexOf('Add one-time alarm')).toBe(headings.indexOf('Suggestions') + 1);
     await user.click(screen.getByRole('button', { name: 'Show the nights' }));
     expect(await screen.findByRole('dialog', { name: 'Notes' })).toBeInTheDocument();
-    expect(screen.getByText('Sun, Sep 27: no change')).toBeInTheDocument();
+    expect(screen.getByText('Sun, Sep 27')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Show the nights' })).toHaveFocus());
   } finally {

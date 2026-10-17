@@ -13,13 +13,18 @@ export const EXCLUDE_ERROR = 'Could not save that night. Try again.';
 export const DELETE_NOTES = 'Delete notes';
 export const DELETE_NOTES_QUESTION = 'Delete notes for both sides? Counting restarts tonight.';
 export const DELETE_NOTES_ERROR = 'Could not delete notes. Try again.';
+export const LEAVE_OUT = 'Leave out';
+export const LEFT_OUT = ', left out';
+export const LEAVE_OUT_HINT = 'Press Leave out on a night that should not count, such as a night away.';
+export const HOW_THIS_WORKS = 'How this works';
+export const HOW_TITLE = 'How suggestions work';
+export const WHAT_COUNTS_TITLE = 'What counts';
 
 const inTen = (share: number) => `${Math.round(share * 10)} in 10`;
 const atLeast = (share: number) => (share === 0.5 ? 'half or more' : `${inTen(share)} or more`);
 const count = (value: number, noun: string) => `${value} ${value === 1 ? noun : `${noun}s`}`;
 const hours = (minutes: number) => count(minutes / 60, 'hour');
 
-export const possessive = (name: string) => (name.endsWith('s') ? `${name}'` : `${name}'s`);
 export const clockTime = (at: string | Date, timeZone: string) => moment.tz(at, timeZone).format('h:mm A');
 export const clockOf = (time: string) => moment(time, 'HH:mm').format('h:mm A');
 
@@ -31,26 +36,25 @@ export function pairTemperatures(fromF: number, toF: number, format: Temperature
 }
 
 export const featureDescription = (rules: SuggestionRules = SUGGESTION_RULES) =>
-  'Notes when and how you change the temperature by hand during a rhythm, from any app or the cover. '
+  'Writes down when and how you change the temperature by hand during a rhythm, from any app or the cover. '
   + `A change you repeat on ${atLeast(rules.MIN_SHARE)} of your nights is suggested on Schedule. Nothing changes until you add it. `
   + `Notes stay on this Pod for ${rules.NOTE_DAYS} days, not in backups.`;
 
 export const sectionCaption = (rules: SuggestionRules = SUGGESTION_RULES) =>
-  `Nightstand notes changes you make by hand during a rhythm. One you repeat on ${atLeast(rules.MIN_SHARE)} of your nights `
-  + `is suggested on this page after ${rules.MIN_NIGHTS} nights.`;
+  `Nightstand writes down changes you make by hand during a rhythm. One you repeat on ${atLeast(rules.MIN_SHARE)} of your nights `
+  + `is suggested here after ${rules.MIN_NIGHTS} nights.`;
 
+// The rest of the rule (how a suggestion stays, the near miss floor) is in docs/VALIDATION.md.
 export const howSuggestionsWork = (rules: SuggestionRules = SUGGESTION_RULES) =>
-  `After ${rules.MIN_NIGHTS} nights, a change in the same direction, within about ${hours(rules.CLUSTER_MIN)}, on `
-  + `${atLeast(rules.MIN_SHARE)} of the last ${rules.WINDOW_NIGHTS} nights is suggested. It stays until fewer than `
-  + `${inTen(rules.HIDE_SHARE)} agree. From ${rules.NEAR_MIN_NIGHTS} nights, one on ${inTen(rules.NEAR_SHARE)} nights, and at least `
-  + `${rules.NEAR_MIN_SUPPORT}, is shown under Suggestions to review. Times and temperatures are middle values. On a Smart Schedule `
-  + 'rhythm it suggests the base, one step at a time. Nothing changes until you add it.';
+  `A change you make the same way, within about ${hours(rules.CLUSTER_MIN)}, on ${atLeast(rules.MIN_SHARE)} of your last `
+  + `${rules.WINDOW_NIGHTS} nights is suggested after ${rules.MIN_NIGHTS} nights. The suggested time and temperature are the middle `
+  + 'of those nights. On a Smart Schedule rhythm it suggests the base, one step at a time. Nothing changes until you add it.';
 
-export const whatCounts = (rules: SuggestionRules = SUGGESTION_RULES) =>
-  'Only hand changes count: in this app, on the cover, or from other apps on your network. Sleep data and presence are not used, '
-  + `so a night counts even if nobody slept. Changes during a pause, or undone within ${rules.COALESCE_MIN} minutes, are left out. `
-  + 'On a Smart Schedule rhythm, only changes at the night temperature, or cooler during the cool-down, of half a level or more. '
-  + `Notes stay on this Pod for ${rules.NOTE_DAYS} days, not in backups. Turn this off in Settings, Features.`;
+export const whatCounts = (smart: boolean, rules: SuggestionRules = SUGGESTION_RULES) =>
+  'Changes you make by hand in this app, on the cover, or from another app on your network. '
+  + 'Nightstand does not check whether anyone was in bed, so leave out a night you were away. '
+  + `A change undone within ${rules.COALESCE_MIN} minutes, or made during a pause, is not noted.`
+  + (smart ? ' On a Smart Schedule rhythm, only changes during the night count, of half a level or more.' : '');
 
 // The line under Suggestions for a rhythm; null when its card says it.
 export function reasonLine(name: string, nights: RhythmNights, mode: 'manual' | 'smart'): string | null {
@@ -65,7 +69,7 @@ export function reasonLine(name: string, nights: RhythmNights, mode: 'manual' | 
   case 'inconsistent':
     return `${name}: changes on ${nights.changed} of ${nights.counted} nights, but not the same one`;
   case 'too-small':
-    return mode === 'smart' ? `${name}: changes too small to suggest` : `${name}: your changes match the plan`;
+    return mode === 'smart' ? `${name}: changes too small to suggest` : `${name}: already does what you set`;
   case 'refused':
     return `${name}: no room for this change`;
   case 'dismissed':
@@ -76,26 +80,27 @@ export function reasonLine(name: string, nights: RhythmNights, mode: 'manual' | 
 }
 
 export const notesTitle = (name?: string) => (name ? `Notes for ${name}` : 'Notes');
-export const notesCountLine = (name: string, counted: number) =>
-  `${count(counted, 'night')} since ${possessive(name)} times or temperatures changed. Mark an unusual night as a one-off to leave it out.`;
-export const nightLabel = (night: NightLog) => (night.tonight ? 'Tonight' : formatDate(night.date));
-export const oneOffName = (night: NightLog) => `One-off, ${formatDate(night.date)}`;
+export const notesCountLine = (name: string, counted: number, earlier: boolean, rules: SuggestionRules = SUGGESTION_RULES) => {
+  if (counted >= rules.WINDOW_NIGHTS) return `Your last ${rules.WINDOW_NIGHTS} nights.`;
+  return earlier ? `${count(counted, 'night')} since you changed ${name}.` : `${count(counted, 'night')} so far.`;
+};
+export const nightLabel = (night: NightLog, leftOut = false) =>
+  (night.tonight ? 'Tonight' : `${formatDate(night.date)}${leftOut ? LEFT_OUT : ''}`);
+export const leaveOutName = (night: NightLog) => `${LEAVE_OUT}, ${formatDate(night.date)}`;
 
 function changeText(change: NightLog['changes'][number], format: TemperatureFormat, timeZone: string): string {
   const from = change.fromF ?? change.plannedF;
   const [before, after] = pairTemperatures(from, change.targetF, format);
+  // Only tags that explain a surprise: a planned value unlike both ends, and the cover. `held` stays in the log.
   const tags = [
-    change.plannedF !== from ? `(planned ${displayTemperature(change.plannedF, format)})` : '',
-    change.held ? '(while holding)' : '',
+    change.plannedF !== from && change.plannedF !== change.targetF ? `(planned ${displayTemperature(change.plannedF, format)})` : '',
     change.source === 'tap' ? '(cover)' : '',
   ].filter(Boolean);
   return [`${before} to ${after} at ${clockTime(change.at, timeZone)}`, ...tags].join(' ');
 }
 
-// One line per change, the night's name on the first; a night with none says so.
+// One line per change. An ended night's date is its own line beside the toggle; tonight has none, so it leads the first line.
 export function noteLines(night: NightLog, format: TemperatureFormat, timeZone: string): string[] {
-  const label = nightLabel(night);
-  if (!night.changes.length) return [`${label}: no change`];
-  return night.changes.map((change, index) => (index === 0
-    ? `${label}: ${changeText(change, format, timeZone)}` : changeText(change, format, timeZone)));
+  const lines = night.changes.length ? night.changes.map(change => changeText(change, format, timeZone)) : ['no change'];
+  return night.tonight ? [`${nightLabel(night)}: ${lines[0]}`, ...lines.slice(1)] : lines;
 }

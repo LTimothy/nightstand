@@ -32,7 +32,7 @@ const show = (props: Partial<Parameters<typeof SuggestionsSection>[0]> = {}) => 
 it('explains the rule and gives one line per rhythm', () => {
   show();
   expect(screen.getByRole('region', { name: 'Suggestions' })).toBeInTheDocument();
-  expect(screen.getByText(/^Nightstand notes changes you make by hand during a rhythm\./)).toBeInTheDocument();
+  expect(screen.getByText(/^Nightstand writes down changes you make by hand during a rhythm\./)).toBeInTheDocument();
   expect(screen.getByText('Workday: 3 of 5 nights so far')).toBeInTheDocument();
   expect(screen.getByText('Weekend: no changes in 14 nights')).toBeInTheDocument();
   expect(screen.getAllByRole('listitem')).toHaveLength(2);
@@ -61,7 +61,7 @@ it('opens the notes only when there are nights to show', async () => {
 it('keeps the heading while loading and offers to try again after a failure', async () => {
   const { unmount } = show({ suggestions: query({ data: undefined }) });
   expect(screen.getByRole('heading', { name: 'Suggestions' })).toBeInTheDocument();
-  expect(screen.queryByText(/^Nightstand notes/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Nightstand writes down/)).not.toBeInTheDocument();
   unmount();
   const refetch = vi.fn();
   show({ suggestions: query({ data: undefined, isError: true, error: new Error('down'), refetch }) });
