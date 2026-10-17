@@ -114,6 +114,41 @@ export const SWEEP: SweepState[] = [
     },
   },
   {
+    name: 'suggestion card',
+    path: '/schedules',
+    open: async page => {
+      await page.getByRole('radio', { name: /^Sam/ }).click();
+      await page.getByRole('button', { name: 'Review suggestion for Off days' }).waitFor();
+    },
+  },
+  {
+    name: 'suggestion review',
+    path: '/schedules',
+    open: async page => {
+      await page.getByRole('radio', { name: /^Sam/ }).click();
+      await press(page, 'Review suggestion for Off days');
+      await shown(page, 'dialog');
+    },
+  },
+  {
+    name: 'suggestion near miss',
+    path: '/schedules',
+    open: async page => {
+      await press(page, 'Review suggestion for Workday');
+      await shown(page, 'dialog');
+    },
+  },
+  {
+    name: 'suggestion notes',
+    path: '/schedules',
+    open: async page => {
+      await page.getByRole('radio', { name: /^Sam/ }).click();
+      await press(page, 'Show the nights');
+      await shown(page, 'dialog', 'Notes');
+      await press(page, 'How this works');
+    },
+  },
+  {
     name: 'weekly schedule',
     path: '/schedules',
     open: async page => {

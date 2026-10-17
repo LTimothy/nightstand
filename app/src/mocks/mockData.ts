@@ -250,7 +250,7 @@ const createSettings = (): Settings => ({
   rebootDaily: true,
   rawArchiveRetentionDays: 14,
   updateChannel: runningChannel,
-  features: { ...defaultFeatures, rhythms: demoRhythmsDefault() },
+  features: { ...defaultFeatures, rhythms: demoRhythmsDefault(), rhythmSuggestions: demoRhythmsDefault() },
   left: {
     name: 'Alex',
     awayMode: false,

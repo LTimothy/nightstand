@@ -41,7 +41,10 @@ import {
   mockCalibration,
 } from './mockData';
 import type { RhythmsUpdate } from '@api/rhythms';
-import { getMockSuggestions } from './suggestionsMock';
+import type { NightExclude, SuggestionDismiss } from '@api/rhythmsSchema';
+import {
+  dismissMockSuggestion, excludeMockNight, forgetMockSuggestions, getMockSuggestions, restoreMockSuggestions,
+} from './suggestionsMock';
 import {
   disableMockRhythms, enableMockRhythms, getMockRhythmsResponse, listMockSleeps, mockLive, scheduledSecondsRemaining, updateMockRhythms,
 } from './rhythmsMock';
@@ -151,15 +154,29 @@ export const handlers = [
     await delay(120);
     return HttpResponse.json(mockLive(side));
   }),
-  http.get('/api/rhythms/suggestions', async () => {
+  http.get('/api/rhythms/suggestions', async ({ request }) => {
+    const side = new URL(request.url).searchParams.get('side') === 'right' ? 'right' : 'left';
     await delay(120);
-    return HttpResponse.json(getMockSuggestions());
+    return HttpResponse.json(getMockSuggestions(side));
   }),
-  http.post('/api/rhythms/suggestions/exclude', async () => {
+  http.post('/api/rhythms/suggestions/dismiss', async ({ request }) => {
+    const ids = dismissMockSuggestion((await request.json()) as SuggestionDismiss);
+    await delay(120);
+    return HttpResponse.json({ ids });
+  }),
+  http.post('/api/rhythms/suggestions/restore', async ({ request }) => {
+    const body = (await request.json()) as { side: 'left' | 'right'; ids: string[] };
+    await delay(120);
+    return restoreMockSuggestions(body.side, body.ids)
+      ? new HttpResponse(null, { status: 204 }) : HttpResponse.json({ error: 'Nothing is hidden with those ids' }, { status: 404 });
+  }),
+  http.post('/api/rhythms/suggestions/exclude', async ({ request }) => {
+    excludeMockNight((await request.json()) as NightExclude);
     await delay(120);
     return new HttpResponse(null, { status: 204 });
   }),
   http.post('/api/rhythms/suggestions/forget', async () => {
+    forgetMockSuggestions();
     await delay(120);
     return new HttpResponse(null, { status: 204 });
   }),
