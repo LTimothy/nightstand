@@ -6,7 +6,7 @@ import type { CurvePhase } from '../../db/smartCurve.js';
 import { nightOf, rhythmOf } from './rhythmsTestData.js';
 import {
   clusterEpisodes, coalesceEpisodes, collapseNights, learnSuggestions, majority, parseLine, placeManual, placeSmart, rhythmEvidence,
-  type ChangeLine, type ExcludeLine, type Line, type NightLine, type Gate, type PlannedRhythm, type Vote,
+  type ChangeLine, type DismissLine, type ExcludeLine, type Line, type NightLine, type Gate, type PlannedRhythm, type RestoreLine, type Vote,
 } from './learn.js';
 
 const MINUTE = 60_000;
@@ -515,5 +515,58 @@ describe('both sides written at once', () => {
       [planned()], afterNight(4));
     assert.equal(result.nights[HAND.id].changed, 3);
     assert.equal(result.suggestions[0]?.rows[0]?.supporting, 3);
+  });
+});
+
+const dismissal = (id: string, scope: 'later' | 'plan', key: string | null, time: string | null, atNight: number,
+  planKey = KEY): DismissLine => ({
+  v: 1, kind: 'dismiss', id, at: afterNight(atNight).toISOString(), side: 'right', rhythmId: HAND.id, planKey, key, time, scope,
+});
+const restoring = (ids: string[], atNight: number): RestoreLine => ({
+  v: 1, kind: 'restore', at: new Date(afterNight(atNight).getTime() + 60_000).toISOString(), side: 'right', rhythmId: HAND.id, ids,
+});
+
+describe('hiding suggestions', () => {
+  const every = habit(10, range(0, 10));
+
+  it('hides everything for 14 nights of the rhythm, under any plan', () => {
+    const later = dismissal('aaaaaaaaaaa1', 'later', null, null, 9);
+    const hidden = learn([...every, later], afterNight(9));
+    assert.equal(entryOf(hidden), undefined);
+    assert.equal(hidden.nights[HAND.id].reason, 'dismissed');
+    assert.deepEqual(hidden.dismissed, [{ id: 'aaaaaaaaaaa1', rhythmId: HAND.id, key: null, time: null, scope: 'later', nightsLeft: 14 }]);
+    const otherPlan = range(10, 23).map(night => nightLine(night, HAND, OTHER_KEY));
+    assert.equal(learn([...every, later, ...otherPlan], afterNight(22)).dismissed[0]?.nightsLeft, 1);
+    const expired = learn([...every, later, ...otherPlan, nightLine(23, HAND, OTHER_KEY)], afterNight(23));
+    assert.equal(entryOf(expired)?.rows.length, 1);
+    assert.deepEqual(expired.dismissed, []);
+  });
+
+  it('hides a row for this plan by kind, direction and a time within two hours', () => {
+    assert.equal(entryOf(learn([...every, dismissal('aaaaaaaaaaa2', 'plan', 'step:down', '01:00', 9)], afterNight(9))), undefined);
+    assert.equal(entryOf(learn([...every, dismissal('aaaaaaaaaaa2', 'plan', 'step:down', '02:00', 9)], afterNight(9)))?.rows.length, 1);
+    assert.equal(entryOf(learn([...every, dismissal('aaaaaaaaaaa2', 'plan', 'step:up', '23:30', 9)], afterNight(9)))?.rows.length, 1);
+    const otherKey = dismissal('aaaaaaaaaaa2', 'plan', 'step:down', '23:30', 9, OTHER_KEY);
+    const result = learn([...every, otherKey], afterNight(9));
+    assert.equal(entryOf(result)?.rows.length, 1);
+    assert.deepEqual(result.dismissed, []);
+  });
+
+  it('lists a per-plan hide and brings the row back once it is restored', () => {
+    const line = dismissal('aaaaaaaaaaa3', 'plan', 'step:down', '23:30', 9);
+    assert.deepEqual(learn([...every, line], afterNight(9)).dismissed,
+      [{ id: 'aaaaaaaaaaa3', rhythmId: HAND.id, key: 'step:down', time: '23:30', scope: 'plan', nightsLeft: 0 }]);
+    const restored = learn([...every, line, restoring(['aaaaaaaaaaa3'], 9)], afterNight(9));
+    assert.equal(entryOf(restored)?.rows.length, 1);
+    assert.deepEqual(restored.dismissed, []);
+  });
+
+  it('caps the rows at 3 after hiding', () => {
+    const four = range(0, 10).flatMap(night => [
+      change(night, 30, 82, 79), change(night, 160, 79, 84), change(night, 290, 84, 80), change(night, 420, 80, 83),
+    ]);
+    const times = (lines: Line[]) => entryOf(learn([...nights(10), ...lines], afterNight(9)))?.rows.map(row => row.kind === 'step' && row.time);
+    assert.deepEqual(times(four), ['22:30', '00:45', '02:45']);
+    assert.deepEqual(times([...four, dismissal('aaaaaaaaaaa4', 'plan', 'step:down', '22:30', 9)]), ['00:45', '02:45', '05:00']);
   });
 });

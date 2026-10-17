@@ -4,14 +4,14 @@ import { z } from 'zod';
 import { MAX_TEMPERATURES_PER_DAY, SideSchema, TemperatureSchema, TimeSchema, type DailySchedule } from '../../db/schedulesSchema.js';
 import {
   CURVE_PHASES, InstantSchema, IsoDateSchema, RhythmIdSchema,
-  type NightLog, type Rhythm, type RhythmNights, type SuggestionReason, type SuggestionRow,
+  type Dismissed, type NightLog, type Rhythm, type RhythmNights, type SuggestionReason, type SuggestionRow,
   type SuggestionsResponse,
 } from '../../db/rhythmsSchema.js';
 import { minutesAfterOn, temperatureInPowerWindow } from '../../db/rhythmWake.js';
 import { F_PER_LEVEL, levelToF, type CurvePhase } from '../../db/smartCurve.js';
 import {
-  BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, ON_WINDOW_MIN, REPLACE_MIN, TIME_ROUND_MIN,
-  WINDOW_NIGHTS,
+  BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, ON_WINDOW_MIN, REPLACE_MIN, SNOOZE_NIGHTS,
+  TIME_ROUND_MIN, WINDOW_NIGHTS,
 } from '../../db/suggestionRules.js';
 
 const MINUTE = 60_000;
@@ -431,6 +431,42 @@ function reasonOf(counted: number, full: Analysis, showing: number): SuggestionR
 
 const byNightOrder = (a: Placed, b: Placed) => a.at - b.at;
 
+type Hidden = { plan: DismissLine[]; later: Array<{ line: DismissLine; nightsLeft: number }> };
+
+// Every ended night of a rhythm id, under any plan or mode, by its latest end.
+function nightEnds(lines: Line[], rhythmId: string, now: Date): number[] {
+  const byDate = new Map<string, number>();
+  for (const line of lines) {
+    if (isSleepLine(line) && line.rhythmId === rhythmId) {
+      byDate.set(line.date, Math.max(byDate.get(line.date) ?? 0, Date.parse(line.sleepEnd)));
+    }
+  }
+  return [...byDate.values()].filter(end => end <= now.getTime());
+}
+
+// Unrestored hides of a rhythm: per plan under its current key, and "for 14 nights" until that many nights have ended.
+function hiddenFor(lines: Line[], { rhythm, planKey }: PlannedRhythm, now: Date): Hidden {
+  const restored = new Set(lines.flatMap(line => (line.kind === 'restore' ? line.ids : [])));
+  const own = lines.filter((line): line is DismissLine => line.kind === 'dismiss' && line.rhythmId === rhythm.id && !restored.has(line.id));
+  const ends = nightEnds(lines, rhythm.id, now);
+  return {
+    plan: own.filter(line => line.scope === 'plan' && line.planKey === planKey),
+    later: own.filter(line => line.scope === 'later')
+      .map(line => ({ line, nightsLeft: SNOOZE_NIGHTS - ends.filter(end => end > Date.parse(line.at)).length }))
+      .filter(entry => entry.nightsLeft > 0),
+  };
+}
+
+// A per-plan hide matches the kind and direction, and for a step a time within CLUSTER_MIN, both after the power-on.
+const visible = (rows: Placed[], hidden: Hidden, on: string): Placed[] => (hidden.later.length ? [] : rows.filter(placed =>
+  !hidden.plan.some(line => line.key === placed.row.key && (placed.row.kind !== 'step'
+    || (line.time !== null && Math.abs(minutesAfterOn(line.time, on) - placed.at) <= CLUSTER_MIN)))));
+
+const dismissedOf = (rhythmId: string, hidden: Hidden): Dismissed[] => [
+  ...hidden.plan.map(line => ({ id: line.id, rhythmId, key: line.key, time: line.time, scope: 'plan' as const, nightsLeft: 0 })),
+  ...hidden.later.map(({ line, nightsLeft }) => ({ id: line.id, rhythmId, key: null, time: null, scope: 'later' as const, nightsLeft })),
+];
+
 export function learnSuggestions(lines: Line[], rhythms: PlannedRhythm[], now: Date): Learned {
   const learned: Learned = { nights: {}, suggestions: [], dismissed: [], log: [] };
   for (const planned of rhythms) {
@@ -438,12 +474,14 @@ export function learnSuggestions(lines: Line[], rhythms: PlannedRhythm[], now: D
     const evidence = rhythmEvidence(lines, planned, now);
     const counted = evidence.counted.length;
     const full = replay(lines, planned, now);
-    const rows = [...full.rows].sort(byNightOrder).slice(0, MAX_SUGGESTIONS);
+    const hidden = hiddenFor(lines, planned, now);
+    const rows = visible(full.rows, hidden, rhythm.night.power.on).sort(byNightOrder).slice(0, MAX_SUGGESTIONS);
     const nights: RhythmNights = {
       counted, needed: MIN_NIGHTS, changed: full.changed, earlier: evidence.earlier, reason: reasonOf(counted, full, rows.length),
     };
     learned.nights[rhythm.id] = nights;
     if (rows.length) learned.suggestions.push({ rhythmId: rhythm.id, near: false, rows: rows.map(placed => placed.row) });
+    learned.dismissed.push(...dismissedOf(rhythm.id, hidden));
     learned.log.push(...nightLogs(evidence, rhythm));
   }
   learned.log.sort((a, b) => b.date.localeCompare(a.date) || a.rhythmId.localeCompare(b.rhythmId));
