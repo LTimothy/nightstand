@@ -22,7 +22,7 @@ export const classic: ThemeTokens = {
       trackOff: '#272727', tick: '#2E2E2E', tickMajor: '#4A4A4A', tickZero: '#6E6E6E', tickOff: '#222222', tickMajorOff: '#303030',
       ghostOpacity: 0.22, haloOpacity: 0.4,
     },
-    step: { cool: '#6B6B6B', warm: '#6B6B6B', disabled: '#2E2E2E' },
+    step: { cool: '#6B6B6B', warm: '#6B6B6B', disabled: '#2E2E2E', plan: '#90CAF9' },
     power: { offBg: '#010101', offText: '#90CAF9', offBorder: 'rgba(144,202,249,0.5)', nightBg: '#010101' },
     tile: { selectedBorder: 'rgba(144,202,249,0.7)' },
     status: { ok: '#66BB6A', warn: '#FFA726', error: '#F6574C', info: '#29B6F6' },

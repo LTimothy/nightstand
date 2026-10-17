@@ -37,9 +37,9 @@ export const CHART_LEGEND = { change: 'With this change', night: 'A night', now:
 
 // The caption under a rhythm card's chart; none for a rhythm without nights.
 export function overlayCaption(nights: number, smart: boolean): string {
-  const blue = smart ? 'Blue is tonight\'s curve.' : 'Blue is your schedule.';
-  return nights === 1 ? `${blue} White is last night, 1 night so far.`
-    : `${blue} White lines are the last ${nights} nights, brighter is more recent.`;
+  const bold = smart ? 'The bold line is tonight\'s curve.' : 'The bold line is your schedule.';
+  return nights === 1 ? `${bold} The thin line is last night, 1 night so far.`
+    : `${bold} The thin lines are the last ${nights} nights, brighter is more recent.`;
 }
 
 // Last night's set points, for screen readers only; x is minutes after the power-on. A Smart night has a point
@@ -55,7 +55,8 @@ export function lastNightText(
     return `Last night: ${displayTemperature(first.f, format)} at ${clockAfterOn(on, first.x)}${cool}${off}`;
   }
   const then = rest.map(point => `, then ${displayTemperature(point.f, format)} at ${clockAfterOn(on, point.x)}`).join('');
-  return `Last night: ${displayTemperature(first.f, format)}${then}${off}`;
+  const when = first.x > 0 ? ` at ${clockAfterOn(on, first.x)}` : '';
+  return `Last night: ${displayTemperature(first.f, format)}${when}${then}${off}`;
 }
 
 type ValueRow = Extract<SuggestionRow, { kind: 'step' | 'on' }>;

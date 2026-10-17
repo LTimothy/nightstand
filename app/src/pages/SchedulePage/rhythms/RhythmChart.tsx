@@ -34,7 +34,10 @@ export default function RhythmChart({ rhythm, log, today, timeZone, format, trac
   const { on } = rhythm.night.power;
   const smart = rhythm.temperatureMode === 'smart';
   const x = (minutes: number) => round((minutes / endMin) * 100);
-  const y = (f: number) => round(((hiF - f) / (hiF - loF)) * 100);
+  // Display units, as NightsChart plots them, so a level or Celsius label sits where its value is drawn.
+  const lo = fahrenheitToDisplay(loF, format);
+  const hi = fahrenheitToDisplay(hiF, format);
+  const y = (f: number) => round(((hi - fahrenheitToDisplay(f, format)) / (hi - lo)) * 100);
   const steps = (points: Step[], end: number) =>
     [`M ${x(points[0].x)} ${y(points[0].f)}`, ...points.slice(1).map(point => `H ${x(point.x)} V ${y(point.f)}`), `H ${x(end)}`].join(' ');
   const top = Math.round(fahrenheitToDisplay(hiF, format));
@@ -59,7 +62,7 @@ export default function RhythmChart({ rhythm, log, today, timeZone, format, trac
           strokeOpacity={ strength(index, night) }
           strokeWidth={ index === 0 && !night.dim ? 2 : 1 }
           { ...stroke }/>).reverse() }
-        { plan.length > 0 && <path data-schedule d={ steps(plan, endMin) } stroke={ palette.step.cool } strokeWidth={ 2.5 } { ...stroke }/> }
+        { plan.length > 0 && <path data-schedule d={ steps(plan, endMin) } stroke={ palette.step.plan } strokeWidth={ 3 } { ...stroke }/> }
       </svg>
       <Box/>
       <Box sx={ { display: 'flex', justifyContent: 'space-between' } }>

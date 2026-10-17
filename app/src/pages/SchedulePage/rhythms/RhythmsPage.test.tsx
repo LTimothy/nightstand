@@ -323,6 +323,27 @@ it('counts nights for suggestions after the rhythms and opens the notes', async 
   }
 });
 
+it('draws no chart when the suggestions response says they are off', async () => {
+  withSuggestions({ enabled: false, nights: {}, suggestions: [], dismissed: [], log: [{
+    date: '2026-09-27', rhythmId: 'workday', tonight: false, excluded: false, samePlan: true, start: '2026-09-27T22:30:00.000Z',
+    plan: [{ offsetMin: 0, temperatureF: 83 }], endMin: 495, changes: [],
+    sets: [{ at: '2026-09-27T22:30:00.000Z', temperatureF: 80 }, { at: '2026-09-28T06:45:00.000Z', temperatureF: null }],
+  }] } as SuggestionsResponse);
+  let read = false;
+  const seen = ({ request }: { request: Request }) => { if (request.url.includes('/rhythms/suggestions')) read = true; };
+  server.events.on('response:mocked', seen);
+  try {
+    renderWithProviders(<ScheduleTab/>);
+    await screen.findByRole('button', { name: 'Edit Workday' });
+    await waitFor(() => expect(read).toBe(true));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(document.querySelector('[data-schedule]')).toBeNull();
+  } finally {
+    server.events.removeListener('response:mocked', seen);
+    noSuggestions();
+  }
+});
+
 it('draws the nights on the rhythm cards while suggestions are on, and nothing while off', async () => {
   withSuggestions({
     enabled: true,
@@ -338,7 +359,7 @@ it('draws the nights on the rhythm cards while suggestions are on, and nothing w
   try {
     const { unmount } = renderWithProviders(<ScheduleTab/>);
     const workday = await screen.findByRole('button', { name: 'Edit Workday' });
-    await waitFor(() => expect(workday).toHaveAccessibleDescription(expect.stringContaining('White is last night, 1 night so far.')));
+    await waitFor(() => expect(workday).toHaveAccessibleDescription(expect.stringContaining('The thin line is last night, 1 night so far.')));
     unmount();
   } finally {
     noSuggestions();

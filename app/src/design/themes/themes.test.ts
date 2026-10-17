@@ -50,6 +50,7 @@ function drawnPairs(p: ThemePalette): Pair[] {
   add('border.control', p.border.control, page, MARK);
   add('step.cool', p.step.cool, { base: p.bg.base }, MARK);
   add('step.warm', p.step.warm, { base: p.bg.base }, MARK);
+  add('step.plan', p.step.plan, { card: p.bg.elevated }, MARK);
   // The nights chart draws these lines on a sheet.
   add('step.cool', p.step.cool, { sheet: p.bg.elevated }, MARK);
   add('step.warm', p.step.warm, { sheet: p.bg.elevated }, MARK);

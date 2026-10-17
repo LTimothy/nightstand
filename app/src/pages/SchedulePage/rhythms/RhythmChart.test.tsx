@@ -3,7 +3,9 @@ import { render, screen } from '@testing-library/react';
 import type { NightLog } from '@api/rhythmsSchema';
 import { palette } from '@design/tokens';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
+import { fahrenheitToDisplay } from '@lib/temperatureConversions';
 import RhythmChart from './RhythmChart';
+import { rhythmOverlay } from './rhythmOverlay';
 
 const offDays = createDemoRhythms(new Date('2026-10-12T19:00:00Z')).right.rhythms['off-days'];
 const at = (date: string, hours: number) => new Date(Date.parse(`${date}T23:00:00.000Z`) + hours * 3_600_000).toISOString();
@@ -12,12 +14,12 @@ const night = (date: string, over: Partial<NightLog> = {}): NightLog => ({
   plan: [{ offsetMin: 0, temperatureF: 82 }, { offsetMin: 240, temperatureF: 79 }], changes: [],
   sets: [{ at: at(date, 0), temperatureF: 82 }, { at: at(date, 4), temperatureF: 79 }, { at: at(date, 8), temperatureF: null }], ...over,
 });
-const draw = (log: NightLog[]) => render(<RhythmChart
+const draw = (log: NightLog[], format: 'fahrenheit' | 'level' = 'fahrenheit') => render(<RhythmChart
   rhythm={ offDays }
   log={ log }
   today="2026-10-12"
   timeZone="UTC"
-  format="fahrenheit"
+  format={ format }
   trackingOn={ false }
   captionId="caption"/>);
 const path = (container: HTMLElement, selector: string) => container.querySelector(selector);
@@ -28,11 +30,12 @@ describe('the chart on a rhythm card', () => {
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     const schedule = path(container, '[data-schedule]');
     expect(schedule?.getAttribute('d')).toMatch(/^M 0 /);
-    expect(schedule).toHaveAttribute('stroke', palette.step.cool);
+    expect(schedule).toHaveAttribute('stroke', palette.step.plan);
+    expect(schedule).toHaveAttribute('stroke-width', '3');
     expect(container.querySelector('svg')?.lastElementChild).toBe(schedule);
     // The middle of 75 and 86 is 80.5, which rounds to 81.
     for (const label of ['86°F', '81', '75', '11:00 PM', '3:00 AM', '7:00 AM']) expect(screen.getByText(label)).toBeInTheDocument();
-    expect(screen.queryByText(/^Blue is/)).toBeNull();
+    expect(document.getElementById('caption')).toBeNull();
   });
 
   it('draws the nights in white, last night strongest, and captions the count', () => {
@@ -53,7 +56,7 @@ describe('the chart on a rhythm card', () => {
     expect(path(container, '[data-night="2026-10-08"]')).toHaveAttribute('stroke-opacity', '0.6');
     expect(path(container, '[data-night="2026-10-08"]')).toHaveAttribute('stroke-width', '1');
     const caption = document.getElementById('caption');
-    expect(caption).toHaveTextContent('Blue is your schedule. White lines are the last 3 nights, brighter is more recent.');
+    expect(caption).toHaveTextContent('The bold line is your schedule. The thin lines are the last 3 nights, brighter is more recent.');
     expect(caption).toHaveTextContent('Last night: 82°F, then 81°F at 11:45 PM, then 79°F at 3:00 AM, off at 7:00 AM.');
   });
 
@@ -66,6 +69,16 @@ describe('the chart on a rhythm card', () => {
 
   it('says so with one night', () => {
     draw([night('2026-10-10')]);
-    expect(document.getElementById('caption')).toHaveTextContent('Blue is your schedule. White is last night, 1 night so far.');
+    expect(document.getElementById('caption')).toHaveTextContent('The bold line is your schedule. The thin line is last night, 1 night so far.');
+  });
+
+  it('plots in display units, so a level label sits where its value is drawn', () => {
+    const { container } = draw([], 'level');
+    const { loF, hiF, plan } = rhythmOverlay({ rhythm: offDays, log: [], today: '2026-10-12', timeZone: 'UTC', trackingOn: false });
+    const [lo, hi] = [loF, hiF].map(f => fahrenheitToDisplay(f, 'level'));
+    const drawn = Number(path(container, '[data-schedule]')?.getAttribute('d')?.match(/^M \S+ (\S+)/)?.[1]);
+    expect(drawn).toBeCloseTo(((hi - fahrenheitToDisplay(plan[0].f, 'level')) / (hi - lo)) * 100, 1);
+    // The middle label is the level halfway between the ends, drawn halfway down.
+    expect(screen.getByText(String(Math.round((lo + hi) / 2)))).toBeInTheDocument();
   });
 });

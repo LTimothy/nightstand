@@ -20,7 +20,7 @@ export const glass: ThemeTokens = {
       trackOff: '#272727', tick: 'rgba(255,255,255,0.12)', tickMajor: 'rgba(255,255,255,0.25)', tickZero: 'rgba(255,255,255,0.4)',
       tickOff: 'rgba(255,255,255,0.08)', tickMajorOff: 'rgba(255,255,255,0.14)', ghostOpacity: 0.22, haloOpacity: 0.4,
     },
-    step: { cool: 'rgba(255,255,255,0.4)', warm: 'rgba(255,255,255,0.4)', disabled: 'rgba(255,255,255,0.12)' },
+    step: { cool: 'rgba(255,255,255,0.4)', warm: 'rgba(255,255,255,0.4)', disabled: 'rgba(255,255,255,0.12)', plan: '#0A84FF' },
     power: { offBg: '#000000', offText: '#0A84FF', offBorder: '#0A84FF', nightBg: '#000000' },
     tile: { selectedBorder: '#0A84FF' },
     status: { ok: '#30D158', warn: '#FFD60A', error: '#FF453A', info: '#0A84FF' },

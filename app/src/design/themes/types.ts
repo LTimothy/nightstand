@@ -23,7 +23,8 @@ export interface ThemePalette {
     trackOff: string; tick: string; tickMajor: string; tickZero: string; tickOff: string; tickMajorOff: string;
     ghostOpacity: number; haloOpacity: number;
   };
-  step: { cool: string; warm: string; disabled: string };
+  // The schedule line drawn over past nights.
+  step: { cool: string; warm: string; disabled: string; plan: string };
   power: { offBg: string; offText: string; offBorder: string; nightBg: string };
   tile: { selectedBorder: string };
   status: { ok: string; warn: string; error: string; info: string };

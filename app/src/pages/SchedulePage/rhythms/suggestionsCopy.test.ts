@@ -258,17 +258,19 @@ describe('undo and the hidden list', () => {
 });
 
 describe('the card chart caption', () => {
-  it('names the two colours and counts the nights, as approved', () => {
-    expect(overlayCaption(14, false)).toBe('Blue is your schedule. White lines are the last 14 nights, brighter is more recent.');
-    expect(overlayCaption(5, true)).toBe('Blue is tonight\'s curve. White lines are the last 5 nights, brighter is more recent.');
-    expect(overlayCaption(1, false)).toBe('Blue is your schedule. White is last night, 1 night so far.');
+  it('names the bold line and counts the nights, with no colours', () => {
+    expect(overlayCaption(14, false)).toBe('The bold line is your schedule. The thin lines are the last 14 nights, brighter is more recent.');
+    expect(overlayCaption(5, true)).toBe('The bold line is tonight\'s curve. The thin lines are the last 5 nights, brighter is more recent.');
+    expect(overlayCaption(1, false)).toBe('The bold line is your schedule. The thin line is last night, 1 night so far.');
   });
 
   it('reads last night\'s set points to a screen reader', () => {
     const points = [{ x: 0, f: 82 }, { x: 45, f: 81 }, { x: 180, f: 83 }];
     expect(lastNightText(points, 480, '23:00', 'fahrenheit', false))
       .toBe('Last night: 82°F, then 81°F at 11:45 PM, then 83°F at 2:00 AM, off at 7:00 AM.');
-    expect(lastNightText([{ x: 120, f: 70 }], 480, '23:00', 'celsius', false)).toBe('Last night: 21°C, off at 7:00 AM.');
+    expect(lastNightText([{ x: 120, f: 70 }], 480, '23:00', 'celsius', false)).toBe('Last night: 21°C at 1:00 AM, off at 7:00 AM.');
+    expect(lastNightText([{ x: 120, f: 79 }, { x: 180, f: 81 }], 480, '23:00', 'fahrenheit', false))
+      .toBe('Last night: 79°F at 1:00 AM, then 81°F at 2:00 AM, off at 7:00 AM.');
   });
 
   it('reads a Smart night short: its start, its coolest and its end', () => {
