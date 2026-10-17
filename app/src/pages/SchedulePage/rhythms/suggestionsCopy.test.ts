@@ -5,7 +5,8 @@ import { createDemoRhythms } from '../../../mocks/rhythmsMock';
 import { withRows } from './rhythmsModel';
 import {
   addLabel, cardEvidence, cardLine, cardRowLine, chartCaption, DONT_SUGGEST, dontSuggestLabel, evidenceSentence, hiddenForLine,
-  hiddenIntro, hiddenRow, nearLine, provenance, reviewName, sheetHeading, sheetOverline, showAgainName, showNightsLabel, startsLine,
+  hiddenIntro, hiddenRow, lastNightText, nearLine, overlayCaption,
+  provenance, reviewName, sheetHeading, sheetOverline, showAgainName, showNightsLabel, startsLine,
   uncheckedNote, undoAddMessage, undoHideMessage, withChangeRows,
   clockOf, featureDescription, howSuggestionsWork, LEAVE_OUT_HINT, leaveOutName, nightLabel, noteLines, notesCountLine, notesTitle,
   pairTemperatures, reasonLine, sectionCaption, whatCounts,
@@ -253,5 +254,27 @@ describe('undo and the hidden list', () => {
     const all = [logged('2026-10-01', 1), logged('2026-10-02', 0), logged('2026-10-03', 0), logged('2026-10-04', 1)];
     expect(chartCaption(all, ['2026-10-01'])).toBe('One line per night. 2 had no change and sit on the dashed line. 1 had other changes.');
     expect(chartCaption(all.slice(0, 2), ['2026-10-01'])).toBe('One line per night. 1 had no change and sits on the dashed line.');
+  });
+});
+
+describe('the card chart caption', () => {
+  it('names the two colours and counts the nights, as approved', () => {
+    expect(overlayCaption(14, false)).toBe('Blue is your schedule. White lines are the last 14 nights, brighter is more recent.');
+    expect(overlayCaption(5, true)).toBe('Blue is tonight\'s curve. White lines are the last 5 nights, brighter is more recent.');
+    expect(overlayCaption(1, false)).toBe('Blue is your schedule. White is last night, 1 night so far.');
+  });
+
+  it('reads last night\'s set points to a screen reader', () => {
+    const points = [{ x: 0, f: 82 }, { x: 45, f: 81 }, { x: 180, f: 83 }];
+    expect(lastNightText(points, 480, '23:00', 'fahrenheit', false))
+      .toBe('Last night: 82°F, then 81°F at 11:45 PM, then 83°F at 2:00 AM, off at 7:00 AM.');
+    expect(lastNightText([{ x: 120, f: 70 }], 480, '23:00', 'celsius', false)).toBe('Last night: 21°C, off at 7:00 AM.');
+  });
+
+  it('reads a Smart night short: its start, its coolest and its end', () => {
+    const points = [{ x: 0, f: 85 }, { x: 60, f: 82 }, { x: 210, f: 79 }, { x: 300, f: 79 }, { x: 400, f: 83 }];
+    expect(lastNightText(points, 465, '23:00', 'fahrenheit', true))
+      .toBe('Last night: 85°F at 11:00 PM, coolest 79°F at 2:30 AM, off at 6:45 AM.');
+    expect(lastNightText([{ x: 0, f: 80 }], 465, '23:00', 'fahrenheit', true)).toBe('Last night: 80°F at 11:00 PM, off at 6:45 AM.');
   });
 });

@@ -4,6 +4,7 @@ import type { Dismissed, NightLog, Rhythm, RhythmNights, SuggestionRow, ThenBack
 import { minutesAfterOn, temperatureInPowerWindow } from '@api/rhythmWake';
 import { SUGGESTION_RULES, type SuggestionRules } from '@api/suggestionRules';
 import { displayTemperature, fahrenheitToLevel, levelToFahrenheit, type TemperatureFormat } from '@lib/temperatureConversions';
+import { clockAfterOn } from './nightsChartModel';
 import { formatDate, type SuggestionStart } from './rhythmsModel';
 
 export const SECTION_TITLE = 'Suggestions';
@@ -33,6 +34,29 @@ export const DONT_SUGGEST_CHECKED = "Don't suggest the checked";
 export const HIDE_ERROR = 'Could not hide this suggestion. Try again.';
 export const SHOW_AGAIN_ERROR = 'Could not show it again. Try again.';
 export const CHART_LEGEND = { change: 'With this change', night: 'A night', now: 'Now' } as const;
+
+// The caption under a rhythm card's chart; none for a rhythm without nights.
+export function overlayCaption(nights: number, smart: boolean): string {
+  const blue = smart ? 'Blue is tonight\'s curve.' : 'Blue is your schedule.';
+  return nights === 1 ? `${blue} White is last night, 1 night so far.`
+    : `${blue} White lines are the last ${nights} nights, brighter is more recent.`;
+}
+
+// Last night's set points, for screen readers only; x is minutes after the power-on. A Smart night has a point
+// every few minutes, so it reads short: where it started, its coolest, and its end.
+export function lastNightText(
+  points: Array<{ x: number; f: number }>, end: number, on: string, format: TemperatureFormat, smart: boolean,
+): string {
+  const [first, ...rest] = points;
+  const off = `, off at ${clockAfterOn(on, end)}.`;
+  if (smart) {
+    const coolest = rest.reduce((low, point) => (point.f < low.f ? point : low), first);
+    const cool = coolest === first ? '' : `, coolest ${displayTemperature(coolest.f, format)} at ${clockAfterOn(on, coolest.x)}`;
+    return `Last night: ${displayTemperature(first.f, format)} at ${clockAfterOn(on, first.x)}${cool}${off}`;
+  }
+  const then = rest.map(point => `, then ${displayTemperature(point.f, format)} at ${clockAfterOn(on, point.x)}`).join('');
+  return `Last night: ${displayTemperature(first.f, format)}${then}${off}`;
+}
 
 type ValueRow = Extract<SuggestionRow, { kind: 'step' | 'on' }>;
 

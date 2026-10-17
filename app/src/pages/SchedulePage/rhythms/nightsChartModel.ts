@@ -5,7 +5,7 @@ import { wallClock } from '@api/rhythmTimes';
 import { minutesAfterOn, temperatureInPowerWindow } from '@api/rhythmWake';
 import { formatDisplayValue, type TemperatureFormat } from '@lib/temperatureConversions';
 
-type Step = { x: number; f: number };
+export type Step = { x: number; f: number };
 export type ChartLine = { id: string; kind: 'plan' | 'night' | 'change'; date?: string; direction?: 'down' | 'up'; values: number[] };
 export type ClipMark = { x: number; edge: 'top' | 'bottom' };
 export type NightsChartModel = {
@@ -15,9 +15,9 @@ export type NightsChartModel = {
 type ValueRow = Extract<SuggestionRow, { kind: 'step' | 'on' }>;
 
 // How far the range reaches past the plan's values, in °F.
-const RANGE_F = 4;
+export const RANGE_F = 4;
 
-const planSteps = (rhythm: Rhythm, endMin: number): Step[] => [
+export const planSteps = (rhythm: Rhythm, endMin: number): Step[] => [
   { x: 0, f: rhythm.night.power.onTemperature },
   ...Object.entries(rhythm.night.temperatures)
     .filter(([time]) => temperatureInPowerWindow(time, rhythm.night.power))
