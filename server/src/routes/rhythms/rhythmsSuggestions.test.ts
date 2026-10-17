@@ -37,6 +37,17 @@ const nightLine = (side: 'left' | 'right', k: number) => {
     date, sleepStart: new Date(start(k)).toISOString(), sleepEnd: new Date(start(k) + 8 * 60 * 60 * 1000).toISOString(),
   };
 };
+// Night k as above, with a hand change `offsetMin` after power-on from `fromF` to `targetF`.
+const changeLine = (side: 'left' | 'right', k: number, offsetMin: number, fromF: number, targetF: number) => ({
+  ...nightLine(side, k), kind: 'change', at: new Date(start(k) + offsetMin * 60_000).toISOString(),
+  offsetMin, plannedF: 82, holdF: null, fromF, targetF, phase: null, held: false, source: 'api',
+});
+// `count` nights, oldest first, with a 23:30 change to 79 on the listed nights (0 is the oldest).
+const habit = (side: 'left' | 'right', count: number, on: number[], extra: (k: number) => object[] = () => []) =>
+  Array.from({ length: count }, (_, index) => count - 1 - index).flatMap(k => [
+    nightLine(side, k),
+    ...(on.includes(count - 1 - k) ? [changeLine(side, k, 90, 82, 79), ...extra(k)] : []),
+  ]);
 const seed = (lines: object[]) => writeFileSync(changesPath(), lines.map(line => `${JSON.stringify(line)}\n`).join(''));
 
 let server: Server;
@@ -133,6 +144,20 @@ describe('exclude while Rhythms is not active', () => {
   });
 });
 
+describe('hide and restore while Rhythms is not active', () => {
+  it('refuse with 409', async () => {
+    seed(habit('right', 6, [0, 1, 2, 3, 4, 5]));
+    const { body } = await post('dismiss', { side: 'right', rhythmId: HAND.id, scope: 'later' });
+    await updateSettings(draft => { draft.features.rhythms = false; });
+    try {
+      assert.equal((await post('dismiss', { side: 'right', rhythmId: HAND.id, scope: 'later' })).status, 409);
+      assert.equal((await post('restore', { side: 'right', ids: body.ids })).status, 409);
+    } finally {
+      await updateSettings(draft => { draft.features.rhythms = true; });
+    }
+  });
+});
+
 describe('POST /rhythms/suggestions/forget', () => {
   it('deletes the notes, also while the feature is off, and leaves nothing behind', async () => {
     seed([nightLine('right', 0)]);
@@ -151,6 +176,70 @@ describe('stored files', () => {
     const before = files.map(file => statSync(file).mtimeMs);
     await post('exclude', { side: 'right', rhythmId: HAND.id, date: nightLine('right', 0).date, excluded: true });
     await post('forget', {});
+    assert.deepEqual(files.map(file => statSync(file).mtimeMs), before);
+  });
+});
+
+describe('suggestions from the notes', () => {
+  it('suggests a change made on enough nights, and offers a near miss below the gate', async () => {
+    seed([...habit('right', 6, [0, 1, 2, 3, 4, 5]), ...habit('left', 7, [2, 4, 6])]);
+    const right = (await get('?side=right')).body;
+    assert.equal(right.nights[HAND.id].reason, 'suggested');
+    assert.deepEqual(right.suggestions.map((entry: { near: boolean; rows: Array<{ time: string; temperatureF: number }> }) =>
+      [entry.near, entry.rows.map(row => [row.time, row.temperatureF])]), [[false, [['23:30', 79]]]]);
+    const left = (await get('?side=left')).body;
+    assert.deepEqual(left.suggestions.map((entry: { near: boolean }) => entry.near), [true]);
+  });
+});
+
+describe('POST /rhythms/suggestions/dismiss and /restore', () => {
+  const twoRows = () => habit('right', 6, [0, 1, 2, 3, 4, 5], k => [changeLine('right', k, 360, 79, 84)]);
+
+  it('hides the checked rows for this plan and brings them back', async () => {
+    seed(twoRows());
+    const dismissed = await post('dismiss', {
+      side: 'right', rhythmId: HAND.id, scope: 'plan', rows: [{ key: 'step:down', time: '23:30' }, { key: 'step:up', time: '04:00' }],
+    });
+    assert.equal(dismissed.status, 200);
+    assert.equal(dismissed.body.ids.length, 2);
+    let { body } = await get('?side=right');
+    assert.deepEqual(body.suggestions, []);
+    assert.equal(body.nights[HAND.id].reason, 'dismissed');
+    assert.deepEqual(body.dismissed.map((entry: { scope: string; key: string; nightsLeft: number }) =>
+      [entry.scope, entry.key, entry.nightsLeft]), [['plan', 'step:down', 0], ['plan', 'step:up', 0]]);
+    assert.equal((await post('restore', { side: 'right', ids: dismissed.body.ids })).status, 204);
+    ({ body } = await get('?side=right'));
+    assert.equal(body.suggestions[0].rows.length, 2);
+  });
+
+  it('hides every row for 14 nights with one line', async () => {
+    seed(twoRows());
+    const dismissed = await post('dismiss', { side: 'right', rhythmId: HAND.id, scope: 'later' });
+    assert.equal(dismissed.body.ids.length, 1);
+    const { body } = await get('?side=right');
+    assert.deepEqual(body.suggestions, []);
+    assert.deepEqual(body.dismissed.map((entry: { scope: string; key: null; time: null; nightsLeft: number }) =>
+      [entry.scope, entry.key, entry.time, entry.nightsLeft]), [['later', null, null, 14]]);
+  });
+
+  it('refuses while the feature is off, for an unknown rhythm or id, or a bad body', async () => {
+    seed(twoRows());
+    assert.equal((await post('dismiss', { side: 'right', rhythmId: 'nope', scope: 'later' })).status, 404);
+    assert.equal((await post('dismiss', { side: 'right', rhythmId: HAND.id, scope: 'plan', rows: [] })).status, 400);
+    assert.equal((await post('restore', { side: 'right', ids: ['0123456789ab'] })).status, 404);
+    const { body } = await post('dismiss', { side: 'left', rhythmId: HAND.id, scope: 'later' });
+    assert.equal((await post('restore', { side: 'right', ids: body.ids })).status, 404);
+    await updateSettings(draft => { draft.features.rhythmSuggestions = false; });
+    assert.equal((await post('dismiss', { side: 'right', rhythmId: HAND.id, scope: 'later' })).status, 409);
+    assert.equal((await post('restore', { side: 'left', ids: body.ids })).status, 409);
+  });
+
+  it('never writes the stored files', async () => {
+    seed(twoRows());
+    const files = ['rhythmsDB.json', 'settingsDB.json'].map(name => path.join(lowdb, name));
+    const before = files.map(file => statSync(file).mtimeMs);
+    const { body } = await post('dismiss', { side: 'right', rhythmId: HAND.id, scope: 'later' });
+    await post('restore', { side: 'right', ids: body.ids });
     assert.deepEqual(files.map(file => statSync(file).mtimeMs), before);
   });
 });

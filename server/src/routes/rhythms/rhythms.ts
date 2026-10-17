@@ -7,8 +7,8 @@ import { SCHEDULE_SIDES } from '../../db/scheduleKeys.js';
 import { Side } from '../../db/schedulesSchema.js';
 import { loadRhythms, RhythmsLoad, RhythmsStateError, updateRhythms } from '../../db/rhythms.js';
 import {
-  NightExcludeSchema, RhythmsLiveQuerySchema, RhythmsResponse, RhythmsSleepsQuerySchema, RhythmsUpdateSchema, SuggestionsQuerySchema,
-  type SuggestionsResponse,
+  NightExcludeSchema, RhythmsLiveQuerySchema, RhythmsResponse, RhythmsSleepsQuerySchema, RhythmsUpdateSchema, SuggestionDismissSchema,
+  SuggestionRestoreSchema, SuggestionsQuerySchema, type SuggestionsResponse,
 } from '../../db/rhythmsSchema.js';
 import { activation } from '../../jobs/rhythms/activation.js';
 import { applyAlarmsEnabled, findOverlaps, resolveLegacySleeps, resolveSleeps } from '../../jobs/rhythms/resolve.js';
@@ -17,8 +17,8 @@ import { z } from 'zod';
 import { enableRhythms } from '../../jobs/rhythms/enable.js';
 import { disableRhythms } from '../../jobs/rhythms/handoff.js';
 import { drivingSide } from '../../jobs/scheduleQueries.js';
-import { appendNoteLines, forgetHandChanges, readChanges, rhythmPlanKey } from '../../jobs/rhythms/handChanges.js';
-import { learnSuggestions } from '../../jobs/rhythms/learn.js';
+import { appendNoteLines, forgetHandChanges, noteId, readChanges, rhythmPlanKey } from '../../jobs/rhythms/handChanges.js';
+import { learnSuggestions, type DismissLine } from '../../jobs/rhythms/learn.js';
 import { liveCurveState, smartResolveHooks } from '../../jobs/rhythms/curveController.js';
 
 const router = express.Router();
@@ -223,6 +223,50 @@ router.post('/rhythms/suggestions/exclude', async (req: Request, res: Response) 
 // Works with the feature off, so notes can always be deleted.
 router.post('/rhythms/suggestions/forget', async (_req: Request, res: Response) => {
   await forgetHandChanges();
+  res.status(204).end();
+});
+
+// Don't suggest this (one line per checked row, for the current plan) or Hide for 14 nights (one line).
+router.post('/rhythms/suggestions/dismiss', async (req: Request, res: Response) => {
+  const parsed = SuggestionDismissSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request data', details: parsed.error.errors });
+    return;
+  }
+  const body = parsed.data;
+  const rhythm = await noteTarget(res, body.side, body.rhythmId);
+  if (!rhythm) return;
+  const base = {
+    v: 1 as const, kind: 'dismiss' as const, at: new Date().toISOString(), side: body.side, rhythmId: body.rhythmId,
+    planKey: rhythmPlanKey(rhythm),
+  };
+  const lines: DismissLine[] = body.scope === 'later'
+    ? [{ ...base, id: noteId(), key: null, time: null, scope: 'later' }]
+    : body.rows.map(row => ({ ...base, id: noteId(), key: row.key, time: row.time, scope: 'plan' as const }));
+  await appendNoteLines(lines);
+  res.json({ ids: lines.map(line => line.id) });
+});
+
+// Undo after hiding, or Show again in the notes.
+router.post('/rhythms/suggestions/restore', async (req: Request, res: Response) => {
+  const parsed = SuggestionRestoreSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request data', details: parsed.error.errors });
+    return;
+  }
+  const { result } = await currentRhythms();
+  if (!suggestionsOn() || !result.active) {
+    res.status(409).json({ error: 'Suggestions from your changes is off' });
+    return;
+  }
+  const { side, ids } = parsed.data;
+  const hidden = (await readChanges())
+    .filter((line): line is DismissLine => line.kind === 'dismiss' && line.side === side && ids.includes(line.id));
+  if (!hidden.length) {
+    res.status(404).json({ error: 'Nothing is hidden with those ids' });
+    return;
+  }
+  await appendNoteLines([{ v: 1, kind: 'restore', at: new Date().toISOString(), side, rhythmId: hidden[0].rhythmId, ids }]);
   res.status(204).end();
 });
 
