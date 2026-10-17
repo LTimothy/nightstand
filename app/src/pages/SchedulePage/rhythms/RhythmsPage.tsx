@@ -8,9 +8,11 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import PageHeader from '@components/PageHeader';
 import SectionHeading from '@components/SectionHeading';
 import SideControl from '@components/SideControl';
-import { postRhythms, refreshRhythms, rhythmsSaveMessage, useResolvedSleeps, useSuggestions } from '@api/rhythms';
+import {
+  postRhythms, postSuggestionDismiss, postSuggestionRestore, refreshRhythms, rhythmsSaveMessage, useResolvedSleeps, useSuggestions,
+} from '@api/rhythms';
 import type { DayOfWeek } from '@api/schedulesSchema';
-import type { RhythmsDB, SideRhythms } from '@api/rhythmsSchema';
+import type { RhythmsDB, SideRhythms, SuggestionRow } from '@api/rhythmsSchema';
 import { isSchedulePaused, pauseEndsAt } from '@api/schedulePause';
 import { useServices } from '@api/services';
 import { useSettings } from '@api/settings';
@@ -23,25 +25,28 @@ import DateChanges from './DateChanges';
 import NotesSheet from './NotesSheet';
 import RhythmEditor from './RhythmEditor';
 import RhythmList from './RhythmList';
+import SuggestionCard from './SuggestionCard';
+import SuggestionSheet from './SuggestionSheet';
 import SuggestionsSection from './SuggestionsSection';
 import UndoBar from './UndoBar';
 import UseRhythmSheet from './UseRhythmSheet';
 import WeekList from './WeekList';
+import { HIDE_ERROR, undoAddMessage, undoHideMessage } from './suggestionsCopy';
 import {
-  comingUpDates, datePickMessage, datesPickMessage, deleteMessage, deleteRhythm, firstComingUpDate, MAX_RHYTHMS_PER_SIDE, restoreDate,
-  restoreDeleted, restoreWeekDays, restoreDates, setDateChange, setDateChanges, setWeekDays, weekPickMessage, type DateChoice,
+  applySuggestion, comingUpDates, datePickMessage, datesPickMessage, deleteMessage, deleteRhythm, firstComingUpDate, hasOwn,
+  MAX_RHYTHMS_PER_SIDE, restoreDate, restoreDeleted, restoreRhythm, restoreWeekDays, restoreDates, setDateChange, setDateChanges,
+  setWeekDays, weekPickMessage, type DateChoice,
 } from './rhythmsModel';
 
 const SHORT_COMING_UP = 7;
 const LONG_COMING_UP = 14;
 
 // `refused` explains an undo that would change nothing, such as a deleted rhythm whose place was taken.
-type Undo = {
-  message: string;
-  revert: (current: SideRhythms) => SideRhythms;
-  focus: () => HTMLElement | null;
-  refused?: (current: SideRhythms) => string;
-};
+// `restore` undoes a hide, which changes no rhythm.
+type Undo = { message: string; focus: () => HTMLElement | null } & (
+  | { revert: (current: SideRhythms) => SideRhythms; refused?: (current: SideRhythms) => string }
+  | { restore: () => Promise<boolean> }
+);
 
 export default function RhythmsPage({ db }: { db: RhythmsDB }) {
   const { side, isUpdating, setIsUpdating } = useAppStore();
@@ -54,6 +59,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
   const [showAllDates, setShowAllDates] = useState(false);
   const [using, setUsing] = useState<string>();
   const [notes, setNotes] = useState<{ rhythmId?: string }>();
+  const [review, setReview] = useState<string>();
   const [headingFocus, setHeadingFocus] = useState(0);
   const closedEditor = useRef<{ id: string | null; created: boolean } | undefined>(undefined);
   const location = useLocation();
@@ -70,6 +76,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
     setError('');
     setUndo(undefined);
     setNotes(undefined);
+    setReview(undefined);
   }, [side]);
   // The editor unmounts on close, so focus would fall to the page body. Return
   // it to the rhythm, or to "Use on some days" for one just created, unless the
@@ -103,6 +110,10 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
   const suggestionsOn = !!settings?.features?.rhythmSuggestions;
   const suggestions = useSuggestions(side, suggestionsOn);
   const away = !!settings?.[side]?.awayMode;
+  const cards = suggestionsOn && suggestions.data?.enabled
+    ? suggestions.data.suggestions.filter(entry => !entry.near && hasOwn(sideData.rhythms, entry.rhythmId)) : [];
+  const reviewEntry = review ? suggestions.data?.suggestions.find(entry => entry.rhythmId === review) : undefined;
+  const reviewRhythm = reviewEntry && hasOwn(sideData.rhythms, reviewEntry.rhythmId) ? sideData.rhythms[reviewEntry.rhythmId] : undefined;
 
   const save = async (next: SideRhythms) => {
     setError('');
@@ -192,8 +203,70 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
     setHeadingFocus(count => count + 1);
     return true;
   };
+  const reviewButton = (rhythmId: string) => () => document.querySelector<HTMLElement>(`[data-review="${rhythmId}"]`)
+    ?? document.getElementById('suggestions-heading');
+  const toSuggestions = () => requestAnimationFrame(() => document.getElementById('suggestions-heading')?.focus({ preventScroll: true }));
+  const openReview = (rhythmId: string) => {
+    setUndo(undefined);
+    setError('');
+    setReview(rhythmId);
+  };
+  // One save for every checked row; a refusal stays in the sheet, which stays open.
+  const addSuggestion = async (rhythmId: string, rows: SuggestionRow[]) => {
+    const before = sideData;
+    const name = sideData.rhythms[rhythmId]?.name ?? '';
+    setUndo(undefined);
+    if (!await save(applySuggestion(sideData, rhythmId, rows))) return;
+    setReview(undefined);
+    setUndo({
+      message: undoAddMessage(name, rows, format), revert: current => restoreRhythm(current, before, rhythmId), focus: reviewButton(rhythmId),
+    });
+    toSuggestions();
+  };
+  const hideSuggestion = async (rhythmId: string, rows: SuggestionRow[]) => {
+    const name = sideData.rhythms[rhythmId]?.name ?? '';
+    setError('');
+    setUndo(undefined);
+    setIsUpdating(true);
+    try {
+      const ids = await postSuggestionDismiss({
+        scope: 'plan', side, rhythmId, rows: rows.map(row => ({ key: row.key, time: row.kind === 'step' ? row.time : null })),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['useSuggestions'] });
+      setReview(undefined);
+      setUndo({
+        message: undoHideMessage(name),
+        focus: reviewButton(rhythmId),
+        restore: async () => {
+          setError('');
+          try {
+            await postSuggestionRestore({ side, ids });
+            await queryClient.invalidateQueries({ queryKey: ['useSuggestions'] });
+            return true;
+          } catch {
+            setError(HIDE_ERROR);
+            return false;
+          }
+        },
+      });
+      toSuggestions();
+    } catch {
+      setError(HIDE_ERROR);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
   const undoPick = async () => {
     if (!undo) return;
+    if ('restore' in undo) {
+      setIsUpdating(true);
+      const restored = await undo.restore();
+      setIsUpdating(false);
+      // The bar stays until the restore lands, so a failed one can be tried again.
+      if (restored) setUndo(undefined);
+      requestAnimationFrame(() => undo.focus()?.focus({ preventScroll: true }));
+      return;
+    }
     const { revert, focus, refused } = undo;
     const next = revert(sideData);
     if (next === sideData && refused) {
@@ -231,7 +304,14 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
         framed
         note="Changes you save apply after the pause."
         onResumed={ () => requestAnimationFrame(() => document.getElementById('week-heading')?.focus({ preventScroll: true })) }/>
-      { error && <Alert severity="error" sx={ { width: '100%' } } onClose={ () => setError('') }>{ error }</Alert> }
+      { error && !reviewEntry && <Alert severity="error" sx={ { width: '100%' } } onClose={ () => setError('') }>{ error }</Alert> }
+      { cards.map(entry => <SuggestionCard
+        key={ entry.rhythmId }
+        name={ sideData.rhythms[entry.rhythmId].name }
+        entry={ entry }
+        counted={ suggestions.data?.nights[entry.rhythmId]?.counted ?? 0 }
+        format={ format }
+        onReview={ () => openReview(entry.rhythmId) }/>) }
       <Stack component="section" aria-labelledby="week-heading" spacing={ 1.5 } sx={ { width: '100%' } }>
         <SectionHeading id="week-heading" tabIndex={ -1 } sx={ { outline: 'none' } }>Week</SectionHeading>
         <WeekList
@@ -292,9 +372,32 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
         sideData={ sideData }
         suggestions={ suggestions }
         away={ away }
+        onReview={ openReview }
         onShowNotes={ () => {
           setUndo(undefined);
           setNotes({});
+        } }/> }
+      { reviewEntry && reviewRhythm && suggestions.data && <SuggestionSheet
+        key={ reviewEntry.rhythmId }
+        entry={ reviewEntry }
+        rhythm={ reviewRhythm }
+        side={ side }
+        counted={ suggestions.data.nights[reviewEntry.rhythmId]?.counted ?? 0 }
+        log={ suggestions.data.log.filter(night => night.rhythmId === reviewEntry.rhythmId) }
+        sleeps={ sleeps }
+        today={ today }
+        timeZone={ timeZone }
+        format={ format }
+        trackingOn={ !!services?.biometrics?.enabled }
+        pausedUntil={ pausedUntil }
+        error={ error }
+        busy={ isUpdating }
+        onAdd={ rows => void addSuggestion(reviewEntry.rhythmId, rows) }
+        onDontSuggest={ rows => void hideSuggestion(reviewEntry.rhythmId, rows) }
+        onShowNights={ () => setNotes({ rhythmId: reviewEntry.rhythmId }) }
+        onClose={ () => {
+          setReview(undefined);
+          setError('');
         } }/> }
       { notes && suggestions.data && <NotesSheet
         side={ side }

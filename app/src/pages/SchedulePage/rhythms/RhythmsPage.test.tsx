@@ -4,7 +4,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
 import { useAppStore } from '@state/appStore';
-import type { SuggestionsResponse } from '@api/rhythmsSchema';
+import type { SuggestionRow, SuggestionsResponse } from '@api/rhythmsSchema';
 import { getSettings, updateSettings } from '../../../mocks/mockData';
 import { createDemoRhythms, getMockRhythms, listMockSleeps, resetMockRhythms } from '../../../mocks/rhythmsMock';
 import { useScheduleStore } from '../scheduleStore';
@@ -347,6 +347,115 @@ it('asks for suggestions once while the feature is on', async () => {
     renderWithProviders(<ScheduleTab/>);
     expect(await screen.findByRole('heading', { name: 'Suggestions' })).toBeInTheDocument();
     expect(reads.count).toBe(1);
+  } finally {
+    noSuggestions();
+  }
+});
+
+const weekendRow: SuggestionRow = {
+  kind: 'step', key: 'step:down', direction: 'down', supporting: 9, firstNight: '2026-09-14', lastNight: '2026-09-27',
+  supportingDates: ['2026-09-26', '2026-09-27'], time: '00:30', temperatureF: 78, plannedF: 80,
+  thenBack: { time: '01:30', temperatureF: 80, supporting: 8 },
+};
+const withCard = () => withSuggestions({
+  enabled: true,
+  nights: {
+    weekend: { counted: 14, needed: 5, changed: 9, earlier: false, reason: 'suggested' },
+    workday: { counted: 3, needed: 5, changed: 0, earlier: false, reason: 'few-nights' },
+  },
+  suggestions: [{ rhythmId: 'weekend', near: false, rows: [weekendRow] }],
+  dismissed: [],
+  log: [{
+    date: '2026-09-27', rhythmId: 'weekend', tonight: false, excluded: false,
+    plan: [{ offsetMin: 0, temperatureF: 80 }], endMin: 555, changes: [],
+  }],
+});
+
+it('puts a suggestion card above the week', async () => {
+  withCard();
+  try {
+    renderWithProviders(<ScheduleTab/>);
+    const review = await screen.findByRole('button', { name: 'Review suggestion for Weekend' });
+    expect(screen.getByText('Weekend: −2 at 12:30 AM, back to −1 at 1:30 AM')).toBeInTheDocument();
+    expect(review.compareDocumentPosition(screen.getByRole('heading', { name: 'Week' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText(/^Weekend: /, { selector: 'li *' })).not.toBeInTheDocument();
+  } finally {
+    noSuggestions();
+  }
+});
+
+it('adds the checked rows, the return included, in one save, and undoes it', async () => {
+  withCard();
+  try {
+    const { user } = renderWithProviders(<ScheduleTab/>);
+    await user.click(await screen.findByRole('button', { name: 'Review suggestion for Weekend' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Add to Weekend' }));
+    await waitFor(() => expect(getMockRhythms()?.left.rhythms.weekend.night.temperatures)
+      .toEqual({ '00:30': 78, '01:30': 80, '02:00': 77, '08:00': 85 }));
+    expect(await screen.findByText('Weekend now sets −2 at 12:30 AM and −1 at 1:30 AM')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Suggestions' })).toHaveFocus());
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(getMockRhythms()?.left.rhythms.weekend.night.temperatures).toEqual({ '02:00': 77, '08:00': 85 }));
+  } finally {
+    noSuggestions();
+  }
+});
+
+it('stacks the notes on the review and returns focus to the button that opened them', async () => {
+  withCard();
+  try {
+    const { user } = renderWithProviders(<ScheduleTab/>);
+    await user.click(await screen.findByRole('button', { name: 'Review suggestion for Weekend' }));
+    const showNights = within(await screen.findByRole('dialog')).getByRole('button', { name: 'Show the 14 nights' });
+    await user.click(showNights);
+    const notes = await screen.findByRole('dialog', { name: 'Notes for Weekend' });
+    await user.click(within(notes).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(showNights).toHaveFocus());
+  } finally {
+    noSuggestions();
+  }
+});
+
+it('keeps the sheet open with the reason inside it when the save is refused', async () => {
+  withCard();
+  server.use(http.post('*/rhythms', () => HttpResponse.json({ error: 'Invalid rhythms', details: ['left: something'] }, { status: 400 })));
+  try {
+    const { user } = renderWithProviders(<ScheduleTab/>);
+    await user.click(await screen.findByRole('button', { name: 'Review suggestion for Weekend' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Add to Weekend' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Could not save Rhythms.');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  } finally {
+    noSuggestions();
+  }
+});
+
+it("stops suggesting with Don't suggest this, and the undo restores exactly what was hidden", async () => {
+  withCard();
+  const posted: Array<[string, unknown]> = [];
+  server.use(
+    http.post('*/rhythms/suggestions/dismiss', async ({ request }) => {
+      posted.push(['dismiss', await request.json()]);
+      return HttpResponse.json({ ids: ['a1b2c3d4e5f6'] });
+    }),
+    http.post('*/rhythms/suggestions/restore', async ({ request }) => {
+      posted.push(['restore', await request.json()]);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  try {
+    const { user } = renderWithProviders(<ScheduleTab/>);
+    await user.click(await screen.findByRole('button', { name: 'Review suggestion for Weekend' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('button', { name: /^Hide for/ })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: "Don't suggest this" }));
+    expect(await screen.findByText('Weekend: suggestion hidden')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(posted).toEqual([
+      ['dismiss', { scope: 'plan', side: 'left', rhythmId: 'weekend', rows: [{ key: 'step:down', time: '00:30' }] }],
+      ['restore', { side: 'left', ids: ['a1b2c3d4e5f6'] }],
+    ]));
   } finally {
     noSuggestions();
   }
