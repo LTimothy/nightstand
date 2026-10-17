@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_SMART, RhythmSchema, type Rhythm } from '@api/rhythmsSchema';
+import { DEFAULT_SMART, RhythmSchema, type Rhythm, type SuggestionRow } from '@api/rhythmsSchema';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
 import { LOWERCASE_DAYS } from '../days';
@@ -9,7 +9,7 @@ import {
   newRhythmId, rhythmDetail, rhythmOptions, rhythmsNotice, rhythmTimes, rhythmUsage, setDateChange, setWeekDays,
   MAX_CHANGE_DAYS_AHEAD, MAX_NAME_LENGTH, MAX_RHYTHMS_PER_SIDE, conversionDifference, datePickMessage, datesPickMessage,
   deleteMessage, restoreDates, restoreDeleted, restoreWeekDays, rhythmName, setDateChanges, upcomingChanges, usageSubject,
-  weekLabel, weekPickMessage, weekRuns, withOffWhenUp,
+  weekLabel, weekPickMessage, weekRuns, withOffWhenUp, applySuggestion, restoreRhythm, suggestionStart, withRows,
 } from './rhythmsModel';
 
 const left = createDemoRhythms(new Date('2026-09-28T19:00:00Z')).left;
@@ -225,4 +225,86 @@ it('stores "When I get up" only when on', () => {
   const off = withOffWhenUp(on, false);
   expect(off).toEqual(DEFAULT_SMART);
   expect('offWhenUp' in off).toBe(false);
+});
+
+const right = createDemoRhythms(new Date('2026-10-12T19:00:00Z')).right;
+const offDays = right.rhythms['off-days'];
+const evidence = { supporting: 9, firstNight: '2026-10-01', lastNight: '2026-10-11', supportingDates: ['2026-10-01', '2026-10-11'] };
+const onRow: SuggestionRow = {
+  kind: 'on', key: 'on:down', direction: 'down', ...evidence, temperatureF: 80, plannedF: 82,
+  thenBack: { time: '01:00', temperatureF: 82, supporting: 7 },
+};
+const replaceRow: SuggestionRow = {
+  kind: 'step', key: 'step:down', direction: 'down', ...evidence, time: '03:00', replaces: '03:00', temperatureF: 77, plannedF: 79,
+};
+const lateRow: SuggestionRow = { kind: 'step', key: 'step:up', direction: 'up', ...evidence, time: '05:00', temperatureF: 84, plannedF: 79 };
+
+it('writes each kind of row, the return included', () => {
+  expect(withRows(offDays, [onRow]).night).toMatchObject({ power: { onTemperature: 80 }, temperatures: { '01:00': 82, '03:00': 79 } });
+  expect(withRows(offDays, [replaceRow]).night.temperatures).toEqual({ '03:00': 77 });
+  const workday = createDemoRhythms(new Date('2026-10-12T19:00:00Z')).left.rhythms.workday;
+  const base: SuggestionRow = { kind: 'base', key: 'base:down', direction: 'down', ...evidence, baseLevel: -2, currentBaseLevel: -1 };
+  expect(withRows(workday, [base]).smart.baseLevel).toBe(-2);
+  expect(offDays.night.temperatures).toEqual({ '03:00': 79 });
+});
+
+it('adds any subset of a three-row suggestion as one valid side', () => {
+  const rows = [onRow, replaceRow, lateRow];
+  for (let mask = 1; mask < 8; mask++) {
+    const picked = rows.filter((_, index) => mask & (1 << index));
+    const side = applySuggestion(right, 'off-days', picked);
+    const next = side.rhythms['off-days'];
+    expect(RhythmSchema.safeParse(next).success).toBe(true);
+    expect(next.night.power.onTemperature).toBe(picked.includes(onRow) ? 80 : 82);
+    expect(next.night.temperatures).toEqual({
+      '03:00': picked.includes(replaceRow) ? 77 : 79,
+      ...(picked.includes(onRow) ? { '01:00': 82 } : {}),
+      ...(picked.includes(lateRow) ? { '05:00': 84 } : {}),
+    });
+    expect(side.rhythms['night-shift']).toBe(right.rhythms['night-shift']);
+  }
+  expect(applySuggestion(right, 'gone', rows)).toBe(right);
+});
+
+it('puts a rhythm back as it was, unless it is gone', () => {
+  const changed = applySuggestion(right, 'off-days', [lateRow]);
+  expect(restoreRhythm(changed, right, 'off-days').rhythms['off-days']).toEqual(offDays);
+  const deleted = { ...changed, rhythms: Object.fromEntries(Object.entries(changed.rhythms).filter(([id]) => id !== 'off-days')) };
+  expect(restoreRhythm(deleted, right, 'off-days')).toBe(deleted);
+});
+
+it('finds the night a suggestion starts', () => {
+  const sleep = (date: string, start: string, end: string) => ({ rhythmId: 'off-days', date, start, end }) as ResolvedSleepResponse;
+  const sleeps = [
+    sleep('2026-10-16', '2026-10-16T23:00:00Z', '2026-10-17T07:00:00Z'),
+    sleep('2026-10-18', '2026-10-18T23:00:00Z', '2026-10-19T07:00:00Z'),
+  ];
+  const now = new Date('2026-10-17T01:00:00Z');
+  const early: SuggestionRow = { ...lateRow, time: '23:45' };
+  expect(suggestionStart(sleeps, offDays, [early, lateRow], now, '2026-10-17', 'UTC')).toEqual({ kind: 'date', date: '2026-10-18' });
+  expect(suggestionStart(sleeps, offDays, [lateRow], now, '2026-10-17', 'UTC')).toEqual({ kind: 'tonight' });
+  expect(suggestionStart(sleeps, offDays, [onRow], new Date('2026-10-18T12:00:00Z'), '2026-10-18', 'UTC')).toEqual({ kind: 'tonight' });
+  expect(suggestionStart([], offDays, [lateRow], now, '2026-10-17', 'UTC')).toEqual({ kind: 'none' });
+});
+
+it('names the time for a daytime rhythm', () => {
+  const shift = right.rhythms['night-shift'];
+  const day = [
+    { rhythmId: 'night-shift', date: '2026-10-17', start: '2026-10-17T08:00:00Z', end: '2026-10-17T15:30:00Z' },
+  ] as ResolvedSleepResponse[];
+  const noon: SuggestionRow = { ...lateRow, time: '12:00' };
+  expect(suggestionStart(day, shift, [noon], new Date('2026-10-17T06:00:00Z'), '2026-10-17', 'UTC')).toEqual({ kind: 'today', at: '08:00' });
+  expect(suggestionStart(day, shift, [noon], new Date('2026-10-17T09:00:00Z'), '2026-10-17', 'UTC')).toEqual({ kind: 'today', at: '12:00' });
+});
+
+it('waits for a pause the change would fall in', () => {
+  const sleeps = [
+    { rhythmId: 'off-days', date: '2026-10-16', start: '2026-10-16T23:00:00Z', end: '2026-10-17T07:00:00Z' },
+  ] as ResolvedSleepResponse[];
+  const startWith = (pause?: Date | null) =>
+    suggestionStart(sleeps, offDays, [lateRow], new Date('2026-10-17T01:00:00Z'), '2026-10-17', 'UTC', pause);
+  expect(startWith(new Date('2026-10-17T07:00:00Z'))).toEqual({ kind: 'paused' });
+  expect(startWith(null)).toEqual({ kind: 'paused' });
+  expect(startWith(new Date('2026-10-17T02:00:00Z'))).toEqual({ kind: 'tonight' });
+  expect(startWith()).toEqual({ kind: 'tonight' });
 });

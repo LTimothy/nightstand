@@ -1,8 +1,12 @@
 import moment from 'moment-timezone';
 import type { DailySchedule, DayOfWeek } from '@api/schedulesSchema';
-import { MAX_RHYTHMS_PER_SIDE, type DateChange, type Rhythm, type SideRhythms, type SmartSchedule } from '@api/rhythmsSchema';
+import {
+  MAX_RHYTHMS_PER_SIDE, type DateChange, type Rhythm, type SideRhythms, type SmartSchedule, type SuggestionRow,
+} from '@api/rhythmsSchema';
 import { describeDays, fullDayName } from '@api/rhythmDays';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
+import { minutesAfterOn } from '@api/rhythmWake';
+import { isDaySleep } from '@api/smartCurve';
 import { LOWERCASE_DAYS } from '../days';
 
 export const MAX_NAME_LENGTH = 24;
@@ -11,6 +15,8 @@ export const NO_SLEEP = 'No sleep scheduled';
 
 export type DateChoice = { kind: 'rhythm'; id: string } | { kind: 'none' } | { kind: 'weekly' };
 export type PickerOption = { choice: DateChoice; label: string; detail?: string };
+export type SuggestionStart =
+  { kind: 'tonight' } | { kind: 'today'; at: string } | { kind: 'date'; date: string } | { kind: 'paused' } | { kind: 'none' };
 export type RhythmUsage = { days: DayOfWeek[]; dates: string[] };
 
 // Stored only when on, so a rhythm without it saves exactly as before.
@@ -22,7 +28,7 @@ export function withOffWhenUp(smart: SmartSchedule, on: boolean): SmartSchedule 
 
 const DATE = 'YYYY-MM-DD';
 // The app's TypeScript lib predates Object.hasOwn.
-const hasOwn = (object: object, key: string) => Object.prototype.hasOwnProperty.call(object, key);
+export const hasOwn = (object: object, key: string) => Object.prototype.hasOwnProperty.call(object, key);
 const clock = (time: string) => moment(time, 'HH:mm').format('h:mm A');
 
 export { MAX_RHYTHMS_PER_SIDE };
@@ -296,4 +302,51 @@ export function rhythmsNotice(reason: string | undefined): string {
   default:
     return 'Rhythms is not running, so the weekly schedule is in use. Your rhythms are kept.';
   }
+}
+
+// Each row is an absolute write, so any subset of a suggestion is itself a valid change.
+export function withRows(rhythm: Rhythm, rows: SuggestionRow[]): Rhythm {
+  const next = structuredClone(rhythm);
+  for (const row of rows) {
+    if (row.kind === 'base') {
+      next.smart.baseLevel = row.baseLevel;
+      continue;
+    }
+    if (row.kind === 'on') next.night.power.onTemperature = row.temperatureF;
+    else next.night.temperatures[row.time] = row.temperatureF;
+    if (row.thenBack) next.night.temperatures[row.thenBack.time] = row.thenBack.temperatureF;
+  }
+  return next;
+}
+
+export function applySuggestion(side: SideRhythms, rhythmId: string, rows: SuggestionRow[]): SideRhythms {
+  if (!hasOwn(side.rhythms, rhythmId)) return side;
+  return { ...side, rhythms: { ...side.rhythms, [rhythmId]: withRows(side.rhythms[rhythmId], rows) } };
+}
+
+export function restoreRhythm(side: SideRhythms, before: SideRhythms, id: string): SideRhythms {
+  if (!hasOwn(side.rhythms, id) || !hasOwn(before.rhythms, id)) return side;
+  return { ...side, rhythms: { ...side.rhythms, [id]: before.rhythms[id] } };
+}
+
+// The first sleep of the rhythm whose earliest change is still ahead; the power-on for an on or base row.
+// `pausedUntil` is the side's pause end: null for a pause with no end, undefined when the side is not paused.
+export function suggestionStart(
+  sleeps: ResolvedSleepResponse[], rhythm: Rhythm, rows: SuggestionRow[], now: Date, today: string, timeZone: string,
+  pausedUntil?: Date | null,
+): SuggestionStart {
+  if (pausedUntil === null) return { kind: 'paused' };
+  const lead = Math.min(...rows.map(row => (row.kind === 'step' ? minutesAfterOn(row.time, rhythm.night.power.on) : 0)));
+  const sleep = sleeps.filter(candidate => candidate.rhythmId === rhythm.id)
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
+    .find(candidate => Date.parse(candidate.start) + lead * 60_000 > now.getTime());
+  if (!sleep) return { kind: 'none' };
+  const start = Date.parse(sleep.start);
+  // The pause end is exclusive, as in isSchedulePaused: a change due exactly then runs.
+  if (pausedUntil && start + lead * 60_000 < pausedUntil.getTime()) return { kind: 'paused' };
+  const running = start <= now.getTime() && now.getTime() < Date.parse(sleep.end);
+  if (sleep.date !== today && !running) return { kind: 'date', date: sleep.date };
+  if (!isDaySleep(new Date(start), new Date(sleep.wake ?? sleep.end), timeZone)) return { kind: 'tonight' };
+  // A daytime rhythm names its time: the power-on, or once it runs, the first change still ahead.
+  return { kind: 'today', at: moment.tz(running ? start + lead * 60_000 : start, timeZone).format('HH:mm') };
 }
