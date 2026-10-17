@@ -243,10 +243,11 @@ planned. Changes from the cover and from other apps on your network count
 too. After 5 nights, a change made the same way on half or more of a
 rhythm's last 14 nights shows on the Schedule page with the nights behind
 it, and one action adds it to the rhythm. Nothing changes until you add it.
-Each rhythm's card on the Schedule page draws the schedule over the last 14
-nights as the bed was set, so you can see the changes you make by hand
-against the plan. For that, Nightstand also writes down what the schedule
-set during each rhythm night.
+Each rhythm's card on the Schedule page draws its schedule and, where a
+typical night of the last 14 differs from it, what the bed was set to
+instead, with one sentence saying what most nights did. For that,
+Nightstand also writes down what the schedule set during each rhythm
+night.
 
 The notes stay on the Pod for 90 days. Delete notes in Settings removes
 them. Neither the notes nor the Smart Schedule history is part of a backup,
