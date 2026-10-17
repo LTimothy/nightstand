@@ -9,8 +9,8 @@ import { server } from '@test/setup';
 import api, { HARDWARE_REQUEST_TIMEOUT_MS } from './api';
 import { validateResponse } from './responseValidation';
 import {
-  disableRhythms, enableRhythms, postNightExclude, postRhythms, postSuggestionsForget, refreshRhythms, rhythmsSaveMessage,
-  RhythmsUpdateSchema, useResolvedSleeps, useRhythmsState, useSuggestions,
+  disableRhythms, enableRhythms, postNightExclude, postRhythms, postSuggestionDismiss, postSuggestionRestore, postSuggestionsForget,
+  refreshRhythms, rhythmsSaveMessage, RhythmsUpdateSchema, useResolvedSleeps, useRhythmsState, useSuggestions,
 } from './rhythms';
 import type { SuggestionsResponse } from './rhythmsSchema';
 import type { ResolvedSleepResponse } from './rhythmsResponse';
@@ -260,4 +260,25 @@ it('reads the notes item by item, dropping a bad night or dismissed entry', () =
   }) as { log: Array<{ date: string }>; dismissed: Array<{ id: string }> };
   expect(read.log.map(item => item.date)).toEqual(['2026-10-09', '2026-10-12']);
   expect(read.dismissed.map(item => item.id)).toEqual(['0123456789ab', 'ba9876543210']);
+});
+
+it('hides a suggestion, keeps the ids, and restores them', async () => {
+  const posted: Array<[string, unknown]> = [];
+  server.use(
+    http.post('*/rhythms/suggestions/dismiss', async ({ request }) => {
+      posted.push(['dismiss', await request.json()]);
+      return HttpResponse.json({ ids: ['a1b2c3d4e5f6'] });
+    }),
+    http.post('*/rhythms/suggestions/restore', async ({ request }) => {
+      posted.push(['restore', await request.json()]);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  const ids = await postSuggestionDismiss({ scope: 'plan', side: 'right', rhythmId: 'off-days', rows: [{ key: 'step:down', time: '23:45' }] });
+  expect(ids).toEqual(['a1b2c3d4e5f6']);
+  await postSuggestionRestore({ side: 'right', ids });
+  expect(posted).toEqual([
+    ['dismiss', { scope: 'plan', side: 'right', rhythmId: 'off-days', rows: [{ key: 'step:down', time: '23:45' }] }],
+    ['restore', { side: 'right', ids: ['a1b2c3d4e5f6'] }],
+  ]);
 });

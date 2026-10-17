@@ -6,7 +6,8 @@ import { serverMessage } from '@lib/requestError';
 import axios, { HARDWARE_REQUEST_TIMEOUT_MS } from './api';
 import { useSettings } from './settings';
 import {
-  IsoDateSchema, NightExcludeSchema, RhythmsUpdateSchema, type NightExclude, type RhythmsUpdate, type SuggestionsResponse,
+  IsoDateSchema, NightExcludeSchema, RhythmsUpdateSchema, SuggestionDismissResponseSchema, SuggestionDismissSchema, SuggestionRestoreSchema,
+  type NightExclude, type RhythmsUpdate, type SuggestionDismiss, type SuggestionsResponse,
 } from './rhythmsSchema';
 import {
   EnableResponseSchema, HandoffReportSchema, type HandoffReport, type ResolvedSleepResponse, type RhythmsLive, type RhythmsResponse,
@@ -51,6 +52,15 @@ export const useSuggestions = (side: 'left' | 'right', enabled: boolean) => useQ
 export const postNightExclude = (body: NightExclude) => axios.post('/rhythms/suggestions/exclude', NightExcludeSchema.parse(body));
 
 export const postSuggestionsForget = () => axios.post('/rhythms/suggestions/forget', {});
+
+// The ids let the undo bring back exactly what was hidden.
+export async function postSuggestionDismiss(body: SuggestionDismiss): Promise<string[]> {
+  const response = await axios.post('/rhythms/suggestions/dismiss', SuggestionDismissSchema.parse(body));
+  return SuggestionDismissResponseSchema.parse(response.data).ids;
+}
+
+export const postSuggestionRestore = (body: { side: 'left' | 'right'; ids: string[] }) =>
+  axios.post('/rhythms/suggestions/restore', SuggestionRestoreSchema.parse(body));
 
 export type RhythmsState = 'unknown' | 'off' | 'loading' | 'error' | 'active' | 'inactive';
 
