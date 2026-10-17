@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
-import { existsSync, mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer } from 'node:http';
@@ -167,6 +167,7 @@ describe('suggestions from the notes', () => {
     it('suggests a change made on enough nights, and offers a near miss below the gate', async () => {
         seed([...habit('right', 6, [0, 1, 2, 3, 4, 5]), ...habit('left', 7, [2, 4, 6])]);
         const right = (await get('?side=right')).body;
+        assert.equal(SuggestionsResponseSchema.safeParse(right).success, true);
         assert.equal(right.nights[HAND.id].reason, 'suggested');
         assert.deepEqual(right.suggestions.map((entry) => [entry.near, entry.rows.map(row => [row.time, row.temperatureF])]), [[false, [['23:30', 79]]]]);
         const left = (await get('?side=left')).body;
@@ -208,6 +209,15 @@ describe('POST /rhythms/suggestions/dismiss and /restore', () => {
         await updateSettings(draft => { draft.features.rhythmSuggestions = false; });
         assert.equal((await post('dismiss', { side: 'right', rhythmId: HAND.id, scope: 'later' })).status, 409);
         assert.equal((await post('restore', { side: 'left', ids: body.ids })).status, 409);
+    });
+    it('stores only the ids that matched a hide, one line per rhythm', async () => {
+        seed(twoRows());
+        const { body } = await post('dismiss', { side: 'right', rhythmId: HAND.id, scope: 'later' });
+        assert.equal((await post('restore', { side: 'right', ids: [...body.ids, '0123456789ab'] })).status, 204);
+        await flushHandChanges();
+        const restores = readFileSync(changesPath(), 'utf8').trim().split('\n').map(text => JSON.parse(text))
+            .filter(line => line.kind === 'restore');
+        assert.deepEqual(restores.map(line => [line.rhythmId, line.ids]), [[HAND.id, body.ids]]);
     });
     it('never writes the stored files', async () => {
         seed(twoRows());

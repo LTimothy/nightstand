@@ -491,13 +491,13 @@ export class CurveController {
             state.hold = null;
             const level = levelAt(state.points, now);
             if (level !== null)
-                await this.apply(state, level, 'manual hold ended');
+                await this.apply(state, level, 'manual hold ended', 'hold-end');
         }
         if (state.hold)
             return;
         if (state.smart.upEarly && !state.upEarlyAt && upEarlyDue(run, state.wake, time)) {
             state.upEarlyAt = now;
-            await this.apply(state, state.smart.baseLevel, 'up early');
+            await this.apply(state, state.smart.baseLevel, 'up early', 'base');
             return;
         }
         const wake = state.wake.getTime();
@@ -506,7 +506,7 @@ export class CurveController {
             && time >= wake && time < wake + AFTER_WAKE_MS && wake < state.powerOff.getTime();
         if (outOfBed) {
             state.outOfBedAt = now;
-            await this.apply(state, state.smart.baseLevel, 'out of bed after wake');
+            await this.apply(state, state.smart.baseLevel, 'out of bed after wake', 'base');
         }
     }
     countExits(state, snapshot, sides, time) {
@@ -524,10 +524,10 @@ export class CurveController {
             state.lastSeen[side] = { ...current };
         }
     }
-    async apply(state, level, why) {
+    async apply(state, level, why, reason) {
         logger.info(`smart schedule ${state.side} ${state.date}: level ${level} (${why})`);
         try {
-            await this.deps.applyLevel(state.side, level);
+            await this.deps.applyLevel(state.side, level, reason);
         }
         catch (error) {
             const message = error instanceof Error ? error.message : String(error);

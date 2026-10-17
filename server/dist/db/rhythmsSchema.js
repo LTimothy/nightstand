@@ -146,6 +146,11 @@ export const NightLogSchema = z.object({
         .max(MAX_TEMPERATURES_PER_DAY + 1),
     endMin: z.number().int().min(1),
     changes: z.array(NightChangeSchema),
+    // The night as the bed ran it, for the rhythm card; optional, so an older answer still reads.
+    start: InstantSchema.optional(),
+    samePlan: z.boolean().optional(),
+    sets: z.array(z.object({ at: InstantSchema, temperatureF: TemperatureSchema.nullable() }).strict())
+        .max(2 * MAX_TEMPERATURES_PER_DAY).optional(),
 }).strict();
 export const DismissIdSchema = z.string().regex(/^[0-9a-f]{12}$/);
 export const DismissedSchema = z.object({

@@ -60,6 +60,8 @@ describe('suggestion shapes', () => {
     const night = {
         date: '2026-10-10', rhythmId: 'off-days', tonight: false, excluded: false,
         plan: [{ offsetMin: 0, temperatureF: 82 }], endMin: 480,
+        start: '2026-10-10T23:00:00.000Z', samePlan: true,
+        sets: [{ at: '2026-10-10T23:00:00.000Z', temperatureF: 82 }, { at: '2026-10-11T07:00:00.000Z', temperatureF: null }],
         changes: [{ at: '2026-10-11T00:31:00.000Z', fromF: 82, targetF: 79, plannedF: 82, held: false, source: 'api' }],
     };
     const response = {

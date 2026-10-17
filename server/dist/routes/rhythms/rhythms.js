@@ -252,7 +252,14 @@ router.post('/rhythms/suggestions/restore', async (req, res) => {
         res.status(404).json({ error: 'Nothing is hidden with those ids' });
         return;
     }
-    await appendNoteLines([{ v: 1, kind: 'restore', at: new Date().toISOString(), side, rhythmId: hidden[0].rhythmId, ids }]);
+    // Only ids that matched a hide, one line per rhythm, so a restore line is pruned with its own rhythm.
+    const byRhythm = new Map();
+    for (const line of hidden)
+        byRhythm.set(line.rhythmId, [...(byRhythm.get(line.rhythmId) ?? []), line.id]);
+    const at = new Date().toISOString();
+    await appendNoteLines([...byRhythm].map(([rhythmId, matched]) => ({
+        v: 1, kind: 'restore', at, side, rhythmId, ids: matched,
+    })));
     res.status(204).end();
 });
 export default router;

@@ -188,6 +188,45 @@ describe('night line', () => {
             ['exclude', 'off-days', at(89)], ['dismiss', 'off-days', at(200)], ['night', 'off-days', IN_NIGHT.toISOString()],
         ]);
     });
+    it('prunes set lines after 90 days, like changes', async () => {
+        const line = (at) => ({
+            v: 1, kind: 'set', at, side: 'left', rhythmId: 'off-days', planKey: 'aaaaaaaaaaaa', date: at.slice(0, 10), targetF: 80, reason: 'step',
+        });
+        const old = '2026-06-01T00:00:00.000Z';
+        const recent = '2026-09-30T00:00:00.000Z';
+        writeFileSync(notes.changesPath(), [line(old), line(recent)].map(entry => JSON.stringify(entry)).join('\n'));
+        notes.recordNight('left', sleepAt(IN_NIGHT), IN_NIGHT);
+        await notes.flushHandChanges();
+        assert.deepEqual(fileLines().map(entry => [entry.kind, entry.at]), [['set', recent], ['night', IN_NIGHT.toISOString()]]);
+    });
+});
+describe('what the scheduler set', () => {
+    it('writes one set line with the sleep\'s plan key, whole degrees, and null for off', async () => {
+        const sleep = sleepAt(IN_NIGHT);
+        notes.recordSet('left', sleep, 78.6, 'step', IN_NIGHT);
+        notes.recordSet('left', sleep, null, 'off', IN_NIGHT);
+        notes.recordSet('left', null, 80, 'hold-end', IN_NIGHT);
+        await notes.flushHandChanges();
+        assert.deepEqual(fileLines(), [
+            { v: 1, kind: 'set', at: IN_NIGHT.toISOString(), side: 'left', rhythmId: 'off-days', planKey: notes.rhythmPlanKey(HAND),
+                date: sleep.date, targetF: 79, reason: 'step' },
+            { v: 1, kind: 'set', at: IN_NIGHT.toISOString(), side: 'left', rhythmId: 'off-days', planKey: notes.rhythmPlanKey(HAND),
+                date: sleep.date, targetF: null, reason: 'off' },
+            { v: 1, kind: 'set', at: IN_NIGHT.toISOString(), side: 'left', rhythmId: 'off-days', planKey: notes.rhythmPlanKey(HAND),
+                date: sleep.date, targetF: 80, reason: 'hold-end' },
+        ]);
+    });
+    it('writes nothing with the feature off, while paused, or outside a Rhythms sleep', async () => {
+        settingsDB.data.features.rhythmSuggestions = false;
+        notes.recordSet('left', sleepAt(IN_NIGHT), 79, 'step', IN_NIGHT);
+        settingsDB.data.features.rhythmSuggestions = true;
+        settingsDB.data.left.scheduleOverrides.pause = { active: true, expiresAt: '' };
+        notes.recordSet('left', sleepAt(IN_NIGHT), 79, 'step', IN_NIGHT);
+        settingsDB.data.left.scheduleOverrides.pause = { active: false, expiresAt: '' };
+        notes.recordSet('left', null, 79, 'base', new Date('2026-10-01T15:00:00.000Z'));
+        await notes.flushHandChanges();
+        assert.deepEqual(fileLines(), []);
+    });
 });
 describe('hand change', () => {
     const change = (over = {}) => ({

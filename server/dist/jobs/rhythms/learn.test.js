@@ -46,6 +46,18 @@ describe('note lines', () => {
         assert.equal(parseLine(JSON.stringify({ ...change(0, 60, 82, 79), targetF: 'cold' })), null);
     });
 });
+describe('note lines', () => {
+    it('reads what the scheduler set, with null for a power-off and any reason', () => {
+        const set = {
+            v: 1, kind: 'set', at: '2026-09-02T02:00:00.000Z', side: 'right', rhythmId: 'off-days', planKey: KEY, date: dateOf(0),
+            targetF: 79, reason: 'step',
+        };
+        assert.deepEqual(parseLine(JSON.stringify(set)), set);
+        assert.equal(parseLine(JSON.stringify({ ...set, targetF: null, reason: 'off' }))?.kind, 'set');
+        assert.equal(parseLine(JSON.stringify({ ...set, reason: 'a-later-one' }))?.kind, 'set');
+        assert.equal(parseLine(JSON.stringify({ ...set, targetF: 120 })), null);
+    });
+});
 describe('note line bounds', () => {
     it('skips a change line with a temperature outside 55 to 110', () => {
         assert.equal(parseLine(JSON.stringify(change(0, 60, 82, 200))), null);
@@ -547,6 +559,54 @@ describe('near misses', () => {
     it('can be a Smart base', () => {
         const lines = [...nights(7, SMART), ...[2, 4, 6].map(night => smartChange(night, 'hold', 74))];
         assert.deepEqual(nearOf(lines, 7, SMART)?.rows.map(row => row.kind === 'base' && row.baseLevel), [-1]);
+    });
+});
+describe('the nights a rhythm card draws', () => {
+    const set = (night, offsetMin, targetF, reason = 'step', planKey = KEY) => ({
+        v: 1, kind: 'set', at: new Date(FIRST + night * DAY + offsetMin * MINUTE).toISOString(), side: 'right', rhythmId: HAND.id,
+        planKey, date: dateOf(night), targetF, reason,
+    });
+    it('lists the last 14 ended nights under any plan beside the counted ones, and marks which ran the saved plan', () => {
+        const lines = [...nights(10, HAND, OTHER_KEY), ...Array.from({ length: 6 }, (_, k) => nightLine(10 + k))];
+        const { log, nights: counts } = learnSuggestions(lines, [planned()], afterNight(15));
+        assert.equal(counts[HAND.id].counted, 6);
+        assert.deepEqual(log.map(night => night.date), range(2, 16).map(dateOf).reverse());
+        assert.deepEqual(log.map(night => night.samePlan), [...Array(6).fill(true), ...Array(8).fill(false)]);
+        assert.deepEqual(log.at(-1)?.plan, []);
+        assert.equal(log.at(-1)?.changes.length, 0);
+    });
+    it('keeps a counted night older than the last 14 ended nights when left out nights pushed it back', () => {
+        const lines = [...nights(16), exclude(14, true), exclude(15, true)];
+        const { log } = learnSuggestions(lines, [planned()], afterNight(15));
+        assert.deepEqual(log.map(night => night.date), range(0, 16).map(dateOf).reverse());
+        assert.deepEqual(log.filter(night => night.excluded).map(night => night.date), [dateOf(15), dateOf(14)]);
+    });
+    it('gives a night its start and what the scheduler set, in time order, and a night under another plan its changes', () => {
+        const lines = [
+            nightLine(0), set(0, 240, 79), set(0, 0, 82, 'on'), set(0, 480, null, 'off'),
+            nightLine(1, HAND, OTHER_KEY), change(1, 60, 82, 79, { planKey: OTHER_KEY }), set(1, 0, 82, 'on', OTHER_KEY),
+        ];
+        const { log } = learnSuggestions(lines, [planned()], afterNight(1));
+        const [other, first] = log;
+        assert.equal(first.start, sleepOf(0).sleepStart);
+        assert.deepEqual(first.sets, [
+            { at: set(0, 0, 82).at, temperatureF: 82 }, { at: set(0, 240, 79).at, temperatureF: 79 }, { at: set(0, 480, null).at, temperatureF: null },
+        ]);
+        assert.equal(other.samePlan, false);
+        assert.equal(other.changes.length, 1);
+        assert.deepEqual(other.sets, [{ at: set(1, 0, 82).at, temperatureF: 82 }]);
+        assert.equal(log.find(night => night.sets === undefined), undefined);
+    });
+    it('describes a night edited mid-way by the current plan when both plans wrote the same end', () => {
+        const lines = [nightLine(0, HAND, OTHER_KEY), nightLine(0)];
+        const { log } = learnSuggestions(lines, [planned()], afterNight(0));
+        assert.equal(log[0].samePlan, true);
+        assert.equal(log[0].plan[0].temperatureF, 82);
+    });
+    it('leaves sets out of a night without any', () => {
+        const [night] = learnSuggestions(nights(1), [planned()], afterNight(0)).log;
+        assert.equal(night.sets, undefined);
+        assert.equal(night.samePlan, true);
     });
 });
 //# sourceMappingURL=learn.test.js.map
