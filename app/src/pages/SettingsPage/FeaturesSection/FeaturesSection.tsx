@@ -6,9 +6,11 @@ import RawArchiveRetention from '../DeviceSettingsSection/RawArchiveRetention';
 import FeatureToggleRow from './FeatureToggleRow.tsx';
 import DisableRhythmsDialog from './DisableRhythmsDialog.tsx';
 import EnableRhythmsDialog from './EnableRhythmsDialog.tsx';
+import DeleteNotesDialog from './DeleteNotesDialog.tsx';
 import CoverButtonOptions from './CoverButtonOptions.tsx';
 import { coverButtonsPath, POD5_HUB_GESTURES } from './coverButtons.ts';
 import { GESTURE_LABELS } from '../tapActions.ts';
+import { DELETE_NOTES, FEATURE_TITLE, featureDescription } from '../../SchedulePage/rhythms/suggestionsCopy';
 import { Services, useServices, postServices } from '@api/services.ts';
 import { useSettings, postSettings } from '@api/settings.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
@@ -43,6 +45,7 @@ export default function FeaturesSection() {
   const setIsUpdating = useAppStore((state) => state.setIsUpdating);
   const isUpdating = useAppStore((state) => state.isUpdating);
   const [rhythmsDialog, setRhythmsDialog] = useState<'enable' | 'disable'>();
+  const [deleteNotes, setDeleteNotes] = useState(false);
   const [rhythmsMessage, setRhythmsMessage] = useState<{ text: string; severity: 'success' | 'warning' }>();
 
   const updateServices = (services: DeepPartial<Services>) => {
@@ -245,6 +248,7 @@ export default function FeaturesSection() {
         settings={ settings }
         disabled={ isUpdating }
         save={ saveSettings }/> }
+      <Box id="rhythms" />
       <FeatureToggleRow
         label="Rhythms (beta)"
         ariaLabel="Rhythms"
@@ -257,6 +261,18 @@ export default function FeaturesSection() {
         description={ 'Plan sleep by day and date, with an optional smart temperature curve. '
           + 'Your weekly schedule is kept and comes back if you turn this off.' }
       />
+      <Box sx={ { pl: 2, borderLeft: 1, borderColor: 'divider' } }>
+        <FeatureToggleRow
+          label={ FEATURE_TITLE }
+          disabled={ isUpdating || features?.rhythmSuggestions === undefined || !features?.rhythms }
+          checked={ features?.rhythmSuggestions ?? false }
+          onChange={ next => updateFeature({ rhythmSuggestions: next }) }
+          description={ !features?.rhythms
+            ? <Link href="#rhythms" sx={ { display: 'inline-flex', minHeight: 44, alignItems: 'center' } }>Needs Rhythms</Link>
+            : featureDescription() }
+        />
+        <Button onClick={ () => setDeleteNotes(true) } sx={ { minHeight: 44, px: 0 } }>{ DELETE_NOTES }</Button>
+      </Box>
       { rhythmsMessage && <Alert severity={ rhythmsMessage.severity } onClose={ () => setRhythmsMessage(undefined) }>
         { rhythmsMessage.text }
       </Alert> }
@@ -266,6 +282,7 @@ export default function FeaturesSection() {
       { rhythmsDialog === 'disable' && <DisableRhythmsDialog
         onClose={ () => setRhythmsDialog(undefined) }
         onDone={ (text, severity) => setRhythmsMessage({ text, severity }) }/> }
+      { deleteNotes && <DeleteNotesDialog onClose={ () => setDeleteNotes(false) }/> }
     </Section>
   );
 }

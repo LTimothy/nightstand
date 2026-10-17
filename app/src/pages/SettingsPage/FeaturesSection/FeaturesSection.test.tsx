@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { QueryClient } from '@tanstack/react-query';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
 import { getDeviceStatus, getServices, getSettings, mockCalibration } from '../../../mocks/mockData';
@@ -271,4 +271,50 @@ it.each([
   expect(toggle).not.toBeChecked();
   await user.click(toggle);
   await waitFor(() => expect(posted).toEqual({ features: { [flag]: true } }));
+});
+
+describe('Suggestions from your changes', () => {
+  it('needs Rhythms first', async () => {
+    renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: 'Suggestions from your changes' });
+    expect(toggle).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Needs Rhythms' })).toHaveAttribute('href', '#rhythms');
+    expect(document.getElementById('rhythms')).not.toBeNull();
+  });
+
+  it('saves its flag once Rhythms is on', async () => {
+    let posted: unknown;
+    server.use(
+      http.get('*/api/settings', () => HttpResponse.json({ ...getSettings(), features: { ...getSettings().features, rhythms: true } })),
+      http.post('*/api/settings', async ({ request }) => { posted = await request.json(); return HttpResponse.json({}); }),
+    );
+    const { user } = renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: 'Suggestions from your changes' });
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(screen.getByText(/A change you repeat on half or more of your nights is suggested on Schedule/)).toBeInTheDocument();
+    await user.click(toggle);
+    await waitFor(() => expect(posted).toEqual({ features: { rhythmSuggestions: true } }));
+  });
+
+  it('deletes the notes after asking, with the feature off too', async () => {
+    let forgot = 0;
+    server.use(http.post('*/rhythms/suggestions/forget', () => { forgot += 1; return new HttpResponse(null, { status: 204 }); }));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    await user.click(await screen.findByRole('button', { name: 'Delete notes' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete notes for both sides? Counting restarts tonight.' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(forgot).toBe(0);
+    await user.click(screen.getByRole('button', { name: 'Delete notes' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete notes' }));
+    await waitFor(() => expect(forgot).toBe(1));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('says when the notes could not be deleted', async () => {
+    server.use(http.post('*/rhythms/suggestions/forget', () => HttpResponse.json({ error: 'nope' }, { status: 500 })));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    await user.click(await screen.findByRole('button', { name: 'Delete notes' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete notes' }));
+    expect(await screen.findByText('Could not delete notes. Try again.')).toBeInTheDocument();
+  });
 });

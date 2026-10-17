@@ -50,6 +50,7 @@ export default function SettingsPage() {
     biometricsEnabled && settings?.features?.biometricsV2,
     settings?.features?.levelTemps, settings?.features?.oneOffAlarms, biometricsInstalled && biometricsEnabled,
     settings?.features?.coverButtons, settings?.features?.rhythms,
+    settings?.features?.rhythms && settings?.features?.rhythmSuggestions,
     settings?.features?.metricsRetention, settings?.features?.metricsLowDiskProtection,
     biometricsEnabled && settings?.features?.firmwareTargetReadout,
     biometricsEnabled && settings?.features?.firmwareHealth,
