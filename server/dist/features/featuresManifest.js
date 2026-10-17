@@ -974,8 +974,9 @@ export const FEATURES_MANIFEST = [
     {
         id: 'rhythm-suggestions',
         title: 'Suggestions from your changes',
-        description: 'Notes temperature changes made by hand during a rhythm and suggests one repeated on half or more of the '
-            + 'last nights. Nothing changes until it is added.',
+        description: 'Notes temperature changes made by hand during a rhythm, shows on each rhythm\'s card where a typical night '
+            + 'differs from its schedule, and suggests a change repeated on half or more of the last nights. Nothing '
+            + 'changes until it is added.',
         category: 'platform',
         version: '3.7.0',
         flag: 'rhythmSuggestions',
