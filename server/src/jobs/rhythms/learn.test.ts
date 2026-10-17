@@ -7,7 +7,8 @@ import { nightOf, rhythmOf } from './rhythmsTestData.js';
 import {
   clusterEpisodes, coalesceEpisodes, collapseNights, learnSuggestions, majority, parseLine, placeManual, placeSmart, rhythmEvidence,
   suggestedTime,
-  type ChangeLine, type DismissLine, type ExcludeLine, type Line, type NightLine, type Gate, type PlannedRhythm, type RestoreLine, type Vote,
+  type ChangeLine, type DismissLine, type ExcludeLine, type Line, type NightLine, type Gate, type PlannedRhythm, type RestoreLine, type SetLine,
+  type Vote,
 } from './learn.js';
 
 const MINUTE = 60_000;
@@ -666,5 +667,52 @@ describe('near misses', () => {
   it('can be a Smart base', () => {
     const lines = [...nights(7, SMART), ...[2, 4, 6].map(night => smartChange(night, 'hold', 74))];
     assert.deepEqual(nearOf(lines, 7, SMART)?.rows.map(row => row.kind === 'base' && row.baseLevel), [-1]);
+  });
+});
+
+describe('the nights a rhythm card draws', () => {
+  const set = (night: number, offsetMin: number, targetF: number | null, reason = 'step', planKey = KEY): SetLine => ({
+    v: 1, kind: 'set', at: new Date(FIRST + night * DAY + offsetMin * MINUTE).toISOString(), side: 'right', rhythmId: HAND.id,
+    planKey, date: dateOf(night), targetF, reason,
+  });
+
+  it('lists the last 14 ended nights under any plan beside the counted ones, and marks which ran the saved plan', () => {
+    const lines = [...nights(10, HAND, OTHER_KEY), ...Array.from({ length: 6 }, (_, k) => nightLine(10 + k))];
+    const { log, nights: counts } = learnSuggestions(lines, [planned()], afterNight(15));
+    assert.equal(counts[HAND.id].counted, 6);
+    assert.deepEqual(log.map(night => night.date), range(2, 16).map(dateOf).reverse());
+    assert.deepEqual(log.map(night => night.samePlan), [...Array(6).fill(true), ...Array(8).fill(false)]);
+    assert.deepEqual(log.at(-1)?.plan, []);
+    assert.equal(log.at(-1)?.changes.length, 0);
+  });
+
+  it('keeps a counted night older than the last 14 ended nights when left out nights pushed it back', () => {
+    const lines = [...nights(16), exclude(14, true), exclude(15, true)];
+    const { log } = learnSuggestions(lines, [planned()], afterNight(15));
+    assert.deepEqual(log.map(night => night.date), range(0, 16).map(dateOf).reverse());
+    assert.deepEqual(log.filter(night => night.excluded).map(night => night.date), [dateOf(15), dateOf(14)]);
+  });
+
+  it('gives a night its start and what the scheduler set, in time order, and a night under another plan its changes', () => {
+    const lines: Line[] = [
+      nightLine(0), set(0, 240, 79), set(0, 0, 82, 'on'), set(0, 480, null, 'off'),
+      nightLine(1, HAND, OTHER_KEY), change(1, 60, 82, 79, { planKey: OTHER_KEY }), set(1, 0, 82, 'on', OTHER_KEY),
+    ];
+    const { log } = learnSuggestions(lines, [planned()], afterNight(1));
+    const [other, first] = log;
+    assert.equal(first.start, sleepOf(0).sleepStart);
+    assert.deepEqual(first.sets, [
+      { at: set(0, 0, 82).at, temperatureF: 82 }, { at: set(0, 240, 79).at, temperatureF: 79 }, { at: set(0, 480, null).at, temperatureF: null },
+    ]);
+    assert.equal(other.samePlan, false);
+    assert.equal(other.changes.length, 1);
+    assert.deepEqual(other.sets, [{ at: set(1, 0, 82).at, temperatureF: 82 }]);
+    assert.equal(log.find(night => night.sets === undefined), undefined);
+  });
+
+  it('leaves sets out of a night without any', () => {
+    const [night] = learnSuggestions(nights(1), [planned()], afterNight(0)).log;
+    assert.equal(night.sets, undefined);
+    assert.equal(night.samePlan, true);
   });
 });

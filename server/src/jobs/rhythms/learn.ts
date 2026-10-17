@@ -174,19 +174,48 @@ function planSteps(rhythm: Rhythm, endMin: number): NightLog['plan'] {
   return [{ offsetMin: 0, temperatureF: power.onTemperature }, ...steps];
 }
 
-export function nightLogs(evidence: Evidence, rhythm: Rhythm): NightLog[] {
-  const entry = (night: Night, tonight: boolean): NightLog => {
-    const endMin = Math.max(1, Math.round((night.sleepEnd - night.sleepStart) / MINUTE));
+type Recorded = { date: string; start: number; end: number; planKey: string; mode: 'manual' | 'smart' };
+
+// Every night of one rhythm id under any plan or mode, newest first, each by the latest end written for its date.
+function recordedNights(own: Line[]): Recorded[] {
+  const byDate = new Map<string, Recorded>();
+  for (const line of own) {
+    if (!isSleepLine(line)) continue;
+    const end = Date.parse(line.sleepEnd);
+    const known = byDate.get(line.date);
+    if (!known || end > known.end) {
+      byDate.set(line.date, { date: line.date, start: Date.parse(line.sleepStart), end, planKey: line.planKey, mode: line.mode });
+    }
+  }
+  return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// One rhythm's log: the nights the rules see (counted, left out, tonight) and the last WINDOW_NIGHTS ended nights
+// under any plan, which its card draws. Only a night under the saved plan and mode carries the plan's steps.
+export function nightLog(own: Line[], { rhythm, planKey }: PlannedRhythm, evidence: Evidence, now: Date): NightLog[] {
+  const nights = recordedNights(own);
+  const recent = nights.filter(night => night.end <= now.getTime()).slice(0, WINDOW_NIGHTS);
+  const seen = new Set([...evidence.counted, ...evidence.excluded, ...(evidence.tonight ? [evidence.tonight] : [])].map(night => night.date));
+  const leftOut = new Map<string, boolean>();
+  const excludes = own.filter((line): line is ExcludeLine => line.kind === 'exclude');
+  for (const line of excludes.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) leftOut.set(line.date, line.excluded);
+  return nights.filter(night => seen.has(night.date) || recent.includes(night)).map((night): NightLog => {
+    const tonight = night.end > now.getTime();
+    const endMin = Math.max(1, Math.round((night.end - night.start) / MINUTE));
+    const samePlan = night.planKey === planKey && night.mode === rhythm.temperatureMode;
+    const dated = own.filter(line => 'date' in line && line.date === night.date);
+    const sets = dated.filter((line): line is SetLine => line.kind === 'set')
+      .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+      .slice(0, 2 * MAX_TEMPERATURES_PER_DAY)
+      .map(line => ({ at: line.at, temperatureF: line.targetF }));
     return {
-      date: night.date, rhythmId: rhythm.id, tonight, excluded: night.excluded, plan: planSteps(rhythm, endMin), endMin,
-      changes: (evidence.episodes.get(night.date) ?? [])
+      date: night.date, rhythmId: rhythm.id, tonight, excluded: !tonight && leftOut.get(night.date) === true,
+      plan: samePlan ? planSteps(rhythm, endMin) : [], endMin,
+      changes: coalesceEpisodes(dated.filter((line): line is ChangeLine => line.kind === 'change'))
         .map(({ at, fromF, targetF, plannedF, held, source }) => ({ at, fromF, targetF, plannedF, held, source })),
+      start: new Date(night.start).toISOString(), samePlan, ...(sets.length ? { sets } : {}),
     };
-  };
-  return [
-    ...[...evidence.counted, ...evidence.excluded].map(night => entry(night, false)),
-    ...(evidence.tonight ? [entry(evidence.tonight, true)] : []),
-  ];
+  });
 }
 
 export type Direction = 'down' | 'up';
@@ -530,7 +559,7 @@ export function learnSuggestions(lines: Line[], rhythms: PlannedRhythm[], now: D
       if (near) learned.suggestions.push({ rhythmId: rhythm.id, near: true, rows: [near.row] });
     }
     learned.dismissed.push(...dismissedOf(rhythm.id, hidden));
-    learned.log.push(...nightLogs(evidence, rhythm));
+    learned.log.push(...nightLog(lines.filter(line => line.rhythmId === rhythm.id), planned, evidence, now));
   }
   learned.log.sort((a, b) => b.date.localeCompare(a.date) || a.rhythmId.localeCompare(b.rhythmId));
   return learned;

@@ -642,8 +642,8 @@ instead of the weekly schedule.
 ### Suggestions from your changes
 
 Needs `features.rhythmSuggestions`. The Pod notes temperature changes made
-by hand during a Rhythms sleep in `rhythms-changes.jsonl`, next to the
-other Rhythms history. These routes never write `rhythmsDB.json` or
+by hand during a Rhythms sleep, and what the schedule set, in
+`rhythms-changes.jsonl`, next to the other Rhythms history. These routes never write `rhythmsDB.json` or
 `settingsDB.json`. Adding a suggestion is an ordinary `POST /api/rhythms`.
 
 #### GET `/api/rhythms/suggestions`
@@ -668,9 +668,14 @@ other Rhythms history. These routes never write `rhythmsDB.json` or
 - `dismissed` lists hidden rows: `id`, `rhythmId`, `key`, `time`, `scope`
   (`later` or `plan`) and `nightsLeft`. A `later` entry has a `null` key
   and time.
-- `log` lists the side's noted nights, newest first: `date`, `rhythmId`,
-  `tonight`, `excluded`, the plan's steps (`plan`), `endMin` and the
-  `changes` made (`at`, `fromF`, `targetF`, `plannedF`, `held`, `source`).
+- `log` lists the side's noted nights, newest first: the nights the counts
+  use and each rhythm's last 14 ended nights under any version of it. Each
+  has `date`, `rhythmId`, `tonight`, `excluded`, `start`, `samePlan` (the
+  night ran the rhythm as saved now), the plan's steps (`plan`, empty when
+  `samePlan` is false), `endMin`, the `changes` made (`at`, `fromF`,
+  `targetF`, `plannedF`, `held`, `source`) and, when the Pod wrote them,
+  `sets`: what the schedule set that night (`at`, `temperatureF`, `null`
+  for the power-off).
 
 ```json
 {
