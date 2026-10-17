@@ -52,7 +52,9 @@ it('draws each rhythm\'s nights inside its card and describes the card by the ca
     onNew={ () => {} }
     onUse={ () => {} }/>);
   const workday = screen.getByRole('button', { name: 'Edit Workday' });
-  expect(workday).toHaveAccessibleDescription(expect.stringContaining('The bold line is tonight\'s curve. The thin line is last night, 1 night so far.'));
+  expect(workday).toHaveAccessibleDescription(
+    expect.stringContaining('The bold line is tonight\'s curve. The thin line is last night, 1 night so far.'),
+  );
   expect(workday).toHaveAccessibleDescription(expect.stringContaining('Last night: 80°F at 10:30 PM, off at 6:45 AM.'));
   expect(workday.querySelector('[data-schedule]')).not.toBeNull();
   expect(workday.querySelectorAll('[data-night]')).toHaveLength(1);
