@@ -8,7 +8,7 @@ import {
 } from '../../db/rhythmsSchema.js';
 import { minutesAfterOn } from '../../db/rhythmWake.js';
 import { levelToF, type CurvePhase } from '../../db/smartCurve.js';
-import { COALESCE_MIN, MIN_NIGHTS, WINDOW_NIGHTS } from '../../db/suggestionRules.js';
+import { CLUSTER_MIN, COALESCE_MIN, MIN_NIGHTS, WINDOW_NIGHTS } from '../../db/suggestionRules.js';
 
 const MINUTE = 60_000;
 const ModeSchema = z.enum(['manual', 'smart']);
@@ -152,6 +152,59 @@ export function nightLogs(evidence: Evidence, rhythm: Rhythm): NightLog[] {
   ];
 }
 
+export type Direction = 'down' | 'up';
+export type Vote = { date: string; direction: Direction; value: number; offset: number; from: number };
+export type Cluster = { votes: Vote[] };
+
+const directionOf = (change: number): Direction => (change < 0 ? 'down' : 'up');
+
+export function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+// A night's vote in a cluster is its net change there, timed at its first change in it.
+function nightVotes(episodes: Episode[]): Vote[] {
+  const byNight = new Map<string, Episode[]>();
+  for (const episode of episodes) byNight.set(episode.date, [...(byNight.get(episode.date) ?? []), episode]);
+  return [...byNight].flatMap(([date, list]) => {
+    const ordered = [...list].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    const first = ordered[0];
+    const last = ordered[ordered.length - 1];
+    const net = last.targetF - first.from;
+    return net === 0 ? [] : [{ date, direction: directionOf(net), value: last.targetF, offset: first.offsetMin, from: first.from }];
+  });
+}
+
+// Takes the CLUSTER_MIN window holding the most nights (the earliest on a tie) as one cluster, until none are left.
+export function clusterEpisodes(episodes: Episode[]): Cluster[] {
+  let remaining = [...episodes].sort((a, b) => a.offsetMin - b.offsetMin || Date.parse(a.at) - Date.parse(b.at));
+  const clusters: Cluster[] = [];
+  while (remaining.length) {
+    let best: Episode[] = [];
+    let bestNights = 0;
+    for (const start of remaining) {
+      const window = remaining.filter(episode => episode.offsetMin >= start.offsetMin && episode.offsetMin <= start.offsetMin + CLUSTER_MIN);
+      const nights = new Set(window.map(episode => episode.date)).size;
+      if (nights > bestNights) {
+        best = window;
+        bestNights = nights;
+      }
+    }
+    remaining = remaining.filter(episode => !best.includes(episode));
+    clusters.push({ votes: nightVotes(best) });
+  }
+  return clusters;
+}
+
+// The direction most nights took; a tie has none.
+export function majority(votes: Vote[]): { direction: Direction; supporting: Vote[] } | null {
+  const down = votes.filter(vote => vote.direction === 'down');
+  const up = votes.filter(vote => vote.direction === 'up');
+  if (down.length === up.length) return null;
+  return down.length > up.length ? { direction: 'down', supporting: down } : { direction: 'up', supporting: up };
+}
 // Counts for the notes until the rules below decide more.
 function notesSummary(evidence: Evidence): RhythmNights {
   const counted = evidence.counted.length;

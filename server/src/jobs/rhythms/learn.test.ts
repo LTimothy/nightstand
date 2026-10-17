@@ -3,8 +3,8 @@ import { describe, it } from 'node:test';
 import type { Rhythm } from '../../db/rhythmsSchema.js';
 import { nightOf, rhythmOf } from './rhythmsTestData.js';
 import {
-  coalesceEpisodes, collapseNights, learnSuggestions, parseLine,
-  type ChangeLine, type ExcludeLine, type Line, type NightLine, type PlannedRhythm,
+  clusterEpisodes, coalesceEpisodes, collapseNights, learnSuggestions, majority, parseLine,
+  type ChangeLine, type ExcludeLine, type Line, type NightLine, type PlannedRhythm, type Vote,
 } from './learn.js';
 
 const MINUTE = 60_000;
@@ -188,5 +188,46 @@ describe('notes', () => {
     const result = run([...nights(5), nightLine(5, weekend)], afterNight(5), [planned(), planned(weekend)]);
     assert.equal(result.nights[HAND.id].counted, 5);
     assert.equal(result.nights.weekend.counted, 1);
+  });
+});
+
+// Helpers for the rules below.
+const range = (from: number, to: number) => Array.from({ length: to - from }, (_, index) => from + index);
+const episodesOf = (changes: ChangeLine[]) => [...new Set(changes.map(line => line.date))]
+  .flatMap(date => coalesceEpisodes(changes.filter(line => line.date === date)));
+
+describe('clusters', () => {
+  it('holds a habit spread over two hours as one cluster', () => {
+    const offsets = [60, 80, 100, 120, 140, 160, 180, 90, 110];
+    const clusters = clusterEpisodes(episodesOf(offsets.map((offset, night) => change(night, offset, 82, 79))));
+    assert.equal(clusters.length, 1);
+    assert.equal(clusters[0].votes.length, 9);
+  });
+
+  it('keeps a change after midnight apart from one before dawn', () => {
+    const lines = range(0, 9).flatMap(night => [change(night, 150, 82, 79), change(night, 360, 79, 82)]);
+    const clusters = clusterEpisodes(episodesOf(lines));
+    assert.deepEqual(clusters.map(cluster => [cluster.votes.length, cluster.votes[0].direction]), [[9, 'down'], [9, 'up']]);
+  });
+
+  it('counts an overshoot and its correction as one vote with the corrected value', () => {
+    const [cluster] = clusterEpisodes(episodesOf([change(0, 60, 82, 78), change(0, 80, 78, 80)]));
+    assert.deepEqual(cluster.votes, [{ date: dateOf(0), direction: 'down', value: 80, offset: 60, from: 82 }]);
+  });
+
+  it('gives no vote to a press and undo more than 10 minutes apart', () => {
+    const [cluster] = clusterEpisodes(episodesOf([change(0, 60, 82, 80), change(0, 75, 80, 82)]));
+    assert.deepEqual(cluster.votes, []);
+  });
+
+  it('is the same whatever order the changes come in', () => {
+    const lines = range(0, 6).flatMap(night => [change(night, 50 + night * 7, 82, 79), change(night, 300, 79, 83)]);
+    assert.deepEqual(clusterEpisodes(episodesOf([...lines].reverse())), clusterEpisodes(episodesOf(lines)));
+  });
+
+  it('finds no majority in a tie', () => {
+    const vote = (direction: Vote['direction'], date: string): Vote => ({ date, direction, value: 80, offset: 60, from: 82 });
+    assert.equal(majority([vote('down', dateOf(0)), vote('up', dateOf(1))]), null);
+    assert.equal(majority([vote('down', dateOf(0)), vote('up', dateOf(1)), vote('down', dateOf(2))])?.supporting.length, 2);
   });
 });
