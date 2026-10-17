@@ -1,0 +1,76 @@
+// The notes reader of the first 3.7.0 builds: learn.ts lines 17 to 70 and handChanges.ts
+// isJsonObject, verbatim. Only this header is new: the values those lines imported, copied
+// from the modules they came from at that build. Types are left as they were; transpiling
+// drops them.
+import { z } from 'zod';
+const SideSchema = z.enum(['right', 'left']);
+const TemperatureSchema = z.number().int().min(55).max(110);
+const TimeSchema = z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Invalid time format, must be HH:mm');
+const CURVE_PHASES = ['prewarm', 'bedtime', 'cooldown', 'hold', 'warmup', 'wake', 'after'] as const;
+const InstantSchema = z.string().datetime({ offset: true });
+const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const RhythmIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/);
+const MINUTE = 60_000;
+const ModeSchema = z.enum(['manual', 'smart']);
+const PlanKeySchema = z.string().regex(/^[0-9a-f]{12}$/);
+const NoteIdSchema = z.string().regex(/^[0-9a-f]{12}$/);
+const sleepFields = {
+  side: SideSchema, rhythmId: RhythmIdSchema, mode: ModeSchema, planKey: PlanKeySchema,
+  date: IsoDateSchema, sleepStart: InstantSchema, sleepEnd: InstantSchema,
+};
+const ChangeLineSchema = z.object({
+  v: z.literal(1), kind: z.literal('change'), at: InstantSchema, ...sleepFields,
+  offsetMin: z.number().int().min(0), plannedF: TemperatureSchema, holdF: TemperatureSchema.nullable(),
+  fromF: TemperatureSchema.nullable(), targetF: TemperatureSchema, phase: z.enum(CURVE_PHASES).nullable(),
+  held: z.boolean(), source: z.enum(['api', 'tap']),
+});
+const NightLineSchema = z.object({ v: z.literal(1), kind: z.literal('night'), at: InstantSchema, ...sleepFields });
+const DismissLineSchema = z.object({
+  v: z.literal(1), kind: z.literal('dismiss'), id: NoteIdSchema, at: InstantSchema, side: SideSchema, rhythmId: RhythmIdSchema,
+  planKey: PlanKeySchema, key: z.string().max(24).nullable(), time: TimeSchema.nullable(), scope: z.enum(['later', 'plan']),
+});
+const RestoreLineSchema = z.object({
+  v: z.literal(1), kind: z.literal('restore'), at: InstantSchema, side: SideSchema, rhythmId: RhythmIdSchema,
+  ids: z.array(NoteIdSchema).min(1),
+});
+const ExcludeLineSchema = z.object({
+  v: z.literal(1), kind: z.literal('exclude'), at: InstantSchema, side: SideSchema, rhythmId: RhythmIdSchema,
+  date: IsoDateSchema, excluded: z.boolean(),
+});
+const LineSchema = z.discriminatedUnion('kind', [ChangeLineSchema, NightLineSchema, DismissLineSchema, RestoreLineSchema, ExcludeLineSchema]);
+
+export type ChangeLine = z.infer<typeof ChangeLineSchema>;
+export type NightLine = z.infer<typeof NightLineSchema>;
+export type DismissLine = z.infer<typeof DismissLineSchema>;
+export type RestoreLine = z.infer<typeof RestoreLineSchema>;
+export type ExcludeLine = z.infer<typeof ExcludeLineSchema>;
+export type Line = z.infer<typeof LineSchema>;
+
+export type PlannedRhythm = { rhythm: Rhythm; planKey: string };
+export type Learned = Omit<SuggestionsResponse, 'enabled'>;
+export type Night = { date: string; sleepStart: number; sleepEnd: number; excluded: boolean };
+export type Collapsed = { counted: Night[]; excluded: Night[]; tonight: Night | null; ended: Night[] };
+export type Episode = {
+  date: string; at: string; offsetMin: number; from: number; fromF: number | null; plannedF: number;
+  holdF: number | null; targetF: number; phase: CurvePhase | null; held: boolean; source: 'api' | 'tap';
+};
+export type Evidence = Collapsed & { earlier: boolean; episodes: Map<string, Episode[]> };
+
+export function parseLine(text: string): Line | null {
+  try {
+    const parsed = LineSchema.safeParse(JSON.parse(text));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+// A line this version cannot read may belong to a later release, so only non-JSON is dropped.
+function isJsonObject(text: string): boolean {
+  try {
+    const value: unknown = JSON.parse(text);
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  } catch {
+    return false;
+  }
+}
+export { isJsonObject };
