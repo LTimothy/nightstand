@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { distance, flatten, ratio, spread } from '@test/colour';
 import { fahrenheitToLevel, levelToFahrenheit } from '@lib/temperatureConversions';
-import { NIGHT_OPACITY } from '../../pages/SchedulePage/rhythms/rhythmOverlay';
+import { BLOCK_OPACITY } from '../../pages/SchedulePage/rhythms/rhythmOverlay';
 import { THEMES } from '.';
 import { DEFAULT_THEME_ID, THEME_IDS, isThemeId } from './ids';
 import { scaleColor } from './scale';
@@ -50,14 +50,14 @@ function drawnPairs(p: ThemePalette): Pair[] {
   add('border.control', p.border.control, page, MARK);
   add('step.cool', p.step.cool, { base: p.bg.base }, MARK);
   add('step.warm', p.step.warm, { base: p.bg.base }, MARK);
+  // A rhythm card's chart: the schedule line and a block's dashed edge on the card, the value printed inside a block
+  // over its tint; the nights chart draws the step colours on a sheet.
   add('step.plan', p.step.plan, { card: p.bg.elevated }, MARK);
-  // The nights chart draws these lines on a sheet.
-  add('step.cool', p.step.cool, { sheet: p.bg.elevated }, MARK);
-  add('step.warm', p.step.warm, { sheet: p.bg.elevated }, MARK);
-  // A rhythm card's chart: its dimmest night line, text.primary faded, on the card.
-  const solid = flatten(p.text.primary, p.bg.elevated);
-  const faded = `rgba(${[1, 3, 5].map(i => parseInt(solid.slice(i, i + 2), 16)).join(',')},${NIGHT_OPACITY.older})`;
-  add('dimmest night line', faded, { card: p.bg.elevated }, MARK);
+  add('step.cool', p.step.cool, { card: p.bg.elevated }, MARK);
+  add('step.warm', p.step.warm, { card: p.bg.elevated }, MARK);
+  const rgba = (hex: string, alpha: number) => `rgba(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',')},${alpha})`;
+  const tint = (step: string) => flatten(rgba(flatten(step, p.bg.elevated), BLOCK_OPACITY), p.bg.elevated);
+  add('block value', p.text.primary, { cool: tint(p.step.cool), warm: tint(p.step.warm) }, TEXT);
   add('dial.tickZero', p.dial.tickZero, { base: p.bg.base }, MARK);
   add('stage.awake', p.stage.awake, { elevated: p.bg.elevated }, MARK);
   add('stage.light', p.stage.light, { elevated: p.bg.elevated }, MARK);

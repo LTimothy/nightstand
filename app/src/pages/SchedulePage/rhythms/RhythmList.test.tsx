@@ -36,7 +36,7 @@ it('stops at twelve rhythms per side', () => {
   expect(screen.getByText('A side can have up to 12 rhythms.')).toBeInTheDocument();
 });
 
-it('draws each rhythm\'s nights inside its card and describes the card by the caption', () => {
+it('draws each rhythm\'s chart inside its card and describes the card by its sentence', () => {
   // Workday powers on at 22:30; the chart works in UTC here.
   const night = {
     date: '2026-09-27', rhythmId: 'workday', tonight: false, excluded: false, samePlan: true, start: '2026-09-27T22:30:00.000Z',
@@ -52,16 +52,12 @@ it('draws each rhythm\'s nights inside its card and describes the card by the ca
     onNew={ () => {} }
     onUse={ () => {} }/>);
   const workday = screen.getByRole('button', { name: 'Edit Workday' });
-  expect(workday).toHaveAccessibleDescription(
-    expect.stringContaining('The bold line is tonight\'s curve. The thin line is last night, 1 night so far.'),
-  );
-  expect(workday).toHaveAccessibleDescription(expect.stringContaining('Last night: 80°F at 10:30 PM, off at 6:45 AM.'));
+  expect(workday).toHaveAccessibleDescription('1 night so far.');
   expect(workday.querySelector('[data-schedule]')).not.toBeNull();
-  expect(workday.querySelectorAll('[data-night]')).toHaveLength(1);
   const weekend = screen.getByRole('button', { name: 'Edit Weekend' });
   expect(weekend.querySelector('[data-schedule]')).not.toBeNull();
-  expect(weekend.querySelectorAll('[data-night]')).toHaveLength(0);
   expect(weekend).not.toHaveAccessibleDescription();
+  expect(document.getElementById(weekend.getAttribute('aria-describedby') ?? '')).not.toBeNull();
 });
 
 it('keeps the cards without a chart while suggestions are off', () => {

@@ -344,7 +344,7 @@ it('draws no chart when the suggestions response says they are off', async () =>
   }
 });
 
-it('draws the nights on the rhythm cards while suggestions are on, and nothing while off', async () => {
+it('draws the chart on the rhythm cards while suggestions are on, and nothing while off', async () => {
   withSuggestions({
     enabled: true,
     nights: { workday: { counted: 1, needed: 5, changed: 0, earlier: false, reason: 'few-nights' } },
@@ -359,7 +359,7 @@ it('draws the nights on the rhythm cards while suggestions are on, and nothing w
   try {
     const { unmount } = renderWithProviders(<ScheduleTab/>);
     const workday = await screen.findByRole('button', { name: 'Edit Workday' });
-    await waitFor(() => expect(workday).toHaveAccessibleDescription(expect.stringContaining('The thin line is last night, 1 night so far.')));
+    await waitFor(() => expect(workday).toHaveAccessibleDescription('1 night so far.'));
     unmount();
   } finally {
     noSuggestions();
