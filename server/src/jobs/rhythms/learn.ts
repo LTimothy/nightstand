@@ -72,7 +72,9 @@ export function parseLine(text: string): Line | null {
 export const isSleepLine = (line: Line): line is ChangeLine | NightLine => line.kind === 'change' || line.kind === 'night';
 
 // One entry per date, with the latest end among its lines (a resume or a kept-on night moves it).
-export function collapseNights(sleeps: Array<ChangeLine | NightLine>, excludes: ExcludeLine[], now: Date): Collapsed {
+type NightIndex = { all: Night[]; latest: Map<string, boolean> };
+
+function indexNights(sleeps: Array<ChangeLine | NightLine>, excludes: ExcludeLine[]): NightIndex {
   const byDate = new Map<string, Night>();
   for (const line of sleeps) {
     const sleepEnd = Date.parse(line.sleepEnd);
@@ -84,6 +86,10 @@ export function collapseNights(sleeps: Array<ChangeLine | NightLine>, excludes: 
   const latest = new Map<string, boolean>();
   for (const line of [...excludes].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) latest.set(line.date, line.excluded);
   const all = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  return { all, latest };
+}
+
+function windowAt({ all, latest }: NightIndex, now: Date): Collapsed {
   const ended = all.filter(night => night.sleepEnd <= now.getTime())
     .map(night => ({ ...night, excluded: latest.get(night.date) === true }));
   const kept = ended.filter(night => !night.excluded);
@@ -97,6 +103,9 @@ export function collapseNights(sleeps: Array<ChangeLine | NightLine>, excludes: 
     ended: kept,
   };
 }
+
+export const collapseNights = (sleeps: Array<ChangeLine | NightLine>, excludes: ExcludeLine[], now: Date): Collapsed =>
+  windowAt(indexNights(sleeps, excludes), now);
 
 // One night's changes as episodes: anything within COALESCE_MIN of an
 // episode's first change joins it. A press and undo nets to nothing and goes.
@@ -118,20 +127,34 @@ export function coalesceEpisodes(changes: ChangeLine[]): Episode[] {
   return episodes.filter(episode => episode.targetF !== episode.from);
 }
 
-// Everything the notes and the rules need for one rhythm, scoped to its current plan and mode.
-export function rhythmEvidence(lines: Line[], { rhythm, planKey }: PlannedRhythm, now: Date): Evidence {
+// A rhythm's lines under its current plan and mode, read once. A night's episodes do not depend on the moment
+// they are read at, so the replay reuses them.
+type Scope = { nights: NightIndex; byDate: Map<string, Episode[]>; earlier: boolean };
+
+function rhythmScope(lines: Line[], { rhythm, planKey }: PlannedRhythm): Scope {
   const own = lines.filter(line => line.rhythmId === rhythm.id);
   const sleeps = own.filter(isSleepLine);
   const scoped = sleeps.filter(line => line.planKey === planKey && line.mode === rhythm.temperatureMode);
-  const excludes = own.filter((line): line is ExcludeLine => line.kind === 'exclude');
-  const collapsed = collapseNights(scoped, excludes, now);
-  const changes = scoped.filter((line): line is ChangeLine => line.kind === 'change');
+  const changes = new Map<string, ChangeLine[]>();
+  for (const line of scoped) if (line.kind === 'change') changes.set(line.date, [...(changes.get(line.date) ?? []), line]);
+  return {
+    nights: indexNights(scoped, own.filter((line): line is ExcludeLine => line.kind === 'exclude')),
+    byDate: new Map([...changes].map(([date, dated]) => [date, coalesceEpisodes(dated)])),
+    earlier: sleeps.length > scoped.length,
+  };
+}
+
+function evidenceAt(scope: Scope, now: Date): Evidence {
+  const collapsed = windowAt(scope.nights, now);
   const episodes = new Map<string, Episode[]>();
   for (const night of [...collapsed.counted, ...collapsed.excluded, ...(collapsed.tonight ? [collapsed.tonight] : [])]) {
-    episodes.set(night.date, coalesceEpisodes(changes.filter(line => line.date === night.date)));
+    episodes.set(night.date, scope.byDate.get(night.date) ?? []);
   }
-  return { ...collapsed, earlier: sleeps.length > scoped.length, episodes };
+  return { ...collapsed, earlier: scope.earlier, episodes };
 }
+
+// Everything the notes and the rules need for one rhythm, scoped to its current plan and mode.
+export const rhythmEvidence = (lines: Line[], planned: PlannedRhythm, now: Date): Evidence => evidenceAt(rhythmScope(lines, planned), now);
 
 function planSteps(rhythm: Rhythm, endMin: number): NightLog['plan'] {
   if (rhythm.temperatureMode === 'smart') return [{ offsetMin: 0, temperatureF: levelToF(rhythm.smart.baseLevel) }];
@@ -394,8 +417,8 @@ export function placeSmart(rhythm: Rhythm, evidence: Evidence, gate: Gate): Plac
 
 type Analysis = Placement & { changed: number };
 
-function analyse(lines: Line[], planned: PlannedRhythm, at: Date, gate: Gate): Analysis {
-  const evidence = rhythmEvidence(lines, planned, at);
+function analyse(scope: Scope, planned: PlannedRhythm, at: Date, gate: Gate): Analysis {
+  const evidence = evidenceAt(scope, at);
   if (planned.rhythm.temperatureMode === 'smart') return placeSmart(planned.rhythm, evidence, gate);
   const episodes = evidence.counted.flatMap(night => evidence.episodes.get(night.date) ?? []);
   if (!episodes.length) return { rows: [], stages: ['no-change'], changed: 0 };
@@ -415,13 +438,13 @@ const shownOf = (rows: Placed[]): Shown[] => rows.flatMap(placed => [
 
 // What is on show is never stored: every ended night of the plan is replayed in order, each on
 // its own window, and carries what showed after it, so a row stays until support falls below HIDE_SHARE.
-function replay(lines: Line[], planned: PlannedRhythm, now: Date): Analysis {
-  const { ended } = rhythmEvidence(lines, planned, now);
-  if (!ended.length) return analyse(lines, planned, now, { kind: 'full', shown: [] });
+function replay(scope: Scope, planned: PlannedRhythm, now: Date): Analysis {
+  const { ended } = evidenceAt(scope, now);
+  if (!ended.length) return analyse(scope, planned, now, { kind: 'full', shown: [] });
   let shown: Shown[] = [];
   let result: Analysis = { rows: [], stages: [], changed: 0 };
   for (const night of ended) {
-    result = analyse(lines, planned, new Date(night.sleepEnd), { kind: 'full', shown });
+    result = analyse(scope, planned, new Date(night.sleepEnd), { kind: 'full', shown });
     shown = shownOf(result.rows);
   }
   return result;
@@ -479,9 +502,10 @@ export function learnSuggestions(lines: Line[], rhythms: PlannedRhythm[], now: D
   const learned: Learned = { nights: {}, suggestions: [], dismissed: [], log: [] };
   for (const planned of rhythms) {
     const { rhythm } = planned;
-    const evidence = rhythmEvidence(lines, planned, now);
+    const scope = rhythmScope(lines, planned);
+    const evidence = evidenceAt(scope, now);
     const counted = evidence.counted.length;
-    const full = replay(lines, planned, now);
+    const full = replay(scope, planned, now);
     const hidden = hiddenFor(lines, planned, now);
     const rows = visible(full.rows, hidden, rhythm.night.power.on).sort(byNightOrder).slice(0, MAX_SUGGESTIONS);
     const nights: RhythmNights = {
@@ -493,7 +517,7 @@ export function learnSuggestions(lines: Line[], rhythms: PlannedRhythm[], now: D
     } else if (counted >= NEAR_MIN_NIGHTS && !hidden.later.length) {
       // The leading pattern below the gate, computed fresh from the floor each time.
       const floor = Math.max(NEAR_MIN_SUPPORT, needed(NEAR_SHARE, counted));
-      const [near] = visible(analyse(lines, planned, now, { kind: 'near', floor }).rows, hidden, rhythm.night.power.on)
+      const [near] = visible(analyse(scope, planned, now, { kind: 'near', floor }).rows, hidden, rhythm.night.power.on)
         .sort((a, b) => b.row.supporting - a.row.supporting || a.at - b.at);
       if (near) learned.suggestions.push({ rhythmId: rhythm.id, near: true, rows: [near.row] });
     }
