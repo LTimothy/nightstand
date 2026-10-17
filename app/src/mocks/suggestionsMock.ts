@@ -37,6 +37,16 @@ const counting = (counted: number, reason: RhythmNights['reason'] = 'few-nights'
 const evidence = (dates: string[]) =>
   ({ supporting: dates.length, firstNight: dates[0], lastNight: dates[dates.length - 1], supportingDates: dates });
 
+// What the demo Pod set: the plan's steps until a hand change held the bed, then the power-off at the night's end.
+function recording(start: moment.Moment, plan: NightLog['plan'], endMin: number, changes: Change[]): NightLog['sets'] {
+  const firstChange = Math.min(...changes.map(change => change.minute));
+  return [
+    ...plan.filter(step => step.offsetMin === 0 || step.offsetMin < firstChange)
+      .map(step => ({ at: start.clone().add(step.offsetMin, 'minutes').toISOString(), temperatureF: step.temperatureF as number | null })),
+    { at: start.clone().add(endMin, 'minutes').toISOString(), temperatureF: null },
+  ];
+}
+
 function nightLog(side: Side, rhythmId: string, date: string, on: string, plan: NightLog['plan'], endMin: number, changes: Change[],
   tonight = false, oneOff = false): NightLog {
   const start = moment.tz(`${date} ${on}`, 'YYYY-MM-DD HH:mm', DEMO_TIME_ZONE);
@@ -47,6 +57,7 @@ function nightLog(side: Side, rhythmId: string, date: string, on: string, plan: 
       at: start.clone().add(change.minute + Math.round(jitter() * 10) - 5, 'minutes').toISOString(),
       fromF: change.fromF, targetF: change.targetF, plannedF: change.plannedF, held: change.held ?? false, source: change.tap ? 'tap' : 'api',
     })),
+    start: start.toISOString(), samePlan: true, ...(tonight ? {} : { sets: recording(start, plan, endMin, changes) }),
   };
 }
 

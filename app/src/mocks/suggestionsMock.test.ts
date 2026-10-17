@@ -65,3 +65,15 @@ it('answers off while the feature or Rhythms is off', () => {
   updateSettings({ features: { ...getSettings().features, rhythmSuggestions: false } });
   expect(getMockSuggestions('right', NOW).enabled).toBe(false);
 });
+
+it('records what each demo night was set to, ending with the power-off', () => {
+  const nights = getMockSuggestions('right', NOW).log.filter(night => night.rhythmId === 'off-days');
+  const ended = nights.filter(night => !night.tonight);
+  expect(ended.every(night => night.start && night.samePlan && night.sets?.[night.sets.length - 1]?.temperatureF === null)).toBe(true);
+  const changed = ended.find(night => night.changes.length > 0)!;
+  const planned = changed.sets!.filter(set => set.temperatureF !== null);
+  expect(planned.every(set => Date.parse(set.at) < Date.parse(changed.changes[0].at) || set === planned[0])).toBe(true);
+  const tonight = nights.find(night => night.tonight);
+  expect(tonight?.start).toBeDefined();
+  expect(tonight?.sets).toBeUndefined();
+});

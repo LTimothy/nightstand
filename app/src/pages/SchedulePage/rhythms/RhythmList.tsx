@@ -1,20 +1,26 @@
+import { useId } from 'react';
 import { Box, Button, ButtonBase, Stack, Typography } from '@mui/material';
 import Add from '@mui/icons-material/Add';
 import ChevronRight from '@mui/icons-material/ChevronRight';
-import type { SideRhythms } from '@api/rhythmsSchema';
+import type { NightLog, SideRhythms } from '@api/rhythmsSchema';
+import type { TemperatureFormat } from '@lib/temperatureConversions';
 import { palette, sx as tokens, weight } from '@design/tokens';
+import RhythmChart from './RhythmChart';
 import { describeUsage, MAX_RHYTHMS_PER_SIDE, rhythmDetail, rhythmUsage } from './rhythmsModel';
 
 type Props = {
   sideData: SideRhythms;
   today: string;
   disabled: boolean;
+  // The notes behind each card's chart, while Suggestions from your changes is on.
+  chart?: { log: NightLog[]; timeZone: string; format: TemperatureFormat; trackingOn: boolean };
   onOpen: (id: string) => void;
   onNew: () => void;
   onUse: (id: string) => void;
 };
 
-export default function RhythmList({ sideData, today, disabled, onOpen, onNew, onUse }: Props) {
+export default function RhythmList({ sideData, today, disabled, chart, onOpen, onNew, onUse }: Props) {
+  const captionId = useId();
   const rhythms = Object.values(sideData.rhythms);
   const full = rhythms.length >= MAX_RHYTHMS_PER_SIDE;
   return <Stack spacing={ 1 } sx={ { width: '100%' } }>
@@ -25,19 +31,30 @@ export default function RhythmList({ sideData, today, disabled, onOpen, onNew, o
       return <Stack key={ rhythm.id } spacing={ 0.5 }>
         <ButtonBase
           aria-label={ `Edit ${rhythm.name}` }
+          aria-describedby={ chart ? `${captionId}-${rhythm.id}` : undefined }
           data-rhythm-id={ rhythm.id }
           disabled={ disabled }
           onClick={ () => onOpen(rhythm.id) }
-          sx={ { ...tokens.glassCard, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, textAlign: 'left',
+          sx={ { ...tokens.glassCard, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 1.25, textAlign: 'left',
             '&.Mui-focusVisible': { outline: `2px solid ${palette.accent}`, outlineOffset: 2 } } }>
-          <Box sx={ { minWidth: 0 } }>
-            <Typography sx={ { fontSize: 16, fontWeight: weight.heading, overflowWrap: 'anywhere' } }><bdi>{ rhythm.name }</bdi></Typography>
-            { detail !== rhythm.name && <Typography variant="body2" color="text.secondary">{ detail }</Typography> }
-            <Typography variant="caption" color="text.secondary" sx={ { display: 'block' } }>
-              { describeUsage(usage) }
-            </Typography>
+          <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 } }>
+            <Box sx={ { minWidth: 0 } }>
+              <Typography sx={ { fontSize: 16, fontWeight: weight.heading, overflowWrap: 'anywhere' } }><bdi>{ rhythm.name }</bdi></Typography>
+              { detail !== rhythm.name && <Typography variant="body2" color="text.secondary">{ detail }</Typography> }
+              <Typography variant="caption" color="text.secondary" sx={ { display: 'block' } }>
+                { describeUsage(usage) }
+              </Typography>
+            </Box>
+            <ChevronRight aria-hidden sx={ { color: 'text.secondary', flexShrink: 0 } }/>
           </Box>
-          <ChevronRight aria-hidden sx={ { color: 'text.secondary', flexShrink: 0 } }/>
+          { chart && <RhythmChart
+            rhythm={ rhythm }
+            log={ chart.log }
+            today={ today }
+            timeZone={ chart.timeZone }
+            format={ chart.format }
+            trackingOn={ chart.trackingOn }
+            captionId={ `${captionId}-${rhythm.id}` }/> }
         </ButtonBase>
         { unused && <Button
           data-use-rhythm={ rhythm.id }

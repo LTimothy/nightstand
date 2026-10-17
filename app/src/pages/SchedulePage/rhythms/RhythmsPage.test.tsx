@@ -323,6 +323,31 @@ it('counts nights for suggestions after the rhythms and opens the notes', async 
   }
 });
 
+it('draws the nights on the rhythm cards while suggestions are on, and nothing while off', async () => {
+  withSuggestions({
+    enabled: true,
+    nights: { workday: { counted: 1, needed: 5, changed: 0, earlier: false, reason: 'few-nights' } },
+    suggestions: [],
+    dismissed: [],
+    log: [{
+      date: '2026-09-27', rhythmId: 'workday', tonight: false, excluded: false, samePlan: true, start: '2026-09-27T22:30:00.000Z',
+      plan: [{ offsetMin: 0, temperatureF: 83 }], endMin: 495, changes: [],
+      sets: [{ at: '2026-09-27T22:30:00.000Z', temperatureF: 80 }, { at: '2026-09-28T06:45:00.000Z', temperatureF: null }],
+    }],
+  });
+  try {
+    const { unmount } = renderWithProviders(<ScheduleTab/>);
+    const workday = await screen.findByRole('button', { name: 'Edit Workday' });
+    await waitFor(() => expect(workday).toHaveAccessibleDescription(expect.stringContaining('White is last night, 1 night so far.')));
+    unmount();
+  } finally {
+    noSuggestions();
+  }
+  renderWithProviders(<ScheduleTab/>);
+  await screen.findByRole('button', { name: 'Edit Workday' });
+  expect(document.querySelector('[data-schedule]')).toBeNull();
+});
+
 const spyOnSuggestions = () => {
   const reads = { count: 0 };
   server.use(http.get('*/rhythms/suggestions', () => { reads.count += 1; return HttpResponse.json({

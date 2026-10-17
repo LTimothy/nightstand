@@ -352,6 +352,9 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
           sideData={ sideData }
           today={ today }
           disabled={ isUpdating }
+          chart={ suggestionsOn && suggestions.data ? {
+            log: suggestions.data.log, timeZone, format, trackingOn: !!services?.biometrics?.enabled,
+          } : undefined }
           onOpen={ id => {
             setUndo(undefined);
             setError('');
