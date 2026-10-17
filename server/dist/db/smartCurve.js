@@ -13,7 +13,7 @@ export const CURVE = {
 };
 // Same linear mapping as the app's levelToFahrenheit (-10 = 55°F, 0 = 82.5°F, +10 = 110°F).
 const NEUTRAL_F = 82.5;
-const F_PER_LEVEL = 27.5 / 10;
+export const F_PER_LEVEL = 27.5 / 10;
 export function levelToF(level) {
     return Math.round(level * F_PER_LEVEL + NEUTRAL_F);
 }
