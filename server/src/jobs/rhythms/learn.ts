@@ -1,14 +1,16 @@
 // Turns one side's note lines and its saved rhythms into counts, suggestions
 // and the notes log. Pure: no clock, no disk, no hashing.
 import { z } from 'zod';
-import { SideSchema, TemperatureSchema, TimeSchema } from '../../db/schedulesSchema.js';
+import { MAX_TEMPERATURES_PER_DAY, SideSchema, TemperatureSchema, TimeSchema, type DailySchedule } from '../../db/schedulesSchema.js';
 import {
   CURVE_PHASES, InstantSchema, IsoDateSchema, RhythmIdSchema,
-  type NightLog, type Rhythm, type RhythmNights, type SuggestionsResponse,
+  type NightLog, type Rhythm, type RhythmNights, type SuggestionRow, type SuggestionsResponse,
 } from '../../db/rhythmsSchema.js';
-import { minutesAfterOn } from '../../db/rhythmWake.js';
+import { minutesAfterOn, temperatureInPowerWindow } from '../../db/rhythmWake.js';
 import { levelToF, type CurvePhase } from '../../db/smartCurve.js';
-import { CLUSTER_MIN, COALESCE_MIN, MIN_NIGHTS, WINDOW_NIGHTS } from '../../db/suggestionRules.js';
+import {
+  CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MIN_NIGHTS, MIN_SHARE, ON_WINDOW_MIN, REPLACE_MIN, TIME_ROUND_MIN, WINDOW_NIGHTS,
+} from '../../db/suggestionRules.js';
 
 const MINUTE = 60_000;
 const ModeSchema = z.enum(['manual', 'smart']);
@@ -205,6 +207,145 @@ export function majority(votes: Vote[]): { direction: Direction; supporting: Vot
   if (down.length === up.length) return null;
   return down.length > up.length ? { direction: 'down', supporting: down } : { direction: 'up', supporting: up };
 }
+export type Stage = 'no-change' | 'inconsistent' | 'too-small' | 'refused';
+export type Shown = { key: string; at: number | null };
+export type Gate = { kind: 'full'; shown: Shown[] } | { kind: 'near'; floor: number };
+export type Placed = { row: SuggestionRow; at: number; backAt?: number };
+export type Placement = { rows: Placed[]; stages: Stage[] };
+type CandidateBase = { direction: Direction; supporting: Vote[]; offset: number; at: number };
+type Candidate = CandidateBase & ({ kind: 'on' } | { kind: 'step'; time: string; replaces?: string });
+
+const needed = (share: number, of: number) => Math.ceil(share * of);
+const isShown = (shown: Shown[], key: string, at: number | null) =>
+  shown.some(entry => entry.key === key && (entry.at === null || at === null || Math.abs(entry.at - at) <= CLUSTER_MIN));
+const minuteOfDay = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+const clockOf = (minute: number) => {
+  const wrapped = ((minute % 1440) + 1440) % 1440;
+  return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+};
+
+// The value a night's plan has `offset` minutes after the power-on.
+function planValueAt(night: DailySchedule, offset: number, steps: Record<string, number> = night.temperatures,
+  onF = night.power.onTemperature): number {
+  let value = onF;
+  let latest = -1;
+  for (const [time, temperatureF] of Object.entries(steps)) {
+    if (!temperatureInPowerWindow(time, night.power)) continue;
+    const at = minutesAfterOn(time, night.power.on);
+    if (at <= offset && at > latest) {
+      latest = at;
+      value = temperatureF;
+    }
+  }
+  return value;
+}
+
+// A half-degree middle value goes to the plan's side: the smaller change.
+const towardPlan = (value: number, plan: number) => {
+  if (Number.isInteger(value)) return value;
+  return Math.abs(Math.floor(value) - plan) <= Math.abs(Math.ceil(value) - plan) ? Math.floor(value) : Math.ceil(value);
+};
+
+// The rounded clock time, snapped onto a saved step close to it. Only the saved night is looked at.
+function suggestedTime(night: DailySchedule, offset: number): { time: string; replaces?: string } {
+  const time = clockOf(Math.round((minuteOfDay(night.power.on) + offset) / TIME_ROUND_MIN) * TIME_ROUND_MIN);
+  const at = minutesAfterOn(time, night.power.on);
+  const [near] = Object.keys(night.temperatures)
+    .filter(key => temperatureInPowerWindow(key, night.power))
+    .map(key => ({ key, after: minutesAfterOn(key, night.power.on) }))
+    .filter(step => Math.abs(step.after - at) <= REPLACE_MIN)
+    .sort((a, b) => Math.abs(a.after - at) - Math.abs(b.after - at) || a.after - b.after);
+  return near ? { time: near.key, replaces: near.key } : { time };
+}
+
+function candidatesOf(night: DailySchedule, clusters: Cluster[]): Candidate[] {
+  const candidates: Candidate[] = [];
+  for (const cluster of clusters) {
+    const top = majority(cluster.votes);
+    if (!top) continue;
+    const offset = median(top.supporting.map(vote => vote.offset));
+    if (offset < ON_WINDOW_MIN) {
+      candidates.push({ ...top, offset, at: 0, kind: 'on' });
+      continue;
+    }
+    const { time, replaces } = suggestedTime(night, offset);
+    candidates.push({ ...top, offset, at: minutesAfterOn(time, night.power.on), kind: 'step', time, ...(replaces ? { replaces } : {}) });
+  }
+  return candidates.sort((a, b) => a.at - b.at || a.offset - b.offset);
+}
+
+function evidenceOf(direction: Direction, key: string, supporting: Vote[]) {
+  const dates = supporting.map(vote => vote.date).sort();
+  return { key, direction, supporting: dates.length, firstNight: dates[0], lastNight: dates[dates.length - 1], supportingDates: dates };
+}
+
+// The editor's own limits: strictly inside the night, and no new step past the cap.
+const refused = (night: DailySchedule, steps: Record<string, number>, time: string) =>
+  !temperatureInPowerWindow(time, night.power) || (!Object.hasOwn(steps, time) && Object.keys(steps).length >= MAX_TEMPERATURES_PER_DAY);
+
+// Places the clusters in night order against a working copy of the saved night, so each row is an absolute write.
+export function placeManual(rhythm: Rhythm, clusters: Cluster[], counted: number, gate: Gate): Placement {
+  const { night } = rhythm;
+  const steps: Record<string, number> = { ...night.temperatures };
+  let onF = night.power.onTemperature;
+  const rows: Placed[] = [];
+  const stages: Stage[] = clusters.filter(cluster => cluster.votes.length > 0 && !majority(cluster.votes)).map((): Stage => 'inconsistent');
+  let last: Placed | undefined;
+  for (const candidate of candidatesOf(night, clusters)) {
+    const saved = candidate.kind === 'on' ? night.power.onTemperature : planValueAt(night, candidate.at);
+    const temperatureF = towardPlan(median(candidate.supporting.map(vote => vote.value)), saved);
+    const working = candidate.kind === 'on' ? onF : planValueAt(night, candidate.at, steps, onF);
+    if (temperatureF === saved && median(candidate.supporting.map(vote => vote.from)) === planValueAt(night, candidate.offset)) {
+      stages.push('too-small');
+      continue;
+    }
+    if (temperatureF === saved) {
+      // A return rides on the row before it, gated among the nights that made that change.
+      const parent = last?.row;
+      if (!last || !parent || parent.kind === 'base' || candidate.kind === 'on') continue;
+      const both = candidate.supporting.filter(vote => parent.supportingDates.includes(vote.date)).length;
+      const share = gate.kind === 'full' && isShown(gate.shown, `back:${parent.key}`, candidate.at) ? HIDE_SHARE : MIN_SHARE;
+      if (both < needed(share, parent.supporting) || refused(night, steps, candidate.time)) continue;
+      parent.thenBack = {
+        time: candidate.time, temperatureF: saved, supporting: both, ...(candidate.replaces ? { replaces: candidate.replaces } : {}),
+      };
+      last.backAt = candidate.at;
+      steps[candidate.time] = saved;
+      continue;
+    }
+    if (temperatureF === working) {
+      stages.push('too-small');
+      continue;
+    }
+    const key = `${candidate.kind}:${candidate.direction}`;
+    const floor = gate.kind === 'near' ? gate.floor
+      : needed(isShown(gate.shown, key, candidate.kind === 'step' ? candidate.at : null) ? HIDE_SHARE : MIN_SHARE, counted);
+    if (candidate.supporting.length < floor) {
+      stages.push('inconsistent');
+      continue;
+    }
+    if (candidate.kind === 'step' && refused(night, steps, candidate.time)) {
+      stages.push('refused');
+      continue;
+    }
+    const evidence = evidenceOf(candidate.direction, key, candidate.supporting);
+    let row: SuggestionRow;
+    if (candidate.kind === 'on') {
+      row = { kind: 'on', ...evidence, temperatureF, plannedF: saved };
+      onF = temperatureF;
+    } else {
+      row = {
+        kind: 'step', ...evidence, time: candidate.time, temperatureF, plannedF: saved,
+        ...(candidate.replaces ? { replaces: candidate.replaces } : {}),
+      };
+      steps[candidate.time] = temperatureF;
+    }
+    last = { row, at: candidate.at };
+    rows.push(last);
+  }
+  return { rows, stages };
+}
+
 // Counts for the notes until the rules below decide more.
 function notesSummary(evidence: Evidence): RhythmNights {
   const counted = evidence.counted.length;

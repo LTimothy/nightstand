@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Rhythm } from '../../db/rhythmsSchema.js';
+import { temperatureInPowerWindow } from '../../db/rhythmWake.js';
 import { nightOf, rhythmOf } from './rhythmsTestData.js';
 import {
-  clusterEpisodes, coalesceEpisodes, collapseNights, learnSuggestions, majority, parseLine,
-  type ChangeLine, type ExcludeLine, type Line, type NightLine, type PlannedRhythm, type Vote,
+  clusterEpisodes, coalesceEpisodes, collapseNights, learnSuggestions, majority, parseLine, placeManual,
+  type ChangeLine, type ExcludeLine, type Line, type NightLine, type Gate, type PlannedRhythm, type Vote,
 } from './learn.js';
 
 const MINUTE = 60_000;
@@ -229,5 +230,103 @@ describe('clusters', () => {
     const vote = (direction: Vote['direction'], date: string): Vote => ({ date, direction, value: 80, offset: 60, from: 82 });
     assert.equal(majority([vote('down', dateOf(0)), vote('up', dateOf(1))]), null);
     assert.equal(majority([vote('down', dateOf(0)), vote('up', dateOf(1)), vote('down', dateOf(2))])?.supporting.length, 2);
+  });
+});
+
+const FULL: Gate = { kind: 'full', shown: [] };
+const place = (rhythm: Rhythm, lines: ChangeLine[], counted: number, gate: Gate = FULL) =>
+  placeManual(rhythm, clusterEpisodes(episodesOf(lines)), counted, gate);
+const down = (count: number, offset = 90) => range(0, count).map(night => change(night, offset, 82, 79));
+const STEPPED = rhythmOf('off-days', nightOf({ on: '22:00', off: '06:00', onTemperature: 82, temperatures: { '00:30': 79 } }));
+const clock = (minute: number) => `${String(Math.floor(minute / 60) % 24).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+
+describe('placing hand-set rows', () => {
+  it('needs half or more of the counted nights', () => {
+    assert.deepEqual(place(HAND, down(2), 5), { rows: [], stages: ['inconsistent'] });
+    assert.equal(place(HAND, down(3), 5).rows.length, 1);
+    assert.equal(place(HAND, down(4), 7).rows.length, 1);
+    assert.deepEqual(place(HAND, down(3), 7).stages, ['inconsistent']);
+  });
+
+  it('makes "down after midnight, back before dawn" one row with a return', () => {
+    const lines = [...down(9, 150), ...range(0, 8).map(night => change(night, 360, 79, 82))];
+    assert.deepEqual(place(HAND, lines, 14).rows.map(placed => placed.row), [{
+      kind: 'step', key: 'step:down', direction: 'down', supporting: 9, firstNight: dateOf(0), lastNight: dateOf(8),
+      supportingDates: range(0, 9).map(dateOf), time: '00:30', temperatureF: 79, plannedF: 82,
+      thenBack: { time: '04:00', temperatureF: 82, supporting: 8 },
+    }]);
+  });
+
+  it('leaves the return off when it happened on too few of those nights', () => {
+    const lines = [...down(9, 150), ...range(0, 4).map(night => change(night, 360, 79, 82))];
+    const { rows } = place(HAND, lines, 14);
+    assert.equal(rows.length, 1);
+    assert.equal((rows[0].row as { thenBack?: unknown }).thenBack, undefined);
+  });
+
+  it('makes "down, then up to a third value" two rows in night order, each valid on its own', () => {
+    const lines = [...down(9, 150), ...range(0, 7).map(night => change(night, 360, 79, 84))];
+    const rows = place(HAND, lines, 14).rows.map(placed => placed.row);
+    assert.deepEqual(rows.map(row => (row.kind === 'step' ? [row.time, row.key, row.temperatureF, row.plannedF] : null)), [
+      ['00:30', 'step:down', 79, 82], ['04:00', 'step:up', 84, 82],
+    ]);
+    for (const row of rows) assert.equal(row.kind === 'step' && temperatureInPowerWindow(row.time, HAND.night.power), true);
+  });
+
+  it('drops a return to the plan with no change before it', () => {
+    assert.deepEqual(place(HAND, range(0, 9).map(night => change(night, 300, 80, 82)), 14), { rows: [], stages: [] });
+  });
+
+  it('suggests the on temperature for a change soon after power-on, with its return', () => {
+    const lines = [...range(0, 8).map(night => change(night, 5, 82, 80)), ...range(0, 7).map(night => change(night, 300, 80, 82))];
+    assert.deepEqual(place(HAND, lines, 12).rows.map(placed => placed.row), [{
+      kind: 'on', key: 'on:down', direction: 'down', supporting: 8, firstNight: dateOf(0), lastNight: dateOf(7),
+      supportingDates: range(0, 8).map(dateOf), temperatureF: 80, plannedF: 82,
+      thenBack: { time: '03:00', temperatureF: 82, supporting: 7 },
+    }]);
+  });
+
+  it('replaces a saved step close to the suggested time', () => {
+    const lines = range(0, 9).map(night => change(night, 165, 79, 77, { plannedF: 79 }));
+    assert.deepEqual(place(STEPPED, lines, 14).rows.map(placed => placed.row), [{
+      kind: 'step', key: 'step:down', direction: 'down', supporting: 9, firstNight: dateOf(0), lastNight: dateOf(8),
+      supportingDates: range(0, 9).map(dateOf), time: '00:30', replaces: '00:30', temperatureF: 77, plannedF: 79,
+    }]);
+  });
+
+  it('drops a change that only sets a saved step a little early', () => {
+    assert.deepEqual(place(STEPPED, down(9, 130), 14), { rows: [], stages: ['too-small'] });
+  });
+
+  it('refuses a step at the power-off or past the step limit', () => {
+    assert.deepEqual(place(HAND, range(0, 9).map(night => change(night, 475, 82, 85)), 14), { rows: [], stages: ['refused'] });
+    const crowded = rhythmOf('off-days', nightOf({
+      on: '22:00', off: '06:00', onTemperature: 82,
+      temperatures: Object.fromEntries(range(1, 49).map(minute => [clock(22 * 60 + minute), 82])),
+    }));
+    assert.deepEqual(place(crowded, down(9, 300), 14), { rows: [], stages: ['refused'] });
+  });
+
+  it('rounds the time to 15 minutes and a half-degree middle value toward the plan', () => {
+    const lines = [...range(0, 4).map(night => change(night, 97, 82, 79)), ...range(4, 8).map(night => change(night, 97, 82, 80))];
+    const [{ row }] = place(HAND, lines, 8).rows;
+    assert.deepEqual(row.kind === 'step' && [row.time, row.temperatureF], ['23:30', 80]);
+  });
+
+  it('suggests a 1 °F habit', () => {
+    const [{ row }] = place(HAND, range(0, 9).map(night => change(night, 90, 82, 81)), 14).rows;
+    assert.equal(row.kind === 'step' && row.temperatureF, 81);
+  });
+
+  it('keeps a row on show down to 4 in 10, and uses the floor for a near miss', () => {
+    assert.deepEqual(place(HAND, down(6), 14).stages, ['inconsistent']);
+    assert.equal(place(HAND, down(6), 14, { kind: 'full', shown: [{ key: 'step:down', at: 120 }] }).rows.length, 1);
+    assert.deepEqual(place(HAND, down(5), 14, { kind: 'full', shown: [{ key: 'step:down', at: 120 }] }).stages, ['inconsistent']);
+    assert.equal(place(HAND, down(3), 7, { kind: 'near', floor: 3 }).rows.length, 1);
+  });
+
+  it('gives a cluster with a tied vote no row', () => {
+    const lines = [change(0, 90, 82, 79), change(1, 90, 82, 85), change(2, 90, 82, 79), change(3, 90, 82, 85)];
+    assert.deepEqual(place(HAND, lines, 5), { rows: [], stages: ['inconsistent'] });
   });
 });
