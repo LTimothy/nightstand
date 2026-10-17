@@ -10,8 +10,8 @@ import {
 import { minutesAfterOn, temperatureInPowerWindow } from '../../db/rhythmWake.js';
 import { F_PER_LEVEL, levelToF, type CurvePhase } from '../../db/smartCurve.js';
 import {
-  BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, ON_WINDOW_MIN, REPLACE_MIN, SNOOZE_NIGHTS,
-  TIME_ROUND_MIN, WINDOW_NIGHTS,
+  BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, NEAR_MIN_NIGHTS, NEAR_MIN_SUPPORT, NEAR_SHARE,
+  ON_WINDOW_MIN, REPLACE_MIN, SNOOZE_NIGHTS, TIME_ROUND_MIN, WINDOW_NIGHTS,
 } from '../../db/suggestionRules.js';
 
 const MINUTE = 60_000;
@@ -480,7 +480,15 @@ export function learnSuggestions(lines: Line[], rhythms: PlannedRhythm[], now: D
       counted, needed: MIN_NIGHTS, changed: full.changed, earlier: evidence.earlier, reason: reasonOf(counted, full, rows.length),
     };
     learned.nights[rhythm.id] = nights;
-    if (rows.length) learned.suggestions.push({ rhythmId: rhythm.id, near: false, rows: rows.map(placed => placed.row) });
+    if (rows.length) {
+      learned.suggestions.push({ rhythmId: rhythm.id, near: false, rows: rows.map(placed => placed.row) });
+    } else if (counted >= NEAR_MIN_NIGHTS && !hidden.later.length) {
+      // The leading pattern below the gate, computed fresh from the floor each time.
+      const floor = Math.max(NEAR_MIN_SUPPORT, needed(NEAR_SHARE, counted));
+      const [near] = visible(analyse(lines, planned, now, { kind: 'near', floor }).rows, hidden, rhythm.night.power.on)
+        .sort((a, b) => b.row.supporting - a.row.supporting || a.at - b.at);
+      if (near) learned.suggestions.push({ rhythmId: rhythm.id, near: true, rows: [near.row] });
+    }
     learned.dismissed.push(...dismissedOf(rhythm.id, hidden));
     learned.log.push(...nightLogs(evidence, rhythm));
   }

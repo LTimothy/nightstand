@@ -570,3 +570,63 @@ describe('hiding suggestions', () => {
     assert.deepEqual(times([...four, dismissal('aaaaaaaaaaa4', 'plan', 'step:down', '22:30', 9)]), ['00:45', '02:45', '05:00']);
   });
 });
+
+describe('near misses', () => {
+  const nearOf = (lines: Line[], count: number, rhythm: Rhythm = HAND) =>
+    learn(lines, afterNight(count - 1), [planned(rhythm)]).suggestions.find(entry => entry.rhythmId === rhythm.id && entry.near);
+
+  it('starts at 7 counted nights with at least 3 behind it', () => {
+    assert.equal(nearOf(habit(4, [0, 1, 2]), 4), undefined);
+    assert.equal(nearOf(habit(7, [2, 4, 6]), 7)?.rows.length, 1);
+    assert.equal(nearOf(habit(7, [2, 6]), 7), undefined);
+  });
+
+  it('needs about 4 in 10 of 14 nights, and has no band at 8 nights', () => {
+    assert.equal(nearOf(habit(14, [2, 4, 7, 9, 11]), 14), undefined);
+    const near = nearOf(habit(14, [2, 4, 7, 9, 11, 13]), 14);
+    assert.deepEqual(near?.rows.map(row => [row.kind, row.supporting]), [['step', 6]]);
+    assert.equal(nearOf(habit(8, [2, 4, 6]), 8), undefined);
+  });
+
+  it('keeps one per rhythm, the earliest on a tie, and leaves the reason alone', () => {
+    const lines = [...habit(7, [2, 4, 6]), ...[1, 3, 6].map(night => change(night, 360, 82, 85))];
+    const result = learn(lines, afterNight(6));
+    const near = result.suggestions.filter(entry => entry.near);
+    assert.equal(near.length, 1);
+    assert.deepEqual(near[0].rows.map(row => row.kind === 'step' && row.time), ['23:30']);
+    assert.equal(result.nights[HAND.id].reason, 'inconsistent');
+  });
+
+  it('is not offered beside a full suggestion', () => {
+    const lines = [...habit(14, range(0, 9)), ...[1, 3, 5, 8, 10, 12].map(night => change(night, 360, 79, 85))];
+    assert.deepEqual(learn(lines, afterNight(13)).suggestions.map(entry => entry.near), [false]);
+  });
+
+  it('can carry a return', () => {
+    const lines = [...habit(14, [2, 4, 7, 9, 11, 13]), ...[2, 4, 7, 9, 11].map(night => change(night, 360, 79, 82))];
+    const [row] = nearOf(lines, 14)?.rows ?? [];
+    assert.deepEqual(row.kind === 'step' && row.thenBack, { time: '04:00', temperatureF: 82, supporting: 5 });
+  });
+
+  it('is never a change the plan makes or the editor refuses', () => {
+    assert.equal(nearOf([...nights(14), ...[2, 4, 7, 9, 11, 13].map(night => change(night, 475, 82, 85))], 14), undefined);
+    assert.equal(nearOf([...nights(14), ...[2, 4, 7, 9, 11, 13].map(night => change(night, 130, 82, 79))], 14, STEPPED), undefined);
+  });
+
+  it('stays hidden by Don\'t suggest this, even after it reaches the gate under the same plan', () => {
+    const hide = dismissal('aaaaaaaaaaa5', 'plan', 'step:down', '23:30', 6);
+    assert.equal(nearOf([...habit(7, [2, 4, 6]), hide], 7), undefined);
+    const later = learn([...habit(14, [2, 4, 6, 7, 8, 9, 10, 11, 12]), hide], afterNight(13));
+    assert.deepEqual(later.suggestions, []);
+    assert.equal(later.nights[HAND.id].reason, 'dismissed');
+  });
+
+  it('is hidden by Hide for 14 nights', () => {
+    assert.equal(nearOf([...habit(7, [2, 4, 6]), dismissal('aaaaaaaaaaa6', 'later', null, null, 6)], 7), undefined);
+  });
+
+  it('can be a Smart base', () => {
+    const lines = [...nights(7, SMART), ...[2, 4, 6].map(night => smartChange(night, 'hold', 74))];
+    assert.deepEqual(nearOf(lines, 7, SMART)?.rows.map(row => row.kind === 'base' && row.baseLevel), [-1]);
+  });
+});
