@@ -114,3 +114,43 @@ it('leaves the Smart sentence out when no Smart rhythm is on the sheet', async (
   await user.click(screen.getByRole('button', { name: 'How this works' }));
   expect(screen.getByText(/^Changes you make by hand in this app/)).not.toHaveTextContent(/Smart Schedule/);
 });
+
+it('starts on its heading', async () => {
+  open({ forRhythm: 'off-days' });
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Notes for Off days' })).toHaveFocus());
+});
+
+it('lists hidden suggestions and shows one again', async () => {
+  const restored: unknown[] = [];
+  server.use(http.post('*/rhythms/suggestions/restore', async ({ request }) => {
+    restored.push(await request.json());
+    return new HttpResponse(null, { status: 204 });
+  }));
+  const { user } = open({ forRhythm: 'off-days', data: { ...data, dismissed: [
+    { id: 'a1b2c3d4e5f6', rhythmId: 'off-days', key: 'step:down', time: '23:45', scope: 'plan', nightsLeft: 0 },
+    { id: 'b1b2c3d4e5f6', rhythmId: 'off-days', key: null, time: null, scope: 'later', nightsLeft: 9 },
+  ] } });
+  expect(screen.getByRole('heading', { name: 'Hidden' })).toBeInTheDocument();
+  expect(screen.getByText('Not suggested again until you change Off days, or press Show again.')).toBeInTheDocument();
+  expect(screen.getByText('Hidden: cooler around 11:45 PM')).toBeInTheDocument();
+  expect(screen.getByText('All suggestions hidden for 9 more nights')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Show again, cooler around 11:45 PM' }));
+  await waitFor(() => expect(restored).toEqual([{ side: 'right', ids: ['a1b2c3d4e5f6'] }]));
+});
+
+it('skips the intro when only a hide for some nights is listed', () => {
+  open({ forRhythm: 'off-days', data: { ...data, dismissed: [
+    { id: 'b1b2c3d4e5f6', rhythmId: 'off-days', key: null, time: null, scope: 'later', nightsLeft: 9 },
+  ] } });
+  expect(screen.getByText('All suggestions hidden for 9 more nights')).toBeInTheDocument();
+  expect(screen.queryByText(/^Not suggested again/)).not.toBeInTheDocument();
+});
+
+it('says so when a hidden suggestion could not be shown again', async () => {
+  server.use(http.post('*/rhythms/suggestions/restore', () => HttpResponse.json({ error: 'nope' }, { status: 500 })));
+  const { user } = open({ forRhythm: 'off-days', data: { ...data, dismissed: [
+    { id: 'a1b2c3d4e5f6', rhythmId: 'off-days', key: 'on:up', time: null, scope: 'plan', nightsLeft: 0 },
+  ] } });
+  await user.click(screen.getByRole('button', { name: 'Show again, a warmer start' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not show it again. Try again.');
+});

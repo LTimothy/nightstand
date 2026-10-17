@@ -1,18 +1,18 @@
 /* eslint-disable react/no-multi-comp */
 // A night's row is private to the notes sheet.
-import { useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, ToggleButton, Typography } from '@mui/material';
 import Check from '@mui/icons-material/Check';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import { postNightExclude } from '@api/rhythms';
-import type { NightLog, Rhythm, SuggestionsResponse } from '@api/rhythmsSchema';
+import { postNightExclude, postSuggestionRestore } from '@api/rhythms';
+import type { Dismissed, NightLog, Rhythm, SuggestionsResponse } from '@api/rhythmsSchema';
 import type { TemperatureFormat } from '@lib/temperatureConversions';
 import { palette, weight } from '@design/tokens';
 import { SCROLL_SHEET } from './sheetStyles';
 import {
-  AWAY_LINE, EXCLUDE_ERROR, HOW_THIS_WORKS, HOW_TITLE, howSuggestionsWork, LEAVE_OUT, LEAVE_OUT_HINT, leaveOutName, nightLabel, noteLines,
-  notesCountLine, notesTitle, WHAT_COUNTS_TITLE, whatCounts,
+  AWAY_LINE, EXCLUDE_ERROR, HIDDEN_HEADING, hiddenIntro, hiddenRow, HOW_THIS_WORKS, HOW_TITLE, howSuggestionsWork, LEAVE_OUT, LEAVE_OUT_HINT,
+  leaveOutName, nightLabel, noteLines, notesCountLine, notesTitle, SHOW_AGAIN, SHOW_AGAIN_ERROR, showAgainName, WHAT_COUNTS_TITLE, whatCounts,
 } from './suggestionsCopy';
 
 type Props = {
@@ -65,6 +65,7 @@ function NightRow({ night, excluded, format, timeZone, onToggle }: RowProps) {
 }
 
 export default function NotesSheet({ side, rhythms, forRhythm, data, away, format, timeZone, onClose }: Props) {
+  const focusHeading = useCallback((node: HTMLHeadingElement | null) => node?.focus(), []);
   const titleId = useId();
   const rulesId = useId();
   const queryClient = useQueryClient();
@@ -74,6 +75,7 @@ export default function NotesSheet({ side, rhythms, forRhythm, data, away, forma
   const shown = forRhythm ? rhythms.filter(rhythm => rhythm.id === forRhythm) : rhythms;
   // Said once per sheet, under the first list that has a Leave out toggle.
   const hintFor = shown.find(rhythm => data.log.some(night => night.rhythmId === rhythm.id && !night.tonight))?.id;
+  const hidden = (rhythmId: string) => data.dismissed.filter(entry => entry.rhythmId === rhythmId);
   const smart = shown.some(rhythm => rhythm.temperatureMode === 'smart');
   const toggle = async (night: NightLog) => {
     const key = nightKey(night);
@@ -88,8 +90,27 @@ export default function NotesSheet({ side, rhythms, forRhythm, data, away, forma
       setError(EXCLUDE_ERROR);
     }
   };
-  return <Dialog open onClose={ onClose } aria-labelledby={ titleId } fullWidth maxWidth="sm" scroll="paper" sx={ SCROLL_SHEET }>
-    <DialogTitle id={ titleId }>{ notesTitle(forRhythm ? shown[0]?.name : undefined) }</DialogTitle>
+  const showAgain = async (entry: Dismissed) => {
+    setError('');
+    try {
+      await postSuggestionRestore({ side, ids: [entry.id] });
+      await queryClient.invalidateQueries({ queryKey: ['useSuggestions'] });
+    } catch {
+      setError(SHOW_AGAIN_ERROR);
+    }
+  };
+  return <Dialog
+    open
+    onClose={ onClose }
+    disableAutoFocus
+    aria-labelledby={ titleId }
+    fullWidth
+    maxWidth="sm"
+    scroll="paper"
+    sx={ SCROLL_SHEET }>
+    <DialogTitle id={ titleId } ref={ focusHeading } tabIndex={ -1 } sx={ { outline: 'none' } }>
+      { notesTitle(forRhythm ? shown[0]?.name : undefined) }
+    </DialogTitle>
     <DialogContent dividers>
       { away && <Typography variant="body2" sx={ { mb: 2 } }>{ AWAY_LINE }</Typography> }
       { shown.map(rhythm => <Box component="section" key={ rhythm.id } sx={ { mb: 3 } }>
@@ -107,6 +128,23 @@ export default function NotesSheet({ side, rhythms, forRhythm, data, away, forma
             onToggle={ () => void toggle(night) }/>) }
         </Stack>
         { rhythm.id === hintFor && <Typography variant="body2" color="text.secondary" sx={ { mt: 1 } }>{ LEAVE_OUT_HINT }</Typography> }
+        { hidden(rhythm.id).length > 0 && <>
+          <Typography component={ forRhythm ? 'h3' : 'h4' } sx={ { ...subheading, fontSize: 14, mt: 2 } }>{ HIDDEN_HEADING }</Typography>
+          { hidden(rhythm.id).some(entry => entry.scope === 'plan') && <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={ { mt: 0.5 } }>
+            { hiddenIntro(rhythm.name) }
+          </Typography> }
+          <Stack component="ul" sx={ { listStyle: 'none', p: 0, m: 0 } }>
+            { hidden(rhythm.id).map(entry => <Box component="li" key={ entry.id } sx={ { display: 'flex', alignItems: 'center', gap: 1 } }>
+              <Typography variant="body2" sx={ { flex: 1, minWidth: 0, overflowWrap: 'anywhere' } }>{ hiddenRow(entry) }</Typography>
+              <Button aria-label={ showAgainName(entry) } onClick={ () => void showAgain(entry) } sx={ { minHeight: 44, flexShrink: 0 } }>
+                { SHOW_AGAIN }
+              </Button>
+            </Box>) }
+          </Stack>
+        </> }
       </Box>) }
       <Button
         aria-expanded={ rulesOpen }
