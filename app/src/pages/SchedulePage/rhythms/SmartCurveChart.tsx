@@ -40,28 +40,47 @@ type Props = {
   timeZone: string;
   format: TemperatureFormat;
   trackingOn: boolean;
+  // The rhythm as it is now, drawn dashed beside the curve with a change.
+  before?: SmartSchedule;
 };
 
-export default function SmartCurveChart({ night, wake, smart, date, timeZone, format, trackingOn }: Props) {
+type LevelPoint = { at: Date; level: number };
+// The level a stepped series has at a moment.
+const levelAtTime = (series: LevelPoint[], at: number) =>
+  series.reduce((level, point) => (point.at.getTime() <= at ? point.level : level), series[0]?.level ?? 0);
+
+export default function SmartCurveChart({ night, wake, smart, before, date, timeZone, format, trackingOn }: Props) {
   const theme = useTheme();
   const preview = useMemo(() => previewCurves({ night, wake, smart, date, timeZone, trackingOn }),
     [night, wake, smart, date, timeZone, trackingOn]);
-  // Scaled to the curve, one step past its bounds, so a few steps read as a curve and not a flat line.
+  const previous = useMemo(() => (before ? previewCurves({ night, wake, smart: before, date, timeZone, trackingOn }) : null),
+    [night, wake, before, date, timeZone, trackingOn]);
+  // Scaled to the curves, one step past their bounds, so a few steps read as a curve and not a flat line.
   const bounds = curveBounds(smart.baseLevel);
+  const beforeBounds = before ? curveBounds(before.baseLevel) : bounds;
   const display = (level: number) => fahrenheitToDisplay(levelToFahrenheit(level), format);
-  const min = display(Math.max(-10, bounds.min - 1));
-  const max = display(Math.min(10, bounds.max + 1));
-  const points: Point[] = preview.series.map(point => ({
-    x: point.at,
-    y: Math.min(max, Math.max(min, display(point.level))),
-    temperature: levelToFahrenheit(point.level),
-    rowId: '',
-  }));
+  const min = display(Math.max(-10, Math.min(bounds.min, beforeBounds.min) - 1));
+  const max = display(Math.min(10, Math.max(bounds.max, beforeBounds.max) + 1));
+  const clamp = (value: number) => Math.min(max, Math.max(min, value));
+  const times = previous
+    ? [...new Set([...preview.series, ...previous.series].map(point => point.at.getTime()))].sort((a, b) => a - b)
+    : [];
+  const points: Point[] = previous
+    ? times.map(time => {
+      const level = levelAtTime(preview.series, time);
+      return { x: new Date(time), y: clamp(display(level)), temperature: levelToFahrenheit(level), rowId: '' };
+    })
+    : preview.series.map(point => ({ x: point.at, y: clamp(display(point.level)), temperature: levelToFahrenheit(point.level), rowId: '' }));
+  const beforeData = previous ? times.map(time => clamp(display(levelAtTime(previous.series, time)))) : [];
   if (points.length < 2) return null;
   const axisColor = theme.palette.text.secondary;
-  const summary = curveSummary(preview.points, level => formatTemperature(levelToFahrenheit(level), format), preview.anchors);
+  const label = (level: number) => formatTemperature(levelToFahrenheit(level), format);
+  const summary = curveSummary(preview.points, label, preview.anchors);
+  const beforeSummary = previous ? curveSummary(previous.points, label, previous.anchors) : '';
+  const figureName = previous
+    ? `Smart Schedule preview. Now: ${beforeSummary}. With this change: ${summary}` : `Smart Schedule preview: ${summary}`;
   const { bedtime, wake: wakeAt } = preview.markers;
-  return <Paper variant="outlined" role="figure" aria-label={ `Smart Schedule preview: ${summary}` } sx={ { width: '100%', p: 2 } }>
+  return <Paper variant="outlined" role="figure" aria-label={ figureName } sx={ { width: '100%', p: 2 } }>
     <Box aria-hidden>
       <LineChart
         height={ 120 }
@@ -87,10 +106,13 @@ export default function SmartCurveChart({ night, wake, smart, date, timeZone, fo
           baseline: min,
           showMark: false,
           curve: 'stepAfter',
-        }] }
+        }, ...(previous ? [{
+          id: 'before', label: 'Now', data: beforeData, showMark: false, curve: 'stepAfter' as const, color: palette.text.secondary,
+        }] : [])] }
         margin={ { right: 32, left: 36, top: 5, bottom: 24 } }
         sx={ {
           [`& .${lineElementClasses.root}`]: { stroke: 'url(#smart-grad-line)' },
+          '& .MuiLineElement-series-before': { stroke: palette.text.secondary, strokeDasharray: '4 4' },
           [`& .${areaElementClasses.root}`]: { fill: 'url(#smart-grad-area)', filter: 'none' },
         } }
         slotProps={ { legend: { hidden: true } } }>
@@ -98,7 +120,10 @@ export default function SmartCurveChart({ night, wake, smart, date, timeZone, fo
         <HorizontalTempGradient idArea="smart-grad-area" idLine="smart-grad-line" points={ points }/>
       </LineChart>
     </Box>
-    { summary && <Typography variant="body2" sx={ { mt: 1 } }>
+    { previous ? <>
+      <Typography variant="body2" sx={ { mt: 1 } }>Now: { beforeSummary }</Typography>
+      <Typography variant="body2">With this change: { summary }</Typography>
+    </> : summary && <Typography variant="body2" sx={ { mt: 1 } }>
       { summary }
     </Typography> }
     <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mt: 0.5 } }>
