@@ -210,6 +210,18 @@ describe('night line', () => {
       ['exclude', 'off-days', at(89)], ['dismiss', 'off-days', at(200)], ['night', 'off-days', IN_NIGHT.toISOString()],
     ]);
   });
+
+  it('prunes set lines after 90 days, like changes', async () => {
+    const line = (at: string) => ({
+      v: 1, kind: 'set', at, side: 'left', rhythmId: 'off-days', planKey: 'aaaaaaaaaaaa', date: at.slice(0, 10), targetF: 80, reason: 'step',
+    });
+    const old = '2026-06-01T00:00:00.000Z';
+    const recent = '2026-09-30T00:00:00.000Z';
+    writeFileSync(notes.changesPath(), [line(old), line(recent)].map(entry => JSON.stringify(entry)).join('\n'));
+    notes.recordNight('left', sleepAt(IN_NIGHT), IN_NIGHT);
+    await notes.flushHandChanges();
+    assert.deepEqual(fileLines().map(entry => [entry.kind, entry.at]), [['set', recent], ['night', IN_NIGHT.toISOString()]]);
+  });
 });
 
 describe('hand change', () => {

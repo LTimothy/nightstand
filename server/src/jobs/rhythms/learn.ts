@@ -29,6 +29,11 @@ const ChangeLineSchema = z.object({
   held: z.boolean(), source: z.enum(['api', 'tap']),
 });
 const NightLineSchema = z.object({ v: z.literal(1), kind: z.literal('night'), at: InstantSchema, ...sleepFields });
+// What the scheduler wrote; null is a power-off. The reason is free text so a later release may add one.
+const SetLineSchema = z.object({
+  v: z.literal(1), kind: z.literal('set'), at: InstantSchema, side: SideSchema, rhythmId: RhythmIdSchema, planKey: PlanKeySchema,
+  date: IsoDateSchema, targetF: TemperatureSchema.nullable(), reason: z.string().max(16),
+});
 const DismissLineSchema = z.object({
   v: z.literal(1), kind: z.literal('dismiss'), id: NoteIdSchema, at: InstantSchema, side: SideSchema, rhythmId: RhythmIdSchema,
   planKey: PlanKeySchema, key: z.string().max(24).nullable(), time: TimeSchema.nullable(), scope: z.enum(['later', 'plan']),
@@ -41,13 +46,16 @@ const ExcludeLineSchema = z.object({
   v: z.literal(1), kind: z.literal('exclude'), at: InstantSchema, side: SideSchema, rhythmId: RhythmIdSchema,
   date: IsoDateSchema, excluded: z.boolean(),
 });
-const LineSchema = z.discriminatedUnion('kind', [ChangeLineSchema, NightLineSchema, DismissLineSchema, RestoreLineSchema, ExcludeLineSchema]);
+const LineSchema = z.discriminatedUnion('kind', [
+  ChangeLineSchema, NightLineSchema, DismissLineSchema, RestoreLineSchema, ExcludeLineSchema, SetLineSchema,
+]);
 
 export type ChangeLine = z.infer<typeof ChangeLineSchema>;
 export type NightLine = z.infer<typeof NightLineSchema>;
 export type DismissLine = z.infer<typeof DismissLineSchema>;
 export type RestoreLine = z.infer<typeof RestoreLineSchema>;
 export type ExcludeLine = z.infer<typeof ExcludeLineSchema>;
+export type SetLine = z.infer<typeof SetLineSchema>;
 export type Line = z.infer<typeof LineSchema>;
 
 export type PlannedRhythm = { rhythm: Rhythm; planKey: string };

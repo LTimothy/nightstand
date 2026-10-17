@@ -57,6 +57,19 @@ describe('note lines', () => {
   });
 });
 
+describe('note lines', () => {
+  it('reads what the scheduler set, with null for a power-off and any reason', () => {
+    const set = {
+      v: 1, kind: 'set', at: '2026-09-02T02:00:00.000Z', side: 'right', rhythmId: 'off-days', planKey: KEY, date: dateOf(0),
+      targetF: 79, reason: 'step',
+    };
+    assert.deepEqual(parseLine(JSON.stringify(set)), set);
+    assert.equal(parseLine(JSON.stringify({ ...set, targetF: null, reason: 'off' }))?.kind, 'set');
+    assert.equal(parseLine(JSON.stringify({ ...set, reason: 'a-later-one' }))?.kind, 'set');
+    assert.equal(parseLine(JSON.stringify({ ...set, targetF: 120 })), null);
+  });
+});
+
 describe('note line bounds', () => {
   it('skips a change line with a temperature outside 55 to 110', () => {
     assert.equal(parseLine(JSON.stringify(change(0, 60, 82, 200))), null);
