@@ -1,6 +1,11 @@
 import moment from 'moment-timezone';
-import type { Dismissed, NightExclude, NightLog, RhythmNights, SuggestionDismiss, SuggestionRow, SuggestionsResponse } from '@api/rhythmsSchema';
+import type {
+  Dismissed, NightExclude, NightLog, Rhythm, RhythmNights, SuggestionDismiss, SuggestionRow, SuggestionsResponse,
+} from '@api/rhythmsSchema';
+import { rhythmSleepBounds } from '@api/rhythmTimes';
 import { minutesAfterOn } from '@api/rhythmWake';
+import { buildCurve } from '@api/smartCurve';
+import { levelToFahrenheit } from '@lib/temperatureConversions';
 import { getSettings } from './mockData';
 import { getMockRhythms, getMockRhythmsResponse } from './rhythmsMock';
 import { DEMO_TIME_ZONE, hashSeed, mulberry32 } from './sampleNights';
@@ -59,6 +64,18 @@ function nightLog(side: Side, rhythmId: string, date: string, on: string, plan: 
     })),
     start: start.toISOString(), samePlan: true, ...(tonight ? {} : { sets: recording(start, plan, endMin, changes) }),
   };
+}
+
+// A Smart night as the Pod writes it: the curve's points until a hand change held the bed, then the power-off.
+function curveSets(rhythm: Rhythm, night: NightLog): NightLog['sets'] {
+  const { start, end, wake } = rhythmSleepBounds(night.date, rhythm.night.power, rhythm.wake, DEMO_TIME_ZONE);
+  const firstChange = Math.min(...night.changes.map(change => Date.parse(change.at)));
+  const points = buildCurve({ smart: rhythm.smart, bedtime: start, coolStart: start, wake, powerOff: end, timeZone: DEMO_TIME_ZONE });
+  return [
+    ...points.filter((point, index) => index === 0 || point.at.getTime() < firstChange)
+      .map(point => ({ at: point.at.toISOString(), temperatureF: levelToFahrenheit(point.level) as number | null })),
+    { at: end.toISOString(), temperatureF: null },
+  ];
 }
 
 // The 14 dates before today, oldest first, and today.
@@ -148,7 +165,10 @@ export function getMockSuggestions(side: Side, now = new Date()): SuggestionsRes
     ...sample,
     nights: Object.fromEntries(Object.keys(rhythms).map(id => [id, sample.nights[id] ?? counting(0)])),
     suggestions: sample.suggestions.filter(entry => known(entry.rhythmId)),
-    log: sample.log.filter(night => known(night.rhythmId)),
+    log: sample.log.filter(night => known(night.rhythmId)).map(night => {
+      const rhythm = rhythms[night.rhythmId];
+      return rhythm.temperatureMode === 'smart' && night.sets ? { ...night, sets: curveSets(rhythm, night) } : night;
+    }),
   };
 }
 

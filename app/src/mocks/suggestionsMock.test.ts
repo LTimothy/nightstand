@@ -66,6 +66,17 @@ it('answers off while the feature or Rhythms is off', () => {
   expect(getMockSuggestions('right', NOW).enabled).toBe(false);
 });
 
+it('writes a Smart night\'s sets from its curve, held from a hand change', () => {
+  const nights = getMockSuggestions('left', NOW).log.filter(night => night.rhythmId === 'workday' && !night.tonight);
+  const quiet = nights.find(night => night.changes.length === 0)!;
+  expect(quiet.sets!.length).toBeGreaterThan(3);
+  expect(quiet.sets![quiet.sets!.length - 1].temperatureF).toBeNull();
+  const changed = nights.find(night => night.changes.length > 0)!;
+  const planned = changed.sets!.filter(set => set.temperatureF !== null);
+  expect(planned.length).toBeLessThan(quiet.sets!.length - 1);
+  expect(planned.every(set => Date.parse(set.at) < Date.parse(changed.changes[0].at) || set === planned[0])).toBe(true);
+});
+
 it('records what each demo night was set to, ending with the power-off', () => {
   const nights = getMockSuggestions('right', NOW).log.filter(night => night.rhythmId === 'off-days');
   const ended = nights.filter(night => !night.tonight);
