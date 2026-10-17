@@ -1,9 +1,10 @@
 // Every sentence of Suggestions from your changes. Numbers come from the shared rules.
 import moment from 'moment-timezone';
-import type { NightLog, RhythmNights } from '@api/rhythmsSchema';
+import type { Dismissed, NightLog, Rhythm, RhythmNights, SuggestionRow, ThenBack } from '@api/rhythmsSchema';
+import { minutesAfterOn, temperatureInPowerWindow } from '@api/rhythmWake';
 import { SUGGESTION_RULES, type SuggestionRules } from '@api/suggestionRules';
-import { displayTemperature, fahrenheitToLevel, type TemperatureFormat } from '@lib/temperatureConversions';
-import { formatDate } from './rhythmsModel';
+import { displayTemperature, fahrenheitToLevel, levelToFahrenheit, type TemperatureFormat } from '@lib/temperatureConversions';
+import { formatDate, type SuggestionStart } from './rhythmsModel';
 
 export const SECTION_TITLE = 'Suggestions';
 export const FEATURE_TITLE = 'Suggestions from your changes';
@@ -19,6 +20,21 @@ export const LEAVE_OUT_HINT = 'Press Leave out on a night that should not count,
 export const HOW_THIS_WORKS = 'How this works';
 export const HOW_TITLE = 'How suggestions work';
 export const WHAT_COUNTS_TITLE = 'What counts';
+export const NEEDS_RHYTHMS = 'Needs Rhythms';
+export const SHOW_NIGHTS = 'Show the nights';
+export const REVIEW = 'Review';
+export const NIGHTS_HEADING = 'Your nights';
+export const WITH_CHANGE_HEADING = 'With this change';
+export const HIDDEN_HEADING = 'Hidden';
+export const SHOW_AGAIN = 'Show again';
+export const CARD_OVERLINE = 'Suggestion from your changes';
+export const DONT_SUGGEST = "Don't suggest this";
+export const DONT_SUGGEST_CHECKED = "Don't suggest the checked";
+export const HIDE_ERROR = 'Could not hide this suggestion. Try again.';
+export const SHOW_AGAIN_ERROR = 'Could not show it again. Try again.';
+export const CHART_LEGEND = { change: 'With this change', night: 'A night', now: 'Now' } as const;
+
+type ValueRow = Extract<SuggestionRow, { kind: 'step' | 'on' }>;
 
 const inTen = (share: number) => `${Math.round(share * 10)} in 10`;
 const atLeast = (share: number) => (share === 0.5 ? 'half or more' : `${inTen(share)} or more`);
@@ -103,4 +119,148 @@ function changeText(change: NightLog['changes'][number], format: TemperatureForm
 export function noteLines(night: NightLog, format: TemperatureFormat, timeZone: string): string[] {
   const lines = night.changes.length ? night.changes.map(change => changeText(change, format, timeZone)) : ['no change'];
   return night.tonight ? [`${nightLabel(night)}: ${lines[0]}`, ...lines.slice(1)] : lines;
+}
+
+const warmth = (direction: 'down' | 'up') => (direction === 'down' ? 'cooler' : 'warmer');
+const capitalized = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+const uncapitalized = (text: string) => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+const joinAnd = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
+// The value a row writes, read against the one it replaces.
+const newValue = (row: ValueRow, format: TemperatureFormat) => pairTemperatures(row.plannedF, row.temperatureF, format)[1];
+const backValue = (row: ValueRow, back: ThenBack, format: TemperatureFormat) =>
+  pairTemperatures(row.temperatureF, back.temperatureF, format)[1];
+
+export const reviewName = (name: string) => `Review suggestion for ${name}`;
+
+// The count is in the label, so no note has to explain which rows Add takes.
+export function addLabel(name: string, checked = 1, total = 1): string {
+  if (total === 1 || checked === 0) return `Add to ${name}`;
+  if (checked < total) return `Add ${checked} of ${total} to ${name}`;
+  return total === 2 ? `Add both to ${name}` : `Add all ${total} to ${name}`;
+}
+export const dontSuggestLabel = (checked: number, total: number) => (checked < total ? DONT_SUGGEST_CHECKED : DONT_SUGGEST);
+export const uncheckedNote = (unchecked: number) => (unchecked === 1
+  ? 'The unchecked change starts counting again after you add.' : 'The unchecked changes start counting again after you add.');
+export const showNightsLabel = (counted: number) => `Show the ${count(counted, 'night')}`;
+
+function cardRow(row: SuggestionRow, format: TemperatureFormat): string {
+  if (row.kind === 'base') return `base one step ${warmth(row.direction)}`;
+  const value = row.kind === 'on' ? `starts at ${newValue(row, format)}` : `${newValue(row, format)} at ${clockOf(row.time)}`;
+  return row.thenBack ? `${value}, back to ${backValue(row, row.thenBack, format)} at ${clockOf(row.thenBack.time)}` : value;
+}
+
+export const cardLine = (name: string, rows: SuggestionRow[], format: TemperatureFormat) =>
+  `${name}: ${rows.map(row => cardRow(row, format)).join(', ')}`;
+
+export const cardEvidence = (row: SuggestionRow, counted: number) => `From ${row.supporting} of ${counted} nights`;
+// A card with two or three rows gives each its own count, on its own line.
+export const cardRowLine = (row: SuggestionRow, counted: number, format: TemperatureFormat) =>
+  `${cardRow(row, format)} · ${row.supporting} of ${counted} nights`;
+
+export function nearLine(name: string, row: SuggestionRow, counted: number): string {
+  const share = `on ${row.supporting} of ${counted} nights`;
+  if (row.kind === 'step') return `${name}: ${warmth(row.direction)} around ${clockOf(row.time)} ${share}`;
+  if (row.kind === 'on') return `${name}: a ${warmth(row.direction)} start ${share}`;
+  return `${name}: ${warmth(row.direction)} than the night temperature ${share}`;
+}
+
+export const hiddenForLine = (name: string, nightsLeft: number) => `${name}: hidden for ${count(nightsLeft, 'more night')}`;
+export const sheetOverline = (name: string, side: 'left' | 'right') => `${name}, ${side} side`;
+
+function rowHeading(row: SuggestionRow): string {
+  if (row.kind === 'step') return `${capitalized(warmth(row.direction))} around ${clockOf(row.time)}`;
+  if (row.kind === 'on') return `${capitalized(warmth(row.direction))} start`;
+  return `Base one step ${warmth(row.direction)}`;
+}
+
+export const sheetHeading = (rows: SuggestionRow[]) =>
+  rows.map((row, index) => (index === 0 ? rowHeading(row) : uncapitalized(rowHeading(row)))).join(', ');
+
+export function evidenceSentence(
+  row: SuggestionRow, counted: number, format: TemperatureFormat, rules: SuggestionRules = SUGGESTION_RULES,
+): string {
+  const nights = `${row.supporting} of ${counted} nights`;
+  if (row.kind === 'base') {
+    return `${nights}: ${warmth(row.direction)} than the night temperature. The whole curve moves, warm start included.`;
+  }
+  const [before, after] = pairTemperatures(row.plannedF, row.temperatureF, format);
+  let first: string;
+  if (row.kind === 'on') first = `${nights}: about ${after} within ${rules.ON_WINDOW_MIN} minutes of turning on, instead of ${before}.`;
+  else if (row.replaces) first = `${nights}: about ${after} instead of ${before} at ${clockOf(row.time)}.`;
+  else first = `${nights}: ${before} to about ${after} around ${clockOf(row.time)}.`;
+  if (!row.thenBack) return first;
+  return `${first} ${row.thenBack.supporting} of those: back to ${backValue(row, row.thenBack, format)} around ${clockOf(row.thenBack.time)}.`;
+}
+
+// The night as text, so nothing is shown only in the chart.
+export function withChangeRows(before: Rhythm, after: Rhythm, format: TemperatureFormat): string[] {
+  if (before.temperatureMode === 'smart') {
+    const now = displayTemperature(levelToFahrenheit(before.smart.baseLevel), format);
+    const next = displayTemperature(levelToFahrenheit(after.smart.baseLevel), format);
+    return [`Base: ${now} now, ${next} with this change`];
+  }
+  const { power, temperatures } = after.night;
+  const changed = (was: number, value: number) => {
+    const [old, shown] = pairTemperatures(was, value, format);
+    return `${shown} | changed, was ${old}`;
+  };
+  const onText = power.onTemperature === before.night.power.onTemperature
+    ? displayTemperature(power.onTemperature, format) : changed(before.night.power.onTemperature, power.onTemperature);
+  const steps = Object.entries(temperatures)
+    .filter(([time]) => temperatureInPowerWindow(time, power))
+    .sort(([a], [b]) => minutesAfterOn(a, power.on) - minutesAfterOn(b, power.on))
+    .map(([time, value]) => {
+      const was = before.night.temperatures[time];
+      const text = was === undefined ? `${displayTemperature(value, format)} | new`
+        : was === value ? displayTemperature(value, format) : changed(was, value);
+      return `${clockOf(time)} | ${text}`;
+    });
+  return [`${clockOf(power.on)} | On, ${onText}`, ...steps, `${clockOf(power.off)} | Off`];
+}
+
+export const provenance = (name: string) => `Middle values of those nights, rounded. Counted since you last changed ${name}.`;
+
+export function startsLine(start: SuggestionStart, name: string): string {
+  if (start.kind === 'tonight') return 'Starts tonight.';
+  if (start.kind === 'today') return `Starts at ${clockOf(start.at)} today.`;
+  if (start.kind === 'paused') return 'Starts after the pause.';
+  if (start.kind === 'date') return `Starts ${formatDate(start.date)}.`;
+  return `Starts next time ${name} runs.`;
+}
+
+export function undoAddMessage(name: string, rows: SuggestionRow[], format: TemperatureFormat): string {
+  const base = rows.find(row => row.kind === 'base');
+  if (base) return `${name} base is now one step ${warmth(base.direction)}`;
+  const values = rows.filter((row): row is ValueRow => row.kind !== 'base');
+  const starts = values.filter(row => row.kind === 'on').map(row => `starts at ${newValue(row, format)}`);
+  const sets = values.flatMap(row => [
+    ...(row.kind === 'step' ? [`${newValue(row, format)} at ${clockOf(row.time)}`] : []),
+    ...(row.thenBack ? [`${backValue(row, row.thenBack, format)} at ${clockOf(row.thenBack.time)}`] : []),
+  ]);
+  return `${name} now ${joinAnd([...starts, ...(sets.length ? [`sets ${joinAnd(sets)}`] : [])])}`;
+}
+
+export const undoHideMessage = (name: string) => `${name}: suggestion hidden`;
+
+export const hiddenIntro = (name: string) => `Not suggested again until you change ${name}, or press Show again.`;
+
+function hiddenWhat(entry: Dismissed): string {
+  if (entry.scope === 'later') return `all suggestions hidden for ${count(entry.nightsLeft, 'more night')}`;
+  const [kind, direction] = (entry.key ?? '').split(':');
+  const way = direction === 'up' ? 'warmer' : 'cooler';
+  if (kind === 'step' && entry.time) return `${way} around ${clockOf(entry.time)}`;
+  return kind === 'on' ? `a ${way} start` : `a ${way} base`;
+}
+
+export const hiddenRow = (entry: Dismissed) => (entry.scope === 'later' ? capitalized(hiddenWhat(entry)) : `Hidden: ${hiddenWhat(entry)}`);
+export const showAgainName = (entry: Dismissed) => `Show again, ${entry.scope === 'later' ? 'all suggestions' : hiddenWhat(entry)}`;
+
+export function chartCaption(nights: NightLog[], supportingDates: string[]): string {
+  const quiet = nights.filter(logged => logged.changes.length === 0).length;
+  const other = nights.filter(logged => logged.changes.length > 0 && !supportingDates.includes(logged.date)).length;
+  return [
+    'One line per night.',
+    ...(quiet ? [quiet === 1 ? '1 had no change and sits on the dashed line.' : `${quiet} had no change and sit on the dashed line.`] : []),
+    ...(other ? [`${other} had other changes.`] : []),
+  ].join(' ');
 }

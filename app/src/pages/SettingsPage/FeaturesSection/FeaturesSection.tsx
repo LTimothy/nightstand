@@ -10,7 +10,7 @@ import DeleteNotesDialog from './DeleteNotesDialog.tsx';
 import CoverButtonOptions from './CoverButtonOptions.tsx';
 import { coverButtonsPath, POD5_HUB_GESTURES } from './coverButtons.ts';
 import { GESTURE_LABELS } from '../tapActions.ts';
-import { DELETE_NOTES, FEATURE_TITLE, featureDescription } from '../../SchedulePage/rhythms/suggestionsCopy';
+import { DELETE_NOTES, FEATURE_TITLE, featureDescription, NEEDS_RHYTHMS } from '../../SchedulePage/rhythms/suggestionsCopy';
 import { Services, useServices, postServices } from '@api/services.ts';
 import { useSettings, postSettings } from '@api/settings.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
@@ -268,7 +268,7 @@ export default function FeaturesSection() {
           checked={ features?.rhythmSuggestions ?? false }
           onChange={ next => updateFeature({ rhythmSuggestions: next }) }
           description={ !features?.rhythms
-            ? <Link href="#rhythms" sx={ { display: 'inline-flex', minHeight: 44, alignItems: 'center' } }>Needs Rhythms</Link>
+            ? <Link href="#rhythms" sx={ { display: 'inline-flex', minHeight: 44, alignItems: 'center' } }>{ NEEDS_RHYTHMS }</Link>
             : featureDescription() }
         />
         <Button onClick={ () => setDeleteNotes(true) } sx={ { minHeight: 44, px: 0 } }>{ DELETE_NOTES }</Button>
