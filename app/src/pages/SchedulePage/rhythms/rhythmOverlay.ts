@@ -11,6 +11,8 @@ import { previewCurves } from './smartPreview';
 const MINUTE = 60_000;
 export type OverlayNight = { date: string; dim: boolean; points: Step[]; end: number };
 export type Overlay = { endMin: number; loF: number; hiF: number; plan: Step[]; nights: OverlayNight[] };
+// Last night, the six before it, and older or dimmed nights. 0.4 is the least that keeps a 3:1 line on the card in every look.
+export const NIGHT_OPACITY = { last: 1, recent: 0.6, older: 0.4 } as const;
 type Args = { rhythm: Rhythm; log: NightLog[]; today: string; timeZone: string; trackingOn: boolean };
 
 // Starts a step line at 0 with the value in force there and cuts it at `end`; what falls outside the axis is not drawn.

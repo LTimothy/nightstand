@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { distance, ratio, spread } from '@test/colour';
+import { distance, flatten, ratio, spread } from '@test/colour';
 import { fahrenheitToLevel, levelToFahrenheit } from '@lib/temperatureConversions';
+import { NIGHT_OPACITY } from '../../pages/SchedulePage/rhythms/rhythmOverlay';
 import { THEMES } from '.';
 import { DEFAULT_THEME_ID, THEME_IDS, isThemeId } from './ids';
 import { scaleColor } from './scale';
@@ -52,6 +53,10 @@ function drawnPairs(p: ThemePalette): Pair[] {
   // The nights chart draws these lines on a sheet.
   add('step.cool', p.step.cool, { sheet: p.bg.elevated }, MARK);
   add('step.warm', p.step.warm, { sheet: p.bg.elevated }, MARK);
+  // A rhythm card's chart: its dimmest night line, text.primary faded, on the card.
+  const solid = flatten(p.text.primary, p.bg.elevated);
+  const faded = `rgba(${[1, 3, 5].map(i => parseInt(solid.slice(i, i + 2), 16)).join(',')},${NIGHT_OPACITY.older})`;
+  add('dimmest night line', faded, { card: p.bg.elevated }, MARK);
   add('dial.tickZero', p.dial.tickZero, { base: p.bg.base }, MARK);
   add('stage.awake', p.stage.awake, { elevated: p.bg.elevated }, MARK);
   add('stage.light', p.stage.light, { elevated: p.bg.elevated }, MARK);
