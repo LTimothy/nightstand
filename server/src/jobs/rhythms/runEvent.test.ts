@@ -606,8 +606,13 @@ describe('"When I get up" sleeps', () => {
 });
 
 describe('night notes', () => {
-  beforeEach(() => forgetHandChanges());
+  beforeEach(async () => {
+    // Set lines are written only while Rhythms is active.
+    setEngineActivation({ active: true, db: testRhythmsDB(schedulesDB.data, everyNight(null)) });
+    await forgetHandChanges();
+  });
   afterEach(async () => {
+    setEngineActivation({ active: false, reason: 'flag-off' });
     settingsDB.data.features.rhythmSuggestions = false;
     await settingsDB.write();
   });
@@ -621,7 +626,9 @@ describe('night notes', () => {
     setNow('2026-09-28T22:00:00Z');
     await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
     await flushHandChanges();
-    assert.deepEqual(nightLines().map(line => [line.kind, line.side, line.date]), [['night', 'left', '2026-09-28']]);
+    assert.deepEqual(nightLines().map(line => [line.kind, line.side, line.date]), [
+      ['night', 'left', '2026-09-28'], ['set', 'left', '2026-09-28'],
+    ]);
   });
 
   it('writes nothing with suggestions off', async () => {
@@ -652,5 +659,22 @@ describe('night notes', () => {
     await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
     await flushHandChanges();
     assert.deepEqual(nightLines(), []);
+  });
+
+  it('writes what each scheduled write set: the power-on, a step and the power-off', async () => {
+    settingsDB.data.features.rhythmSuggestions = true;
+    await settingsDB.write();
+    const sleep = sleepOn('2026-09-28');
+    const expected: Array<[string, number | null]> = [];
+    for (const kind of ['power-on', 'temperature', 'power-off'] as const) {
+      const event = eventOf(sleep, kind);
+      setNow(event.at.toISOString());
+      await runRhythmEvent('left', sleep, event);
+      const reason = { 'power-on': 'on', temperature: 'step', 'power-off': 'off' }[kind];
+      expected.push([reason, 'temperatureF' in event ? event.temperatureF : null]);
+    }
+    await flushHandChanges();
+    const sets = nightLines().filter(line => line.kind === 'set') as unknown as Array<{ reason: string; targetF: number | null }>;
+    assert.deepEqual(sets.map(line => [line.reason, line.targetF]), expected);
   });
 });

@@ -18,7 +18,9 @@ import { currentSleep, drivingSide, engineActivation, scheduledTemperatureNow } 
 import { smartCurveStatus, smartTemperatureGate } from './curveController.js';
 import { appendPruned } from './history.js';
 import { canonicalJson } from './night.js';
-import { parseLine, type ChangeLine, type DismissLine, type ExcludeLine, type Line, type NightLine, type RestoreLine } from './learn.js';
+import {
+  parseLine, type ChangeLine, type DismissLine, type ExcludeLine, type Line, type NightLine, type RestoreLine, type SetLine,
+} from './learn.js';
 import type { ResolvedSleep } from './resolve.js';
 
 export const CHANGES_FILE_NAME = 'rhythms-changes.jsonl';
@@ -108,6 +110,28 @@ export function recordNight(side: Side, sleep: ResolvedSleep, now: Date = new Da
       sleepStart: sleep.start.toISOString(), sleepEnd: sleep.end.toISOString(),
     };
     void enqueue(() => appendPruned(changesPath(), keepFor(now), [JSON.stringify(line)])).catch(warn);
+  } catch (error: unknown) {
+    warn(error);
+  }
+}
+
+export type SetReason = 'on' | 'step' | 'curve' | 'hold-end' | 'base' | 'off';
+
+// What the scheduler wrote during a Rhythms sleep, so the cards can draw what the bed was set to. The Smart
+// controller's writes pass no sleep and are matched to the one in progress. Never throws.
+export function recordSet(side: Side, sleep: ResolvedSleep | null, targetF: number | null, reason: SetReason, now: Date = new Date()): void {
+  try {
+    const settings = settingsDB.data;
+    if (settings.features?.rhythmSuggestions !== true || !settings.timeZone || !engineActivation().active) return;
+    if (isSchedulePaused(settings, side, now)) return;
+    const night = sleep ?? currentSleep(side, now);
+    if (!night?.rhythmId) return;
+    const line: SetLine = {
+      v: 1, kind: 'set', at: now.toISOString(), side, rhythmId: night.rhythmId,
+      planKey: planKeyOf(night.night, night.mode, night.smart?.baseLevel ?? 0), date: night.date,
+      targetF: targetF === null ? null : Math.round(Math.min(MAX_TEMPERATURE_F, Math.max(MIN_TEMPERATURE_F, targetF))), reason,
+    };
+    void enqueue(() => appendLines([line])).catch(warn);
   } catch (error: unknown) {
     warn(error);
   }

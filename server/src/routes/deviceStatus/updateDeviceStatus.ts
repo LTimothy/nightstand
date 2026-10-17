@@ -107,8 +107,8 @@ const updateSettings = async (settings: Partial<DeviceStatus['settings']>, optio
   await executeFunction('SET_SETTINGS', hexString, options);
 };
 
-// Scheduled callers pass { background: true } to wait longer for the hardware.
-export const updateDeviceStatus = async (deviceStatus: DeepPartial<DeviceStatus>, updateOptions: DeviceUpdateOptions = {}) => {
+// Scheduled callers pass { background: true } to wait longer for the hardware. Resolves false when a newer update replaced it.
+export const updateDeviceStatus = async (deviceStatus: DeepPartial<DeviceStatus>, updateOptions: DeviceUpdateOptions = {}): Promise<boolean> => {
   logger.info(`Updating device status..`);
   const { onUntil, ...options } = updateOptions;
 
@@ -120,7 +120,8 @@ export const updateDeviceStatus = async (deviceStatus: DeepPartial<DeviceStatus>
   } catch (error) {
     if (!(error instanceof FrankenSupersededError)) throw error;
     logger.info('Dropped an update replaced by a newer one while the Pod was unreachable');
-    return;
+    return false;
   }
   logger.info('Finished updating device status');
+  return true;
 };

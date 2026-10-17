@@ -59,6 +59,7 @@ function harness(options: {
   let clock = local(options.start ?? `${DATE} 21:00`);
   const presence: PresenceSnapshot = { left: { present: false }, right: { present: false } };
   const applied: Array<[Side, number, string]> = [];
+  const reasons: string[] = [];
   const history: SleepSummary[] = [];
   let retimes = 0;
 
@@ -75,7 +76,8 @@ function harness(options: {
         : applySmartCurve(base, TZ, controller.coolStartFor(side, DATE));
       return sleep.start < to && sleep.end > from ? [sleep] : [];
     },
-    applyLevel: async (side, level) => {
+    applyLevel: async (side, level, reason) => {
+      reasons.push(reason);
       applied.push([side, level, moment(clock).tz(TZ).format('HH:mm')]);
     },
     retime: () => { retimes += 1; },
@@ -110,7 +112,7 @@ function harness(options: {
     return resolved;
   };
   return {
-    controller, applied, history, runUntil,
+    controller, applied, reasons, history, runUntil,
     retimes: () => retimes,
     now: () => clock,
     curve,
@@ -310,6 +312,7 @@ describe('CurveController manual hold', () => {
     assert.equal(h.controller.gate('left', DATE, local('2026-09-30 05:00')), 'run');
     await h.runUntil('2026-09-30 05:01');
     assert.deepEqual(h.applied, [['left', -2, '05:00']]);
+    assert.equal(h.reasons.at(-1), 'hold-end');
     assert.equal(h.controller.gate('left', DATE, local('2026-09-30 05:45')), 'run');
   });
 
@@ -438,6 +441,7 @@ describe('CurveController up early and after wake', () => {
     const h = harness({ smart: { upEarly: true } });
     await h.runUntil('2026-09-30 07:31', upAt530);
     assert.deepEqual(h.applied, [['left', 0, '05:50']]);
+    assert.equal(h.reasons.at(-1), 'base');
     assert.equal(h.history[0].upEarlyAt, local('2026-09-30 05:50').toISOString());
   });
 

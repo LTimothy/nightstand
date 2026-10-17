@@ -93,7 +93,7 @@ export type CurveControllerDeps = {
   isPaused: (side: Side, now: Date) => boolean;
   // Every resolved sleep for the side intersecting [from, to], with smartCoolStartFor applied.
   sleeps: (side: Side, from: Date, to: Date) => ResolvedSleep[];
-  applyLevel: (side: Side, level: number) => Promise<void>;
+  applyLevel: (side: Side, level: number, reason: 'hold-end' | 'base') => Promise<void>;
   retime: () => void;
   recordHistory: (summary: SleepSummary) => Promise<void>;
   // Without it, "When I get up" sleeps turn off at their set time.
@@ -599,13 +599,13 @@ export class CurveController {
     if (state.hold && !moved && time >= state.hold.until.getTime()) {
       state.hold = null;
       const level = levelAt(state.points, now);
-      if (level !== null) await this.apply(state, level, 'manual hold ended');
+      if (level !== null) await this.apply(state, level, 'manual hold ended', 'hold-end');
     }
     if (state.hold) return;
 
     if (state.smart.upEarly && !state.upEarlyAt && upEarlyDue(run, state.wake, time)) {
       state.upEarlyAt = now;
-      await this.apply(state, state.smart.baseLevel, 'up early');
+      await this.apply(state, state.smart.baseLevel, 'up early', 'base');
       return;
     }
     const wake = state.wake.getTime();
@@ -614,7 +614,7 @@ export class CurveController {
       && time >= wake && time < wake + AFTER_WAKE_MS && wake < state.powerOff.getTime();
     if (outOfBed) {
       state.outOfBedAt = now;
-      await this.apply(state, state.smart.baseLevel, 'out of bed after wake');
+      await this.apply(state, state.smart.baseLevel, 'out of bed after wake', 'base');
     }
   }
 
@@ -634,10 +634,10 @@ export class CurveController {
     }
   }
 
-  private async apply(state: SleepState, level: number, why: string): Promise<void> {
+  private async apply(state: SleepState, level: number, why: string, reason: 'hold-end' | 'base'): Promise<void> {
     logger.info(`smart schedule ${state.side} ${state.date}: level ${level} (${why})`);
     try {
-      await this.deps.applyLevel(state.side, level);
+      await this.deps.applyLevel(state.side, level, reason);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       logger.warn(`smart schedule ${state.side} ${state.date}: could not set level: ${message}`);

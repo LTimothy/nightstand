@@ -10,6 +10,7 @@ import logger from '../../logger.js';
 import { levelToF } from '../../db/smartCurve.js';
 import { getPresenceData } from '../../routes/metrics/presence.js';
 import { updateDeviceStatus } from '../../routes/deviceStatus/updateDeviceStatus.js';
+import { recordSet } from './handChanges.js';
 import { isSchedulePaused } from '../schedulePause.js';
 import { applyAlarmsEnabled, resolveSleeps, type ResolvedSleep } from './resolve.js';
 import { isAlarmOverridden } from './gates.js';
@@ -85,12 +86,14 @@ export function curveDeps(retime: () => void, smartOff?: SmartOffDeps): CurveCon
     },
     // Scheduled work: waits out a reconnect, where a newer set point for the
     // side replaces it. Not awaited, so a waiting write never stalls the tick.
-    applyLevel: async (side, level) => {
+    applyLevel: async (side, level, reason) => {
       const update = { [side]: { targetTemperatureF: levelToF(level) } } as DeepPartial<DeviceStatus>;
-      void updateDeviceStatus(update, { background: true }).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(`smart schedule: could not set the ${side} level: ${message}`);
-      });
+      void updateDeviceStatus(update, { background: true })
+        .then(written => { if (written !== false) recordSet(side, null, levelToF(level), reason); })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          logger.warn(`smart schedule: could not set the ${side} level: ${message}`);
+        });
     },
     retime,
     recordHistory: summary => recordSleepHistory(summary),

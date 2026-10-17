@@ -13,16 +13,23 @@ process.env.ENV = 'local';
 const deviceUpdates: Array<{ update: unknown; options: unknown }> = [];
 // Set to make a write wait forever, like one waiting for the hardware connection.
 let writesWait = false;
+let writesReplaced = false;
 mock.module(new URL('../../routes/deviceStatus/updateDeviceStatus.js', import.meta.url).href, {
   namedExports: {
     updateDeviceStatus: async (update: unknown, options?: unknown) => {
       deviceUpdates.push({ update, options });
       if (writesWait) await new Promise(() => {});
+      return !writesReplaced;
     },
   },
 });
 mock.module(new URL('../../routes/metrics/presence.js', import.meta.url).href, {
   namedExports: { getPresenceData: () => ({ left: { present: false }, right: { present: false } }) },
+});
+
+const sets: unknown[][] = [];
+mock.module(new URL('./handChanges.js', import.meta.url).href, {
+  namedExports: { recordSet: (...args: unknown[]) => { sets.push(args); } },
 });
 
 let runtime: typeof import('./curveRuntime.js');
@@ -86,7 +93,7 @@ describe('recordSleepHistory', () => {
 describe('curveDeps', () => {
   it('writes levels as Fahrenheit through updateDeviceStatus as scheduled work', async () => {
     const deps = runtime.curveDeps(() => {});
-    await deps.applyLevel('left', -2);
+    await deps.applyLevel('left', -2, 'hold-end');
     assert.deepEqual(deviceUpdates.at(-1), { update: { left: { targetTemperatureF: 77 } }, options: { background: true } });
   });
 
@@ -94,10 +101,34 @@ describe('curveDeps', () => {
     writesWait = true;
     try {
       const deps = runtime.curveDeps(() => {});
-      await deps.applyLevel('right', 1);
+      await deps.applyLevel('right', 1, 'base');
       assert.deepEqual(deviceUpdates.at(-1), { update: { right: { targetTemperatureF: 85 } }, options: { background: true } });
     } finally {
       writesWait = false;
+    }
+  });
+
+  it('writes down a level once its write lands, and not while it waits or when a newer write replaced it', async () => {
+    sets.length = 0;
+    const deps = runtime.curveDeps(() => {});
+    await deps.applyLevel('left', -2, 'hold-end');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(sets, [['left', null, 77, 'hold-end']]);
+    writesWait = true;
+    try {
+      await deps.applyLevel('left', 1, 'base');
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(sets.length, 1);
+    } finally {
+      writesWait = false;
+    }
+    writesReplaced = true;
+    try {
+      await deps.applyLevel('left', 1, 'base');
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(sets.length, 1, 'a replaced write is not noted');
+    } finally {
+      writesReplaced = false;
     }
   });
 

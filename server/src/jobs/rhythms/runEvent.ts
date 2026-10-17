@@ -16,7 +16,7 @@ import { isTempScheduleOverridden } from '../scheduleOverride.js';
 import { effectiveSides, engineActivation } from '../scheduleQueries.js';
 import { rhythmSkipReason } from './gates.js';
 import { smartOffDecision, smartPowerOffFor, smartTemperatureGate } from './curveController.js';
-import { recordNight } from './handChanges.js';
+import { recordNight, recordSet } from './handChanges.js';
 import { turnsOffWhenUp, type ResolvedSleep, type RhythmEvent } from './resolve.js';
 
 export const FIRMWARE_MARGIN_SECONDS = 300;
@@ -160,11 +160,12 @@ export async function runRhythmEvent(side: Side, sleep: ResolvedSleep, event: Rh
         ? smartTemperatureGate(side, sleep.date, event.at) !== 'run'
         : isTempScheduleOverridden(side);
       if (held) logger.info(`Temperature held by a manual change, powering ${side} on without setting it`);
-      await updateDeviceStatus({
+      const written = await updateDeviceStatus({
         [side]: held ? { isOn: true } : { isOn: true, targetTemperatureF: event.temperatureF },
       }, { ...SCHEDULED, onUntil });
       noteArmed(settings, side, sleep.end);
       recordNight(side, sleep, now);
+      if (!held && written !== false) recordSet(side, sleep, event.temperatureF, 'on', now);
       markStatus('powerSchedule');
     } else if (event.kind === 'temperature') {
       const smartGate = sleep.mode === 'smart' ? smartTemperatureGate(side, sleep.date, event.at) : 'run';
@@ -176,7 +177,9 @@ export async function runRhythmEvent(side: Side, sleep: ResolvedSleep, event: Rh
         logger.info(`Skipping ${label}: held by a manual change`);
         return 0;
       }
-      await updateDeviceStatus({ [side]: { targetTemperatureF: event.temperatureF } }, SCHEDULED);
+      const written = await updateDeviceStatus({ [side]: { targetTemperatureF: event.temperatureF } }, SCHEDULED);
+      // false: a newer write replaced this one before it reached the Pod.
+      if (written !== false) recordSet(side, sleep, event.temperatureF, sleep.mode === 'smart' ? 'curve' : 'step', now);
       markStatus('temperatureSchedule');
     } else if (event.kind === 'alarm') {
       const { vibrationIntensity, duration, vibrationPattern } = event.alarm;
@@ -187,7 +190,7 @@ export async function runRhythmEvent(side: Side, sleep: ResolvedSleep, event: Rh
         { ...SCHEDULED, dueAt: event.at.getTime() },
       );
     } else {
-      await updateDeviceStatus({ [side]: { isOn: false } }, SCHEDULED);
+      if (await updateDeviceStatus({ [side]: { isOn: false } }, SCHEDULED) !== false) recordSet(side, sleep, null, 'off', now);
       markStatus('powerSchedule');
     }
   } catch (error: unknown) {
