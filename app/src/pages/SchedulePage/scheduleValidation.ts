@@ -1,4 +1,7 @@
 import { DailySchedule, DailyScheduleSchema, AlarmScheduleSchema, MAX_ALARMS_PER_DAY } from '@api/schedulesSchema';
+import { temperatureInPowerWindow } from '@api/rhythmWake';
+
+export { temperatureInPowerWindow };
 
 export function minutesSincePowerOn(time: string, powerOn: string): number {
   const minutes = (value: string) => {
@@ -13,12 +16,6 @@ export function timeInPowerWindow(time: string, power: DailySchedule['power']): 
   const offset = minutesSincePowerOn(time, power.on);
   const end = power.off === power.on ? 1440 : minutesSincePowerOn(power.off, power.on);
   return Number.isFinite(offset) && end > 0 && offset <= end;
-}
-
-export function temperatureInPowerWindow(time: string, power: DailySchedule['power']): boolean {
-  const offset = minutesSincePowerOn(time, power.on);
-  const end = power.off === power.on ? 1440 : minutesSincePowerOn(power.off, power.on);
-  return Number.isFinite(offset) && offset > 0 && offset < end;
 }
 
 export function validateSchedule(schedule: DailySchedule | undefined, existingAlarmCount = 0) {

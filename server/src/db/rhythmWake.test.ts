@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { minutesAfterOn, wakeFromNight, wakeInNight } from './rhythmWake.js';
+import { minutesAfterOn, temperatureInPowerWindow, wakeFromNight, wakeInNight } from './rhythmWake.js';
 import { alarmAt, nightOf, WORKDAY } from '../jobs/rhythms/rhythmsTestData.js';
 
 describe('rhythmWake', () => {
@@ -27,5 +27,21 @@ describe('rhythmWake', () => {
     assert.equal(wakeInNight('07:00', power), true);
     assert.equal(wakeInNight('07:01', power), false);
     assert.equal(wakeInNight('21:59', { ...power, on: '22:00', off: '22:00' }), true);
+  });
+});
+
+describe('temperatureInPowerWindow', () => {
+  const power = { on: '22:00', off: '06:00', onTemperature: 82, enabled: true };
+  it('is strictly inside the night, across midnight', () => {
+    assert.equal(temperatureInPowerWindow('23:45', power), true);
+    assert.equal(temperatureInPowerWindow('05:59', power), true);
+    assert.equal(temperatureInPowerWindow('22:00', power), false);
+    assert.equal(temperatureInPowerWindow('06:00', power), false);
+    assert.equal(temperatureInPowerWindow('12:00', power), false);
+  });
+  it('treats a full-day night as 24 hours and a malformed time as outside', () => {
+    assert.equal(temperatureInPowerWindow('21:59', { ...power, off: '22:00' }), true);
+    assert.equal(temperatureInPowerWindow('7:00', power), false);
+    assert.equal(temperatureInPowerWindow('24:00', power), false);
   });
 });

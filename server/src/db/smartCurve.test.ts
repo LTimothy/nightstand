@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import moment from 'moment-timezone';
 import {
-  buildCurve, curveBounds, CURVE, isDaySleep, levelAt, levelToF, phaseAt, prewarmMinutes, warmsBeforeBedtime,
+  buildCurve, curveBounds, CURVE, F_PER_LEVEL, isDaySleep, levelAt, levelToF, phaseAt, prewarmMinutes, warmsBeforeBedtime,
   type CurveInput, type CurvePoint,
 } from './smartCurve.js';
 import { DEFAULT_SMART, type SmartSchedule } from './rhythmsSchema.js';
@@ -407,4 +407,9 @@ describe('"When I get up"', () => {
       assert.equal(after.at(-1)?.phase, 'wake');
     }
   });
+});
+
+it('steps 2.75 °F per level, the same mapping as levelToF', () => {
+  assert.equal(F_PER_LEVEL, 2.75);
+  assert.equal(levelToF(-1), Math.round(82.5 - F_PER_LEVEL));
 });

@@ -21,3 +21,12 @@ export function wakeFromNight(night: DailySchedule): string {
     .sort((a, b) => minutesAfterOn(a.time, power.on) - minutesAfterOn(b.time, power.on));
   return alarms[0]?.time ?? power.off;
 }
+
+const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Same rule as the app's set point check: after power on and before power off, never at either.
+export function temperatureInPowerWindow(time: string, power: DailySchedule['power']): boolean {
+  if (!CLOCK.test(time)) return false;
+  const offset = minutesAfterOn(time, power.on);
+  return offset > 0 && offset < nightMinutes(power);
+}
