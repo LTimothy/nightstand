@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { SuggestionsResponse } from '@api/rhythmsSchema';
+import type { SuggestionRow, SuggestionsResponse } from '@api/rhythmsSchema';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
 import SuggestionsSection from './SuggestionsSection';
 
@@ -27,6 +27,7 @@ const show = (props: Partial<Parameters<typeof SuggestionsSection>[0]> = {}) => 
   suggestions={ query() }
   away={ false }
   onShowNotes={ () => {} }
+  onReview={ () => {} }
   { ...props }/>);
 
 it('explains the rule and gives one line per rhythm', () => {
@@ -77,4 +78,37 @@ it('shows nothing for an older Pod without suggestions, or with them off', () =>
   unmount();
   const off = show({ suggestions: query({ data: { ...data, enabled: false } }) });
   expect(off.container).toBeEmptyDOMElement();
+});
+
+const nearRow: SuggestionRow = {
+  kind: 'step', key: 'step:down', direction: 'down', supporting: 6, firstNight: '2026-09-14', lastNight: '2026-09-27',
+  supportingDates: ['2026-09-27'], time: '23:45', temperatureF: 79, plannedF: 80,
+};
+
+it('leaves out a rhythm that has a card, and puts a near miss with Review in place of its reason', async () => {
+  const onReview = vi.fn();
+  show({
+    onReview,
+    suggestions: query({ data: {
+      ...data,
+      nights: { ...data.nights, weekend: { counted: 14, needed: 5, changed: 8, earlier: false, reason: 'inconsistent' } },
+      suggestions: [
+        { rhythmId: 'workday', near: false, rows: [{ ...nearRow, supporting: 9 }] },
+        { rhythmId: 'weekend', near: true, rows: [nearRow] },
+      ],
+    } }),
+  });
+  expect(screen.queryByText(/^Workday:/)).not.toBeInTheDocument();
+  expect(screen.getByText('Weekend: cooler around 11:45 PM on 6 of 14 nights')).toBeInTheDocument();
+  expect(screen.queryByText(/but not the same one/)).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Review suggestion for Weekend' }));
+  expect(onReview).toHaveBeenCalledWith('weekend');
+});
+
+it('says how long a rhythm\'s suggestions stay hidden', () => {
+  show({ suggestions: query({ data: {
+    ...data,
+    dismissed: [{ id: 'a1b2c3d4e5f6', rhythmId: 'weekend', key: null, time: null, scope: 'later', nightsLeft: 9 }],
+  } }) });
+  expect(screen.getByText('Weekend: hidden for 9 more nights')).toBeInTheDocument();
 });
