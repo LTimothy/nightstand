@@ -722,8 +722,8 @@ by hand during a Rhythms sleep, and what the schedule set, in
 
 #### POST `/api/rhythms/suggestions/exclude`
 
-- Body: `{ "side", "rhythmId", "date", "excluded" }`. Marks a night as a
-  one-off, or counts it again.
+- Body: `{ "side", "rhythmId", "date", "excluded" }`. Leaves a night out of
+  the count, or counts it again.
 - `204`: saved.
 - `400`: invalid body, or the rhythm has no notes for that date on that side.
 - `404`: the side has no such rhythm.

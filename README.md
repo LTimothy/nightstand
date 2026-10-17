@@ -218,8 +218,11 @@ when clock synchronization is unavailable or reports an unsynchronized clock.
 
 Smart Schedule sets a rhythm's temperatures: comfortable when you lie down,
 a little cooler once you have settled in bed, and warming gently before your
-wake time. It doesn't learn from your sleep or change the curve from night
-to night. With Biometrics on, its only input is whether you are in bed,
+wake time. With Suggestions from your changes on, Nightstand keeps a note of
+each temperature change you make by hand during a rhythm sleep and, after 5
+nights, suggests a change you made on half or more of them. Nothing changes
+until you add it; the curve itself does not change from night to night.
+With Biometrics on, its only input is whether you are in bed,
 which starts the cool-down once you have been in bed for 20 minutes, but not
 before bedtime and never later than two hours after it.
 
@@ -230,6 +233,21 @@ Both rely on presence, which in a shared bed can mistake the other sleeper
 for you. The [timings](docs/VALIDATION.md#smart-schedule) are my own
 estimates, and the studies under "The research behind it" in the app didn't
 test this curve. It is not medical advice.
+
+### Suggestions from your changes
+
+Off by default, under Settings > Features next to Rhythms. While it is on,
+Nightstand writes down each temperature change made by hand during a
+rhythm: when, what the bed was at, what was set and what the rhythm
+planned. Changes from the cover and from other apps on your network count
+too. After 5 nights, a change made the same way on half or more of a
+rhythm's last 14 nights shows on the Schedule page with the nights behind
+it, and one action adds it to the rhythm. Nothing changes until you add it.
+
+The notes stay on the Pod for 90 days. Delete notes in Settings removes
+them. Neither the notes nor the Smart Schedule history is part of a backup,
+and a reset deletes both. The [rule and its limits](docs/VALIDATION.md#suggestions-from-your-changes)
+are written up with the other checks.
 
 ## Biometrics
 

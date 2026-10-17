@@ -198,6 +198,9 @@ Other controls can affect a scheduled night:
 - With Biometrics enabled and a live stream, presence auto-off can turn a
   side off after 45 minutes without presence outside a scheduled sleep.
   A long preheat automation may therefore end before someone gets in.
+- While Suggestions from your changes is on, a temperature write during a
+  Rhythms sleep counts as a hand change, whichever app sent it, and can be
+  suggested back to the rhythm.
 - `isOn: true` starts a 12-hour timer. Use `isOn: false` to turn off;
   `secondsRemaining: 0` is currently accepted but does not turn a side off.
 - When either side is in away mode, a one-side device-status write can

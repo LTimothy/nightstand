@@ -11,7 +11,7 @@ notes link the CI run for its tag, with the exact results.
 
 | Suite | Tool | About | What it covers | Runs on |
 | --- | --- | --- | --- | --- |
-| Server | node:test | 2,200 tests | Scheduling, Rhythms and Smart Schedule, alarms and missed alarms, the firmware's own off timers, the connection to the Pod's hardware, the API, the database and its migrations, and the shell scripts (below) | Node 24 |
+| Server | node:test | 2,200 tests | Scheduling, Rhythms and Smart Schedule, alarms and missed alarms, the firmware's own off timers, the connection to the Pod's hardware, the API, the database and its migrations, suggestions from hand changes, and the shell scripts (below) | Node 24 |
 | App | Vitest | 1,700 tests | Screens and flows against the same mock data as the demo | Node 24, jsdom |
 | Biometrics | pytest | 800 tests | Presence, sleep records, calibration and the vitals estimators, with fixed inputs and pinned results | Python 3.9 and 3.10 |
 | Browser | Playwright | 570 tests, plus 40 screenshot comparisons (24 theme, 16 layout) | The demo build at phone, tablet and laptop sizes | Chromium; WebKit for a subset |

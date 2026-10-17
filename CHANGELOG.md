@@ -8,6 +8,14 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+### Suggestions from your changes
+
+- Suggestions from your changes (off by default): a rhythm shows the
+  temperature change you made by hand on half or more of its nights, with
+  the nights behind it, and one action adds it to the rhythm. Notes stay on
+  the Pod for 90 days and can be deleted in Settings.
+- Checked on: the server and app test suites and the demo layout sweep.
+
 ### Cover taps
 
 - A tap can now set its side to a chosen temperature and turn it on

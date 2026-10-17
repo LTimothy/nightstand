@@ -185,6 +185,26 @@ up, and its firmware timer turned it off with the server stopped. The studies
 listed in the app used other beds and didn't test this curve. Both features
 rely on presence, which in a shared bed can mistake the other sleeper for you.
 
+## Suggestions from your changes
+
+A change is suggested once a rhythm has 5 ended nights and the same change,
+in the same direction and within about two hours, was made on half or more
+of its last 14 nights. Once shown it stays until fewer than 4 in 10 of those
+nights agree. From 7 nights, a change made on about 4 in 10 nights, and on at
+least 3, is offered more quietly, as a line under Suggestions with a Review
+button. Suggested times and temperatures are the middle values of the nights
+behind them, rounded, so they are estimates.
+
+The timing rule and the night counting were checked against the July and
+August log lines of my own Pod. Those lines carry no temperatures, so no
+suggested value had been checked before the notes ran on a Pod. I haven't
+checked whether adding a suggestion changes anyone's sleep.
+
+A shared bed, an automation that sets its own temperatures, or nights nobody
+slept in can teach a rhythm something nobody meant. Presence is not used, so
+a night counts even if the bed was empty, unless it is left out in the notes.
+In a household with such an automation, leave the feature off.
+
 ## Limits
 
 - One Pod 5, one household, two sleepers, seven nights of notes.
