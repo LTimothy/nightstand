@@ -8,7 +8,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import PageHeader from '@components/PageHeader';
 import SectionHeading from '@components/SectionHeading';
 import SideControl from '@components/SideControl';
-import { postRhythms, refreshRhythms, rhythmsSaveMessage, useResolvedSleeps } from '@api/rhythms';
+import { postRhythms, refreshRhythms, rhythmsSaveMessage, useResolvedSleeps, useSuggestions } from '@api/rhythms';
 import type { DayOfWeek } from '@api/schedulesSchema';
 import type { RhythmsDB, SideRhythms } from '@api/rhythmsSchema';
 import { isSchedulePaused, pauseEndsAt } from '@api/schedulePause';
@@ -20,8 +20,10 @@ import OneOffAlarmSection from '../OneOffAlarmSection';
 import SchedulePauseNotice from '../../ControlTempPage/SchedulePauseNotice';
 import ComingUp from './ComingUp';
 import DateChanges from './DateChanges';
+import NotesSheet from './NotesSheet';
 import RhythmEditor from './RhythmEditor';
 import RhythmList from './RhythmList';
+import SuggestionsSection from './SuggestionsSection';
 import UndoBar from './UndoBar';
 import UseRhythmSheet from './UseRhythmSheet';
 import WeekList from './WeekList';
@@ -51,6 +53,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
   const [undo, setUndo] = useState<Undo>();
   const [showAllDates, setShowAllDates] = useState(false);
   const [using, setUsing] = useState<string>();
+  const [notes, setNotes] = useState<{ rhythmId?: string }>();
   const [headingFocus, setHeadingFocus] = useState(0);
   const closedEditor = useRef<{ id: string | null; created: boolean } | undefined>(undefined);
   const location = useLocation();
@@ -66,6 +69,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
     setEditing(undefined);
     setError('');
     setUndo(undefined);
+    setNotes(undefined);
   }, [side]);
   // The editor unmounts on close, so focus would fall to the page body. Return
   // it to the rhythm, or to "Use on some days" for one just created, unless the
@@ -96,6 +100,9 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
   const sideLabel = settings?.[side]?.name || (side === 'left' ? 'Left side' : 'Right side');
   const paused = !!settings && isSchedulePaused(settings, side, new Date());
   const pausedUntil = !settings || !paused ? undefined : pauseEndsAt(settings, side);
+  const suggestionsOn = !!settings?.features?.rhythmSuggestions;
+  const suggestions = useSuggestions(side, suggestionsOn);
+  const away = !!settings?.[side]?.awayMode;
 
   const save = async (next: SideRhythms) => {
     setError('');
@@ -281,6 +288,23 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
             setEditing({ id: null });
           } }/>
       </Stack>
+      { suggestionsOn && <SuggestionsSection
+        sideData={ sideData }
+        suggestions={ suggestions }
+        away={ away }
+        onShowNotes={ () => {
+          setUndo(undefined);
+          setNotes({});
+        } }/> }
+      { notes && suggestions.data && <NotesSheet
+        side={ side }
+        rhythms={ Object.values(sideData.rhythms) }
+        forRhythm={ notes.rhythmId }
+        data={ suggestions.data }
+        away={ away }
+        format={ format }
+        timeZone={ timeZone }
+        onClose={ () => setNotes(undefined) }/> }
       { using && sideData.rhythms[using] && <UseRhythmSheet
         name={ sideData.rhythms[using].name }
         onClose={ () => setUsing(undefined) }

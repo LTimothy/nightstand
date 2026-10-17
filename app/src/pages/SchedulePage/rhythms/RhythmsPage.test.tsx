@@ -4,7 +4,8 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
 import { useAppStore } from '@state/appStore';
-import { getSettings } from '../../../mocks/mockData';
+import type { SuggestionsResponse } from '@api/rhythmsSchema';
+import { getSettings, updateSettings } from '../../../mocks/mockData';
 import { createDemoRhythms, getMockRhythms, listMockSleeps, resetMockRhythms } from '../../../mocks/rhythmsMock';
 import { useScheduleStore } from '../scheduleStore';
 import ScheduleTab from '../ScheduleTab';
@@ -287,4 +288,66 @@ it('reads Rhythms again after a save the Pod refused with a conflict', async () 
   await pickSaturday(user);
   expect(await screen.findByRole('alert')).toHaveTextContent('Rhythms are not set up on this Pod.');
   await waitFor(() => expect(reads).toBeGreaterThan(before));
+});
+
+const withSuggestions = (body: SuggestionsResponse) => {
+  updateSettings({ features: { ...getSettings().features, rhythmSuggestions: true } });
+  server.use(http.get('*/rhythms/suggestions', () => HttpResponse.json(body)));
+};
+const noSuggestions = () => updateSettings({ features: { ...getSettings().features, rhythmSuggestions: false } });
+
+it('counts nights for suggestions after the rhythms and opens the notes', async () => {
+  withSuggestions({
+    enabled: true,
+    nights: { workday: { counted: 3, needed: 5, changed: 0, earlier: false, reason: 'few-nights' } },
+    suggestions: [],
+    dismissed: [],
+    log: [{
+      date: '2026-09-27', rhythmId: 'workday', tonight: false, excluded: false,
+      plan: [{ offsetMin: 0, temperatureF: 83 }], endMin: 495, changes: [],
+    }],
+  });
+  try {
+    const { user } = renderWithProviders(<ScheduleTab/>);
+    expect(await screen.findByText('Workday: 3 of 5 nights so far')).toBeInTheDocument();
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
+    expect(headings.indexOf('Suggestions')).toBe(headings.indexOf('Rhythms') + 1);
+    expect(headings.indexOf('Add one-time alarm')).toBe(headings.indexOf('Suggestions') + 1);
+    await user.click(screen.getByRole('button', { name: 'Show the nights' }));
+    expect(await screen.findByRole('dialog', { name: 'Notes' })).toBeInTheDocument();
+    expect(screen.getByText('Sun, Sep 27: no change')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Show the nights' })).toHaveFocus());
+  } finally {
+    noSuggestions();
+  }
+});
+
+const spyOnSuggestions = () => {
+  const reads = { count: 0 };
+  server.use(http.get('*/rhythms/suggestions', () => { reads.count += 1; return HttpResponse.json({
+    enabled: true, nights: {}, suggestions: [], dismissed: [], log: [],
+  }); }));
+  return reads;
+};
+
+it('shows nothing of suggestions and asks for nothing while the feature is off', async () => {
+  const reads = spyOnSuggestions();
+  renderWithProviders(<ScheduleTab/>);
+  expect(await screen.findByRole('heading', { name: 'Rhythms' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Fri and Sat: Weekend' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Suggestions' })).not.toBeInTheDocument();
+  expect(reads.count).toBe(0);
+});
+
+it('asks for suggestions once while the feature is on', async () => {
+  updateSettings({ features: { ...getSettings().features, rhythmSuggestions: true } });
+  const reads = spyOnSuggestions();
+  try {
+    renderWithProviders(<ScheduleTab/>);
+    expect(await screen.findByRole('heading', { name: 'Suggestions' })).toBeInTheDocument();
+    expect(reads.count).toBe(1);
+  } finally {
+    noSuggestions();
+  }
 });
