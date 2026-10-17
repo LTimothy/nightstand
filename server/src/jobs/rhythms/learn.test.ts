@@ -6,6 +6,7 @@ import type { CurvePhase } from '../../db/smartCurve.js';
 import { nightOf, rhythmOf } from './rhythmsTestData.js';
 import {
   clusterEpisodes, coalesceEpisodes, collapseNights, learnSuggestions, majority, parseLine, placeManual, placeSmart, rhythmEvidence,
+  suggestedTime,
   type ChangeLine, type DismissLine, type ExcludeLine, type Line, type NightLine, type Gate, type PlannedRhythm, type RestoreLine, type Vote,
 } from './learn.js';
 
@@ -299,13 +300,37 @@ describe('placing hand-set rows', () => {
     assert.deepEqual(place(STEPPED, down(9, 130), 14), { rows: [], stages: ['too-small'] });
   });
 
-  it('refuses a step at the power-off or past the step limit', () => {
-    assert.deepEqual(place(HAND, range(0, 9).map(night => change(night, 475, 82, 85)), 14), { rows: [], stages: ['refused'] });
+  it('refuses a step past the power-off or past the step limit', () => {
+    assert.deepEqual(place(HAND, range(0, 9).map(night => change(night, 520, 82, 85)), 14), { rows: [], stages: ['refused'] });
     const crowded = rhythmOf('off-days', nightOf({
       on: '22:00', off: '06:00', onTemperature: 82,
       temperatures: Object.fromEntries(range(1, 49).map(minute => [clock(22 * 60 + minute), 82])),
     }));
     assert.deepEqual(place(crowded, down(9, 300), 14), { rows: [], stages: ['refused'] });
+  });
+
+  it('rounds a time that lands on the power-off inward to the last mark inside the night', () => {
+    const late = rhythmOf('off-days', nightOf({ on: '22:07', off: '06:00', onTemperature: 82 }));
+    const [{ row }] = place(late, range(0, 9).map(night => change(night, 466, 82, 85)), 14).rows;
+    assert.deepEqual(row.kind === 'step' && [row.time, row.temperatureF], ['05:45', 85]);
+  });
+
+  it('pulls a habit at or just past the power-off back to the last mark inside the night', () => {
+    const night = nightOf({ on: '22:00', off: '06:00', onTemperature: 82 });
+    assert.deepEqual(suggestedTime(night, 480), { time: '05:45' });
+    assert.deepEqual(suggestedTime(night, 485), { time: '05:45' });
+    assert.equal(temperatureInPowerWindow(suggestedTime(night, 520).time, night.power), false);
+  });
+
+  // Guards the function only: a placed step is always at least 15 minutes in.
+  it('rounds a time that lands on the power-on inward to the first mark inside the night', () => {
+    const night = nightOf({ on: '22:05', off: '06:00', onTemperature: 82 });
+    assert.deepEqual(suggestedTime(night, 1), { time: '22:15' });
+  });
+
+  it('refuses when no 15 minute mark fits inside the night', () => {
+    const short = nightOf({ on: '22:01', off: '22:14', onTemperature: 82 });
+    assert.equal(temperatureInPowerWindow(suggestedTime(short, 10).time, short.power), false);
   });
 
   it('rounds the time to 15 minutes and a half-degree middle value toward the plan', () => {
@@ -490,7 +515,7 @@ describe('learning over nights', () => {
     assert.equal(reasonOf(nights(5), 5), 'no-change');
     assert.equal(reasonOf(habit(5, [1, 3]), 5), 'inconsistent');
     assert.equal(reasonOf([...nights(9), ...down(9, 130)], 9, STEPPED), 'too-small');
-    assert.equal(reasonOf([...nights(9), ...range(0, 9).map(night => change(night, 475, 82, 85))], 9), 'refused');
+    assert.equal(reasonOf([...nights(9), ...range(0, 9).map(night => change(night, 520, 82, 85))], 9), 'refused');
     assert.equal(reasonOf(habit(9, range(0, 9)), 9), 'suggested');
     assert.equal(reasonOf([...nights(5, SMART), ...range(0, 5).map(night => smartChange(night, 'warmup', 85))], 5, SMART), 'no-change');
   });
@@ -609,7 +634,7 @@ describe('near misses', () => {
   });
 
   it('is never a change the plan makes or the editor refuses', () => {
-    assert.equal(nearOf([...nights(14), ...[2, 4, 7, 9, 11, 13].map(night => change(night, 475, 82, 85))], 14), undefined);
+    assert.equal(nearOf([...nights(14), ...[2, 4, 7, 9, 11, 13].map(night => change(night, 520, 82, 85))], 14), undefined);
     assert.equal(nearOf([...nights(14), ...[2, 4, 7, 9, 11, 13].map(night => change(night, 130, 82, 79))], 14, STEPPED), undefined);
   });
 

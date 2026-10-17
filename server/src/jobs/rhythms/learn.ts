@@ -7,7 +7,7 @@ import {
   type Dismissed, type NightLog, type Rhythm, type RhythmNights, type SuggestionReason, type SuggestionRow,
   type SuggestionsResponse,
 } from '../../db/rhythmsSchema.js';
-import { minutesAfterOn, temperatureInPowerWindow } from '../../db/rhythmWake.js';
+import { minutesAfterOn, nightMinutes, temperatureInPowerWindow } from '../../db/rhythmWake.js';
 import { F_PER_LEVEL, levelToF, type CurvePhase } from '../../db/smartCurve.js';
 import {
   BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, NEAR_MIN_NIGHTS, NEAR_MIN_SUPPORT, NEAR_SHARE,
@@ -251,9 +251,17 @@ const towardPlan = (value: number, plan: number) => {
   return Math.abs(Math.floor(value) - plan) <= Math.abs(Math.ceil(value) - plan) ? Math.floor(value) : Math.ceil(value);
 };
 
-// The rounded clock time, snapped onto a saved step close to it. Only the saved night is looked at.
-function suggestedTime(night: DailySchedule, offset: number): { time: string; replaces?: string } {
-  const time = clockOf(Math.round((minuteOfDay(night.power.on) + offset) / TIME_ROUND_MIN) * TIME_ROUND_MIN);
+// The rounded clock time, kept strictly inside the night when a mark fits there, and snapped
+// onto a saved step close to it. Only the saved night is looked at.
+export function suggestedTime(night: DailySchedule, offset: number): { time: string; replaces?: string } {
+  const on = minuteOfDay(night.power.on);
+  const length = nightMinutes(night.power);
+  const first = Math.floor(on / TIME_ROUND_MIN) * TIME_ROUND_MIN + TIME_ROUND_MIN;
+  const last = Math.ceil((on + length) / TIME_ROUND_MIN) * TIME_ROUND_MIN - TIME_ROUND_MIN;
+  const rounded = Math.round((on + offset) / TIME_ROUND_MIN) * TIME_ROUND_MIN;
+  // A habit that rounds onto an end of the night moves to the nearest mark inside it.
+  const nearEnd = offset > 0 && offset < length + TIME_ROUND_MIN / 2;
+  const time = clockOf(nearEnd && first <= last ? Math.min(last, Math.max(first, rounded)) : rounded);
   const at = minutesAfterOn(time, night.power.on);
   const [near] = Object.keys(night.temperatures)
     .filter(key => temperatureInPowerWindow(key, night.power))
