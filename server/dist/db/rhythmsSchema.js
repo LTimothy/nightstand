@@ -1,6 +1,7 @@
 // WARNING! - Any changes here MUST be the same between app/src/api & server/src/db/
 import { z } from 'zod';
-import { DailyScheduleSchema, SideSchema, TimeSchema } from './schedulesSchema.js';
+import { DailyScheduleSchema, MAX_TEMPERATURES_PER_DAY, SideSchema, TemperatureSchema, TimeSchema } from './schedulesSchema.js';
+import { MAX_SUGGESTIONS, WINDOW_NIGHTS } from './suggestionRules.js';
 // The update and rollback scripts skip the pre-stop handoff for a target that
 // has the prepare-to-stop route, assuming it can continue a rhythm sleep. A
 // new version here must keep that true or change that check.
@@ -75,7 +76,7 @@ export const RhythmsSleepsQuerySchema = z.object({
 export const DEFAULT_SMART = { baseLevel: 0, intensity: 'standard', warmStart: true, warmUp: true, upEarly: false };
 // GET /rhythms/live: the running Smart Schedule night, read from memory.
 export const CURVE_PHASES = ['prewarm', 'bedtime', 'cooldown', 'hold', 'warmup', 'wake', 'after'];
-const InstantSchema = z.string().datetime({ offset: true });
+export const InstantSchema = z.string().datetime({ offset: true });
 // Set while a "When I get up" sleep runs and presence is fresh: the latest it turns off.
 export const OffWhenUpLiveSchema = z.object({ by: InstantSchema }).strict();
 export const RhythmsLiveSchema = z.object({
@@ -91,4 +92,88 @@ export const RhythmsLiveSchema = z.object({
 }).strict();
 export const RhythmsLiveResponseSchema = RhythmsLiveSchema.nullable();
 export const RhythmsLiveQuerySchema = z.object({ side: SideSchema }).strict();
+// GET /rhythms/suggestions, and the bodies that hide, restore and exclude.
+const Evidence = {
+    key: z.string().max(24),
+    direction: z.enum(['down', 'up']),
+    supporting: z.number().int().min(1),
+    firstNight: IsoDateSchema,
+    lastNight: IsoDateSchema,
+    // The review chart draws these nights from the log.
+    supportingDates: z.array(IsoDateSchema).max(WINDOW_NIGHTS),
+};
+export const ThenBackSchema = z.object({
+    time: TimeSchema, temperatureF: TemperatureSchema, supporting: z.number().int().min(1), replaces: TimeSchema.optional(),
+}).strict();
+export const SuggestionRowSchema = z.discriminatedUnion('kind', [
+    z.object({
+        kind: z.literal('step'), ...Evidence, time: TimeSchema, temperatureF: TemperatureSchema, plannedF: TemperatureSchema,
+        replaces: TimeSchema.optional(), thenBack: ThenBackSchema.optional(),
+    }).strict(),
+    z.object({
+        kind: z.literal('on'), ...Evidence, temperatureF: TemperatureSchema, plannedF: TemperatureSchema, thenBack: ThenBackSchema.optional(),
+    }).strict(),
+    z.object({
+        kind: z.literal('base'), ...Evidence,
+        baseLevel: z.number().int().min(-10).max(10), currentBaseLevel: z.number().int().min(-10).max(10),
+    }).strict(),
+]);
+export const RhythmSuggestionSchema = z.object({
+    rhythmId: RhythmIdSchema,
+    // A near miss: the rhythm's leading pattern below the gate, always one row.
+    near: z.boolean(),
+    rows: z.array(SuggestionRowSchema).min(1).max(MAX_SUGGESTIONS),
+}).strict();
+export const SUGGESTION_REASONS = ['few-nights', 'no-change', 'inconsistent', 'too-small', 'refused', 'dismissed', 'suggested'];
+export const RhythmNightsSchema = z.object({
+    counted: z.number().int().min(0),
+    needed: z.number().int().min(1),
+    changed: z.number().int().min(0),
+    earlier: z.boolean(),
+    reason: z.enum(SUGGESTION_REASONS),
+}).strict();
+export const NightChangeSchema = z.object({
+    at: InstantSchema, fromF: TemperatureSchema.nullable(), targetF: TemperatureSchema, plannedF: TemperatureSchema,
+    held: z.boolean(), source: z.enum(['api', 'tap']),
+}).strict();
+export const NightLogSchema = z.object({
+    date: IsoDateSchema,
+    rhythmId: RhythmIdSchema,
+    tonight: z.boolean(),
+    excluded: z.boolean(),
+    // The plan's steps that night, the power-on first.
+    plan: z.array(z.object({ offsetMin: z.number().int().min(0), temperatureF: TemperatureSchema }).strict())
+        .max(MAX_TEMPERATURES_PER_DAY + 1),
+    endMin: z.number().int().min(1),
+    changes: z.array(NightChangeSchema),
+}).strict();
+export const DismissIdSchema = z.string().regex(/^[0-9a-f]{12}$/);
+export const DismissedSchema = z.object({
+    id: DismissIdSchema,
+    rhythmId: RhythmIdSchema,
+    key: z.string().max(24).nullable(),
+    time: TimeSchema.nullable(),
+    scope: z.enum(['later', 'plan']),
+    nightsLeft: z.number().int().min(0),
+}).strict();
+export const SuggestionsResponseSchema = z.object({
+    enabled: z.boolean(),
+    nights: z.record(RhythmIdSchema, RhythmNightsSchema),
+    suggestions: z.array(RhythmSuggestionSchema),
+    dismissed: z.array(DismissedSchema),
+    log: z.array(NightLogSchema),
+}).strict();
+export const SuggestionsQuerySchema = z.object({ side: SideSchema }).strict();
+const DismissRowSchema = z.object({ key: z.string().max(24), time: TimeSchema.nullable() }).strict();
+export const SuggestionDismissSchema = z.discriminatedUnion('scope', [
+    z.object({ scope: z.literal('later'), side: SideSchema, rhythmId: RhythmIdSchema }).strict(),
+    z.object({
+        scope: z.literal('plan'), side: SideSchema, rhythmId: RhythmIdSchema, rows: z.array(DismissRowSchema).min(1).max(MAX_SUGGESTIONS),
+    }).strict(),
+]);
+export const SuggestionDismissResponseSchema = z.object({ ids: z.array(DismissIdSchema).min(1).max(MAX_SUGGESTIONS) }).strict();
+export const SuggestionRestoreSchema = z.object({ side: SideSchema, ids: z.array(DismissIdSchema).min(1).max(MAX_SUGGESTIONS) }).strict();
+export const NightExcludeSchema = z.object({
+    side: SideSchema, rhythmId: RhythmIdSchema, date: IsoDateSchema, excluded: z.boolean(),
+}).strict();
 //# sourceMappingURL=rhythmsSchema.js.map

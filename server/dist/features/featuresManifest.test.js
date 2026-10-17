@@ -15,6 +15,18 @@ const isFeaturesSchemaKey = (flag) => typeof flag === 'string' && flag in defaul
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const releasesManifest = JSON.parse(readFileSync(path.join(repoRoot, 'releases.json'), 'utf8'));
 describe('FEATURES_MANIFEST', () => {
+    it('lists suggestions from hand changes behind their own flag, needing Rhythms', () => {
+        const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === 'rhythm-suggestions');
+        assert.ok(entry, 'rhythm-suggestions has no featuresManifest entry');
+        assert.equal(entry.title, 'Suggestions from your changes');
+        assert.equal(entry.flag, 'rhythmSuggestions');
+        assert.equal(entry.default, false);
+        assert.equal(entry.version, '3.7.0');
+        assert.deepEqual(entry.depends_on, ['rhythms']);
+        for (const file of [...entry.touchpoints, ...entry.tests]) {
+            assert.ok(existsSync(path.join(repoRoot, file)), `${file} does not exist`);
+        }
+    });
     it('has every required field, non-empty where it is a string', () => {
         for (const entry of FEATURES_MANIFEST) {
             for (const field of REQUIRED_FIELDS) {

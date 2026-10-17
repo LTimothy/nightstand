@@ -972,6 +972,42 @@ export const FEATURES_MANIFEST = [
             + ' A rhythm set to turn off when the person gets up carries one optional key, which 3.5.0 drops on read.',
     },
     {
+        id: 'rhythm-suggestions',
+        title: 'Suggestions from your changes',
+        description: 'Notes temperature changes made by hand during a rhythm and suggests one repeated on half or more of the '
+            + 'last nights. Nothing changes until it is added.',
+        category: 'platform',
+        version: '3.7.0',
+        flag: 'rhythmSuggestions',
+        default: false,
+        touchpoints: [
+            'server/src/db/settingsSchema.ts', 'server/src/db/suggestionRules.ts', 'server/src/db/rhythmsSchema.ts',
+            'server/src/jobs/rhythms/handChanges.ts', 'server/src/jobs/rhythms/learn.ts', 'server/src/jobs/rhythms/history.ts',
+            'server/src/jobs/rhythms/runEvent.ts', 'server/src/jobs/scheduleOverride.ts', 'server/src/8sleep/lastDeviceStatus.ts',
+            'server/src/8sleep/frankenMonitor.ts', 'server/src/8sleep/buttonMonitor.ts', 'server/src/routes/deviceStatus/deviceStatus.ts',
+            'server/src/routes/rhythms/rhythms.ts', 'app/src/api/suggestionRules.ts', 'app/src/api/rhythms.ts', 'app/src/api/rhythmsResponse.ts',
+            'app/src/mocks/suggestionsMock.ts', 'app/src/pages/SchedulePage/rhythms/suggestionsCopy.ts',
+            'app/src/pages/SchedulePage/rhythms/SuggestionsSection.tsx', 'app/src/pages/SchedulePage/rhythms/NotesSheet.tsx',
+            'app/src/pages/SettingsPage/FeaturesSection/DeleteNotesDialog.tsx',
+        ],
+        depends_on: ['rhythms'],
+        reversible: true,
+        tests: [
+            'server/src/db/suggestionRules.test.ts', 'server/src/features/featuresManifest.test.ts', 'server/src/db/rhythmsSchema.test.ts',
+            'server/src/jobs/rhythms/handChanges.test.ts', 'server/src/jobs/rhythms/learn.test.ts', 'server/src/jobs/rhythms/history.test.ts',
+            'server/src/jobs/scheduleOverride.handChange.test.ts', 'server/src/8sleep/frankenMonitor.handChange.test.ts',
+            'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/lastDeviceStatus.test.ts',
+            'server/src/routes/deviceStatus/deviceStatusRoute.test.ts', 'server/src/routes/rhythms/rhythmsSuggestions.test.ts',
+            'app/src/api/rhythms.test.tsx', 'app/src/pages/SchedulePage/rhythms/suggestionsCopy.test.ts',
+            'app/src/pages/SchedulePage/rhythms/NotesSheet.test.tsx', 'app/src/pages/SchedulePage/rhythms/SuggestionsSection.test.tsx',
+            'app/src/pages/SettingsPage/FeaturesSection/DeleteNotesDialog.test.tsx',
+        ],
+        upstream_offer: false,
+        rationale: 'Off by default. Learns only from hand changes, never from sleep data or presence, and only proposes: a rhythm '
+            + 'changes when the person adds a suggestion, through the ordinary rhythms save. The notes live in rhythms-changes.jsonl '
+            + 'next to the lowdb folder, which older versions never read.',
+    },
+    {
         id: 'tap-alarm',
         title: 'Alarm taps',
         description: 'Accepts the alarm tap action upstream uses, which has no effect yet. On a Pod 5 the firmware '

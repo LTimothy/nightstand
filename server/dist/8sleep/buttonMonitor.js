@@ -10,6 +10,8 @@ import { MIN_TEMPERATURE_F, MAX_TEMPERATURE_F } from '../routes/deviceStatus/dev
 import { connectFrankenWithin } from './frankenServer.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import { markManualTempChange } from '../jobs/scheduleOverride.js';
+import { drivingSide } from '../jobs/scheduleQueries.js';
+import { lastDeviceStatus } from './lastDeviceStatus.js';
 import { activeAlarms, alarmEndedAt, hasSnooze } from '../jobs/activeAlarms.js';
 import { handleAlarmTap } from './tapAlarm.js';
 import { ButtonEventMachine } from './buttonEvents.js';
@@ -310,14 +312,20 @@ export class ButtonMonitor {
         logger.info(`[buttonMonitor] ${side} ${button} button: ${readTarget} -> ${targetF} F`);
         await updateDeviceStatus({ [side]: { targetTemperatureF: targetF } }, { notAfter: at + MAX_PRESS_AGE_MS });
         // A press counts as a manual change for the schedule override, as a tap does.
-        await markManualTempChange(side);
+        const read = status[drivingSide(settingsDB.data, side) ?? side];
+        await markManualTempChange(side, {
+            targetF, fromF: read?.targetTemperatureF ?? null, on: read?.isOn ?? null, setsOn: false, source: 'tap',
+        });
     }
     // The logo with no alarm: an absolute target, so pressing it again changes nothing.
     async setFavorite(side, favoriteF, at) {
         logger.info(`[buttonMonitor] ${side} logo button: ${favoriteF} F and on`);
+        const before = lastDeviceStatus()?.[drivingSide(settingsDB.data, side) ?? side];
         const update = { [side]: { isOn: true, targetTemperatureF: favoriteF } };
         await updateDeviceStatus(update, { notAfter: at + MAX_PRESS_AGE_MS });
-        await markManualTempChange(side);
+        await markManualTempChange(side, {
+            targetF: favoriteF, fromF: before?.targetTemperatureF ?? null, on: true, setsOn: before?.isOn === false, source: 'tap',
+        });
     }
 }
 let monitor = null;

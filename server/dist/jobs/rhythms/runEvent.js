@@ -14,6 +14,7 @@ import { isTempScheduleOverridden } from '../scheduleOverride.js';
 import { effectiveSides, engineActivation } from '../scheduleQueries.js';
 import { rhythmSkipReason } from './gates.js';
 import { smartOffDecision, smartPowerOffFor, smartTemperatureGate } from './curveController.js';
+import { recordNight } from './handChanges.js';
 import { turnsOffWhenUp } from './resolve.js';
 export const FIRMWARE_MARGIN_SECONDS = 300;
 export const FIRMWARE_MAX_SECONDS = 43200;
@@ -149,6 +150,7 @@ export async function runRhythmEvent(side, sleep, event) {
                 [side]: held ? { isOn: true } : { isOn: true, targetTemperatureF: event.temperatureF },
             }, { ...SCHEDULED, onUntil });
             noteArmed(settings, side, sleep.end);
+            recordNight(side, sleep, now);
             markStatus('powerSchedule');
         }
         else if (event.kind === 'temperature') {
