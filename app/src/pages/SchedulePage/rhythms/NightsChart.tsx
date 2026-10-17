@@ -1,7 +1,7 @@
 /* eslint-disable react/no-multi-comp */
 // The clip marks, the step label and the legend are private to this chart; the first two need its scales.
 import { useMemo } from 'react';
-import { Box, Stack, Typography } from '@mui/material';
+import { Box, Stack, Typography, useMediaQuery } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { useDrawingArea, useXScale, useYScale } from '@mui/x-charts/hooks';
 import type { NightLog, Rhythm, SuggestionRow } from '@api/rhythmsSchema';
@@ -55,6 +55,7 @@ const strokeOf = (line: ChartLine, changeColor: string) => {
 
 // One line per counted night over the plan, with the night as it would be with the checked rows.
 export default function NightsChart({ rhythm, after, nights, rows, timeZone, format, evidence }: Props) {
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)', { noSsr: true });
   const model = useMemo(() => nightsChartModel({ rhythm, after, nights, rows, timeZone }), [rhythm, after, nights, rows, timeZone]);
   const counted = nights.filter(night => !night.excluded && !night.tonight && night.samePlan !== false);
   const caption = chartCaption(counted, rows.flatMap(row => row.supportingDates));
@@ -65,6 +66,7 @@ export default function NightsChart({ rhythm, after, nights, rows, timeZone, for
   return <Box role="figure" aria-label={ `${evidence} ${caption}` } sx={ { width: '100%' } }>
     <Box aria-hidden>
       <LineChart
+        skipAnimation={ reduceMotion }
         height={ 160 }
         xAxis={ [{
           scaleType: 'linear', data: model.xs, min: 0, max: model.endMin, tickInterval: model.ticks, tickLabelStyle: axisText,

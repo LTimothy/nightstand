@@ -2,7 +2,7 @@
 // The band is private to this chart and needs the chart's scale.
 import { useMemo } from 'react';
 import moment from 'moment-timezone';
-import { Box, Paper, Typography } from '@mui/material';
+import { Box, Paper, Typography, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { LineChart, areaElementClasses, lineElementClasses } from '@mui/x-charts/LineChart';
 import { useDrawingArea, useXScale } from '@mui/x-charts/hooks';
@@ -50,6 +50,7 @@ const levelAtTime = (series: LevelPoint[], at: number) =>
   series.reduce((level, point) => (point.at.getTime() <= at ? point.level : level), series[0]?.level ?? 0);
 
 export default function SmartCurveChart({ night, wake, smart, before, date, timeZone, format, trackingOn }: Props) {
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)', { noSsr: true });
   const theme = useTheme();
   const preview = useMemo(() => previewCurves({ night, wake, smart, date, timeZone, trackingOn }),
     [night, wake, smart, date, timeZone, trackingOn]);
@@ -83,6 +84,7 @@ export default function SmartCurveChart({ night, wake, smart, before, date, time
   return <Paper variant="outlined" role="figure" aria-label={ figureName } sx={ { width: '100%', p: 2 } }>
     <Box aria-hidden>
       <LineChart
+        skipAnimation={ reduceMotion }
         height={ 120 }
         xAxis={ [{
           scaleType: 'time',
