@@ -7,9 +7,9 @@ import {
   type NightLog, type Rhythm, type RhythmNights, type SuggestionRow, type SuggestionsResponse,
 } from '../../db/rhythmsSchema.js';
 import { minutesAfterOn, temperatureInPowerWindow } from '../../db/rhythmWake.js';
-import { levelToF, type CurvePhase } from '../../db/smartCurve.js';
+import { F_PER_LEVEL, levelToF, type CurvePhase } from '../../db/smartCurve.js';
 import {
-  CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MIN_NIGHTS, MIN_SHARE, ON_WINDOW_MIN, REPLACE_MIN, TIME_ROUND_MIN, WINDOW_NIGHTS,
+  BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MIN_NIGHTS, MIN_SHARE, ON_WINDOW_MIN, REPLACE_MIN, TIME_ROUND_MIN, WINDOW_NIGHTS,
 } from '../../db/suggestionRules.js';
 
 const MINUTE = 60_000;
@@ -207,6 +207,7 @@ export function majority(votes: Vote[]): { direction: Direction; supporting: Vot
   if (down.length === up.length) return null;
   return down.length > up.length ? { direction: 'down', supporting: down } : { direction: 'up', supporting: up };
 }
+
 export type Stage = 'no-change' | 'inconsistent' | 'too-small' | 'refused';
 export type Shown = { key: string; at: number | null };
 export type Gate = { kind: 'full'; shown: Shown[] } | { kind: 'near'; floor: number };
@@ -344,6 +345,39 @@ export function placeManual(rhythm: Rhythm, clusters: Cluster[], counted: number
     rows.push(last);
   }
   return { rows, stages };
+}
+
+const halfAway = (value: number) => Math.sign(value) * Math.round(Math.abs(value));
+
+// A Smart rhythm learns only its base: from changes at the night level, or cooler during the cool-down.
+export function placeSmart(rhythm: Rhythm, evidence: Evidence, gate: Gate): Placement & { changed: number } {
+  const votes: Vote[] = [];
+  let seen = false;
+  for (const night of evidence.counted) {
+    const deltas: number[] = [];
+    for (const episode of evidence.episodes.get(night.date) ?? []) {
+      if ((episode.phase !== 'cooldown' && episode.phase !== 'hold') || episode.holdF === null) continue;
+      seen = true;
+      if (episode.phase === 'cooldown' && episode.targetF >= episode.holdF) continue;
+      deltas.push(halfAway((episode.targetF - episode.holdF) / F_PER_LEVEL));
+    }
+    const delta = deltas.length ? halfAway(median(deltas)) : 0;
+    if (delta !== 0) votes.push({ date: night.date, direction: directionOf(delta), value: delta, offset: 0, from: 0 });
+  }
+  if (!seen) return { rows: [], stages: ['no-change'], changed: 0 };
+  if (!votes.length) return { rows: [], stages: ['too-small'], changed: 0 };
+  const counted = evidence.counted.length;
+  const top = majority(votes);
+  const key = top ? `base:${top.direction}` : '';
+  const floor = gate.kind === 'near' ? gate.floor : needed(isShown(gate.shown, key, null) ? HIDE_SHARE : MIN_SHARE, counted);
+  if (!top || (gate.kind === 'full' && counted < MIN_NIGHTS) || top.supporting.length < floor) {
+    return { rows: [], stages: ['inconsistent'], changed: votes.length };
+  }
+  const current = rhythm.smart.baseLevel;
+  const baseLevel = Math.max(-10, Math.min(10, current + (top.direction === 'down' ? -BASE_STEP : BASE_STEP)));
+  if (baseLevel === current) return { rows: [], stages: ['too-small'], changed: votes.length };
+  const row: SuggestionRow = { kind: 'base', ...evidenceOf(top.direction, key, top.supporting), baseLevel, currentBaseLevel: current };
+  return { rows: [{ row, at: 0 }], stages: [], changed: votes.length };
 }
 
 // Counts for the notes until the rules below decide more.

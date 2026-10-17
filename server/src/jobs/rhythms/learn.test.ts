@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { Rhythm } from '../../db/rhythmsSchema.js';
+import { DEFAULT_SMART, type Rhythm } from '../../db/rhythmsSchema.js';
 import { temperatureInPowerWindow } from '../../db/rhythmWake.js';
+import type { CurvePhase } from '../../db/smartCurve.js';
 import { nightOf, rhythmOf } from './rhythmsTestData.js';
 import {
-  clusterEpisodes, coalesceEpisodes, collapseNights, learnSuggestions, majority, parseLine, placeManual,
+  clusterEpisodes, coalesceEpisodes, collapseNights, learnSuggestions, majority, parseLine, placeManual, placeSmart, rhythmEvidence,
   type ChangeLine, type ExcludeLine, type Line, type NightLine, type Gate, type PlannedRhythm, type Vote,
 } from './learn.js';
 
@@ -313,6 +314,12 @@ describe('placing hand-set rows', () => {
     assert.deepEqual(row.kind === 'step' && [row.time, row.temperatureF], ['23:30', 80]);
   });
 
+  it('rounds a half-degree middle value up when the plan is below it', () => {
+    const lines = [...range(0, 4).map(night => change(night, 90, 82, 83)), ...range(4, 8).map(night => change(night, 90, 82, 84))];
+    const [{ row }] = place(HAND, lines, 8).rows;
+    assert.equal(row.kind === 'step' && row.temperatureF, 83);
+  });
+
   it('suggests a 1 °F habit', () => {
     const [{ row }] = place(HAND, range(0, 9).map(night => change(night, 90, 82, 81)), 14).rows;
     assert.equal(row.kind === 'step' && row.temperatureF, 81);
@@ -328,5 +335,74 @@ describe('placing hand-set rows', () => {
   it('gives a cluster with a tied vote no row', () => {
     const lines = [change(0, 90, 82, 79), change(1, 90, 82, 85), change(2, 90, 82, 79), change(3, 90, 82, 85)];
     assert.deepEqual(place(HAND, lines, 5), { rows: [], stages: ['inconsistent'] });
+  });
+});
+
+const SMART = rhythmOf('workday', nightOf({ on: '22:00', off: '06:00' }), { temperatureMode: 'smart', smart: { ...DEFAULT_SMART } });
+// The night level is 77 °F (level -2) in these fixtures.
+const smartChange = (night: number, phase: CurvePhase, targetF: number) => change(night, 120, 77, targetF, {
+  rhythmId: SMART.id, mode: 'smart', phase, holdF: 77, plannedF: 77,
+});
+const smartPlace = (lines: Line[], count: number, rhythm: Rhythm = SMART, gate: Gate = FULL) =>
+  placeSmart(rhythm, rhythmEvidence(lines, planned(rhythm), afterNight(count - 1)), gate);
+
+describe('Smart Schedule votes', () => {
+  it('moves the base one step from changes at the night level', () => {
+    const result = smartPlace([...nights(9, SMART), ...range(0, 7).map(night => smartChange(night, 'hold', 74))], 9);
+    assert.equal(result.changed, 7);
+    assert.deepEqual(result.rows.map(placed => placed.row), [{
+      kind: 'base', key: 'base:down', direction: 'down', supporting: 7, firstNight: dateOf(0), lastNight: dateOf(6),
+      supportingDates: range(0, 7).map(dateOf), baseLevel: -1, currentBaseLevel: 0,
+    }]);
+  });
+
+  it('counts a cooler cool-down change, and a warmer night-level one', () => {
+    assert.equal(smartPlace([...nights(5, SMART), ...range(0, 3).map(night => smartChange(night, 'cooldown', 74))], 5).rows.length, 1);
+    const warmer = smartPlace([...nights(5, SMART), ...range(0, 3).map(night => smartChange(night, 'hold', 80))], 5);
+    assert.equal(warmer.rows[0].row.kind === 'base' && warmer.rows[0].row.baseLevel, 1);
+  });
+
+  it('does not count a cool-down change at or warmer than the night level', () => {
+    for (const targetF of [77, 79]) {
+      // The curve is still warmer than the night level during the cool-down.
+      const lines = range(0, 5).map(night => ({ ...smartChange(night, 'cooldown', targetF), fromF: 80 }));
+      const result = smartPlace([...nights(5, SMART), ...lines], 5);
+      assert.deepEqual({ rows: result.rows, stages: result.stages, changed: result.changed }, { rows: [], stages: ['too-small'], changed: 0 });
+    }
+  });
+
+  it('does not count a change under half a level', () => {
+    assert.deepEqual(smartPlace([...nights(5, SMART), ...range(0, 5).map(night => smartChange(night, 'hold', 76))], 5).stages, ['too-small']);
+  });
+
+  it('learns nothing from the warm-up', () => {
+    assert.deepEqual(smartPlace([...nights(5, SMART), ...range(0, 5).map(night => smartChange(night, 'warmup', 85))], 5).stages, ['no-change']);
+  });
+
+  it('stays at the coldest base', () => {
+    const coldest = { ...SMART, smart: { ...SMART.smart, baseLevel: -10 } };
+    const lines = [...nights(5, SMART), ...range(0, 5).map(night => smartChange(night, 'hold', 74))];
+    assert.deepEqual(smartPlace(lines, 5, coldest).stages, ['too-small']);
+  });
+
+  it('needs 5 counted nights for a full row even when all of them vote', () => {
+    const lines = [...nights(4, SMART), ...range(0, 4).map(night => smartChange(night, 'hold', 74))];
+    const result = smartPlace(lines, 4);
+    assert.deepEqual({ rows: result.rows, stages: result.stages }, { rows: [], stages: ['inconsistent'] });
+  });
+
+  it('rounds each change to a level before taking the night\'s median', () => {
+    const later = (night: number) => ({
+      ...smartChange(night, 'hold', 74), offsetMin: 180, at: new Date(FIRST + night * DAY + 180 * MINUTE).toISOString(),
+    });
+    const lines = [...nights(5, SMART), ...range(0, 5).flatMap(night => [smartChange(night, 'hold', 78), later(night)])];
+    const [placed] = smartPlace(lines, 5).rows;
+    assert.equal(placed?.row.kind === 'base' && placed.row.baseLevel, -1);
+  });
+
+  it('needs the gate, or the floor for a near miss', () => {
+    const lines = [...nights(7, SMART), ...[2, 4, 6].map(night => smartChange(night, 'hold', 74))];
+    assert.deepEqual(smartPlace(lines, 7).stages, ['inconsistent']);
+    assert.equal(smartPlace(lines, 7, SMART, { kind: 'near', floor: 3 }).rows.length, 1);
   });
 });
