@@ -62,3 +62,16 @@ describe('"When I get up" in rhythmsDB.json', () => {
     assert.equal(JSON.stringify(RhythmsDBSchema.parse(plain)), JSON.stringify(readV350.parse(plain)));
   });
 });
+
+describe('a rhythm with a suggestion added', () => {
+  it('reads in 3.5.0 exactly as saved, since adding writes an ordinary rhythm', () => {
+    const added = structuredClone(plain);
+    added.left.rhythms.workday.night.temperatures['23:45'] = 79;
+    added.left.rhythms.workday.night.power.onTemperature = 80;
+    added.left.rhythms.workday.smart.baseLevel = -1;
+    const parsed = readV350.safeParse(JSON.parse(JSON.stringify(added)));
+    assert.ok(parsed.success, '3.5.0 would mark the file invalid');
+    assert.deepEqual(parsed.data, added);
+    assert.equal(RhythmsDBSchemaV350.safeParse(added).success, true);
+  });
+});

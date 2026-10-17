@@ -150,6 +150,14 @@ generic message; the details go to the server log.
   (`scheduleOverrides.temperatureSchedules` in `/api/settings`). On a Smart
   Schedule night it holds the curve instead (see
   [`/api/rhythms/live`](#get-apirhythmslive)).
+- While Suggestions from your changes is on, a `targetTemperatureF`
+  written during a Rhythms sleep is noted as a hand change with source
+  `api`, whichever app sent it, together with the bed's previous target
+  and the value the rhythm planned. Taps, the cover buttons and the logo
+  are noted the same way with source `tap`. A request that also sends
+  `isOn: true` at the planned temperature is not noted, and neither is a
+  change while the side is off. Nothing is noted while the feature is off,
+  while the schedule is paused or on the weekly schedule.
 
 ---
 
@@ -636,7 +644,7 @@ instead of the weekly schedule.
 Needs `features.rhythmSuggestions`. The Pod notes temperature changes made
 by hand during a Rhythms sleep in `rhythms-changes.jsonl`, next to the
 other Rhythms history. These routes never write `rhythmsDB.json` or
-`settingsDB.json`.
+`settingsDB.json`. Adding a suggestion is an ordinary `POST /api/rhythms`.
 
 #### GET `/api/rhythms/suggestions`
 
@@ -645,10 +653,67 @@ other Rhythms history. These routes never write `rhythmsDB.json` or
 - Returns `{ "enabled", "nights", "suggestions", "dismissed", "log" }`.
   While the feature or Rhythms is off, `enabled` is `false` and the other
   keys are empty (`{}` or `[]`).
-- `nights` has one entry per rhythm on the side: `counted`, `needed`,
-  `changed`, `earlier` and a `reason`. `log` lists the side's noted nights,
-  newest first, each with its changes and whether it is left out
-  (`excluded`).
+- `nights` has one entry per rhythm on the side, keyed by rhythm id:
+  `counted` (nights noted under the current plan), `needed`, `changed`
+  (nights with a change that counts), `earlier` (notes exist from before
+  the plan last changed) and a `reason`: `few-nights`, `no-change`,
+  `inconsistent`, `too-small`, `refused`, `dismissed` or `suggested`.
+- `suggestions` has at most one entry per rhythm: `rhythmId`, `near` and
+  `rows`. A row is a `step` (`time`, `temperatureF`, `plannedF`, and
+  optionally `replaces` and `thenBack`), an `on` (the power-on
+  temperature) or a `base` (`baseLevel` and `currentBaseLevel` on the -10
+  to +10 scale). Every row also has `key`, `direction`, `supporting`,
+  `firstNight`, `lastNight` and `supportingDates`. A `near` entry is one
+  row that is below the usual gate and is offered only when it is close.
+- `dismissed` lists hidden rows: `id`, `rhythmId`, `key`, `time`, `scope`
+  (`later` or `plan`) and `nightsLeft`. A `later` entry has a `null` key
+  and time.
+- `log` lists the side's noted nights, newest first: `date`, `rhythmId`,
+  `tonight`, `excluded`, the plan's steps (`plan`), `endMin` and the
+  `changes` made (`at`, `fromF`, `targetF`, `plannedF`, `held`, `source`).
+
+```json
+{
+  "enabled": true,
+  "nights": {
+    "workday": { "counted": 6, "needed": 5, "changed": 6, "earlier": false, "reason": "suggested" }
+  },
+  "suggestions": [
+    {
+      "rhythmId": "workday",
+      "near": false,
+      "rows": [
+        {
+          "kind": "step", "key": "step:down", "direction": "down", "supporting": 6,
+          "firstNight": "2026-10-09", "lastNight": "2026-10-14", "supportingDates": ["2026-10-09"],
+          "time": "23:30", "temperatureF": 79, "plannedF": 82
+        }
+      ]
+    }
+  ],
+  "dismissed": [],
+  "log": []
+}
+```
+
+#### POST `/api/rhythms/suggestions/dismiss`
+
+- Body: `{ "side", "rhythmId", "scope": "later" }` hides every suggestion for
+  the rhythm for 14 nights. `{ "side", "rhythmId", "scope": "plan",
+  "rows": [{ "key", "time" }] }` stops suggesting the listed rows while
+  the rhythm's plan stays as it is. One to three rows.
+- `200 { "ids": ["..."] }`: one id per note written, to pass to restore.
+- `400`: invalid body.
+- `404`: the side has no such rhythm.
+- `409`: the feature is off, or Rhythms is not active.
+
+#### POST `/api/rhythms/suggestions/restore`
+
+- Body: `{ "side", "ids": ["..."] }`. Brings back what the ids hid.
+- `204`: saved.
+- `400`: invalid body.
+- `404`: none of the ids is a hidden note on that side.
+- `409`: the feature is off, or Rhythms is not active.
 
 #### POST `/api/rhythms/suggestions/exclude`
 
