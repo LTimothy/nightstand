@@ -710,6 +710,13 @@ describe('the nights a rhythm card draws', () => {
     assert.equal(log.find(night => night.sets === undefined), undefined);
   });
 
+  it('describes a night edited mid-way by the current plan when both plans wrote the same end', () => {
+    const lines = [nightLine(0, HAND, OTHER_KEY), nightLine(0)];
+    const { log } = learnSuggestions(lines, [planned()], afterNight(0));
+    assert.equal(log[0].samePlan, true);
+    assert.equal(log[0].plan[0].temperatureF, 82);
+  });
+
   it('leaves sets out of a night without any', () => {
     const [night] = learnSuggestions(nights(1), [planned()], afterNight(0)).log;
     assert.equal(night.sets, undefined);

@@ -176,14 +176,16 @@ function planSteps(rhythm: Rhythm, endMin: number): NightLog['plan'] {
 
 type Recorded = { date: string; start: number; end: number; planKey: string; mode: 'manual' | 'smart' };
 
-// Every night of one rhythm id under any plan or mode, newest first, each by the latest end written for its date.
-function recordedNights(own: Line[]): Recorded[] {
+// Every night of one rhythm id under any plan or mode, newest first, each by the latest end written for its date,
+// and on a tie by the line under the current plan and mode (a plan edited mid-night without moving the wake time).
+function recordedNights(own: Line[], { rhythm, planKey }: PlannedRhythm): Recorded[] {
+  const current = (line: Recorded | ChangeLine | NightLine) => line.planKey === planKey && line.mode === rhythm.temperatureMode;
   const byDate = new Map<string, Recorded>();
   for (const line of own) {
     if (!isSleepLine(line)) continue;
     const end = Date.parse(line.sleepEnd);
     const known = byDate.get(line.date);
-    if (!known || end > known.end) {
+    if (!known || end > known.end || (end === known.end && !current(known) && current(line))) {
       byDate.set(line.date, { date: line.date, start: Date.parse(line.sleepStart), end, planKey: line.planKey, mode: line.mode });
     }
   }
@@ -192,8 +194,9 @@ function recordedNights(own: Line[]): Recorded[] {
 
 // One rhythm's log: the nights the rules see (counted, left out, tonight) and the last WINDOW_NIGHTS ended nights
 // under any plan, which its card draws. Only a night under the saved plan and mode carries the plan's steps.
-export function nightLog(own: Line[], { rhythm, planKey }: PlannedRhythm, evidence: Evidence, now: Date): NightLog[] {
-  const nights = recordedNights(own);
+export function nightLog(own: Line[], planned: PlannedRhythm, evidence: Evidence, now: Date): NightLog[] {
+  const { rhythm, planKey } = planned;
+  const nights = recordedNights(own, planned);
   const recent = nights.filter(night => night.end <= now.getTime()).slice(0, WINDOW_NIGHTS);
   const seen = new Set([...evidence.counted, ...evidence.excluded, ...(evidence.tonight ? [evidence.tonight] : [])].map(night => night.date));
   const leftOut = new Map<string, boolean>();
