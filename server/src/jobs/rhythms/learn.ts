@@ -4,12 +4,14 @@ import { z } from 'zod';
 import { MAX_TEMPERATURES_PER_DAY, SideSchema, TemperatureSchema, TimeSchema, type DailySchedule } from '../../db/schedulesSchema.js';
 import {
   CURVE_PHASES, InstantSchema, IsoDateSchema, RhythmIdSchema,
-  type NightLog, type Rhythm, type RhythmNights, type SuggestionRow, type SuggestionsResponse,
+  type NightLog, type Rhythm, type RhythmNights, type SuggestionReason, type SuggestionRow,
+  type SuggestionsResponse,
 } from '../../db/rhythmsSchema.js';
 import { minutesAfterOn, temperatureInPowerWindow } from '../../db/rhythmWake.js';
 import { F_PER_LEVEL, levelToF, type CurvePhase } from '../../db/smartCurve.js';
 import {
-  BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MIN_NIGHTS, MIN_SHARE, ON_WINDOW_MIN, REPLACE_MIN, TIME_ROUND_MIN, WINDOW_NIGHTS,
+  BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, ON_WINDOW_MIN, REPLACE_MIN, TIME_ROUND_MIN,
+  WINDOW_NIGHTS,
 } from '../../db/suggestionRules.js';
 
 const MINUTE = 60_000;
@@ -51,7 +53,7 @@ export type Line = z.infer<typeof LineSchema>;
 export type PlannedRhythm = { rhythm: Rhythm; planKey: string };
 export type Learned = Omit<SuggestionsResponse, 'enabled'>;
 export type Night = { date: string; sleepStart: number; sleepEnd: number; excluded: boolean };
-export type Collapsed = { counted: Night[]; excluded: Night[]; tonight: Night | null };
+export type Collapsed = { counted: Night[]; excluded: Night[]; tonight: Night | null; ended: Night[] };
 export type Episode = {
   date: string; at: string; offsetMin: number; from: number; fromF: number | null; plannedF: number;
   holdF: number | null; targetF: number; phase: CurvePhase | null; held: boolean; source: 'api' | 'tap';
@@ -84,13 +86,15 @@ export function collapseNights(sleeps: Array<ChangeLine | NightLine>, excludes: 
   const all = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   const ended = all.filter(night => night.sleepEnd <= now.getTime())
     .map(night => ({ ...night, excluded: latest.get(night.date) === true }));
-  const counted = ended.filter(night => !night.excluded).slice(-WINDOW_NIGHTS);
+  const kept = ended.filter(night => !night.excluded);
+  const counted = kept.slice(-WINDOW_NIGHTS);
   const since = counted.length === WINDOW_NIGHTS ? counted[0].date : '';
   const open = all.filter(night => night.sleepEnd > now.getTime());
   return {
     counted,
     excluded: ended.filter(night => night.excluded && night.date >= since),
     tonight: open[open.length - 1] ?? null,
+    ended: kept,
   };
 }
 
@@ -380,23 +384,68 @@ export function placeSmart(rhythm: Rhythm, evidence: Evidence, gate: Gate): Plac
   return { rows: [{ row, at: 0 }], stages: [], changed: votes.length };
 }
 
-// Counts for the notes until the rules below decide more.
-function notesSummary(evidence: Evidence): RhythmNights {
+type Analysis = Placement & { changed: number };
+
+function analyse(lines: Line[], planned: PlannedRhythm, at: Date, gate: Gate): Analysis {
+  const evidence = rhythmEvidence(lines, planned, at);
+  if (planned.rhythm.temperatureMode === 'smart') return placeSmart(planned.rhythm, evidence, gate);
+  const episodes = evidence.counted.flatMap(night => evidence.episodes.get(night.date) ?? []);
+  if (!episodes.length) return { rows: [], stages: ['no-change'], changed: 0 };
+  const clusters = clusterEpisodes(episodes);
+  const changed = new Set(clusters.flatMap(cluster => cluster.votes.map(vote => vote.date))).size;
   const counted = evidence.counted.length;
-  const changed = evidence.counted.filter(night => (evidence.episodes.get(night.date) ?? []).length > 0).length;
-  // Changed nights say nothing yet: the rules that tell a repeat from noise come next.
-  const reason = counted < MIN_NIGHTS ? 'few-nights' : changed === 0 ? 'no-change' : 'suggested';
-  return { counted, needed: MIN_NIGHTS, changed, earlier: evidence.earlier, reason };
+  if (gate.kind === 'full' && counted < MIN_NIGHTS) return { rows: [], stages: [], changed };
+  // Changes that every night undid: they match the plan.
+  if (changed === 0) return { rows: [], stages: ['too-small'], changed };
+  return { ...placeManual(planned.rhythm, clusters, counted, gate), changed };
 }
 
-export function learnSuggestions(lines: Line[], rhythms: PlannedRhythm[], now: Date): Learned {
-  const nights: Record<string, RhythmNights> = {};
-  const log: NightLog[] = [];
-  for (const planned of rhythms) {
-    const evidence = rhythmEvidence(lines, planned, now);
-    nights[planned.rhythm.id] = notesSummary(evidence);
-    log.push(...nightLogs(evidence, planned.rhythm));
+const shownOf = (rows: Placed[]): Shown[] => rows.flatMap(placed => [
+  { key: placed.row.key, at: placed.row.kind === 'step' ? placed.at : null },
+  ...(placed.backAt === undefined ? [] : [{ key: `back:${placed.row.key}`, at: placed.backAt }]),
+]);
+
+// What is on show is never stored: every ended night of the plan is replayed in order, each on
+// its own window, and carries what showed after it, so a row stays until support falls below HIDE_SHARE.
+function replay(lines: Line[], planned: PlannedRhythm, now: Date): Analysis {
+  const { ended } = rhythmEvidence(lines, planned, now);
+  if (!ended.length) return analyse(lines, planned, now, { kind: 'full', shown: [] });
+  let shown: Shown[] = [];
+  let result: Analysis = { rows: [], stages: [], changed: 0 };
+  for (const night of ended) {
+    result = analyse(lines, planned, new Date(night.sleepEnd), { kind: 'full', shown });
+    shown = shownOf(result.rows);
   }
-  log.sort((a, b) => b.date.localeCompare(a.date) || a.rhythmId.localeCompare(b.rhythmId));
-  return { nights, suggestions: [], dismissed: [], log };
+  return result;
+}
+
+const STAGE_ORDER: SuggestionReason[] = ['no-change', 'inconsistent', 'too-small', 'refused', 'dismissed', 'suggested'];
+
+function reasonOf(counted: number, full: Analysis, showing: number): SuggestionReason {
+  if (counted < MIN_NIGHTS) return 'few-nights';
+  if (showing > 0) return 'suggested';
+  if (full.rows.length > 0) return 'dismissed';
+  return full.stages.reduce<SuggestionReason>(
+    (best, stage) => (STAGE_ORDER.indexOf(stage) > STAGE_ORDER.indexOf(best) ? stage : best), full.stages[0] ?? 'inconsistent');
+}
+
+const byNightOrder = (a: Placed, b: Placed) => a.at - b.at;
+
+export function learnSuggestions(lines: Line[], rhythms: PlannedRhythm[], now: Date): Learned {
+  const learned: Learned = { nights: {}, suggestions: [], dismissed: [], log: [] };
+  for (const planned of rhythms) {
+    const { rhythm } = planned;
+    const evidence = rhythmEvidence(lines, planned, now);
+    const counted = evidence.counted.length;
+    const full = replay(lines, planned, now);
+    const rows = [...full.rows].sort(byNightOrder).slice(0, MAX_SUGGESTIONS);
+    const nights: RhythmNights = {
+      counted, needed: MIN_NIGHTS, changed: full.changed, earlier: evidence.earlier, reason: reasonOf(counted, full, rows.length),
+    };
+    learned.nights[rhythm.id] = nights;
+    if (rows.length) learned.suggestions.push({ rhythmId: rhythm.id, near: false, rows: rows.map(placed => placed.row) });
+    learned.log.push(...nightLogs(evidence, rhythm));
+  }
+  learned.log.sort((a, b) => b.date.localeCompare(a.date) || a.rhythmId.localeCompare(b.rhythmId));
+  return learned;
 }

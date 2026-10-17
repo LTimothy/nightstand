@@ -139,9 +139,9 @@ describe('notes', () => {
     assert.equal(run(lines, afterNight(4)).nights[HAND.id].changed, 1);
   });
 
-  it('claims nothing about 5 nights with changes until the rules decide', () => {
+  it('says inconsistent when 5 nights hold changes that do not repeat', () => {
     const lines = [...nights(5), change(0, 60, 82, 79), change(1, 300, 82, 85)];
-    assert.equal(run(lines, afterNight(4)).nights[HAND.id].reason, 'suggested');
+    assert.equal(run(lines, afterNight(4)).nights[HAND.id].reason, 'inconsistent');
   });
 
   it('restarts the count under a new plan and says it counted before', () => {
@@ -404,5 +404,116 @@ describe('Smart Schedule votes', () => {
     const lines = [...nights(7, SMART), ...[2, 4, 6].map(night => smartChange(night, 'hold', 74))];
     assert.deepEqual(smartPlace(lines, 7).stages, ['inconsistent']);
     assert.equal(smartPlace(lines, 7, SMART, { kind: 'near', floor: 3 }).rows.length, 1);
+  });
+});
+
+const learn = (lines: Line[], now: Date, rhythms: PlannedRhythm[] = [planned()]) => learnSuggestions(lines, rhythms, now);
+const entryOf = (result: ReturnType<typeof learnSuggestions>, id = HAND.id) => result.suggestions.find(entry => entry.rhythmId === id);
+// `count` nights, with a 23:30 change to 79 on the listed nights.
+const habit = (count: number, on: number[]) => [...nights(count), ...on.map(night => change(night, 90, 82, 79))];
+
+describe('learning over nights', () => {
+  it('waits for 5 nights and half or more of them', () => {
+    assert.equal(entryOf(learn(habit(4, range(0, 4)), afterNight(3))), undefined);
+    assert.equal(entryOf(learn(habit(5, [1, 3]), afterNight(4))), undefined);
+    assert.equal(entryOf(learn(habit(5, [0, 1, 2]), afterNight(4)))?.rows.length, 1);
+    assert.equal(entryOf(learn(habit(7, [3, 4, 5, 6]), afterNight(6)))?.rows.length, 1);
+  });
+
+  it('suggests a habit spread over two hours at its middle time', () => {
+    const offsets = [60, 80, 100, 120, 140, 160, 180, 90, 110];
+    const lines = [...nights(14), ...offsets.map((offset, night) => change(night, offset, 82, 79))];
+    const entry = entryOf(learn(lines, afterNight(13)));
+    assert.equal(entry?.near, false);
+    assert.deepEqual(entry?.rows.map(row => row.kind === 'step' && [row.time, row.temperatureF]), [['23:45', 79]]);
+  });
+
+  it('counts only the last 14 nights', () => {
+    const result = learn(habit(20, range(0, 8)), afterNight(19));
+    assert.equal(entryOf(result), undefined);
+    assert.deepEqual(result.nights[HAND.id], { counted: 14, needed: 5, changed: 2, earlier: false, reason: 'inconsistent' });
+  });
+
+  it('never lets the night in progress vote, and still logs it', () => {
+    const lines = [...habit(5, [0, 1]), nightLine(5), change(5, 90, 82, 79)];
+    const result = learn(lines, afterNight(4));
+    assert.equal(entryOf(result), undefined);
+    assert.equal(result.log[0].tonight, true);
+    assert.equal(result.log[0].changes.length, 1);
+  });
+
+  it('restarts after the suggested change is added, and comes back on undo', () => {
+    const lines = habit(9, range(0, 9));
+    assert.equal(entryOf(learn(lines, afterNight(8)))?.rows.length, 1);
+    const added = learn(lines, afterNight(8), [planned(STEPPED, OTHER_KEY)]);
+    assert.equal(entryOf(added), undefined);
+    assert.deepEqual(added.nights[HAND.id], { counted: 0, needed: 5, changed: 0, earlier: true, reason: 'few-nights' });
+    assert.equal(entryOf(learn(lines, afterNight(8)))?.rows.length, 1);
+  });
+
+  it('keeps a row on show at 6 of 14 once it showed, and hides it at 5 of 14', () => {
+    assert.equal(entryOf(learn(habit(15, range(0, 7)), afterNight(14)))?.near, false);
+    const hidden = learn(habit(16, range(0, 7)), afterNight(15));
+    assert.equal(hidden.suggestions.find(entry => !entry.near), undefined);
+    assert.equal(hidden.nights[HAND.id].reason, 'inconsistent');
+  });
+
+  it('keeps a row that first showed before the last 14 nights while 6 of 14 still agree', () => {
+    const on = [3, ...range(0, 45).filter(night => night % 7 <= 2)];
+    for (let night = 17; night < 45; night++) {
+      assert.equal(entryOf(learn(habit(night + 1, on.filter(change => change <= night)), afterNight(night)))?.near, false, `night ${night}`);
+    }
+  });
+
+  it('does not give a full row at 6 of 14 to a pattern that never showed', () => {
+    const result = learn(habit(14, [2, 4, 7, 9, 11, 13]), afterNight(13));
+    assert.equal(result.suggestions.find(entry => !entry.near), undefined);
+  });
+
+  it('replays the same way every time', () => {
+    const lines = habit(16, [0, 2, 3, 5, 8, 9, 12, 15]);
+    assert.deepEqual(learn(lines, afterNight(15)), learn(lines, afterNight(15)));
+  });
+
+  it('lists exactly the supporting nights and counts the nights that voted', () => {
+    const lines = [...habit(10, range(0, 7)), change(8, 90, 82, 85), change(9, 95, 82, 86)];
+    const result = learn(lines, afterNight(9));
+    const [row] = entryOf(result)?.rows ?? [];
+    assert.deepEqual(row.supportingDates, range(0, 7).map(dateOf));
+    assert.equal(result.nights[HAND.id].changed, 9);
+  });
+
+  it('gives the furthest reason a rhythm reached', () => {
+    const reasonOf = (lines: Line[], count: number, rhythm: Rhythm = HAND) =>
+      learn(lines, afterNight(count - 1), [planned(rhythm)]).nights[rhythm.id].reason;
+    assert.equal(reasonOf(nights(3), 3), 'few-nights');
+    assert.equal(reasonOf(nights(5), 5), 'no-change');
+    assert.equal(reasonOf(habit(5, [1, 3]), 5), 'inconsistent');
+    assert.equal(reasonOf([...nights(9), ...down(9, 130)], 9, STEPPED), 'too-small');
+    assert.equal(reasonOf([...nights(9), ...range(0, 9).map(night => change(night, 475, 82, 85))], 9), 'refused');
+    assert.equal(reasonOf(habit(9, range(0, 9)), 9), 'suggested');
+    assert.equal(reasonOf([...nights(5, SMART), ...range(0, 5).map(night => smartChange(night, 'warmup', 85))], 5, SMART), 'no-change');
+  });
+
+  it('says the changes match the plan when every night nets to zero', () => {
+    const lines = [...nights(5), ...range(0, 5).flatMap(night => [change(night, 60, 82, 79), change(night, 90, 79, 82)])];
+    assert.deepEqual(learn(lines, afterNight(4)).nights[HAND.id], { counted: 5, needed: 5, changed: 0, earlier: false, reason: 'too-small' });
+  });
+
+  it('suggests a Smart base through the same replay', () => {
+    const lines = [...nights(9, SMART), ...range(0, 7).map(night => smartChange(night, 'hold', 74))];
+    const entry = entryOf(learn(lines, afterNight(8), [planned(SMART)]), SMART.id);
+    assert.deepEqual(entry?.rows.map(row => row.kind === 'base' && row.baseLevel), [-1]);
+  });
+});
+
+describe('both sides written at once', () => {
+  it('reads an away-mode write for both sides as one change', () => {
+    const twice = [change(0, 90, 82, 79), change(0, 90, 82, 79)];
+    assert.equal(coalesceEpisodes(twice).length, 1);
+    const result = learnSuggestions([...nights(5), ...range(0, 3).flatMap(night => [change(night, 90, 82, 79), change(night, 90, 82, 79)])],
+      [planned()], afterNight(4));
+    assert.equal(result.nights[HAND.id].changed, 3);
+    assert.equal(result.suggestions[0]?.rows[0]?.supporting, 3);
   });
 });
