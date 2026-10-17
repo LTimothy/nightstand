@@ -5,6 +5,7 @@ import { minutesAfterOn, temperatureInPowerWindow } from '@api/rhythmWake';
 import { SUGGESTION_RULES, type SuggestionRules } from '@api/suggestionRules';
 import { displayTemperature, fahrenheitToLevel, levelToFahrenheit, type TemperatureFormat } from '@lib/temperatureConversions';
 import { clockAfterOn } from './nightsChartModel';
+import type { Block } from './rhythmOverlay';
 import { formatDate, type SuggestionStart } from './rhythmsModel';
 
 export const SECTION_TITLE = 'Suggestions';
@@ -35,29 +36,8 @@ export const HIDE_ERROR = 'Could not hide this suggestion. Try again.';
 export const SHOW_AGAIN_ERROR = 'Could not show it again. Try again.';
 export const CHART_LEGEND = { change: 'With this change', night: 'A night', now: 'Now' } as const;
 
-// The caption under a rhythm card's chart; none for a rhythm without nights.
-export function overlayCaption(nights: number, smart: boolean): string {
-  const bold = smart ? 'The bold line is tonight\'s curve.' : 'The bold line is your schedule.';
-  return nights === 1 ? `${bold} The thin line is last night, 1 night so far.`
-    : `${bold} The thin lines are the last ${nights} nights, brighter is more recent.`;
-}
-
-// Last night's set points, for screen readers only; x is minutes after the power-on. A Smart night has a point
-// every few minutes, so it reads short: where it started, its coolest, and its end.
-export function lastNightText(
-  points: Array<{ x: number; f: number }>, end: number, on: string, format: TemperatureFormat, smart: boolean,
-): string {
-  const [first, ...rest] = points;
-  const off = `, off at ${clockAfterOn(on, end)}.`;
-  if (smart) {
-    const coolest = rest.reduce((low, point) => (point.f < low.f ? point : low), first);
-    const cool = coolest === first ? '' : `, coolest ${displayTemperature(coolest.f, format)} at ${clockAfterOn(on, coolest.x)}`;
-    return `Last night: ${displayTemperature(first.f, format)} at ${clockAfterOn(on, first.x)}${cool}${off}`;
-  }
-  const then = rest.map(point => `, then ${displayTemperature(point.f, format)} at ${clockAfterOn(on, point.x)}`).join('');
-  const when = first.x > 0 ? ` at ${clockAfterOn(on, first.x)}` : '';
-  return `Last night: ${displayTemperature(first.f, format)}${when}${then}${off}`;
-}
+export const MATCH_SCHEDULE = 'Your nights match the schedule.';
+export const MATCH_CURVE = 'Your nights match the curve.';
 
 type ValueRow = Extract<SuggestionRow, { kind: 'step' | 'on' }>;
 
@@ -150,6 +130,30 @@ const warmth = (direction: 'down' | 'up') => (direction === 'down' ? 'cooler' : 
 const capitalized = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 const uncapitalized = (text: string) => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
 const joinAnd = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
+
+export const nightsSoFar = (nights: number) => `${count(nights, 'night')} so far.`;
+
+// The sentence under a rhythm card's chart: what the typical night did where it left the schedule, in time order.
+// A Smart rhythm's nights can differ from tonight's curve with no hand change, so the bed is the subject there.
+export function typicalNightText(blocks: Block[], on: string, format: TemperatureFormat, smart: boolean): string {
+  if (!blocks.length) return smart ? MATCH_CURVE : MATCH_SCHEDULE;
+  const what = smart ? 'the curve' : 'the schedule';
+  const round = SUGGESTION_RULES.TIME_ROUND_MIN;
+  const clauses = blocks.map((block, index) => {
+    const value = pairTemperatures(block.schedule[0].f, block.f, format)[1];
+    if (!block.turned) {
+      // Both printed values share a unit, so a level pair never mixes a level with °F.
+      const [held, far] = pairTemperatures(block.f, block.farF, format);
+      const [now, then] = held === value ? [held, far] : [block.f, block.farF].map(f => displayTemperature(f, 'fahrenheit'));
+      return `${smart ? 'stayed' : 'kept it'} at ${now} while ${what} went ${block.farF < block.f ? 'down' : 'up'} to ${then}`;
+    }
+    const previous = blocks[index - 1];
+    const verb = previous?.turned ? '' : smart ? (previous ? 'the bed went ' : 'went ') : 'turned it ';
+    return `${verb}${block.turned} to ${value} around ${clockAfterOn(on, Math.round(block.from / round) * round)}`;
+  });
+  return `Most nights ${smart ? 'the bed' : 'you'} ${joinAnd(clauses)}.`;
+}
+
 // The value a row writes, read against the one it replaces.
 const newValue = (row: ValueRow, format: TemperatureFormat) => pairTemperatures(row.plannedF, row.temperatureF, format)[1];
 const backValue = (row: ValueRow, back: ThenBack, format: TemperatureFormat) =>
