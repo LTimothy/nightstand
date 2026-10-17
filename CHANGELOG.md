@@ -14,6 +14,9 @@ is a hard fork; for the history of the projects it descends from, see
   temperature change you made by hand on half or more of its nights, with
   the nights behind it, and one action adds it to the rhythm. Notes stay on
   the Pod for 90 days and can be deleted in Settings.
+- Each rhythm card on the Schedule page shows its schedule over the last 14
+  nights as the bed was set, brighter the more recent. What the schedule
+  sets during a rhythm night is kept with the notes for 90 days.
 - Checked on: the server and app test suites and the demo layout sweep.
 
 ### Cover taps

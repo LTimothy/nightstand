@@ -68,3 +68,11 @@ still need separate attention.
 The migration adds only the nightly summary table. Install and update
 apply migrations through the existing `prisma migrate deploy` path. Shipped
 migration checksums are pinned by the release process, not by this change.
+
+## Rhythms notes
+
+With Suggestions from your changes on, `rhythms-changes.jsonl` in the data
+folder keeps hand changes and what the schedule set during each rhythm
+night. Lines older than 90 days are removed each time a rhythm night starts.
+Two sides come to well under 1 MB at 90 days. The file is not in backups,
+neither switch above touches it, and Delete notes removes it.

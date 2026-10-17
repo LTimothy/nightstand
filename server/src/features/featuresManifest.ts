@@ -1023,6 +1023,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       'app/src/pages/SchedulePage/rhythms/RhythmsPage.tsx', 'app/src/pages/SchedulePage/rhythms/rhythmsModel.ts',
       'app/src/mocks/handlers.ts', 'app/e2e/routes.ts', 'README.md', 'docs/VALIDATION.md',
       'app/src/pages/SchedulePage/rhythms/NightsChart.tsx', 'app/src/pages/SchedulePage/rhythms/nightsChartModel.ts',
+      'app/src/pages/SchedulePage/rhythms/RhythmChart.tsx', 'app/src/pages/SchedulePage/rhythms/rhythmOverlay.ts',
+      'docs/METRICS_RETENTION.md',
     ],
     depends_on: ['rhythms'],
     reversible: true,
@@ -1038,7 +1040,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       'server/src/db/rhythmsCompat.test.ts', 'app/src/pages/SchedulePage/rhythms/SuggestionSheet.test.tsx',
       'app/src/pages/SchedulePage/rhythms/SuggestionCard.test.tsx', 'app/src/pages/SchedulePage/rhythms/RhythmsPage.test.tsx',
       'app/src/pages/SchedulePage/rhythms/rhythmsModel.test.ts', 'app/src/mocks/suggestionsMock.test.ts',
-      'app/src/pages/SchedulePage/rhythms/NightsChart.test.tsx',
+      'app/src/pages/SchedulePage/rhythms/NightsChart.test.tsx', 'app/src/pages/SchedulePage/rhythms/RhythmChart.test.tsx',
+      'app/src/pages/SchedulePage/rhythms/rhythmOverlay.test.ts', 'server/src/jobs/rhythms/notesCompat.test.ts',
     ],
     upstream_offer: false,
     rationale: 'Off by default. Learns only from hand changes, never from sleep data or presence, and only proposes: a rhythm '
