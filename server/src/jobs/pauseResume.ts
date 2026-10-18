@@ -1,5 +1,6 @@
 import schedule from 'node-schedule';
 import { resumeSchedule } from './resumeSchedule.js';
+import { endPauseHold } from './pauseHold.js';
 import logger from '../logger.js';
 import { updateSettings } from '../db/settings.js';
 import { Settings } from '../db/settingsSchema.js';
@@ -27,6 +28,7 @@ export async function clearEndedPause(side: Side, expiresAt: string): Promise<bo
   }
   if (cleared) {
     logger.info(`Schedule pause for ${side} ended at ${expiresAt}`);
+    await endPauseHold(side);
     const endedAt = new Date(expiresAt);
     await resumeSchedule(side, Number.isFinite(endedAt.getTime()) ? endedAt : new Date());
   }

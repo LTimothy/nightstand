@@ -2,6 +2,7 @@ import { useState } from 'react';
 import moment from 'moment-timezone';
 import { Alert, Box, Button, Drawer, FormControlLabel, Radio, RadioGroup, TextField, Typography } from '@mui/material';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
+import { MAX_ON_DURATION_SECONDS } from '@api/deviceStatusSchema.ts';
 import { postSettings, useSettings } from '@api/settings.ts';
 import { isSchedulePaused } from '@api/schedulePause.ts';
 import { useSchedules } from '@api/schedules.ts';
@@ -56,11 +57,16 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
     if (bed.state === 'rhythms') return skippedFromSleeps(bed.sleeps, timeZone, now, end);
     return schedule ? weeklySkips(schedule, timeZone, now, end) : [];
   };
-  // A running side is left as it is; only its own timer, or the person, turns it off.
+  // A pause with an end moves a running side's timer out to that end, by at most 12 hours.
   const status = deviceStatus?.[side];
   const timer = status?.isOn && (status.secondsRemaining ?? 0) > 0 ? now.clone().add(status.secondsRemaining, 'seconds') : undefined;
-  const onNow = !status?.isOn ? '' : timer
-    ? `${name}'s side is on now and stays as it is. It turns off at ${formatPauseEnd(timer, timeZone, now)}, or when you turn it off.`
+  const end = choice === 'tonight' ? tonightEnd : choice === 'until' && !untilError ? untilEnd : undefined;
+  const held = end && moment.min(end, now.clone().add(MAX_ON_DURATION_SECONDS, 'seconds'));
+  const offAt = timer && held ? moment.max(timer, held) : timer;
+  const offText = offAt && formatPauseEnd(offAt, timeZone, now);
+  const until = offAt && (end && offAt.isSame(end) ? `the pause ends at ${offText}` : offText);
+  const onNow = !status?.isOn ? '' : until
+    ? `${name}'s side is on now and stays on until ${until}, or until you turn it off.`
     : `${name}'s side is on now and stays on until you turn it off.`;
 
   // A save in flight cannot be cancelled, so closing waits for it.

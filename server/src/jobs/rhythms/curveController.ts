@@ -171,6 +171,11 @@ export class CurveController {
     return record.status === 'extended' ? record.latest : record.at;
   }
 
+  extendedUntil(side: Side): Date | undefined {
+    for (const record of this.offs.values()) if (record.side === side && record.status === 'extended') return record.latest;
+    return undefined;
+  }
+
   isExtended(side: Side, date: string): boolean {
     return this.offs.get(keyOf(side, date))?.status === 'extended';
   }
@@ -699,6 +704,11 @@ export function smartCoolStartFor(side: Side, date: string): Date | undefined {
 
 export function smartPowerOffFor(side: Side, date: string): Date | undefined {
   return active?.powerOffFor(side, date);
+}
+
+// The latest off of a side's sleep kept on past its set off, if any.
+export function smartOffExtendedUntil(side: Side): Date | undefined {
+  return active?.extendedUntil(side);
 }
 
 export function smartOffExtends(side: Side, date: string): boolean {

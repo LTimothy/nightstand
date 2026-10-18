@@ -61,6 +61,7 @@ const { resetPowerOnTimes } = await import('../powerScheduler.js');
 const { setEngineActivation } = await import('../scheduleQueries.js');
 const { nextReboot } = await import('../rebootTime.js');
 const { changesPath, flushHandChanges, forgetHandChanges } = await import('./handChanges.js');
+const { endPauseHold, holdForPause } = await import('../pauseHold.js');
 
 const at = (iso: string) => new Date(iso);
 const setNow = (iso: string) => mock.timers.setTime(Date.parse(iso));
@@ -538,6 +539,18 @@ describe('"When I get up" sleeps', () => {
     // Fail fast: a step that cannot reach the Pod now is dropped, not delivered late.
     assert.deepEqual(updateOptions, [{}]);
     assert.equal(armedEnd('left'), at('2026-09-29T09:00:00Z').getTime());
+  });
+
+  it('never steps a timer back inside a schedule pause hold', async () => {
+    setNow('2026-09-29T06:00:00Z');
+    Object.assign(deviceStatus.left, { secondsRemaining: 600 });
+    await holdForPause('left', at('2026-09-29T10:00:00Z'));
+    updates.length = 0;
+    await armExtensionStep('left', at('2026-09-29T06:15:00Z'), at('2026-09-29T09:00:00Z'), at('2026-09-29T06:00:00Z'));
+    assert.deepEqual(updates, [{ left: { secondsRemaining: 4 * 3600 + 300 } }]);
+    // The timer no longer matches the hold, so ending it writes nothing.
+    await endPauseHold('left');
+    Reflect.deleteProperty(deviceStatus.left, 'secondsRemaining');
   });
 
   it('turns off at the set time when the controller cannot decide', async () => {

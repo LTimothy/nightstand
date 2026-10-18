@@ -320,6 +320,15 @@ is a hard fork; for the history of the projects it descends from, see
   70 KB less to download.
 - The compact side picker no longer polls presence.
 
+### Fixes
+
+- Pausing the schedule until a set time now keeps a side that is on running
+  until the pause ends, for up to 12 hours. Before, the side's own timer
+  from the power-on still turned it off at the planned end. Resuming early
+  gives the side its planned off time back. If that time has passed, the
+  side turns off, unless someone is in bed and presence auto-off is on:
+  then presence auto-off turns it off after they get up.
+
 ## [3.6.1] - 2026-10-07
 
 Keeps tap temperature changes within range, reports the daily reboot under its own status, stops sending an unverified command, and credits three contributors.

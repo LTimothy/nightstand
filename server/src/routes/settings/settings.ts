@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import { resumeSchedule } from '../../jobs/resumeSchedule.js';
+import { endPauseHold, holdForPause } from '../../jobs/pauseHold.js';
 import { SCHEDULE_SIDES } from '../../db/scheduleKeys.js';
 import type { Side } from '../../db/schedulesSchema.js';
 import express, { Request, Response } from 'express';
@@ -36,6 +37,7 @@ router.post('/settings', async (req: Request, res: Response) => {
   const validatedUpdate = validationResult.data;
   delete validatedUpdate.id;
   const resumed: Side[] = [];
+  const held: Array<[Side, Date]> = [];
   const resumedAt = new Date();
   let conflict = '';
   const rejected: { error?: string } = {};
@@ -57,6 +59,10 @@ router.post('/settings', async (req: Request, res: Response) => {
       if (draft[side].scheduleOverrides.pause.active && validatedUpdate[side]?.scheduleOverrides?.pause?.active === false) resumed.push(side);
     }
     _.merge(draft, validatedUpdate);
+    for (const side of SCHEDULE_SIDES) {
+      const pause = draft[side].scheduleOverrides.pause;
+      if (validatedUpdate[side]?.scheduleOverrides?.pause?.active && pause.expiresAt) held.push([side, new Date(pause.expiresAt)]);
+    }
     // A gesture is replaced whole, so no field of its previous action stays behind.
     for (const side of SCHEDULE_SIDES) {
       for (const [gesture, tap] of Object.entries(validatedUpdate[side]?.taps ?? {})) {
@@ -76,9 +82,10 @@ router.post('/settings', async (req: Request, res: Response) => {
     res.status(400).json({ error: rejected.error });
     return;
   }
-  // A resume can wait minutes for the Pod; the save is done, so answer now.
+  // Hub writes can wait for the Pod; the save is done, so answer now.
+  for (const [side, end] of held) void holdForPause(side, end);
   for (const side of resumed) {
-    void resumeSchedule(side, resumedAt).catch((error: unknown) => {
+    void endPauseHold(side).then(() => resumeSchedule(side, resumedAt)).catch((error: unknown) => {
       logger.error(`Failed to resume the ${side} schedule: ${error instanceof Error ? error.message : String(error)}`);
     });
   }

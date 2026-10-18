@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it, before, beforeEach, after } from 'node:test';
+import { describe, it, before, beforeEach, after, mock } from 'node:test';
 import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -14,6 +14,10 @@ const dataFolder = mkdtempSync(path.join(tmpdir(), 'nightstand-settings-validati
 mkdirSync(path.join(dataFolder, 'lowdb'));
 process.env.DATA_FOLDER = `${dataFolder}/`;
 process.env.ENV = 'local';
+// A pause with an end reads the Pod; there is none here.
+mock.module(new URL('../../jobs/pauseHold.js', import.meta.url).href, {
+  namedExports: { holdForPause: async () => {}, endPauseHold: async () => {}, pauseHoldUntil: () => undefined },
+});
 
 let settingsRouter: express.Router;
 

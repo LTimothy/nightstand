@@ -226,10 +226,34 @@ it('lists what tonight only skips from the resolved sleep while Rhythms runs', (
   expect(screen.getByText('Skips: 11:00 PM start, temperature changes, 9:00 AM alarm')).toBeInTheDocument();
 });
 
-it('says a running side stays on until its own timer turns it off', () => {
+it('says a running side stays on until the pause ends', () => {
   device.status = { left: { isOn: true, secondsRemaining: 5400 } };
   render(<PauseScheduleSheet open onClose={ onClose }/>);
-  expect(screen.getByText('Alex\'s side is on now and stays as it is. It turns off at 9:30 PM today, or when you turn it off.'))
+  expect(screen.getByText('Alex\'s side is on now and stays on until the pause ends at 7:00 AM tomorrow, or until you turn it off.'))
+    .toBeInTheDocument();
+});
+
+it('says a running side keeps a timer that already runs past the pause end', () => {
+  device.status = { left: { isOn: true, secondsRemaining: 12 * 3600 } };
+  render(<PauseScheduleSheet open onClose={ onClose }/>);
+  expect(screen.getByText('Alex\'s side is on now and stays on until 8:00 AM tomorrow, or until you turn it off.'))
+    .toBeInTheDocument();
+});
+
+it('says a running side stays on at most 12 hours for a long pause', () => {
+  device.status = { left: { isOn: true, secondsRemaining: 5400 } };
+  render(<PauseScheduleSheet open onClose={ onClose }/>);
+  fireEvent.click(screen.getByRole('radio', { name: /^Until a set time/ }));
+  fireEvent.change(screen.getByLabelText('Resume at'), { target: { value: '2026-09-30T20:00' } });
+  expect(screen.getByText('Alex\'s side is on now and stays on until 8:00 AM tomorrow, or until you turn it off.'))
+    .toBeInTheDocument();
+});
+
+it('says a running side keeps its own timer for a pause until resumed', () => {
+  device.status = { left: { isOn: true, secondsRemaining: 5400 } };
+  render(<PauseScheduleSheet open onClose={ onClose }/>);
+  fireEvent.click(screen.getByRole('radio', { name: /^Until I resume/ }));
+  expect(screen.getByText('Alex\'s side is on now and stays on until 9:30 PM today, or until you turn it off.'))
     .toBeInTheDocument();
 });
 

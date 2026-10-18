@@ -277,6 +277,24 @@ describe('presenceAutoOffMonitor', () => {
     assert.equal(powerOffCalls.length > 0, true, 'an ended pause still held off auto-off');
   });
 
+  it('keeps a side left on in bed after a pause, then turns it off once they are up', async () => {
+    await settingsDB.read();
+    settingsDB.data.left.scheduleOverrides.pause = { active: true, expiresAt: '2026-03-02T13:00:00Z' };
+    await settingsDB.write();
+    let offWhileInBed = false;
+    await runTicks(at('2026-03-02T14:00:00'), 120, (i) => {
+      const now = moment.tz(Date.now(), 'UTC').format();
+      if (i < 60) {
+        presenceState.left = { present: true, lastUpdatedAt: now, lastPresenceAt: now };
+        offWhileInBed ||= powerOffCalls.length > 0;
+      } else {
+        presenceState.left = { ...presenceState.left, present: false, lastUpdatedAt: now };
+      }
+    });
+    assert.equal(offWhileInBed, false, 'powered off while in bed');
+    assert.equal(powerOffCalls.length > 0, true, 'stayed on once they were up');
+  });
+
   it('still acts on a side whose partner is paused', async () => {
     await settingsDB.read();
     settingsDB.data.right.scheduleOverrides.pause = { active: true, expiresAt: '' };

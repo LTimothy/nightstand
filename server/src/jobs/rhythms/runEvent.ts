@@ -12,6 +12,7 @@ import { executeAlarm } from '../alarmScheduler.js';
 import { rhythmNightAlarms, waitForNightAlarms } from '../alarmActivity.js';
 import { executeAnalyzeSleep } from '../analyzeSleep.js';
 import { notePowerOn, poweredOnSince } from '../powerScheduler.js';
+import { pauseHoldUntil } from '../pauseHold.js';
 import { isTempScheduleOverridden } from '../scheduleOverride.js';
 import { effectiveSides, engineActivation } from '../scheduleQueries.js';
 import { rhythmSkipReason } from './gates.js';
@@ -250,7 +251,9 @@ export async function rearmRhythmSleep(side: Side, sleep: ResolvedSleep): Promis
 export async function armExtensionStep(side: Side, until: Date, latest: Date, now: Date = new Date()): Promise<boolean> {
   if (handedBack()) return false;
   noteArmed(settingsDB.data, side, latest);
-  await updateDeviceStatus({ [side]: { secondsRemaining: firmwareSeconds(until, now) } }, {});
+  // A schedule pause may hold the side on for longer.
+  const end = new Date(Math.max(until.getTime(), pauseHoldUntil(side) ?? 0));
+  await updateDeviceStatus({ [side]: { secondsRemaining: firmwareSeconds(end, now) } }, {});
   return true;
 }
 
