@@ -15,6 +15,11 @@ is a hard fork; for the history of the projects it descends from, see
 - The biometrics stream copies only warnings and errors to the system
   journal. Before, every line went to both its log file and the journal,
   about 250 journal entries every 10 minutes on our Pod.
+- `servicesDB.json` is rewritten only when a status changes. Sensor
+  temperatures (every 30 s) and the biometrics stream heartbeat (every 60 s)
+  stay in memory, which removes about 4300 whole-file rewrites a day. After a
+  restart the stream still has five minutes to check in before it shows as
+  stopped.
 
 ### Suggestions from your changes
 
