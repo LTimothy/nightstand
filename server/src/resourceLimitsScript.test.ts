@@ -12,12 +12,23 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = path.join(repoRoot, 'scripts/setup_resource_limits.sh');
 
-function runScript() {
+const OLD_RESTART_DROPIN = `# Managed by scripts/setup_resource_limits.sh. See that script for why.
+[Unit]
+StartLimitIntervalSec=0
+
+[Service]
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+`;
+
+function runScript(systemdVersion?: string) {
   const root = mkdtempSync(path.join(tmpdir(), 'nightstand-limits-'));
   const bin = path.join(root, 'bin');
   const calls = path.join(root, 'systemctl-calls');
   execFileSync('mkdir', ['-p', bin]);
-  writeFileSync(path.join(bin, 'systemctl'), `#!/bin/sh\necho "$@" >> "${calls}"\n`);
+  const version = systemdVersion ? `echo "systemd ${systemdVersion} (${systemdVersion})"; exit 0` : 'exit 1';
+  writeFileSync(path.join(bin, 'systemctl'), `#!/bin/sh\nif [ "$1" = --version ]; then ${version}; fi\necho "$@" >> "${calls}"\n`);
   chmodSync(path.join(bin, 'systemctl'), 0o755);
   execFileSync('bash', [SCRIPT], {
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_SYSTEMD_DIR: root },
@@ -52,6 +63,21 @@ describe('setup_resource_limits.sh', () => {
     assert.match(conf, /^\[Unit\]\nStartLimitIntervalSec=0$/m);
     assert.match(conf, /^Restart=always$/m);
     assert.match(conf, /^RestartSec=5$/m);
+  });
+
+  it('grows the wait between automatic restarts up to a minute on systemd 254 and newer', () => {
+    const conf = runScript('255').dropinNamed('free-sleep.service', '20-nightstand-restart.conf');
+    const service = conf.slice(conf.indexOf('[Service]'));
+    assert.match(service, /^RestartSec=5$/m);
+    assert.match(service, /^RestartSteps=4$/m);
+    assert.match(service, /^RestartMaxDelaySec=60$/m);
+  });
+
+  it('keeps the fixed wait on older systemd or an unknown version', () => {
+    for (const version of ['253', undefined]) {
+      const conf = runScript(version).dropinNamed('free-sleep.service', '20-nightstand-restart.conf');
+      assert.equal(conf, OLD_RESTART_DROPIN);
+    }
   });
 
   it('also sets the older StartLimitInterval spelling in [Service] for systemd before 230', () => {

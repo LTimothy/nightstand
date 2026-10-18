@@ -26,6 +26,12 @@
 # ignore the new name; newer systemd still accepts it as an alias with the
 # same value.
 #
+# On systemd 254 and newer the wait after each automatic restart grows from
+# 5 s to 60 s, so a server that keeps crashing restarts about once a minute
+# instead of filling the journal every few seconds. Manual starts are never
+# delayed. systemd counts automatic restarts until a manual start, so a
+# server that crashed often since its last update waits up to 60 s.
+#
 # To undo: rm the three drop-ins below, then systemctl daemon-reload.
 
 set -euo pipefail
@@ -48,7 +54,13 @@ EOF
 write_dropin free-sleep.service 1200M
 write_dropin free-sleep-stream.service 512M
 
-cat > "${SYSTEMD_DIR}/free-sleep.service.d/20-nightstand-restart.conf" <<'EOF'
+SYSTEMD_VERSION=$(systemctl --version 2>/dev/null | sed -n '1s/^systemd \([0-9][0-9]*\).*/\1/p' || true)
+BACKOFF=
+if [ -n "$SYSTEMD_VERSION" ] && [ "$SYSTEMD_VERSION" -ge 254 ]; then
+  BACKOFF=$'\nRestartSteps=4\nRestartMaxDelaySec=60'
+fi
+
+cat > "${SYSTEMD_DIR}/free-sleep.service.d/20-nightstand-restart.conf" <<EOF
 # Managed by scripts/setup_resource_limits.sh. See that script for why.
 [Unit]
 StartLimitIntervalSec=0
@@ -56,7 +68,7 @@ StartLimitIntervalSec=0
 [Service]
 Restart=always
 RestartSec=5
-StartLimitInterval=0
+StartLimitInterval=0${BACKOFF}
 EOF
 
 systemctl daemon-reload

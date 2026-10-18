@@ -27,6 +27,9 @@ is a hard fork; for the history of the projects it descends from, see
   every minute, keep systemd's start and finish lines out of the journal. Their
   own messages and any failure are still logged. On our Pod these lines were
   about 145 journal entries every 10 minutes.
+- On systemd 254 and newer, a server that keeps crashing waits longer between
+  automatic restarts, from 5 s up to 60 s, so a crash loop no longer floods
+  the journal. Updates, rollbacks and the health check still start it at once.
 
 ### Suggestions from your changes
 
