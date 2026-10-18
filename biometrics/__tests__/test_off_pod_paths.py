@@ -48,6 +48,8 @@ class ScriptsRunOffPodTest(unittest.TestCase):
     def _run(self, script, *args):
         with tempfile.TemporaryDirectory() as folder:
             env = dict(os.environ, DATA_FOLDER=folder, PYTHONDONTWRITEBYTECODE='1')
+            # Under a journal (CI runners too) the console keeps only warnings; these checks read the info lines.
+            env.pop('JOURNAL_STREAM', None)
             result = subprocess.run(
                 [sys.executable, '-B', os.path.join(SLEEP_DETECTION, script), *args],
                 env=env, capture_output=True, text=True, timeout=300,
