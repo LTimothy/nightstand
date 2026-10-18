@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it, before } from 'node:test';
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 // config.ts throws if these aren't set, and reading it is what sets
@@ -74,6 +74,27 @@ describe('updateServices', () => {
         await updateServices(parsed.data);
         await servicesDB.read();
         assert.equal('extraField' in servicesDB.data.biometrics.jobs.calibrateLeft, false);
+    });
+});
+describe('readings and heartbeats', () => {
+    const file = () => path.join(dataFolder, 'lowdb', 'servicesDB.json');
+    const temps = { ambient: 2100, heatsink: 2500, left: 2900, right: 3000, lastUpdated: '2026-10-18T10:00:30.000Z' };
+    it('keeps sensor temperatures and heartbeats in memory without rewriting the file', async () => {
+        await updateServices({ biometrics: { jobs: { stream: { status: 'healthy', message: '', timestamp: '2026-10-18T10:00:00.000Z' } } } });
+        const before = readFileSync(file(), 'utf8');
+        await updateServices({ biometrics: { sensorTemps: temps } });
+        await updateServices({ biometrics: { jobs: { stream: { status: 'healthy', message: '', timestamp: '2026-10-18T10:01:00.000Z' } } } });
+        assert.equal(readFileSync(file(), 'utf8'), before);
+        await servicesDB.read();
+        assert.equal(servicesDB.data.biometrics.sensorTemps?.ambient, 2100);
+        assert.equal(servicesDB.data.biometrics.jobs.stream.timestamp, '2026-10-18T10:01:00.000Z');
+    });
+    it('writes the file when a status changes, with the latest readings', async () => {
+        await updateServices({ biometrics: { jobs: { stream: { status: 'failed', message: 'stopped', timestamp: '2026-10-18T10:02:00.000Z' } } } });
+        const saved = JSON.parse(readFileSync(file(), 'utf8'));
+        assert.equal(saved.biometrics.jobs.stream.status, 'failed');
+        assert.equal(saved.biometrics.jobs.stream.timestamp, '2026-10-18T10:02:00.000Z');
+        assert.equal(saved.biometrics.sensorTemps.ambient, 2100);
     });
 });
 //# sourceMappingURL=services.test.js.map

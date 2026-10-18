@@ -66,8 +66,44 @@ const defaultData = {
         }
     }
 };
+// Sensor temperatures and job timestamps change every minute. They are kept
+// here and laid over every read; the file is rewritten only when anything
+// else changes, which spares the flash about 4300 rewrites a day.
+const live = { timestamps: {} };
+const remember = (data) => {
+    live.sensorTemps = data.biometrics.sensorTemps;
+    for (const [key, job] of Object.entries(data.biometrics.jobs)) {
+        if (job.timestamp !== undefined)
+            live.timestamps[key] = job.timestamp;
+    }
+};
+const overlay = (data) => {
+    if (live.sensorTemps)
+        data.biometrics.sensorTemps = live.sensorTemps;
+    for (const [key, timestamp] of Object.entries(live.timestamps)) {
+        const job = data.biometrics.jobs[key];
+        if (job)
+            job.timestamp = timestamp;
+    }
+};
+// The file's content minus what lives in memory.
+const durable = (data) => JSON.stringify({
+    ...data,
+    biometrics: {
+        ...data.biometrics,
+        sensorTemps: undefined,
+        jobs: _.mapValues(data.biometrics.jobs, job => ({ ...job, timestamp: undefined })),
+    },
+});
+class ServicesLow extends Low {
+    async read() {
+        await super.read();
+        if (this.data?.biometrics?.jobs)
+            overlay(this.data);
+    }
+}
 const file = new JSONFile(`${config.lowDbFolder}servicesDB.json`);
-const servicesDB = new Low(file, defaultData);
+const servicesDB = new ServicesLow(file, defaultData);
 await servicesDB.read();
 // Allows us to add default values to the services if users have existing servicesDB.json data
 servicesDB.data = _.merge({}, defaultData, servicesDB.data);
@@ -86,6 +122,11 @@ for (const job of Object.values(servicesDB.data.biometrics.jobs)) {
     }
 }
 await servicesDB.write();
+// The stream's last heartbeat used to be on disk, so a restarted server gave
+// it five minutes to check in. Starting the clock at startup keeps that.
+if (Number.isFinite(Date.parse(servicesDB.data.biometrics.jobs.stream.timestamp ?? ''))) {
+    live.timestamps.stream = new Date().toISOString();
+}
 // Serializes read-merge-write updates against servicesDB. The biometrics
 // python jobs (left/right analyzeSleep, calibrateLeft/Right, pumpLeft/Right)
 // POST their status independently and can land within milliseconds of each
@@ -97,6 +138,7 @@ let updateQueue = Promise.resolve();
 export const updateServices = (partial) => {
     const result = updateQueue.then(async () => {
         await servicesDB.read();
+        const before = durable(servicesDB.data);
         if (typeof partial === 'function') {
             if (partial(servicesDB.data) === false)
                 return servicesDB.data;
@@ -104,7 +146,9 @@ export const updateServices = (partial) => {
         else {
             _.merge(servicesDB.data, partial);
         }
-        await servicesDB.write();
+        remember(servicesDB.data);
+        if (durable(servicesDB.data) !== before)
+            await servicesDB.write();
         return servicesDB.data;
     });
     // Swallow rejection on the shared chain so one failed update doesn't

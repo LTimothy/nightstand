@@ -1,0 +1,2 @@
+import{Q as a,R as s}from"./index.js";const u=()=>a({queryKey:["useCalibration"],queryFn:async({signal:e})=>(await s.get("/calibration",{signal:e})).data}),i=e=>a({queryKey:["useStorage"],queryFn:async({signal:r})=>(await s.get("/storage",{signal:r})).data,refetchInterval:e});function c(e){if(e<1024)return`${e} B`;const r=["KB","MB","GB","TB"];let t=e/1024,n=0;for(;t>=1024&&n<r.length-1;)t/=1024,n+=1;return`${t<10?t.toFixed(1):Math.round(t)} ${r[n]}`}export{i as a,c as f,u};
+//# sourceMappingURL=formatBytes-CcnrCMt3.js.map

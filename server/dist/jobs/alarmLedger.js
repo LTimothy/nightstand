@@ -93,6 +93,11 @@ function setAside(file, why) {
 // Set when the file could not be read, so a good ledger on disk is never
 // replaced by an empty one made in this run.
 let unreadable = false;
+// The ledger as last written, without aliveAt. With the same upcoming list a
+// restart carries and judges the same alarms whatever aliveAt says, since each
+// saved alarm is later than the aliveAt saved with it.
+let savedShape;
+const shape = () => JSON.stringify({ ...ledger, aliveAt: null });
 function readLedgerFile(file) {
     for (let attempt = 1;; attempt += 1) {
         try {
@@ -142,6 +147,7 @@ function save() {
         const file = ledgerFile();
         writeFileSync(`${file}.tmp`, JSON.stringify(ledger));
         renameSync(`${file}.tmp`, file);
+        savedShape = shape();
     }
     catch (error) {
         logger.warn(`Could not save the alarm ledger: ${messageOf(error)}`);
@@ -236,7 +242,8 @@ function beat(now, jobsPlanned) {
     else {
         ledger.upcoming = [...pending];
     }
-    save();
+    if (shape() !== savedShape)
+        save();
 }
 // Call once, when the clock is valid and before jobs are planned: reports
 // alarms that fell due between the last heartbeat and now, then starts the
@@ -334,6 +341,7 @@ export function resetAlarmLedgerForTests() {
     ledger = empty();
     loaded = false;
     unreadable = false;
+    savedShape = undefined;
     running = false;
     planned = false;
     pending = [];

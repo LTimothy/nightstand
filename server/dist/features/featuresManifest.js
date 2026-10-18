@@ -1075,5 +1075,23 @@ export const FEATURES_MANIFEST = [
             + 'The set temperature action is its own tap type, which releases before 3.7.0 skip, so a rollback leaves that '
             + 'gesture doing nothing instead of stepping the bed.',
     },
+    {
+        id: 'flash-health',
+        title: 'Flash memory health',
+        description: 'Shows the flash chip wear estimate, spare block state and average daily writes on System status.',
+        category: 'platform',
+        version: '3.7.0',
+        flag: null,
+        default: true,
+        touchpoints: [
+            'server/src/routes/storage/storage.ts', 'server/src/routes/storage/parseFlashWear.ts',
+            'app/src/pages/StatusPage/FlashHealthPanel.tsx',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: ['server/src/routes/storage/parseFlashWear.test.ts', 'app/src/pages/StatusPage/FlashHealthPanel.test.tsx'],
+        upstream_offer: false,
+        rationale: 'Always on: it only reads three kernel files and changes nothing, so there is nothing to turn off.',
+    },
 ];
 //# sourceMappingURL=featuresManifest.js.map
