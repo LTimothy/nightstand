@@ -27,6 +27,7 @@ import TemperatureFormatSelector from './DeviceSettingsSection/TemperatureFormat
 import ThemePicker from './ThemePicker.tsx';
 import TapGestures from './TapGestures.tsx';
 import CoverButtonsCard from './CoverButtonsCard.tsx';
+import DiagnosticsCard from './DiagnosticsCard.tsx';
 import LedBrightnessSlider from './DeviceSettingsSection/LedBrightnessSlider.tsx';
 import { friendlyTimeZone } from '../../lib/timeZone';
 import DeviceInfo from './DeviceSettingsSection/DeviceInfo.tsx';
@@ -53,9 +54,6 @@ export default function SettingsPage() {
     settings?.features?.rhythms,
     settings?.features?.rhythms && settings?.features?.rhythmSuggestions,
     settings?.features?.metricsRetention, settings?.features?.metricsLowDiskProtection,
-    biometricsEnabled && settings?.features?.firmwareTargetReadout,
-    biometricsEnabled && settings?.features?.firmwareHealth,
-    biometricsEnabled && settings?.features?.tapDiagnostics,
     biometricsEnabled && settings?.features?.coolingWarning];
   const enabledFeatures = featureSwitches.filter(Boolean).length;
   const zone = settings?.timeZone ? friendlyTimeZone(settings.timeZone) : 'Time zone not set';
@@ -187,6 +185,11 @@ export default function SettingsPage() {
               </ListItemButton>
             )) }
           </List>
+          <ErrorBoundary componentName="Diagnostics">
+            <DiagnosticsCard
+              settings={ settings }
+              updateSettings={ updateSettings }/>
+          </ErrorBoundary>
           <ErrorBoundary componentName="Storage indicator">
             <Section>
               <StorageIndicator />

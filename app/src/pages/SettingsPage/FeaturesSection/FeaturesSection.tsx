@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, CircularProgress, Link, Typography } from '@mui/material';
 import Section from '../Section.tsx';
@@ -36,6 +37,12 @@ export default function FeaturesSection() {
   const [rhythmsDialog, setRhythmsDialog] = useState<'enable' | 'disable'>();
   const [deleteNotes, setDeleteNotes] = useState(false);
   const [rhythmsMessage, setRhythmsMessage] = useState<{ text: string; severity: 'success' | 'warning' }>();
+  // A "Turn on Biometrics first" link from another page lands here with a hash.
+  const { hash } = useLocation();
+  const loaded = !!services && !!settings;
+  useEffect(() => {
+    if (hash && loaded) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [hash, loaded]);
 
   const updateServices = (services: DeepPartial<Services>) => {
     setError(null);
@@ -169,27 +176,6 @@ export default function FeaturesSection() {
         checked={ features?.coolingWarning ?? false }
         onChange={ next => updateFeature({ coolingWarning: next }) }
         description="Warns when measured water keeps warming during cooling demand. Needs Biometrics. Does not change bed operation."
-      />
-      <FeatureToggleRow
-        label="Tap diagnostics"
-        disabled={ isUpdating || features?.tapDiagnostics === undefined }
-        checked={ features?.tapDiagnostics ?? false }
-        onChange={ next => updateFeature({ tapDiagnostics: next }) }
-        description="Records button and tap candidates on System status, with export. Needs Biometrics. Does not trigger actions."
-      />
-      <FeatureToggleRow
-        label="Firmware health"
-        disabled={ isUpdating || features?.firmwareHealth === undefined }
-        checked={ features?.firmwareHealth ?? false }
-        onChange={ next => updateFeature({ firmwareHealth: next }) }
-        description="Shows selected firmware health messages on System status. Needs Biometrics."
-      />
-      <FeatureToggleRow
-        label="Firmware target"
-        disabled={ isUpdating || features?.firmwareTargetReadout === undefined }
-        checked={ features?.firmwareTargetReadout ?? false }
-        onChange={ next => updateFeature({ firmwareTargetReadout: next }) }
-        description="Shows the target reported by firmware on System status. Needs Biometrics."
       />
       <FeatureToggleRow
         label="Low-disk protection"

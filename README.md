@@ -191,9 +191,11 @@ scheduled off timer with a new 12-hour timer.
   rate and, with New sleep tracking, breathing rate (estimates)
 - Firmware target, Firmware health and Tap diagnostics show the firmware's
   thermostat targets, selected health messages and button/tap candidates
-  on System status. Cooling warning reports water warming during cooling
-  demand. These Settings > Features switches need Biometrics and do not
-  send hardware commands. Firmware health is on by default, the others off
+  on System status; their switches are under Settings > Pod and
+  diagnostics > Diagnostics. Cooling warning, under Settings > Features,
+  reports water warming during cooling demand. All four need Biometrics and
+  do not send hardware commands. Firmware health is on by default, the
+  others off
 - Cover buttons, for a Pod 4 hub with a Pod 5 cover, whose firmware ignores
   short clicks on the cover's buttons: each ignored plus or minus click
   steps that side by 1 F per click by default and the logo stops an alarm or sets a favorite

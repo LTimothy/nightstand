@@ -1,5 +1,5 @@
 import SectionHeading from '@components/SectionHeading';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, useId } from 'react';
 import { Card, CardContent } from '@mui/material';
 
 
@@ -9,13 +9,17 @@ type SectionProps = PropsWithChildren<{
 }>;
 
 export default function Section({ title, children }: SectionProps) {
+  const headingId = useId();
   return (
-    <Card sx={ { width: '100%', overflowWrap: 'break-word', wordBreak: 'break-word' } }>
+    <Card
+      component={ title ? 'section' : 'div' }
+      aria-labelledby={ title ? headingId : undefined }
+      sx={ { width: '100%', overflowWrap: 'break-word', wordBreak: 'break-word' } }>
       <CardContent>
         {
           title && (
             <>
-              <SectionHeading sx={ { textAlign: 'left', mb: 1.5 } }>
+              <SectionHeading id={ headingId } sx={ { textAlign: 'left', mb: 1.5 } }>
                 { title }
               </SectionHeading>
             </>

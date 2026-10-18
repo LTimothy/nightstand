@@ -172,18 +172,19 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Firmware readouts
 
-- Settings > Features > Firmware target, off by default, shows each side's
-  thermostat target from firmware records on System status. It needs
-  Biometrics. This is separate from the app's temperature scale and from
-  measured water or mattress temperature; saved temperatures and command
-  conversions keep their existing convention.
-- Settings > Features > Firmware health, on by default, shows selected
-  firmware messages about pumps, sensors, storage and connections on
-  System status. It needs Biometrics; raw firmware log text stays local.
-- Settings > Features > Tap diagnostics, off by default, lists button and
-  tap candidates on System status with an export. It needs Biometrics and
-  does not trigger actions. Button records alone do not prove a cover tap
-  or a temperature change.
+- Settings > Pod and diagnostics > Diagnostics > Firmware target, off by
+  default, shows each side's thermostat target from firmware records on
+  System status. It needs Biometrics. This is separate from the app's
+  temperature scale and from measured water or mattress temperature; saved
+  temperatures and command conversions keep their existing convention.
+- Settings > Pod and diagnostics > Diagnostics > Firmware health, on by
+  default, shows selected firmware messages about pumps, sensors, storage
+  and connections on System status. It needs Biometrics; raw firmware log
+  text stays local.
+- Settings > Pod and diagnostics > Diagnostics > Tap diagnostics, off by
+  default, lists button and tap candidates on System status with an
+  export. It needs Biometrics and does not trigger actions. Button records
+  alone do not prove a cover tap or a temperature change.
 - Settings > Features > Cooling warning, off by default, reports when
   measured water keeps warming while cooling is requested. It needs
   Biometrics and does not send a hardware command. The warning is a sensor

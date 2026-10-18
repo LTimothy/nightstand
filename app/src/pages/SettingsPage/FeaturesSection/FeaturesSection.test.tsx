@@ -240,10 +240,7 @@ it.each([null, ''])('reports invalid settings instead of leaving features loadin
   expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
 });
 
-it.each([
-  ['Firmware target', 'firmwareTargetReadout'], ['Firmware health', 'firmwareHealth'],
-  ['Tap diagnostics', 'tapDiagnostics'], ['Cooling warning', 'coolingWarning'],
-] as const)('starts %s at its default and posts only its feature flag', async (label, flag) => {
+it.each([['Cooling warning', 'coolingWarning']] as const)('starts %s at its default and posts only its feature flag', async (label, flag) => {
   let posted: unknown;
   server.use(http.post('*/api/settings', async ({ request }) => {
     posted = await request.json(); return HttpResponse.json({});
