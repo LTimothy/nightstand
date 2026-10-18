@@ -23,6 +23,10 @@ is a hard fork; for the history of the projects it descends from, see
 - The alarm ledger is saved only when its list of alarms changes, not on
   every 60 s heartbeat. Alarms missed while the server was stopped are still
   listed after a restart.
+- The RAW archive, health check and network watchdog services, which run
+  every minute, keep systemd's start and finish lines out of the journal. Their
+  own messages and any failure are still logged. On our Pod these lines were
+  about 145 journal entries every 10 minutes.
 
 ### Suggestions from your changes
 

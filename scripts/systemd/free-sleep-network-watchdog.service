@@ -8,3 +8,7 @@ ExecStart=/bin/bash -c '[ -f /usr/local/lib/nightstand/live/scripts/network_watc
 TimeoutStartSec=2min
 User=root
 Group=root
+# Runs every minute: only notices and worse reach the journal. The script's
+# own output is stored as notice so it stays.
+LogLevelMax=notice
+SyslogLevel=notice

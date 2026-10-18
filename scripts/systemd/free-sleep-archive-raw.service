@@ -8,3 +8,7 @@ ExecStart=/bin/bash /usr/local/lib/nightstand/live/scripts/archive-raw.sh
 # either ownership or root, due to fs.protected_hardlinks=1 on this kernel.
 User=root
 Group=root
+# Runs every minute: only notices and worse reach the journal. The script's
+# own output is stored as notice so it stays.
+LogLevelMax=notice
+SyslogLevel=notice
