@@ -83,6 +83,7 @@ describe('FeaturesSection', () => {
   it('posts coverButtons when the cover buttons toggle is switched on', async () => {
     let posted: unknown;
     server.use(
+      http.get('*/api/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: 'Pod 4' })),
       http.post('*/api/settings', async ({ request }) => {
         posted = await request.json();
         return HttpResponse.json({});

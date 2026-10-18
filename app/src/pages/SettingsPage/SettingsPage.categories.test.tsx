@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
-import { getServerStatus, getServices, getSettings } from '../../mocks/mockData';
+import { getDeviceStatus, getServerStatus, getServices, getSettings } from '../../mocks/mockData';
 import SettingsPage from './SettingsPage';
 
 it('exposes four named categories without loading every control into the index', async () => {
@@ -37,11 +37,12 @@ it('keeps software actions on Software without repeating its link on Device', as
 it('keeps optional toggles together and bed maintenance with the sides', async () => {
   const { unmount } = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings/features' });
   for (const label of ['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)',
-    'Low-disk protection', 'Prune detail after 30 days', 'Level temperature display', 'One-time alarm', 'Cover buttons', 'Rhythms',
+    'Low-disk protection', 'Prune detail after 30 days', 'Level temperature display', 'One-time alarm', 'Rhythms',
     'Suggestions from your changes',
     'Firmware target', 'Firmware health', 'Tap diagnostics', 'Cooling warning']) {
     expect(await screen.findByRole('switch', { name: label })).toBeInTheDocument();
   }
+  expect(screen.getByRole('heading', { level: 2, name: 'Cover buttons' })).toBeInTheDocument();
   expect(screen.queryByRole('switch', { name: 'Sleep score' })).not.toBeInTheDocument();
   expect(screen.queryByText('Priming')).not.toBeInTheDocument();
   unmount();
@@ -66,13 +67,14 @@ it('counts new sleep tracking once it is on', async () => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, biometricsV2: true } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('7 of 14 on')).toBeVisible();
+  expect(await screen.findByText('7 of 13 on')).toBeVisible();
 });
 
-it('counts cover buttons when Biometrics is off', async () => {
+it('counts cover buttons on a Pod 4 hub when Biometrics is off', async () => {
   const settings = getSettings();
   const services = getServices();
   server.use(
+    http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: 'Pod 4' })),
     http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, coverButtons: true } })),
     http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })),
   );
@@ -80,11 +82,18 @@ it('counts cover buttons when Biometrics is off', async () => {
   expect(await screen.findByText('4 of 14 on')).toBeVisible();
 });
 
+it('leaves cover buttons out of the count on a Pod 5 hub, which has no switch for them', async () => {
+  const settings = getSettings();
+  server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, coverButtons: true } })));
+  renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
+  expect(await screen.findByText('6 of 13 on')).toBeVisible();
+});
+
 const featureCount = async (features: Record<string, boolean>) => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, ...features } })));
   const { unmount } = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  const text = (await screen.findByText(/^\d+ of 14 on$/)).textContent!;
+  const text = (await screen.findByText(/^\d+ of 13 on$/)).textContent!;
   unmount();
   return Number(text.split(' ')[0]);
 };
@@ -110,7 +119,7 @@ it('does not count dependent feature switches while biometrics is off', async ()
   const services = getServices();
   server.use(http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('3 of 14 on')).toBeVisible();
+  expect(await screen.findByText('3 of 13 on')).toBeVisible();
 });
 
 it.each(['firmwareTargetReadout', 'firmwareHealth', 'tapDiagnostics', 'coolingWarning'] as const)(
@@ -119,7 +128,7 @@ it.each(['firmwareTargetReadout', 'firmwareHealth', 'tapDiagnostics', 'coolingWa
     const features = { ...settings.features, firmwareHealth: false, [flag]: true };
     server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features })));
     renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-    expect(await screen.findByText('6 of 14 on')).toBeVisible();
+    expect(await screen.findByText('6 of 13 on')).toBeVisible();
   },
 );
 
@@ -133,7 +142,7 @@ it('excludes firmware monitoring switches from the enabled count when Biometrics
     http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })),
   );
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('3 of 14 on')).toBeVisible();
+  expect(await screen.findByText('3 of 13 on')).toBeVisible();
 });
 
 it('counts retention as off when future deletions are disabled', async () => {
@@ -142,7 +151,7 @@ it('counts retention as off when future deletions are disabled', async () => {
     ...settings, features: { ...settings.features, metricsLowDiskProtection: false },
   })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('5 of 14 on')).toBeVisible();
+  expect(await screen.findByText('5 of 13 on')).toBeVisible();
 });
 
 

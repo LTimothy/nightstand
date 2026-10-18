@@ -81,12 +81,12 @@ is a hard fork; for the history of the projects it descends from, see
   sets the side to a favorite temperature and turns it on. The step, a plus
   and minus swap and the logo temperature are set per side under the
   switch. A click can take 15 to 25 s to apply, because the firmware writes
-  its log in batches. A Pod 5 hub handles its buttons itself, so the switch
-  does nothing there. By @2-X.
-- On a Pod 5 hub, which handles its buttons itself, the same Cover buttons
-  options change the tap actions instead. The Pod's logs show a plus click
-  counting as a triple tap and a minus click as a double tap; the logo as a
-  quad tap still needs a check on a Pod 5.
+  its log in batches. The switch is shown only on that hardware. By @2-X.
+- On a Pod 5 hub with a Pod 5 cover, which handles its buttons itself, the
+  same Cover buttons options change the tap actions instead, under a Cover
+  buttons heading with no switch. The Pod's logs show a plus click counting
+  as a triple tap and a minus click as a double tap; the logo as a quad tap
+  still needs a check on a Pod 5. Other hardware shows no Cover buttons row.
 
 ### Alarms
 

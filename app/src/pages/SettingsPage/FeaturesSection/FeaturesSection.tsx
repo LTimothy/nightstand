@@ -20,6 +20,7 @@ import { Settings } from '@api/settingsSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { DeepPartial } from 'ts-essentials';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { palette } from '@design/tokens';
 
 const BIOMETRICS_ESTIMATES = 'Detects time in bed and estimates heart rate from the bed\'s sensors. '
   + 'These are estimates, not medical measurements, and have only been checked on a Pod 5.';
@@ -31,7 +32,7 @@ const COVER_BUTTONS = 'For a Pod 4 hub with a Pod 5 cover, whose firmware ignore
 const gestureName = (gesture: keyof typeof GESTURE_LABELS) => GESTURE_LABELS[gesture].toLowerCase();
 const COVER_BUTTONS_POD5_HUB = 'Your Pod 5 hub handles the cover\'s buttons itself. These options change the tap actions it '
   + `triggers: plus is a ${gestureName(POD5_HUB_GESTURES.plus)}, minus a ${gestureName(POD5_HUB_GESTURES.minus)}, `
-  + `and the logo probably a ${gestureName(POD5_HUB_GESTURES.logo)} (not yet checked on a Pod). They work with the switch on or off.`;
+  + `and the logo probably a ${gestureName(POD5_HUB_GESTURES.logo)} (not yet checked on a Pod).`;
 const NEW_SLEEP_TRACKING_CHECKED = 'Tells the two sides apart with the bed\'s capacitance sensors, for bed times, '
   + 'the in-bed indicator, auto-off and Smart Schedule; that part has been checked on one Pod 5. '
   + 'Heart rate and breathing use newer estimates.';
@@ -236,13 +237,19 @@ export default function FeaturesSection() {
         onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
         description="Adds a one-time alarm to Schedule, separate from the daily wake-up."
       />
-      <FeatureToggleRow
+      { coverPath === 'buttons' && <FeatureToggleRow
         label="Cover buttons"
         disabled={ isUpdating || features?.coverButtons === undefined }
         checked={ features?.coverButtons ?? false }
         onChange={ (next) => updateFeature({ coverButtons: next }) }
-        description={ coverPath === 'taps' ? COVER_BUTTONS_POD5_HUB : COVER_BUTTONS }
-      />
+        description={ COVER_BUTTONS }
+      /> }
+      { coverPath === 'taps' && <Box sx={ { mb: 1 } }>
+        <Typography component="h2" sx={ { fontSize: '1rem', color: palette.text.primary, py: 0.5 } }>Cover buttons</Typography>
+        <Typography sx={ { color: palette.text.secondary, fontSize: '0.875rem', lineHeight: 1.5, mt: 1 } }>
+          { COVER_BUTTONS_POD5_HUB }
+        </Typography>
+      </Box> }
       { (coverPath === 'taps' || (coverPath === 'buttons' && features?.coverButtons)) && <CoverButtonOptions
         path={ coverPath }
         settings={ settings }

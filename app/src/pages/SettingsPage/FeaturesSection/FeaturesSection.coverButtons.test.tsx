@@ -30,6 +30,7 @@ describe('Cover buttons options', () => {
     pod('Pod 4', 'Pod 5');
     renderWithProviders(<FeaturesSection/>);
     await screen.findByRole('switch', { name: 'Cover buttons' });
+    expect(screen.queryByRole('heading', { name: 'Cover buttons' })).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Left side buttons' })).not.toBeInTheDocument();
   });
 
@@ -52,13 +53,14 @@ describe('Cover buttons options', () => {
     ]);
   });
 
-  it('on a Pod 5 hub, explains the tap mapping and saves whole tap actions with the switch off', async () => {
+  it('on a Pod 5 hub, shows a heading instead of a switch, explains the tap mapping and saves whole tap actions', async () => {
     const posted = pod('Pod 5', 'Pod 5');
     renderWithProviders(<FeaturesSection/>);
+    expect(await screen.findByRole('heading', { level: 2, name: 'Cover buttons' })).toBeVisible();
+    expect(screen.queryByRole('switch', { name: 'Cover buttons' })).not.toBeInTheDocument();
     expect(await screen.findByText(
       'Your Pod 5 hub handles the cover\'s buttons itself. These options change the tap actions it triggers: '
-      + 'plus is a triple tap, minus a double tap, and the logo probably a quad tap (not yet checked on a Pod).'
-      + ' They work with the switch on or off.',
+      + 'plus is a triple tap, minus a double tap, and the logo probably a quad tap (not yet checked on a Pod).',
     )).toBeVisible();
     const group = await leftButtons();
     await userEvent.click(within(group).getByRole('combobox', { name: 'Left Step per click' }));
@@ -145,17 +147,15 @@ describe('Cover buttons options', () => {
     expect(within(group).queryByRole('switch')).not.toBeInTheDocument();
   });
 
-  it('shows no options for a Pod 5 hub with a Pod 4 or unknown cover', async () => {
-    pod('Pod 5', 'Pod 4');
-    renderWithProviders(<FeaturesSection/>);
-    await screen.findByRole('switch', { name: 'Cover buttons' });
-    expect(screen.queryByRole('group', { name: 'Left side buttons' })).not.toBeInTheDocument();
-  });
-
-  it('shows no options for a Pod without a Pod 5 cover or hub', async () => {
-    pod('Pod 4', 'Pod 4');
-    renderWithProviders(<FeaturesSection/>);
-    await screen.findByRole('switch', { name: 'Cover buttons' });
-    expect(screen.queryByRole('group', { name: 'Left side buttons' })).not.toBeInTheDocument();
-  });
+  it.each([['Pod 5', 'Pod 4'], ['Pod 4', 'Pod 4'], ['Pod 5', 'Version not found'], ['Version not found', 'Version not found']])(
+    'shows nothing for cover buttons on a %s hub with a %s cover', async (hub, cover) => {
+      pod(hub, cover);
+      renderWithProviders(<FeaturesSection/>);
+      await screen.findByRole('switch', { name: 'One-time alarm' });
+      expect(screen.queryByRole('switch', { name: 'Cover buttons' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Cover buttons' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/cover's buttons/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Left side buttons' })).not.toBeInTheDocument();
+    },
+  );
 });
