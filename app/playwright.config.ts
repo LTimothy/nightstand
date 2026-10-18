@@ -23,8 +23,6 @@ export default defineConfig({
     baseURL,
     // Not Pacific, the demo's own zone, so a spec that only passes on a Pacific-time machine fails here.
     timezoneId: 'Asia/Tokyo',
-    // Charts draw in with JavaScript, which toHaveScreenshot's animations option does not stop.
-    contextOptions: { reducedMotion: 'reduce' },
     trace: 'on-first-retry',
     ...(theme ? {
       storageState: { cookies: [], origins: [{ origin: baseURL, localStorage: [{ name: THEME_STORAGE_KEY, value: theme }] }] },

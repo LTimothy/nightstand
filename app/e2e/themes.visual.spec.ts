@@ -3,6 +3,9 @@ import { test, expect } from '@playwright/test';
 import { THEME_IDS } from '../src/design/themes/ids';
 import { DESKTOP, PHONE, SCREENS, openThemed } from './themeHelpers';
 
+// Charts draw in with JavaScript, which the screenshot animations option does not stop.
+test.use({ contextOptions: { reducedMotion: 'reduce' } });
+
 test.skip(process.platform !== 'linux', 'The baselines are rendered on Linux, in the Playwright image CI runs');
 
 for (const id of THEME_IDS) {

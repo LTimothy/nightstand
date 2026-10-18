@@ -3,6 +3,9 @@ import { SWEEP } from './routes';
 import { probeLayout } from './layoutProbe';
 import { smallTargets } from './themeHelpers';
 
+// Charts draw in with JavaScript, which the screenshot animations option does not stop.
+test.use({ contextOptions: { reducedMotion: 'reduce' } });
+
 // Pages that stream (logs) never go idle, so settle for a bounded time.
 const settle = (page: Page) => page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
 // Sheets slide in, so measure once every finite transition has ended.
