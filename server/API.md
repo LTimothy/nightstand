@@ -280,7 +280,7 @@ generic message; the details go to the server log.
   or snoozed alarm on that side, as an alarm tap set to dismiss does, and
   otherwise sets the side to `favoriteTemperatureF` (55 to 110, default 80)
   and turns it on. Firmware that reports the logo as a tap logs no ignored
-  click for it, so `taps` stays in charge there. Settings > Features >
+  click for it, so `taps` stays in charge there. Settings > Bed and sides >
   Cover buttons edits them on a Pod 4 hub with a Pod 5 cover.
 - `features` are feature flags. `sleepScore` turns the sleep score and sleep
   stage routes on and off; the app no longer shows either.
@@ -1435,9 +1435,10 @@ the biometrics service; `/api/deviceStatus` converts them.
 - `waterTank` is `healthy` while the tank sensor reads ok and `failed` once
   it has read low for about 30 seconds; its `timestamp` is when the current
   state began. It stays `not_started` until the first reading.
-- `buttonMonitor` is `healthy` with the message `Off in Settings > Features`
-  while `features.coverButtons` is off. On, it is `healthy` while the newest
-  RAW file in `/persistent` was written in the last 15 seconds and `failed`
+- `buttonMonitor` is `healthy` with the message
+  `Off in Settings > Bed and sides > Cover buttons` while
+  `features.coverButtons` is off. On, it is `healthy` while the newest RAW
+  file in `/persistent` was written in the last 15 seconds and `failed`
   with the reason otherwise: no RAW file, a file that stopped growing, or a
   click that could not be applied.
 
@@ -1450,7 +1451,7 @@ the biometrics service; `/api/deviceStatus` converts them.
   "express": { "name": "Express", "status": "healthy", "description": "The back-end server", "message": "" },
   "franken": { "name": "Franken sock", "status": "healthy", "description": "Socket service for controlling the hardware", "message": "" },
   "frankenMonitor": { "name": "Franken monitor", "status": "healthy", "description": "Handles gestures and monitoring the status", "message": "" },
-  "buttonMonitor": { "name": "Cover buttons", "status": "healthy", "description": "Reads ignored cover clicks from the RAW files", "message": "Off in Settings > Features", "timestamp": "2026-09-20T18:04:11-07:00" },
+  "buttonMonitor": { "name": "Cover buttons", "status": "healthy", "description": "Reads ignored cover clicks from the RAW files", "message": "Off in Settings > Bed and sides > Cover buttons", "timestamp": "2026-09-20T18:04:11-07:00" },
   "jobs": { "name": "Job scheduler", "status": "healthy", "description": "Scheduling service for temperature changes, alarms, and maintenance", "message": "" },
   "logger": { "name": "Logger", "status": "healthy", "description": "Logging service", "message": "" },
   "powerSchedule": { "name": "Power schedule", "status": "healthy", "description": "Power on/off schedule", "message": "" },

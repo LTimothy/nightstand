@@ -522,7 +522,7 @@ describe('ButtonMonitor', () => {
 
     assert.deepEqual(updates, []);
     assert.equal(serverStatus.status.buttonMonitor.status, 'healthy');
-    assert.match(serverStatus.status.buttonMonitor.message, /Off in Settings/);
+    assert.match(serverStatus.status.buttonMonitor.message, /^Off in Settings > Bed and sides > Cover buttons$/);
   });
 
   it('reports a missing or stale RAW file and recovers on fresh data', async () => {

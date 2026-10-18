@@ -467,7 +467,7 @@ const createServerStatus = (): ServerStatus => ({
     name: 'Cover buttons',
     status: 'healthy',
     description: 'Reads ignored cover clicks from the RAW files',
-    message: 'Off in Settings > Features',
+    message: 'Off in Settings > Bed and sides > Cover buttons',
   },
   jobs: {
     name: 'Job scheduler',
