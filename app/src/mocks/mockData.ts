@@ -581,6 +581,7 @@ const createStorageInfo = (): StorageInfo => ({
     biometricsArchiveBytes: 351 * 1024 * 1024,
     databaseBytes: 220 * 1024,
   },
+  flash: { lifeTimeA: 1, lifeTimeB: 1, preEolInfo: 1, writtenBytesPerDay: 3_560_000_000 },
 });
 
 const createMemoryInfo = (): MemoryInfo => ({

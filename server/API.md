@@ -1505,6 +1505,13 @@ the biometrics service; `/api/deviceStatus` converts them.
 
 - Disk use of the data folder's partition (`df`), and what is using it:
   logs and the RAW archive (`du`), and the SQLite files.
+- `flash`, where the Pod has an eMMC chip: the chip's own wear estimate.
+  `lifeTimeA` (fast area) and `lifeTimeB` (main area) are 1 to 10 for 0 to
+  10% up to 90 to 100% of rated life used, and 11 past it. `preEolInfo` is
+  1 normal, 2 warning (80% of spare blocks used), 3 urgent (90%).
+  `writtenBytesPerDay` averages the kernel's write counter since boot, and
+  is null in the first hour. A value the chip does not give is null. Missing
+  before 3.7.0.
 
 #### Response
 
@@ -1519,7 +1526,8 @@ the biometrics service; `/api/deviceStatus` converts them.
     "logsBytes": 15728640,
     "biometricsArchiveBytes": 4194304000,
     "databaseBytes": 52428800
-  }
+  },
+  "flash": { "lifeTimeA": 1, "lifeTimeB": 1, "preEolInfo": 1, "writtenBytesPerDay": 3560000000 }
 }
 ```
 

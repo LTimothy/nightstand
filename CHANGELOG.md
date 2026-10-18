@@ -30,6 +30,10 @@ is a hard fork; for the history of the projects it descends from, see
 - On systemd 254 and newer, a server that keeps crashing waits longer between
   automatic restarts, from 5 s up to 60 s, so a crash loop no longer floods
   the journal. Updates, rollbacks and the health check still start it at once.
+- System status shows the flash memory's own wear estimate (main storage
+  and the fast area, in 10% steps), the state of its spare blocks, and the
+  average written per day since the last restart. It only reads these
+  values. `GET /api/storage` returns them as `flash`.
 
 ### Suggestions from your changes
 

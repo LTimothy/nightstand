@@ -12,6 +12,13 @@ export const StorageInfoSchema = z.object({
     biometricsArchiveBytes: z.number(),
     databaseBytes: z.number(),
   }),
+  // Missing off-Pod and on releases before 3.7.0.
+  flash: z.object({
+    lifeTimeA: z.number().nullable(),
+    lifeTimeB: z.number().nullable(),
+    preEolInfo: z.number().nullable(),
+    writtenBytesPerDay: z.number().nullable(),
+  }).optional(),
 });
 
 export type StorageInfo = z.infer<typeof StorageInfoSchema>;

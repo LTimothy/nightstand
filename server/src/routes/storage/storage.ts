@@ -6,6 +6,7 @@ import path from 'path';
 import logger from '../../logger.js';
 import config from '../../config.js';
 import { parseDfOutput, parseDuOutput } from './parseDiskUsage.js';
+import { parseFlashWear, FlashWear } from './parseFlashWear.js';
 import { StorageInfo } from './storageSchema.js';
 
 const router = express.Router();
@@ -43,6 +44,19 @@ async function dbBytes(): Promise<number> {
   return sizes.reduce((sum, size) => sum + size, 0);
 }
 
+const FLASH = '/sys/block/mmcblk0';
+
+async function readFlash(): Promise<FlashWear | undefined> {
+  try {
+    const files = [`${FLASH}/device/life_time`, `${FLASH}/device/pre_eol_info`, `${FLASH}/stat`, '/proc/uptime'];
+    const [lifeTime, preEol, stat, uptime] = await Promise.all(files.map(file => fs.promises.readFile(file, 'utf8')));
+    return parseFlashWear(lifeTime, preEol, stat, uptime) ?? undefined;
+  } catch {
+    // No eMMC here, such as on a Mac in development.
+    return undefined;
+  }
+}
+
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const { stdout: dfOutput } = await execFileAsync('df', ['-k', '-P', DATA_DIR], { timeout: 5000 });
@@ -51,10 +65,11 @@ router.get('/', async (_req: Request, res: Response) => {
       throw new Error(`Unable to parse df output: ${dfOutput}`);
     }
 
-    const [logsKb, archiveKb, databaseBytes] = await Promise.all([
+    const [logsKb, archiveKb, databaseBytes, flash] = await Promise.all([
       duKb(LOGS_DIR),
       duKb(RAW_ARCHIVE_DIR),
       dbBytes(),
+      readFlash(),
     ]);
 
     const info: StorageInfo = {
@@ -68,6 +83,7 @@ router.get('/', async (_req: Request, res: Response) => {
         biometricsArchiveBytes: archiveKb * 1024,
         databaseBytes,
       },
+      ...(flash ? { flash } : {}),
     };
 
     res.json(info);
