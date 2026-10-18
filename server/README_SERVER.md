@@ -340,6 +340,13 @@ responses are logged. See
 logs, set `LOG_LEVEL=debug` in `/home/dac/free-sleep/server/.env.pod` and
 restart the service. The next update replaces that file.
 
+The biometrics services read `LOG_LEVEL` too (`debug`, `info`, `warning`
+or `error`; unset means `debug`) for their files under
+`/persistent/free-sleep-data/logs/`. The jobs the server starts take it from
+`.env.pod`; the biometrics stream takes it from its unit's environment.
+Under systemd they copy only warnings and errors to the journal, since the
+file already has every line.
+
 ### 5. Throttled presence-debug log (in the repo)
 
 [`biometric_processor.py`](../biometrics/stream/biometric_processor.py) logs

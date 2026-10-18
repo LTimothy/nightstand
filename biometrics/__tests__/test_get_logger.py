@@ -71,5 +71,39 @@ class ErrorTracebackTest(unittest.TestCase):
         self.assertEqual(handler.messages, ['just text'])
 
 
+def _console(logger):
+    return [h for h in logger.handlers if type(h) is logging.StreamHandler]
+
+
+class LevelTest(unittest.TestCase):
+    def build(self, **env):
+        with unittest.mock.patch.dict(os.environ, env):
+            for key in ('LOG_LEVEL', 'JOURNAL_STREAM'):
+                if key not in env:
+                    os.environ.pop(key, None)
+            logger = gl.BaseLogger('level-test')
+            gl._build_logger(logger, 'free-sleep-stream')
+        return logger
+
+    def test_unset_level_keeps_debug(self):
+        logger = self.build()
+        self.assertEqual(logger.level, logging.DEBUG)
+        self.assertEqual(_console(logger)[0].level, logging.DEBUG)
+
+    def test_log_level_is_honoured_in_any_case(self):
+        self.assertEqual(self.build(LOG_LEVEL='info').level, logging.INFO)
+        self.assertEqual(self.build(LOG_LEVEL='WARNING').level, logging.WARNING)
+        self.assertEqual(self.build(LOG_LEVEL='nonsense').level, logging.DEBUG)
+
+    def test_journal_gets_only_warnings_and_errors(self):
+        logger = self.build(JOURNAL_STREAM='8:12345')
+        self.assertEqual(logger.level, logging.DEBUG)
+        self.assertEqual(_console(logger)[0].level, logging.WARNING)
+
+    def test_journal_level_never_drops_below_the_configured_one(self):
+        logger = self.build(JOURNAL_STREAM='8:12345', LOG_LEVEL='error')
+        self.assertEqual(_console(logger)[0].level, logging.ERROR)
+
+
 if __name__ == '__main__':
     unittest.main()

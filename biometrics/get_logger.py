@@ -45,8 +45,13 @@ def _get_logger_instance(name: str = None) -> Tuple[BaseLogger, LoggerName]:
 
 
 
+_LEVELS = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING,
+           'WARN': logging.WARNING, 'ERROR': logging.ERROR}
+
+
 def _get_log_level():
-    return logging.INFO if os.getenv('LOG_LEVEL') == 'INFO' else logging.DEBUG
+    # Unset or unknown keeps DEBUG, the level the files have always had.
+    return _LEVELS.get(os.getenv('LOG_LEVEL', '').strip().upper(), logging.DEBUG)
 
 
 class FixedWidthFormatter(logging.Formatter):
@@ -93,9 +98,10 @@ def _get_file_handler(data_folder_path: str, name: str):
     return handler
 
 
-def _get_console_handler():
+def _get_console_handler(level):
     handler = logging.StreamHandler()
-    handler.setLevel(logging.DEBUG)
+    # Under systemd stderr goes to the journal, and the log file already has every line.
+    handler.setLevel(max(level, logging.WARNING) if os.getenv('JOURNAL_STREAM') else level)
     # Use the custom FixedWidthFormatter
     handler.setFormatter(FORMATTER)
     return handler
@@ -123,8 +129,9 @@ def _build_logger(logger: BaseLogger, name: LoggerName):
     logger.propagate = False
     logger.folder_path = data_folder()
 
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(_get_console_handler())
+    level = _get_log_level()
+    logger.setLevel(level)
+    logger.addHandler(_get_console_handler(level))
     logger.addHandler(_get_file_handler(logger.folder_path, name))
 
 

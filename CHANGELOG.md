@@ -8,6 +8,14 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+### Fewer flash writes
+
+- The biometrics services now honour `LOG_LEVEL`. Before, they always logged
+  at debug whatever it said.
+- The biometrics stream copies only warnings and errors to the system
+  journal. Before, every line went to both its log file and the journal,
+  about 250 journal entries every 10 minutes on our Pod.
+
 ### Suggestions from your changes
 
 - Suggestions from your changes (off by default): a rhythm shows the
