@@ -20,6 +20,9 @@ is a hard fork; for the history of the projects it descends from, see
   stay in memory, which removes about 4300 whole-file rewrites a day. After a
   restart the stream still has five minutes to check in before it shows as
   stopped.
+- The alarm ledger is saved only when its list of alarms changes, not on
+  every 60 s heartbeat. Alarms missed while the server was stopped are still
+  listed after a restart.
 
 ### Suggestions from your changes
 

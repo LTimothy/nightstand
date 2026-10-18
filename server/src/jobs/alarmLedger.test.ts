@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it, before, beforeEach } from 'node:test';
+import { describe, it, before, beforeEach, after } from 'node:test';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -450,5 +450,37 @@ describe('an alarm job from start to finish', () => {
     await assert.rejects(activity.trackAlarm('left', 'rhythm-left-2026-10-05-alarm-0630-0', failing));
     assert.deepEqual(ledger.listMissedAlarms().map(m => m.reason), ['error']);
     assert.deepEqual(saved().started.map((run: { done?: boolean }) => run.done), [true]);
+  });
+});
+
+describe('heartbeats that change nothing but the time', () => {
+  after(() => {
+    Object.keys(nodeSchedule.scheduledJobs).forEach(name => nodeSchedule.cancelJob(name));
+    ledger.resetAlarmLedgerForTests();
+  });
+
+  it('do not rewrite the file', () => {
+    nodeSchedule.scheduleJob('left-one-off-alarm', new Date(Date.now() + 3_600_000), () => undefined);
+    ledger.startAlarmLedger(new Date());
+    ledger.alarmLedgerHeartbeat(new Date());
+    const first = readFileSync(LEDGER, 'utf8');
+    ledger.alarmLedgerHeartbeat(new Date(Date.now() + 60_000));
+    assert.equal(readFileSync(LEDGER, 'utf8'), first);
+
+    nodeSchedule.scheduleJob('right-one-off-alarm', new Date(Date.now() + 7_200_000), () => undefined);
+    ledger.alarmLedgerHeartbeat(new Date(Date.now() + 120_000));
+    assert.equal(saved().upcoming.length, 2);
+  });
+
+  it('still lists an alarm missed after skipped heartbeats', () => {
+    nodeSchedule.scheduleJob('left-one-off-alarm', at(90), () => undefined);
+    ledger.startAlarmLedger(at(60));
+    ledger.alarmLedgerHeartbeat(at(61));
+    ledger.alarmLedgerHeartbeat(at(62));
+    assert.equal(saved().aliveAt, at(61).toISOString());
+    ledger.resetAlarmLedgerForTests();
+    const found = ledger.startAlarmLedger(at(100));
+    assert.equal(found.length, 1);
+    assert.equal(found[0].reason, 'not-running');
   });
 });
