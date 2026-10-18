@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it, before, after } from 'node:test';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import _ from 'lodash';
 
 // config.ts throws if these aren't set, and reading it is what sets
 // lowDbFolder for the db module under test. Must run before the dynamic
@@ -25,8 +26,14 @@ before(async () => {
 });
 
 describe('settingsDB defaultData merge', () => {
-  it('backfills the features object on an old doc that predates it', () => {
-    assert.deepEqual(settingsDB.data.features, defaultFeatures);
+  it('backfills the features object on an old doc that predates it, keeping the weekly schedule', () => {
+    assert.deepEqual(settingsDB.data.features, { ...defaultFeatures, rhythms: false });
+  });
+
+  it('pins the feature defaults', () => {
+    const on = ['sleepScore', 'levelTemps', 'oneOffAlarms', 'presenceAutoOff', 'nightstandTheme', 'rhythms',
+      'firmwareHealth', 'metricsLowDiskProtection', 'rhythmSuggestions'];
+    for (const [key, value] of Object.entries(defaultFeatures)) assert.equal(value, on.includes(key), key);
   });
 
   it('backfills an inactive schedule pause for both sides', () => {
@@ -105,6 +112,66 @@ describe('settingsDB cover button settings', () => {
     assert.ok(read.success);
     assert.equal('buttons' in read.data.right, false);
     assert.equal(older.deepPartial().safeParse({ right: { name: read.data.right.name } }).success, true);
+  });
+});
+
+describe('settingsDB Rhythms on first start', () => {
+  const lowdb = () => path.join(dataFolder, 'lowdb');
+
+  it('keeps Rhythms off when a stored file predates the rhythms key', async () => {
+    const older = _.omit(defaultFeatures, 'rhythms');
+    writeFileSync(path.join(lowdb(), 'settingsDB.json'), JSON.stringify({ ...settingsDB.data, features: older }));
+    const loaded = await import(new URL('./settings.js?upgrade', import.meta.url).href) as typeof import('./settings.js');
+    assert.equal(loaded.default.data.features.rhythms, false);
+    assert.equal(existsSync(path.join(lowdb(), 'rhythmsDB.json')), false);
+  });
+
+  it('keeps a stored Rhythms switch as it is', async () => {
+    writeFileSync(path.join(lowdb(), 'settingsDB.json'), JSON.stringify({ features: { rhythms: true } }));
+    const loaded = await import(new URL('./settings.js?stored-on', import.meta.url).href) as typeof import('./settings.js');
+    assert.equal(loaded.default.data.features.rhythms, true);
+    assert.equal(existsSync(path.join(lowdb(), 'rhythmsDB.json')), false);
+  });
+
+  it('turns Rhythms on for a new install with the weekly schedule converted, as the switch does', async () => {
+    rmSync(path.join(lowdb(), 'settingsDB.json'));
+    const loaded = await import(new URL('./settings.js?fresh', import.meta.url).href) as typeof import('./settings.js');
+    const { default: schedulesDB } = await import('./schedules.js');
+    const { loadRhythms } = await import('./rhythms.js');
+    const { activation } = await import('../jobs/rhythms/activation.js');
+    assert.equal(loaded.default.data.features.rhythms, true);
+    assert.equal(JSON.parse(readFileSync(path.join(lowdb(), 'settingsDB.json'), 'utf8')).features.rhythms, true);
+    assert.equal(activation(loaded.default.data, await loadRhythms(), schedulesDB.data).active, true);
+  });
+
+  it('treats the update channel the installer writes before the first start as a new install', async () => {
+    rmSync(path.join(lowdb(), 'rhythmsDB.json'), { force: true });
+    writeFileSync(path.join(lowdb(), 'settingsDB.json'), JSON.stringify({ updateChannel: 'beta' }));
+    const loaded = await import(new URL('./settings.js?installer', import.meta.url).href) as typeof import('./settings.js');
+    const { default: schedulesDB } = await import('./schedules.js');
+    const { loadRhythms } = await import('./rhythms.js');
+    const { activation } = await import('../jobs/rhythms/activation.js');
+    assert.equal(loaded.default.data.updateChannel, 'beta');
+    assert.equal(loaded.default.data.features.rhythms, true);
+    assert.equal(activation(loaded.default.data, await loadRhythms(), schedulesDB.data).active, true);
+  });
+
+  it('leaves Rhythms off on a new install whose weekly schedule does not convert, as the switch does', async () => {
+    const { default: schedulesDB } = await import('./schedules.js');
+    const { testNight } = await import('../jobs/rhythms/testSupport.js');
+    const saved = schedulesDB.data.left.monday;
+    const eleven = Array.from({ length: 11 }, (_unused, index) => `05:${String(index * 5).padStart(2, '0')}`);
+    schedulesDB.data.left.monday = testNight('23:00', '07:30', { alarms: eleven });
+    rmSync(path.join(lowdb(), 'rhythmsDB.json'), { force: true });
+    rmSync(path.join(lowdb(), 'settingsDB.json'));
+    try {
+      const loaded = await import(new URL('./settings.js?unconvertible', import.meta.url).href) as typeof import('./settings.js');
+      assert.equal(loaded.default.data.features.rhythms, false);
+      assert.equal(JSON.parse(readFileSync(path.join(lowdb(), 'settingsDB.json'), 'utf8')).features.rhythms, false);
+      assert.equal(existsSync(path.join(lowdb(), 'rhythmsDB.json')), false);
+    } finally {
+      schedulesDB.data.left.monday = saved;
+    }
   });
 });
 

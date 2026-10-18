@@ -265,7 +265,7 @@ export default function FeaturesSection() {
         <FeatureToggleRow
           label={ FEATURE_TITLE }
           disabled={ isUpdating || features?.rhythmSuggestions === undefined || !features?.rhythms }
-          checked={ features?.rhythmSuggestions ?? false }
+          checked={ !!features?.rhythms && !!features?.rhythmSuggestions }
           onChange={ next => updateFeature({ rhythmSuggestions: next }) }
           description={ !features?.rhythms
             ? <Link href="#rhythms" sx={ { display: 'inline-flex', minHeight: 44, alignItems: 'center' } }>{ NEEDS_RHYTHMS }</Link>

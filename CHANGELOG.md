@@ -35,9 +35,16 @@ is a hard fork; for the history of the projects it descends from, see
   average written per day since the last restart. It only reads these
   values. `GET /api/storage` returns them as `flash`.
 
+### Defaults
+
+- Suggestions from your changes and Firmware health are on by default. A
+  new install also starts with Rhythms on, its weekly schedule converted
+  as the Rhythms switch does; an update keeps Rhythms as it was, so a Pod
+  on the weekly schedule stays on it.
+
 ### Suggestions from your changes
 
-- Suggestions from your changes (off by default): a rhythm shows the
+- Suggestions from your changes (on by default): a rhythm shows the
   temperature change you made by hand on half or more of its nights, with
   the nights behind it, and one action adds it to the rhythm. Notes stay on
   the Pod for 90 days and can be deleted in Settings.
@@ -170,7 +177,7 @@ is a hard fork; for the history of the projects it descends from, see
   Biometrics. This is separate from the app's temperature scale and from
   measured water or mattress temperature; saved temperatures and command
   conversions keep their existing convention.
-- Settings > Features > Firmware health, off by default, shows selected
+- Settings > Features > Firmware health, on by default, shows selected
   firmware messages about pumps, sensors, storage and connections on
   System status. It needs Biometrics; raw firmware log text stays local.
 - Settings > Features > Tap diagnostics, off by default, lists button and

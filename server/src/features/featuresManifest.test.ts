@@ -25,7 +25,7 @@ describe('FEATURES_MANIFEST', () => {
     assert.ok(entry, 'rhythm-suggestions has no featuresManifest entry');
     assert.equal(entry.title, 'Suggestions from your changes');
     assert.equal(entry.flag, 'rhythmSuggestions');
-    assert.equal(entry.default, false);
+    assert.equal(entry.default, true);
     assert.equal(entry.version, '3.7.0');
     assert.deepEqual(entry.depends_on, ['rhythms']);
     for (const file of [...entry.touchpoints, ...entry.tests]) {
@@ -129,7 +129,7 @@ describe('FEATURES_MANIFEST', () => {
     const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === 'rhythms');
     assert.ok(entry, 'rhythms has no featuresManifest entry');
     assert.equal(entry.flag, 'rhythms');
-    assert.equal(entry.default, false);
+    assert.equal(entry.default, true);
     assert.equal(entry.reversible, true);
     assert.ok(entry.tests.includes('server/src/jobs/rhythms/equivalence.test.ts'), 'the equivalence gate is listed');
     assert.ok(entry.touchpoints.includes('app/src/pages/SchedulePage/ScheduleTab.tsx'), 'the app screens are listed');

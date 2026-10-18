@@ -139,7 +139,7 @@ it('does not let logs refresh missing sensor telemetry and emits the corroborate
   assert.equal(store.snapshot(healthFeatures, true, 171).sensorFresh, false);
   ingestLog(store, log('bus-timeout', 230, 3));
   assert.equal(store.summary(healthFeatures, true, 230)?.message, 'Bed sensor readings are interrupted.');
-  assert.equal(store.summary(healthFeatures, false, 230)?.message, 'Monitoring unavailable');
+  assert.equal(store.summary(healthFeatures, false, 230), undefined);
 });
 
 it('preserves cooling history across thirty-second delivery batches and out-of-order records', () => {

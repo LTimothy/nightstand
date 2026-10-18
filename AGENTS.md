@@ -181,6 +181,10 @@ for each day, and date changes:
   converts the weekly schedule into rhythms (`convert.ts`) and creates the
   file. Later enables keep the saved rhythms and rewrite the fingerprint to
   the weekly schedule as it is now.
+- A new install starts on Rhythms: `server/src/db/settings.ts` converts the
+  default weekly schedule into `rhythmsDB.json` at the first start. A settings
+  file without the `rhythms` key keeps it off, so existing Pods keep their
+  engine.
 - Jobs: `scheduleRhythms.ts` resolves sleeps (`resolve.ts`) 48 hours ahead
   as one-shot jobs named `rhythm-<side>-<date>-<kind>-<HHmm>-<n>`, and an
   hourly `rhythms-horizon` job extends that window. Each job runs through

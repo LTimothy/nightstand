@@ -261,16 +261,17 @@ it.each([null, ''])('reports invalid settings instead of leaving features loadin
 it.each([
   ['Firmware target', 'firmwareTargetReadout'], ['Firmware health', 'firmwareHealth'],
   ['Tap diagnostics', 'tapDiagnostics'], ['Cooling warning', 'coolingWarning'],
-])('starts %s off and posts only its feature flag', async (label, flag) => {
+] as const)('starts %s at its default and posts only its feature flag', async (label, flag) => {
   let posted: unknown;
   server.use(http.post('*/api/settings', async ({ request }) => {
     posted = await request.json(); return HttpResponse.json({});
   }));
+  const on = getSettings().features[flag];
   const { user } = renderWithProviders(<FeaturesSection />);
   const toggle = await screen.findByRole('switch', { name: label });
-  expect(toggle).not.toBeChecked();
+  expect((toggle as HTMLInputElement).checked).toBe(on);
   await user.click(toggle);
-  await waitFor(() => expect(posted).toEqual({ features: { [flag]: true } }));
+  await waitFor(() => expect(posted).toEqual({ features: { [flag]: !on } }));
 });
 
 describe('Suggestions from your changes', () => {
@@ -280,6 +281,15 @@ describe('Suggestions from your changes', () => {
     expect(toggle).toBeDisabled();
     expect(screen.getByRole('link', { name: 'Needs Rhythms' })).toHaveAttribute('href', '#rhythms');
     expect(document.getElementById('rhythms')).not.toBeNull();
+  });
+
+  it.each([[false, false], [true, true]])('shows checked only with Rhythms on too (Rhythms %s)', async (rhythms, checked) => {
+    server.use(http.get('*/api/settings', () => HttpResponse.json({
+      ...getSettings(), features: { ...getSettings().features, rhythms, rhythmSuggestions: true },
+    })));
+    renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: 'Suggestions from your changes' });
+    expect((toggle as HTMLInputElement).checked).toBe(checked);
   });
 
   it('saves its flag once Rhythms is on', async () => {

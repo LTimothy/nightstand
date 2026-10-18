@@ -24,10 +24,9 @@ export default function FirmwarePanel() {
     </Paper> }
     { settings?.features.tapDiagnostics && <TapDiagnostics data={ query.data } /> }
     { settings?.features.firmwareTargetReadout && <FirmwareReadout data={ query.data } format={ settings.temperatureFormat } /> }
-    { settings?.features.firmwareHealth && <Paper variant="outlined" sx={ { p: 2 } }>
+    { settings?.features.firmwareHealth && query.data.availability !== 'Monitoring unavailable' && <Paper variant="outlined" sx={ { p: 2 } }>
       <Typography variant="h6">Firmware health details</Typography>
-      <Typography>{ query.data.availability === 'Monitoring unavailable' ? 'Monitoring unavailable'
-        : query.data.sensorFresh ? 'Recent sensor readings received.' : 'No recent readings' }</Typography>
+      <Typography>{ query.data.sensorFresh ? 'Recent sensor readings received.' : 'No recent readings' }</Typography>
       { query.data.incidents.map(item => <Stack key={ `${item.code}-${item.side}` } sx={ { mt: 1 } }>
         <Typography>{ item.side ? `${item.side === 'left' ? 'Left' : 'Right'}: ` : '' }{ item.message } ({ item.count })</Typography>
         <Typography variant="body2" color="text.secondary">

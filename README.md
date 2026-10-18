@@ -184,15 +184,16 @@ scheduled off timer with a new 12-hour timer.
 - Temperature in °F, °C or the Eight Sleep app's -10 to +10 scale, plus
   away mode, LED brightness and adjustable base control (untested)
 - Schedules for power, temperature, priming and vibration alarms, with a
-  one-side pause. Rhythms (beta, off by default): named plans per side, a
-  week that assigns one to each day, and single-date changes
+  one-side pause. Rhythms (beta, on for a new install; an update keeps the
+  weekly schedule until it is turned on): named plans per side, a week that
+  assigns one to each day, and single-date changes
 - Sleep data (see [Biometrics](#biometrics)): time in bed (measured); heart
   rate and, with New sleep tracking, breathing rate (estimates)
 - Firmware target, Firmware health and Tap diagnostics show the firmware's
   thermostat targets, selected health messages and button/tap candidates
   on System status. Cooling warning reports water warming during cooling
-  demand. These Settings > Features switches are all off by default, need
-  Biometrics and do not send hardware commands
+  demand. These Settings > Features switches need Biometrics and do not
+  send hardware commands. Firmware health is on by default, the others off
 - Cover buttons, for a Pod 4 hub with a Pod 5 cover, whose firmware ignores
   short clicks on the cover's buttons: each ignored plus or minus click
   steps that side by 1 F per click by default and the logo stops an alarm or sets a favorite
@@ -236,7 +237,7 @@ test this curve. It is not medical advice.
 
 ### Suggestions from your changes
 
-Off by default, under Settings > Features next to Rhythms. While it is on,
+On by default, under Settings > Features next to Rhythms. While it is on,
 Nightstand writes down each temperature change made by hand during a
 rhythm: when, what the bed was at, what was set and what the rhythm
 planned. Changes from the cover and from other apps on your network count

@@ -75,14 +75,15 @@ export class FirmwareTelemetry {
   }
 
   summary(features: FirmwareFeatures, biometrics: boolean, now: number): StatusInfo | undefined {
-    if (!features.firmwareHealth) return undefined;
+    // On by default, so a Pod without Biometrics gets no row rather than one that can never fill.
+    if (!features.firmwareHealth || !biometrics) return undefined;
     const data = this.snapshot(features, biometrics, now);
     const warnings = data.incidents.filter(item => item.severity === 'warning' && !item.recoveredAt && item.freshness === 'Recent');
-    const message = !biometrics ? 'Monitoring unavailable' : data.interrupted ? 'Bed sensor readings are interrupted.'
+    const message = data.interrupted ? 'Bed sensor readings are interrupted.'
       : warnings.length ? warnings.map(item => item.message).join(' ')
         : !data.sensorFresh ? 'No recent readings' : 'Recent sensor readings received.';
     return { name: 'Firmware health', description: 'Selected firmware messages and sensor freshness.',
-      status: !biometrics ? 'waiting_for_data' : warnings.length ? 'failed' : !data.sensorFresh ? 'waiting_for_data' : 'healthy',
+      status: warnings.length ? 'failed' : !data.sensorFresh ? 'waiting_for_data' : 'healthy',
       message, ...(data.interrupted ? { status: 'failed' as const } : {}) };
   }
 

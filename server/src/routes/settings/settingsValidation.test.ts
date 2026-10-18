@@ -219,12 +219,12 @@ describe('POST /settings schedule pause', () => {
 });
 
 describe('POST /settings features.rhythms', () => {
-  it('starts off and leaves turning it on or off to the Rhythms routes', async () => {
+  it('starts on for a new install and leaves turning it on or off to the Rhythms routes', async () => {
     const before = await fetch(`${baseUrl}/settings`).then(res => res.json());
-    assert.equal(before.features.rhythms, false);
-    const res = await postSettings({ features: { rhythms: true } });
+    assert.equal(before.features.rhythms, true);
+    const res = await postSettings({ features: { rhythms: false } });
     assert.equal(res.status, 409, `expected 409, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal((await postSettings({ features: { rhythms: false } })).status, 200);
+    assert.equal((await postSettings({ features: { rhythms: true } })).status, 200);
     assert.equal((await postSettings({ features: { futureFeature: true } })).status, 400);
     assert.equal((await postSettings({ features: { rhythms: 'yes' } })).status, 400);
   });

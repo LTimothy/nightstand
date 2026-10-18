@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it, before, after, mock } from 'node:test';
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import moment from 'moment-timezone';
@@ -11,6 +11,8 @@ import type { RhythmsDB } from '../../db/rhythmsSchema.js';
 // config.ts reads DATA_FOLDER at import time, so set it before importing.
 const dataFolder = mkdtempSync(path.join(tmpdir(), 'nightstand-smart-jobs-'));
 mkdirSync(path.join(dataFolder, 'lowdb'));
+// An existing settings file, so Rhythms starts off as on an updated Pod.
+writeFileSync(path.join(dataFolder, 'lowdb', 'settingsDB.json'), '{}');
 process.env.DATA_FOLDER = `${dataFolder}/`;
 process.env.ENV = 'local';
 

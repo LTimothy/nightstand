@@ -1,9 +1,10 @@
 import { DailySchedule, DayOfWeek, Schedules, SideSchedule } from '../../db/schedulesSchema.js';
-import { DEFAULT_SMART, Rhythm, SideRhythms, WeekPlan } from '../../db/rhythmsSchema.js';
+import { DEFAULT_SMART, RHYTHMS_FILE_VERSION, Rhythm, RhythmsDBSchema, SideRhythms, WeekPlan } from '../../db/rhythmsSchema.js';
 import { conversionName } from '../../db/rhythmDays.js';
 import { wakeFromNight } from '../../db/rhythmWake.js';
 import { SCHEDULE_DAYS } from '../../db/scheduleKeys.js';
 import { canonicalJson, normalizeNight } from './night.js';
+import { legacyFingerprint } from './fingerprint.js';
 
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'rhythm';
 
@@ -46,4 +47,10 @@ function convertSide(side: SideSchedule): SideRhythms {
 // Identical enabled nights share one rhythm named after its days; disabled nights plan no sleep.
 export function convertLegacy(schedules: Schedules): { left: SideRhythms; right: SideRhythms } {
   return { left: convertSide(schedules.left), right: convertSide(schedules.right) };
+}
+
+// The rhythms file turning Rhythms on first writes.
+export function weeklyRhythms(schedules: Schedules) {
+  const { left, right } = convertLegacy(schedules);
+  return RhythmsDBSchema.safeParse({ version: RHYTHMS_FILE_VERSION, legacyFingerprint: legacyFingerprint(schedules), left, right });
 }

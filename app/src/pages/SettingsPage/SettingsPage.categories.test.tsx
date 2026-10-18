@@ -58,7 +58,7 @@ it('counts every visible feature switch', async () => {
   const total = screen.getAllByRole('switch').filter(control => !control.closest('[role="group"][aria-label$=" side buttons"]')).length;
   features.unmount();
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText(`5 of ${total} on`)).toBeVisible();
+  expect(await screen.findByText(`6 of ${total} on`)).toBeVisible();
   expect(screen.queryByText(`${total} of ${total} on`)).not.toBeInTheDocument();
 });
 
@@ -66,7 +66,7 @@ it('counts new sleep tracking once it is on', async () => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, biometricsV2: true } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('6 of 14 on')).toBeVisible();
+  expect(await screen.findByText('7 of 14 on')).toBeVisible();
 });
 
 it('counts cover buttons when Biometrics is off', async () => {
@@ -116,7 +116,8 @@ it('does not count dependent feature switches while biometrics is off', async ()
 it.each(['firmwareTargetReadout', 'firmwareHealth', 'tapDiagnostics', 'coolingWarning'] as const)(
   'counts %s when monitoring is available', async flag => {
     const settings = getSettings();
-    server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, [flag]: true } })));
+    const features = { ...settings.features, firmwareHealth: false, [flag]: true };
+    server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features })));
     renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
     expect(await screen.findByText('6 of 14 on')).toBeVisible();
   },
@@ -141,7 +142,7 @@ it('counts retention as off when future deletions are disabled', async () => {
     ...settings, features: { ...settings.features, metricsLowDiskProtection: false },
   })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('4 of 14 on')).toBeVisible();
+  expect(await screen.findByText('5 of 14 on')).toBeVisible();
 });
 
 
