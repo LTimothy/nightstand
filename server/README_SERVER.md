@@ -104,11 +104,9 @@ stopped and leaves it alone.
 
 ### Units a deploy does not install
 
-`ops/deploy.sh` and `scripts/deploy-dev.sh` copy code, not systemd units or
-sudoers rules. Install and update set those up, so a Pod that was installed
-or updated to a recent release already has them. When a change adds or
-changes one, or on a Pod that only ever received deploys, install them by
-hand once.
+`scripts/deploy-dev.sh` copies code, not systemd units or sudoers rules.
+Install, update and `ops/deploy.sh` set those up, apart from the RAW archive
+timer below.
 
 The update, rollback and switch services, their sudoers rules, the
 Biometrics switch rule, and the health check and network watchdog timers

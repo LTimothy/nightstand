@@ -53,9 +53,12 @@ The in-app updater installs published releases. For unpublished changes, use
 the workflow above. [Hot reload](../server/README_SERVER.md#hot-reloading-on-the-pod)
 and `scripts/deploy-dev.sh` do not include the same backup and rollback steps.
 
-A deploy copies code, not systemd units, sudoers rules or the hardware
-watchdog setting. When a change adds or changes one, install it by hand once
-([how](../server/README_SERVER.md#units-a-deploy-does-not-install)).
+Besides the application, a deploy keeps root-owned copies of the pod scripts
+under `/usr/local/lib/nightstand` and applies pending database migrations.
+Once the health check passes it runs `scripts/setup_services.sh`, which
+installs the systemd units, drop-ins and sudoers rules. `ops/rollback.sh`
+swaps only the application tree back, so those units, drop-ins and rules stay
+as the deploy left them.
 
 ### What is backed up and checked
 
