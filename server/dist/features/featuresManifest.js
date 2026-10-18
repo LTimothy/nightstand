@@ -866,6 +866,7 @@ export const FEATURES_MANIFEST = [
         id: 'schedule-pause',
         title: 'Pause schedule',
         description: 'Pause one side\'s schedule for tonight, until a set time or until resumed. '
+            + 'A side that is on stays on until a pause with an end ends, for up to 12 hours. '
             + 'An off side turns on when the pause ends if its night is in progress. The saved schedule and the one-time alarm are kept.',
         category: 'platform',
         version: '3.6.0',
@@ -873,7 +874,7 @@ export const FEATURES_MANIFEST = [
         default: true,
         touchpoints: [
             'server/src/jobs/schedulePause.ts', 'server/src/jobs/pauseResume.ts', 'server/src/jobs/resumeSchedule.ts',
-            'server/src/jobs/powerScheduler.ts',
+            'server/src/jobs/pauseHold.ts', 'server/src/jobs/powerScheduler.ts',
             'server/src/jobs/temperatureScheduler.ts', 'server/src/jobs/alarmScheduler.ts', 'server/src/jobs/jobScheduler.ts',
             'server/src/8sleep/presenceAutoOffMonitor.ts', 'server/src/routes/settings/settingsGuards.ts',
             'app/src/pages/ControlTempPage/PauseScheduleSheet.tsx', 'app/src/pages/ControlTempPage/SchedulePauseNotice.tsx',
@@ -885,6 +886,7 @@ export const FEATURES_MANIFEST = [
             'server/src/jobs/schedulePause.test.ts', 'server/src/jobs/schedulePauseJobs.test.ts',
             'server/src/jobs/schedulePauseAlarms.test.ts', 'server/src/jobs/pauseResume.test.ts', 'server/src/jobs/pauseResumeSchedule.test.ts',
             'server/src/jobs/jobSchedulerPause.test.ts', 'server/src/routes/settings/settingsGuards.test.ts',
+            'server/src/routes/settings/settingsPauseHold.test.ts',
             'app/src/pages/ControlTempPage/PauseScheduleSheet.test.tsx', 'app/src/pages/ControlTempPage/UpcomingNight.pause.test.tsx',
             'app/e2e/pause-schedule.spec.ts',
         ],

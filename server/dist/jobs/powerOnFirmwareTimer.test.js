@@ -132,7 +132,7 @@ describe('scheduled power-on', () => {
         await job('left-monday-21:00-power-on').invoke(FIRED);
         assert.equal(sent[0].arg, String(10 * 3600 + 300));
     });
-    it('leaves a paused side to turn off a few minutes after its scheduled off, not 12 hours after it came on', async () => {
+    it('leaves a side paused until resumed to turn off a few minutes after its scheduled off, not 12 hours after it came on', async () => {
         schedulePowerOn(settingsDB.data, 'left', 'monday', POWER);
         schedulePowerOff(settingsDB.data, 'left', 'monday', POWER);
         await job('left-monday-21:00-power-on').invoke(FIRED);
