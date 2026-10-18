@@ -1,7 +1,7 @@
 # Metrics retention
 
-Settings > Features has two independent switches, checked daily even when
-Biometrics is off:
+Settings > Features > Storage has two independent switches, checked daily
+even when Biometrics is off:
 
 - Low-disk protection is on by default. It runs only below 150 MiB available
   on the data filesystem (`/persistent` on a Pod). It deletes the oldest

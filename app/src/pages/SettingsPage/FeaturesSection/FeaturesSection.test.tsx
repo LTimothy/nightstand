@@ -8,14 +8,55 @@ import { getDeviceStatus, getServices, getSettings, mockCalibration } from '../.
 import { EXPERIMENTAL_ON_THIS_POD } from '@api/sleepTrackingValidation.ts';
 import FeaturesSection from './FeaturesSection';
 
-const BIOMETRICS_ESTIMATES = 'Detects time in bed and estimates heart rate from the bed\'s sensors. '
-  + 'These are estimates, not medical measurements, and have only been checked on a Pod 5.';
-const BIOMETRICS_UNCHECKED_MODEL = 'Not checked on this Pod model. Numbers may be further off than on a Pod 5.';
-const NEW_SLEEP_TRACKING_CHECKED = 'Tells the two sides apart with the bed\'s capacitance sensors, for bed times, '
-  + 'the in-bed indicator, auto-off and Smart Schedule; that part has been checked on one Pod 5. '
-  + 'Heart rate and breathing use newer estimates.';
+const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
+const BIOMETRICS_UNCHECKED_MODEL = 'Not checked on this Pod model.';
+const NEW_SLEEP_TRACKING_CHECKED = 'Tells the two sides apart with the capacitance sensors. Checked on one Pod 5.';
+const biometricsOff = () => {
+  const services = getServices();
+  server.use(http.get('*/api/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));
+};
+const switchNames = (region: HTMLElement) => within(region).getAllByRole('switch').map(control => control.getAttribute('aria-label'));
 
 describe('FeaturesSection', () => {
+  it('groups the switches into Everyday, Sleep tracking and Storage cards', async () => {
+    renderWithProviders(<FeaturesSection />);
+    const everyday = await screen.findByRole('region', { name: 'Everyday' });
+    const tracking = screen.getByRole('region', { name: 'Sleep tracking' });
+    const storage = screen.getByRole('region', { name: 'Storage' });
+    expect(screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
+      .toEqual(['Everyday', 'Sleep tracking', 'Storage']);
+    expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm', 'Level temperature display']);
+    expect(within(everyday).getByRole('button', { name: 'Delete notes' })).toBeVisible();
+    expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)', 'Cooling warning']);
+    expect(within(tracking).getByRole('combobox', { name: 'Keep raw sensor recordings' })).toBeVisible();
+    expect(within(tracking).getByText('Sleep analysis reads these. About 0.4 GB a day. '
+      + 'Oldest removed first if storage runs low.')).toBeVisible();
+    expect(switchNames(storage)).toEqual(['Low-disk protection', 'Prune detail after 30 days']);
+  });
+
+  it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Cooling warning']])(
+    'disables %s while Biometrics is off and links to it', async label => {
+      biometricsOff();
+      renderWithProviders(<FeaturesSection />);
+      const tracking = await screen.findByRole('region', { name: 'Sleep tracking' });
+      await waitFor(() => expect(within(tracking).getAllByRole('link', { name: 'Turn on Biometrics first' })).toHaveLength(3));
+      const toggle = within(tracking).getByRole('switch', { name: label });
+      expect(toggle).toBeDisabled();
+      const row = toggle.closest('.MuiBox-root')!.parentElement!;
+      expect(within(row).getByRole('link', { name: 'Turn on Biometrics first' })).toHaveAttribute('href', '#biometrics');
+      expect(document.getElementById('biometrics')).not.toBeNull();
+    },
+  );
+
+  it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Cooling warning']])(
+    'enables %s once Biometrics is on', async label => {
+      renderWithProviders(<FeaturesSection />);
+      const toggle = await screen.findByRole('switch', { name: label });
+      await waitFor(() => expect(toggle).toBeEnabled());
+      expect(screen.queryByRole('link', { name: 'Turn on Biometrics first' })).not.toBeInTheDocument();
+    },
+  );
+
   it('defaults to low-disk protection, keeps age pruning opt-in and saves each separately', async () => {
     const posted: unknown[] = [];
     server.use(http.post('*/api/settings', async ({ request }) => {
@@ -27,9 +68,10 @@ describe('FeaturesSection', () => {
     const age = screen.getByRole('switch', { name: 'Prune detail after 30 days' });
     expect(lowDisk).toBeChecked();
     expect(age).not.toBeChecked();
-    expect(screen.getByText(/Below 150 MiB/)).toHaveTextContent('does not shrink');
-    expect(screen.getByText(/Below 150 MiB/)).toHaveTextContent('last 2 nights');
-    expect(screen.getByText(/Opt-in/)).toHaveTextContent('Never deletes nightly summaries, sleep records or scores');
+    expect(screen.getByText('Below 150 MiB free, deletes the oldest detailed vitals. '
+      + 'Keeps 2 nights of detail and every nightly summary.')).toBeVisible();
+    expect(screen.getByText('Deletes detailed vitals older than 30 days. Summaries, scores and movement stay. '
+      + 'Cannot be undone.')).toBeVisible();
     await user.click(age);
     await waitFor(() => expect(age).toBeEnabled());
     await user.click(lowDisk);
@@ -253,12 +295,27 @@ it.each([['Cooling warning', 'coolingWarning']] as const)('starts %s at its defa
   await waitFor(() => expect(posted).toEqual({ features: { [flag]: !on } }));
 });
 
+it.each(['biometrics', 'rhythms'])('scrolls to and focuses #%s when it opens with that hash', async id => {
+  const scrolled: string[] = [];
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this.id); };
+  try {
+    renderWithProviders(<FeaturesSection />, { initialRoute: `/settings/features#${id}` });
+    await screen.findByRole('switch', { name: 'Biometrics' });
+    await waitFor(() => expect(document.activeElement).toBe(document.getElementById(id)));
+    expect(scrolled).toContain(id);
+    expect(document.getElementById(id)).toHaveAttribute('tabindex', '-1');
+  } finally {
+    Element.prototype.scrollIntoView = original;
+  }
+});
+
 describe('Suggestions from your changes', () => {
   it('needs Rhythms first', async () => {
     renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: 'Suggestions from your changes' });
     expect(toggle).toBeDisabled();
-    expect(screen.getByRole('link', { name: 'Needs Rhythms' })).toHaveAttribute('href', '#rhythms');
+    expect(screen.getByRole('link', { name: 'Turn on Rhythms first' })).toHaveAttribute('href', '#rhythms');
     expect(document.getElementById('rhythms')).not.toBeNull();
   });
 
@@ -280,7 +337,7 @@ describe('Suggestions from your changes', () => {
     const { user } = renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: 'Suggestions from your changes' });
     await waitFor(() => expect(toggle).toBeEnabled());
-    expect(screen.getByText(/A change you repeat on half or more of your nights is suggested on Schedule/)).toBeInTheDocument();
+    expect(screen.getByText(/suggests the ones you repeat/)).toBeInTheDocument();
     await user.click(toggle);
     await waitFor(() => expect(posted).toEqual({ features: { rhythmSuggestions: true } }));
   });

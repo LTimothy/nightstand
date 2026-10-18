@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { isAxiosError } from 'axios';
-import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, CircularProgress, Link, Typography } from '@mui/material';
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
 import Section from '../Section.tsx';
 import RawArchiveRetention from '../DeviceSettingsSection/RawArchiveRetention';
 import FeatureToggleRow from './FeatureToggleRow.tsx';
+import TurnOnFirst from './TurnOnFirst.tsx';
 import DisableRhythmsDialog from './DisableRhythmsDialog.tsx';
 import EnableRhythmsDialog from './EnableRhythmsDialog.tsx';
 import DeleteNotesDialog from './DeleteNotesDialog.tsx';
-import { DELETE_NOTES, FEATURE_TITLE, featureDescription, NEEDS_RHYTHMS } from '../../SchedulePage/rhythms/suggestionsCopy';
+import { DELETE_NOTES, FEATURE_TITLE, featureDescription } from '../../SchedulePage/rhythms/suggestionsCopy';
 import { Services, useServices, postServices } from '@api/services.ts';
 import { useSettings, postSettings } from '@api/settings.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
@@ -19,12 +20,10 @@ import { useAppStore } from '@state/appStore.tsx';
 import { DeepPartial } from 'ts-essentials';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
-const BIOMETRICS_ESTIMATES = 'Detects time in bed and estimates heart rate from the bed\'s sensors. '
-  + 'These are estimates, not medical measurements, and have only been checked on a Pod 5.';
-const BIOMETRICS_UNCHECKED_MODEL = 'Not checked on this Pod model. Numbers may be further off than on a Pod 5.';
-const NEW_SLEEP_TRACKING_CHECKED = 'Tells the two sides apart with the bed\'s capacitance sensors, for bed times, '
-  + 'the in-bed indicator, auto-off and Smart Schedule; that part has been checked on one Pod 5. '
-  + 'Heart rate and breathing use newer estimates.';
+const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
+const BIOMETRICS_UNCHECKED_MODEL = 'Not checked on this Pod model.';
+const NEW_SLEEP_TRACKING_CHECKED = 'Tells the two sides apart with the capacitance sensors. Checked on one Pod 5.';
+const child = { pl: 2, borderLeft: 1, borderColor: 'divider' };
 
 export default function FeaturesSection() {
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +36,13 @@ export default function FeaturesSection() {
   const [rhythmsDialog, setRhythmsDialog] = useState<'enable' | 'disable'>();
   const [deleteNotes, setDeleteNotes] = useState(false);
   const [rhythmsMessage, setRhythmsMessage] = useState<{ text: string; severity: 'success' | 'warning' }>();
-  // A "Turn on Biometrics first" link from another page lands here with a hash.
+  // A "Turn on Biometrics first" link from another page lands here with a hash; focus follows the scroll.
   const { hash } = useLocation();
   const loaded = !!services && !!settings;
   useEffect(() => {
-    if (hash && loaded) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+    const target = hash && loaded ? document.getElementById(hash.slice(1)) : null;
+    target?.scrollIntoView({ block: 'start' });
+    target?.focus({ preventScroll: true });
   }, [hash, loaded]);
 
   const updateServices = (services: DeepPartial<Services>) => {
@@ -104,140 +105,136 @@ export default function FeaturesSection() {
   const modelUnchecked = deviceStatus === undefined
     || sleepTrackingExperimental(deviceStatus.coverVersion, deviceStatus.hubVersion, []);
 
+  const needsBiometrics = !biometricsEnabled && <TurnOnFirst
+    parent="Biometrics"
+    href="#biometrics"/>;
+
   return (
-    <Section>
+    <>
       { error && (
         <Alert severity="error" onClose={ () => setError(null) }>
           { error }
         </Alert>
       ) }
-      <Box id="biometrics" />
-      <FeatureToggleRow
-        label="Biometrics"
-        disabled={ isUpdating || !biometricsInstalled }
-        checked={ biometricsEnabled }
-        onChange={ (next) => updateServices({ biometrics: { enabled: next } }) }
-        description={
-          biometricsInstalled ? <>
-            { BIOMETRICS_ESTIMATES }
-            { modelUnchecked && <Box component="span" sx={ { display: 'block', mt: 0.5 } }>{ BIOMETRICS_UNCHECKED_MODEL }</Box> }
-          </>
-            : 'Not installed. Optional sleep and vital estimates.'
-        }
-      />
-      { biometricsEnabled && <Box sx={ { pl: 2, my: 2, borderLeft: 1, borderColor: 'divider' } }>
-        <RawArchiveRetention
-          settings={ settings }
-          updateSettings={ saveSettings } />
-      </Box> }
-      { !biometricsInstalled && <Accordion disableGutters>
-        <AccordionSummary expandIcon={ <ExpandMoreIcon/> }>How to install</AccordionSummary>
-        <AccordionDetails>
-          <Typography variant="body2">Run this command over SSH, then enable Biometrics here.</Typography>
-          <Box component="code" sx={ { display: 'block', overflowWrap: 'anywhere', my: 1 } }>
-                sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh
-          </Box>
-          <Button
-            onClick={ async () => {
-              try { await navigator.clipboard.writeText('sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh'); }
-              catch { setError('Could not copy the command. Select and copy it above.'); }
-            } }>Copy command</Button>
-        </AccordionDetails>
-      </Accordion> }
-      <Box sx={ { pl: 2, borderLeft: 1, borderColor: 'divider' } }>
+      <Section title="Everyday">
+        <Box id="rhythms" tabIndex={ -1 } />
         <FeatureToggleRow
-          label="Presence auto-off"
-          disabled={ isUpdating || features?.presenceAutoOff === undefined || !biometricsEnabled }
-          checked={ features?.presenceAutoOff ?? false }
-          onChange={ (next) => updateFeature({ presenceAutoOff: next }) }
+          label="Rhythms (beta)"
+          ariaLabel="Rhythms"
+          disabled={ isUpdating || !features }
+          checked={ features?.rhythms ?? false }
+          onChange={ (next) => {
+            setRhythmsMessage(undefined);
+            setRhythmsDialog(next ? 'enable' : 'disable');
+          } }
+          description="Plan sleep by day and date, with an optional smart temperature curve. Your weekly schedule is kept."
+        />
+        <Box sx={ child }>
+          <FeatureToggleRow
+            label={ FEATURE_TITLE }
+            disabled={ isUpdating || features?.rhythmSuggestions === undefined || !features?.rhythms }
+            checked={ !!features?.rhythms && !!features?.rhythmSuggestions }
+            onChange={ next => updateFeature({ rhythmSuggestions: next }) }
+            description={ !features?.rhythms
+              ? <TurnOnFirst
+                parent="Rhythms"
+                href="#rhythms"/>
+              : featureDescription() }
+          />
+          <Button onClick={ () => setDeleteNotes(true) } sx={ { minHeight: 44, px: 0 } }>{ DELETE_NOTES }</Button>
+        </Box>
+        { rhythmsMessage && <Alert severity={ rhythmsMessage.severity } onClose={ () => setRhythmsMessage(undefined) }>
+          { rhythmsMessage.text }
+        </Alert> }
+        <FeatureToggleRow
+          label="One-time alarm"
+          disabled={ isUpdating || features?.oneOffAlarms === undefined }
+          checked={ features?.oneOffAlarms ?? false }
+          onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
+          description="Adds a one-time alarm to Schedule, separate from the daily wake-up."
+        />
+        <FeatureToggleRow
+          label="Level temperature display"
+          disabled={ isUpdating || features?.levelTemps === undefined }
+          checked={ features?.levelTemps ?? false }
+          onChange={ (next) => updateFeature({ levelTemps: next }) }
+          description="Show the -10 to +10 scale as a temperature option."
+        />
+      </Section>
+      <Section title="Sleep tracking">
+        <Box id="biometrics" tabIndex={ -1 } />
+        <FeatureToggleRow
+          label="Biometrics"
+          disabled={ isUpdating || !biometricsInstalled }
+          checked={ biometricsEnabled }
+          onChange={ (next) => updateServices({ biometrics: { enabled: next } }) }
           description={
-            !biometricsEnabled
-              ? <Link href="#biometrics" sx={ { display: 'inline-flex', minHeight: 44, alignItems: 'center' } }>Needs Biometrics</Link>
-              : 'Turns a side off after 45 minutes with no one on it. Never during a scheduled on-window or in away mode.'
+            biometricsInstalled ? <>
+              { BIOMETRICS_ESTIMATES }
+              { modelUnchecked && <Box component="span" sx={ { display: 'block', mt: 0.5 } }>{ BIOMETRICS_UNCHECKED_MODEL }</Box> }
+            </>
+              : 'Not installed. Optional sleep and vital estimates.'
           }
         />
-      </Box>
-      <Box sx={ { pl: 2, borderLeft: 1, borderColor: 'divider' } }>
+        { !biometricsInstalled && <Accordion disableGutters>
+          <AccordionSummary expandIcon={ <ExpandMoreIcon/> }>How to install</AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2">Run this command over SSH, then enable Biometrics here.</Typography>
+            <Box component="code" sx={ { display: 'block', overflowWrap: 'anywhere', my: 1 } }>
+                  sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh
+            </Box>
+            <Button
+              onClick={ async () => {
+                try { await navigator.clipboard.writeText('sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh'); }
+                catch { setError('Could not copy the command. Select and copy it above.'); }
+              } }>Copy command</Button>
+          </AccordionDetails>
+        </Accordion> }
+        <Box sx={ child }>
+          { biometricsEnabled && <Box sx={ { my: 2 } }>
+            <RawArchiveRetention
+              settings={ settings }
+              updateSettings={ saveSettings } />
+          </Box> }
+          <FeatureToggleRow
+            label="Presence auto-off"
+            disabled={ isUpdating || features?.presenceAutoOff === undefined || !biometricsEnabled }
+            checked={ features?.presenceAutoOff ?? false }
+            onChange={ (next) => updateFeature({ presenceAutoOff: next }) }
+            description={ needsBiometrics || 'Turns a side off after 45 minutes with no one on it, outside scheduled hours and away mode.' }
+          />
+          <FeatureToggleRow
+            label="New sleep tracking (beta)"
+            disabled={ isUpdating || features?.biometricsV2 === undefined || !biometricsEnabled }
+            checked={ features?.biometricsV2 ?? false }
+            onChange={ (next) => updateFeature({ biometricsV2: next }) }
+            description={ needsBiometrics || (experimental ? EXPERIMENTAL_ON_THIS_POD : NEW_SLEEP_TRACKING_CHECKED) }
+          />
+          <FeatureToggleRow
+            label="Cooling warning"
+            disabled={ isUpdating || features?.coolingWarning === undefined || !biometricsEnabled }
+            checked={ features?.coolingWarning ?? false }
+            onChange={ next => updateFeature({ coolingWarning: next }) }
+            description={ needsBiometrics || 'Warns when the water keeps warming while cooling. Changes nothing on the bed.' }
+          />
+        </Box>
+      </Section>
+      <Section title="Storage">
         <FeatureToggleRow
-          label="New sleep tracking (beta)"
-          disabled={ isUpdating || features?.biometricsV2 === undefined || !biometricsEnabled }
-          checked={ features?.biometricsV2 ?? false }
-          onChange={ (next) => updateFeature({ biometricsV2: next }) }
-          description={
-            !biometricsEnabled
-              ? <Link href="#biometrics" sx={ { display: 'inline-flex', minHeight: 44, alignItems: 'center' } }>Needs Biometrics</Link>
-              : experimental ? EXPERIMENTAL_ON_THIS_POD : NEW_SLEEP_TRACKING_CHECKED
-          }
+          label="Low-disk protection"
+          disabled={ isUpdating || features?.metricsLowDiskProtection === undefined }
+          checked={ features?.metricsLowDiskProtection ?? true }
+          onChange={ (next) => updateFeature({ metricsLowDiskProtection: next }) }
+          description="Below 150 MiB free, deletes the oldest detailed vitals. Keeps 2 nights of detail and every nightly summary."
         />
-      </Box>
-      <FeatureToggleRow
-        label="Cooling warning"
-        disabled={ isUpdating || features?.coolingWarning === undefined }
-        checked={ features?.coolingWarning ?? false }
-        onChange={ next => updateFeature({ coolingWarning: next }) }
-        description="Warns when measured water keeps warming during cooling demand. Needs Biometrics. Does not change bed operation."
-      />
-      <FeatureToggleRow
-        label="Low-disk protection"
-        disabled={ isUpdating || features?.metricsLowDiskProtection === undefined }
-        checked={ features?.metricsLowDiskProtection ?? true }
-        onChange={ (next) => updateFeature({ metricsLowDiskProtection: next }) }
-        description={ 'On by default. Below 150 MiB free, deletes the oldest detailed vitals in batches until '
-          + '16 MiB of database pages can be reused. Keeps at least the last 2 nights of detail. '
-          + 'Stops database growth by reusing space; does not shrink the database file. '
-          + 'Never deletes nightly summaries, sleep records, scores or movement.' }
-      />
-      <FeatureToggleRow
-        label="Prune detail after 30 days"
-        disabled={ isUpdating || features?.metricsRetention === undefined }
-        checked={ features?.metricsRetention ?? false }
-        onChange={ (next) => updateFeature({ metricsRetention: next }) }
-        description={ 'Opt-in, off by default. Deletes detailed vitals older than 30 days. '
-          + 'Never deletes nightly summaries, sleep records or scores, and keeps movement. '
-          + 'Deleted detail cannot be restored. Turning either switch off stops its future deletions.' }
-      />
-      <FeatureToggleRow
-        label="Level temperature display"
-        disabled={ isUpdating || features?.levelTemps === undefined }
-        checked={ features?.levelTemps ?? false }
-        onChange={ (next) => updateFeature({ levelTemps: next }) }
-        description="Show the -10 to +10 scale as a temperature option."
-      />
-      <FeatureToggleRow
-        label="One-time alarm"
-        disabled={ isUpdating || features?.oneOffAlarms === undefined }
-        checked={ features?.oneOffAlarms ?? false }
-        onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
-        description="Adds a one-time alarm to Schedule, separate from the daily wake-up."
-      />
-      <Box id="rhythms" />
-      <FeatureToggleRow
-        label="Rhythms (beta)"
-        ariaLabel="Rhythms"
-        disabled={ isUpdating || !features }
-        checked={ features?.rhythms ?? false }
-        onChange={ (next) => {
-          setRhythmsMessage(undefined);
-          setRhythmsDialog(next ? 'enable' : 'disable');
-        } }
-        description={ 'Plan sleep by day and date, with an optional smart temperature curve. '
-          + 'Your weekly schedule is kept and comes back if you turn this off.' }
-      />
-      <Box sx={ { pl: 2, borderLeft: 1, borderColor: 'divider' } }>
         <FeatureToggleRow
-          label={ FEATURE_TITLE }
-          disabled={ isUpdating || features?.rhythmSuggestions === undefined || !features?.rhythms }
-          checked={ !!features?.rhythms && !!features?.rhythmSuggestions }
-          onChange={ next => updateFeature({ rhythmSuggestions: next }) }
-          description={ !features?.rhythms
-            ? <Link href="#rhythms" sx={ { display: 'inline-flex', minHeight: 44, alignItems: 'center' } }>{ NEEDS_RHYTHMS }</Link>
-            : featureDescription() }
+          label="Prune detail after 30 days"
+          disabled={ isUpdating || features?.metricsRetention === undefined }
+          checked={ features?.metricsRetention ?? false }
+          onChange={ (next) => updateFeature({ metricsRetention: next }) }
+          description="Deletes detailed vitals older than 30 days. Summaries, scores and movement stay. Cannot be undone."
         />
-        <Button onClick={ () => setDeleteNotes(true) } sx={ { minHeight: 44, px: 0 } }>{ DELETE_NOTES }</Button>
-      </Box>
-      { rhythmsMessage && <Alert severity={ rhythmsMessage.severity } onClose={ () => setRhythmsMessage(undefined) }>
-        { rhythmsMessage.text }
-      </Alert> }
+      </Section>
       { rhythmsDialog === 'enable' && <EnableRhythmsDialog
         onClose={ () => setRhythmsDialog(undefined) }
         onDone={ text => setRhythmsMessage({ text, severity: 'success' }) }/> }
@@ -245,6 +242,6 @@ export default function FeaturesSection() {
         onClose={ () => setRhythmsDialog(undefined) }
         onDone={ (text, severity) => setRhythmsMessage({ text, severity }) }/> }
       { deleteNotes && <DeleteNotesDialog onClose={ () => setDeleteNotes(false) }/> }
-    </Section>
+    </>
   );
 }

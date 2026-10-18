@@ -270,13 +270,13 @@ Nightstand keeps its sleep data on the Pod ([server/API.md](server/API.md));
 the firmware's own uploads are covered under
 [Before you install](#before-you-install).
 
-Settings > Features has Low-disk protection (on by default), which deletes
-old detailed vitals below 150 MiB free, and Prune detail after 30 days (off
-by default). Both keep at least the last two nights of detail, nightly
-summaries, sleep records, scores and movement. Pruning makes database pages
-reusable; it does not shrink the file, and deleted detail cannot be restored
-([metrics retention](docs/METRICS_RETENTION.md)). Sleep reads default to
-90 days; the app can still browse older weeks.
+Settings > Features > Storage has Low-disk protection (on by default), which
+deletes old detailed vitals below 150 MiB free, and Prune detail after 30
+days (off by default). Both keep at least the last two nights of detail,
+nightly summaries, sleep records, scores and movement. Pruning makes
+database pages reusable; it does not shrink the file, and deleted detail
+cannot be restored ([metrics retention](docs/METRICS_RETENTION.md)). Sleep
+reads default to 90 days; the app can still browse older weeks.
 
 ### Accuracy
 

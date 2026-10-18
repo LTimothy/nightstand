@@ -35,8 +35,7 @@ export default function RawArchiveRetention({ settings, updateSettings }: RawArc
         </Select>
       </FormControl>
       <Typography variant="body2" color="text.secondary" sx={ { mt: 1 } }>
-        Sleep analysis and calibration read these recordings. They take about 0.4 GB a day,
-        and the oldest are removed first if storage runs low.
+        Sleep analysis reads these. About 0.4 GB a day. Oldest removed first if storage runs low.
       </Typography>
     </>
   );

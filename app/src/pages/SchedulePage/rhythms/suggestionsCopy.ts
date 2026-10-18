@@ -22,7 +22,6 @@ export const LEAVE_OUT_HINT = 'Press Leave out on a night that should not count,
 export const HOW_THIS_WORKS = 'How this works';
 export const HOW_TITLE = 'How suggestions work';
 export const WHAT_COUNTS_TITLE = 'What counts';
-export const NEEDS_RHYTHMS = 'Needs Rhythms';
 export const SHOW_NIGHTS = 'Show the nights';
 export const REVIEW = 'Review';
 export const NIGHTS_HEADING = 'Your nights';
@@ -57,8 +56,7 @@ export function pairTemperatures(fromF: number, toF: number, format: Temperature
 }
 
 export const featureDescription = (rules: SuggestionRules = SUGGESTION_RULES) =>
-  'Writes down when and how you change the temperature by hand during a rhythm, from any app or the cover. '
-  + `A change you repeat on ${atLeast(rules.MIN_SHARE)} of your nights is suggested on Schedule. Nothing changes until you add it. `
+  'Notes your manual temperature changes during a rhythm and suggests the ones you repeat. '
   + `Notes stay on this Pod for ${rules.NOTE_DAYS} days, not in backups.`;
 
 export const sectionCaption = (rules: SuggestionRules = SUGGESTION_RULES) =>

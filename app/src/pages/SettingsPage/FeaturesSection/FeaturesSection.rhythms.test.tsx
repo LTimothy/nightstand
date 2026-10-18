@@ -26,7 +26,7 @@ it('describes Rhythms and starts off', async () => {
   expect(await screen.findByRole('switch', { name: 'Rhythms' })).not.toBeChecked();
   expect(screen.getByText('Rhythms (beta)')).toBeInTheDocument();
   expect(screen.getByText('Plan sleep by day and date, with an optional smart temperature curve. '
-    + 'Your weekly schedule is kept and comes back if you turn this off.')).toBeInTheDocument();
+    + 'Your weekly schedule is kept.')).toBeInTheDocument();
 });
 
 it('turns Rhythms on and saves new names for the converted rhythms', async () => {

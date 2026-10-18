@@ -71,8 +71,7 @@ describe('rule texts', () => {
       + 'or made during a pause, is not noted.');
     expect(whatCounts(true)).toBe(`${whatCounts(false)} On a Smart Schedule rhythm, only changes during the night count, of half a `
       + 'level or more.');
-    expect(featureDescription()).toBe('Writes down when and how you change the temperature by hand during a rhythm, from any app or '
-      + 'the cover. A change you repeat on half or more of your nights is suggested on Schedule. Nothing changes until you add it. '
+    expect(featureDescription()).toBe('Notes your manual temperature changes during a rhythm and suggests the ones you repeat. '
       + 'Notes stay on this Pod for 90 days, not in backups.');
   });
 

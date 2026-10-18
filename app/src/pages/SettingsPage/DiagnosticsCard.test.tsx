@@ -71,6 +71,7 @@ describe('Diagnostics card', () => {
       await user.click(within(diagnostics).getAllByRole('link', { name: 'Turn on Biometrics first' })[0]);
       await screen.findByRole('switch', { name: 'Biometrics' });
       await waitFor(() => expect(scrolled.map(element => element.id)).toContain('biometrics'));
+      expect(document.activeElement).toBe(document.getElementById('biometrics'));
     } finally {
       Element.prototype.scrollIntoView = original;
     }

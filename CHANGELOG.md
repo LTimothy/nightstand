@@ -351,6 +351,10 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### App
 
+- Settings > Features is split into Everyday, Sleep tracking and Storage
+  cards with shorter descriptions. A switch that needs another one stays
+  visible under it, turned off, with a "Turn on Biometrics first" or "Turn
+  on Rhythms first" link; Cooling warning now waits for Biometrics too.
 - The app ships one copy of zod and moment-timezone instead of two, about
   70 KB less to download.
 - The compact side picker no longer polls presence.
