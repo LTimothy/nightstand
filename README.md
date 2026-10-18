@@ -197,11 +197,11 @@ scheduled off timer with a new 12-hour timer.
 - Cover buttons, for a Pod 4 hub with a Pod 5 cover, whose firmware ignores
   short clicks on the cover's buttons: each ignored plus or minus click
   steps that side by 1 F per click by default and the logo stops an alarm or sets a favorite
-  temperature, 15 to 25 s later. Off by default under
-  Settings > Features and does not need Biometrics. A Pod 5 hub handles
+  temperature, 15 to 25 s later. Off by default under Settings > Bed and
+  sides > Cover buttons and does not need Biometrics. A Pod 5 hub handles
   its buttons itself, so there is no switch there; the step, a plus and minus
   swap and a logo temperature are set per side under the switch, and on a
-  Pod 5 hub with a Pod 5 cover the same options change the tap actions
+  Pod 5 hub with a Pod 5 cover the same card changes the tap actions
 - Three themes under Settings > Bed and sides > Theme, saved on each device:
   lamp (the default), free-sleep classic and jmew. The last two
   follow the original free-sleep app by throwaway31265 and jmew's fork of it

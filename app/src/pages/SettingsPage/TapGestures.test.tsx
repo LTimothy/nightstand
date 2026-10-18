@@ -156,23 +156,13 @@ describe('TapGestures', () => {
     expect(within(left()).getByRole('combobox', { name: 'Left Double tap' })).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('explains the Pod 5 cover buttons only on a Pod 5 hub with a Pod 5 cover', async () => {
-    const note = 'On your Pod 5 cover, plus is a triple tap and minus a double tap. Settings > Features > Cover buttons sets them too.';
-    const pod = (hubVersion: string, coverVersion: string) => server.use(
-      http.get('*/api/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion, coverVersion })),
-    );
-    pod('Pod 5', 'Pod 5');
-    const { unmount } = renderWithProviders(<TapGestures
-      settings={ getSettings() }
-      updateSettings={ vi.fn() }/>);
-    expect(await screen.findByText(note)).toBeVisible();
-    unmount();
-    pod('Pod 4', 'Pod 5');
+  it('leaves the Pod 5 cover buttons to their own card and does not point to Features', async () => {
+    server.use(http.get('*/api/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: 'Pod 5', coverVersion: 'Pod 5' })));
     renderWithProviders(<TapGestures
       settings={ getSettings() }
       updateSettings={ vi.fn() }/>);
     await screen.findByRole('group', { name: 'Left side taps' });
     await new Promise(resolve => setTimeout(resolve, 50));
-    expect(screen.queryByText(note)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Features|Pod 5 cover/)).not.toBeInTheDocument();
   });
 });

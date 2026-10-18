@@ -7,9 +7,6 @@ import FeatureToggleRow from './FeatureToggleRow.tsx';
 import DisableRhythmsDialog from './DisableRhythmsDialog.tsx';
 import EnableRhythmsDialog from './EnableRhythmsDialog.tsx';
 import DeleteNotesDialog from './DeleteNotesDialog.tsx';
-import CoverButtonOptions from './CoverButtonOptions.tsx';
-import { coverButtonsPath, POD5_HUB_GESTURES } from './coverButtons.ts';
-import { GESTURE_LABELS } from '../tapActions.ts';
 import { DELETE_NOTES, FEATURE_TITLE, featureDescription, NEEDS_RHYTHMS } from '../../SchedulePage/rhythms/suggestionsCopy';
 import { Services, useServices, postServices } from '@api/services.ts';
 import { useSettings, postSettings } from '@api/settings.ts';
@@ -20,19 +17,10 @@ import { Settings } from '@api/settingsSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { DeepPartial } from 'ts-essentials';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { palette } from '@design/tokens';
 
 const BIOMETRICS_ESTIMATES = 'Detects time in bed and estimates heart rate from the bed\'s sensors. '
   + 'These are estimates, not medical measurements, and have only been checked on a Pod 5.';
 const BIOMETRICS_UNCHECKED_MODEL = 'Not checked on this Pod model. Numbers may be further off than on a Pod 5.';
-const COVER_BUTTONS = 'For a Pod 4 hub with a Pod 5 cover, whose firmware ignores short clicks on the cover\'s buttons. '
-  + 'Each ignored plus or minus click steps that side by 1 F per click by default, and the logo stops an alarm or sets a favorite temperature, '
-  + '15 to 25 s later, because the firmware writes its log in batches. '
-  + 'A Pod 5 hub handles its buttons itself, so this does nothing there.';
-const gestureName = (gesture: keyof typeof GESTURE_LABELS) => GESTURE_LABELS[gesture].toLowerCase();
-const COVER_BUTTONS_POD5_HUB = 'Your Pod 5 hub handles the cover\'s buttons itself. These options change the tap actions it '
-  + `triggers: plus is a ${gestureName(POD5_HUB_GESTURES.plus)}, minus a ${gestureName(POD5_HUB_GESTURES.minus)}, `
-  + `and the logo probably a ${gestureName(POD5_HUB_GESTURES.logo)} (not yet checked on a Pod).`;
 const NEW_SLEEP_TRACKING_CHECKED = 'Tells the two sides apart with the bed\'s capacitance sensors, for bed times, '
   + 'the in-bed indicator, auto-off and Smart Schedule; that part has been checked on one Pod 5. '
   + 'Heart rate and breathing use newer estimates.';
@@ -108,7 +96,6 @@ export default function FeaturesSection() {
   // Biometrics only needs the model: the capacitance format is a New sleep tracking matter.
   const modelUnchecked = deviceStatus === undefined
     || sleepTrackingExperimental(deviceStatus.coverVersion, deviceStatus.hubVersion, []);
-  const coverPath = coverButtonsPath(deviceStatus?.hubVersion, deviceStatus?.coverVersion);
 
   return (
     <Section>
@@ -237,24 +224,6 @@ export default function FeaturesSection() {
         onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
         description="Adds a one-time alarm to Schedule, separate from the daily wake-up."
       />
-      { coverPath === 'buttons' && <FeatureToggleRow
-        label="Cover buttons"
-        disabled={ isUpdating || features?.coverButtons === undefined }
-        checked={ features?.coverButtons ?? false }
-        onChange={ (next) => updateFeature({ coverButtons: next }) }
-        description={ COVER_BUTTONS }
-      /> }
-      { coverPath === 'taps' && <Box sx={ { mb: 1 } }>
-        <Typography component="h2" sx={ { fontSize: '1rem', color: palette.text.primary, py: 0.5 } }>Cover buttons</Typography>
-        <Typography sx={ { color: palette.text.secondary, fontSize: '0.875rem', lineHeight: 1.5, mt: 1 } }>
-          { COVER_BUTTONS_POD5_HUB }
-        </Typography>
-      </Box> }
-      { (coverPath === 'taps' || (coverPath === 'buttons' && features?.coverButtons)) && <CoverButtonOptions
-        path={ coverPath }
-        settings={ settings }
-        disabled={ isUpdating }
-        save={ saveSettings }/> }
       <Box id="rhythms" />
       <FeatureToggleRow
         label="Rhythms (beta)"

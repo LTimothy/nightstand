@@ -525,16 +525,16 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     default: false,
     touchpoints: [
       'server/src/8sleep/buttonMonitor.ts', 'server/src/8sleep/buttonEvents.ts',
-      'app/src/pages/SettingsPage/FeaturesSection',
-      'app/src/pages/SettingsPage/FeaturesSection/CoverButtonOptions.tsx',
-      'app/src/pages/SettingsPage/FeaturesSection/coverButtons.ts',
+      'app/src/pages/SettingsPage/CoverButtonsCard.tsx',
+      'app/src/pages/SettingsPage/CoverButtonOptions.tsx',
+      'app/src/pages/SettingsPage/coverButtons.ts',
     ],
     depends_on: [],
     reversible: true,
     tests: [
       'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/buttonEvents.test.ts',
-      'app/src/pages/SettingsPage/FeaturesSection/coverButtons.test.ts',
-      'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.coverButtons.test.tsx',
+      'app/src/pages/SettingsPage/coverButtons.test.ts',
+      'app/src/pages/SettingsPage/CoverButtonsCard.test.tsx',
     ],
     upstream_offer: false,
     rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short cover clicks. '

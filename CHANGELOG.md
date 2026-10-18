@@ -73,7 +73,7 @@ is a hard fork; for the history of the projects it descends from, see
   stepped from the same read's target and the second write undid the first.
   Seen on a Pod 4 hub with a Pod 5 cover by @2-X, where the newer host
   firmware reports a held cover button as a tap.
-- Settings > Features has a new Cover buttons switch, off by default. It is
+- Settings > Bed and sides has a new Cover buttons switch, off by default. It is
   for a Pod 4 hub with a Pod 5 cover, whose firmware ignores short clicks on
   the cover's buttons. With it on, Nightstand reads those ignored clicks
   from the Pod's RAW files. Plus and minus step that side, 1 F per click by
@@ -83,8 +83,8 @@ is a hard fork; for the history of the projects it descends from, see
   switch. A click can take 15 to 25 s to apply, because the firmware writes
   its log in batches. The switch is shown only on that hardware. By @2-X.
 - On a Pod 5 hub with a Pod 5 cover, which handles its buttons itself, the
-  same Cover buttons options change the tap actions instead, under a Cover
-  buttons heading with no switch. The Pod's logs show a plus click counting
+  same Cover buttons options change the tap actions instead, with no
+  switch. The Pod's logs show a plus click counting
   as a triple tap and a minus click as a double tap; the logo as a quad tap
   still needs a check on a Pod 5. Other hardware shows no Cover buttons row.
 

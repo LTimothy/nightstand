@@ -26,7 +26,7 @@ import TimeZoneSelector from './DeviceSettingsSection/TimeZoneSelector.tsx';
 import TemperatureFormatSelector from './DeviceSettingsSection/TemperatureFormatSelector.tsx';
 import ThemePicker from './ThemePicker.tsx';
 import TapGestures from './TapGestures.tsx';
-import { coverButtonsPath } from './FeaturesSection/coverButtons.ts';
+import CoverButtonsCard from './CoverButtonsCard.tsx';
 import LedBrightnessSlider from './DeviceSettingsSection/LedBrightnessSlider.tsx';
 import { friendlyTimeZone } from '../../lib/timeZone';
 import DeviceInfo from './DeviceSettingsSection/DeviceInfo.tsx';
@@ -50,8 +50,6 @@ export default function SettingsPage() {
   const featureSwitches = [biometricsEnabled && settings?.features?.presenceAutoOff,
     biometricsEnabled && settings?.features?.biometricsV2,
     settings?.features?.levelTemps, settings?.features?.oneOffAlarms, biometricsInstalled && biometricsEnabled,
-    // Only a Pod 4 hub with a Pod 5 cover has a Cover buttons switch.
-    ...(coverButtonsPath(device?.hubVersion, device?.coverVersion) === 'buttons' ? [settings?.features?.coverButtons] : []),
     settings?.features?.rhythms,
     settings?.features?.rhythms && settings?.features?.rhythmSuggestions,
     settings?.features?.metricsRetention, settings?.features?.metricsLowDiskProtection,
@@ -145,6 +143,11 @@ export default function SettingsPage() {
                 settings={ settings }
                 updateSettings={ updateSettings }/>
             </Section>
+          </ErrorBoundary>
+          <ErrorBoundary componentName="Cover buttons">
+            <CoverButtonsCard
+              settings={ settings }
+              updateSettings={ updateSettings }/>
           </ErrorBoundary>
           <ErrorBoundary componentName="Bed preferences">
             <Section>

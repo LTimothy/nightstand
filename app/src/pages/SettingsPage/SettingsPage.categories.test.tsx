@@ -42,7 +42,6 @@ it('keeps optional toggles together and bed maintenance with the sides', async (
     'Firmware target', 'Firmware health', 'Tap diagnostics', 'Cooling warning']) {
     expect(await screen.findByRole('switch', { name: label })).toBeInTheDocument();
   }
-  expect(screen.getByRole('heading', { level: 2, name: 'Cover buttons' })).toBeInTheDocument();
   expect(screen.queryByRole('switch', { name: 'Sleep score' })).not.toBeInTheDocument();
   expect(screen.queryByText('Priming')).not.toBeInTheDocument();
   unmount();
@@ -70,21 +69,12 @@ it('counts new sleep tracking once it is on', async () => {
   expect(await screen.findByText('7 of 13 on')).toBeVisible();
 });
 
-it('counts cover buttons on a Pod 4 hub when Biometrics is off', async () => {
+it.each(['Pod 4', 'Pod 5'])('leaves cover buttons out of the count on a %s hub', async hubVersion => {
   const settings = getSettings();
-  const services = getServices();
   server.use(
-    http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: 'Pod 4' })),
+    http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion })),
     http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, coverButtons: true } })),
-    http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })),
   );
-  renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('4 of 14 on')).toBeVisible();
-});
-
-it('leaves cover buttons out of the count on a Pod 5 hub, which has no switch for them', async () => {
-  const settings = getSettings();
-  server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, coverButtons: true } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
   expect(await screen.findByText('6 of 13 on')).toBeVisible();
 });

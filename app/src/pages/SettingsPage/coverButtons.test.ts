@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getSettings } from '../../../mocks/mockData';
+import { getSettings } from '../../mocks/mockData';
 import { coverButtonsPatch, coverButtonsPath, POD5_HUB_GESTURES, readCoverButtons } from './coverButtons';
 
 const pod5HubSide = () => ({

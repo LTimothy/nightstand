@@ -80,25 +80,6 @@ describe('FeaturesSection', () => {
     expect(posted).toEqual({ features: { presenceAutoOff: false } });
   });
 
-  it('posts coverButtons when the cover buttons toggle is switched on', async () => {
-    let posted: unknown;
-    server.use(
-      http.get('*/api/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: 'Pod 4' })),
-      http.post('*/api/settings', async ({ request }) => {
-        posted = await request.json();
-        return HttpResponse.json({});
-      }),
-    );
-
-    const { user } = renderWithProviders(<FeaturesSection />);
-
-    const toggle = await screen.findByRole('switch', { name: 'Cover buttons' });
-    expect(toggle).not.toBeChecked();
-    await user.click(toggle);
-
-    expect(posted).toEqual({ features: { coverButtons: true } });
-  });
-
   it('posts biometricsV2 when new sleep tracking is switched on', async () => {
     let posted: unknown;
     server.use(

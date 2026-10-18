@@ -4,18 +4,15 @@ import { Box, FormControl, InputLabel, MenuItem, Select, Stack, Typography } fro
 import { DeepPartial } from 'ts-essentials';
 import { GestureSchema, type Gesture, type Settings, type TapAction } from '@api/settingsSchema.ts';
 import { useBaseConfigured } from '@api/baseControl.ts';
-import { useDeviceStatus } from '@api/deviceStatus.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { type TemperatureFormat } from '@lib/temperatureConversions';
 import { withCurrentValue } from '@lib/selectOptions';
 import { weight } from '@design/tokens';
 import TemperatureStepper from '../SchedulePage/TemperatureStepper';
 import TemperatureChangeSelect from './TemperatureChangeSelect';
-import { coverButtonsPath, POD5_HUB_GESTURES } from './FeaturesSection/coverButtons';
 import { ACTIONS, actionOf, GESTURE_LABELS, tapFor, type ActionKey } from './tapActions';
 
 const SNOOZE_SECONDS = [60, 120, 180, 240, 300, 360, 420, 480, 540, 600];
-const gestureName = (gesture: Gesture) => GESTURE_LABELS[gesture].toLowerCase();
 const SIDES = [['left', 'Left'], ['right', 'Right']] as const;
 
 type Props = {
@@ -90,21 +87,13 @@ function GestureRow({ gesture, side, sideId, tap, format, baseConfigured, disabl
 export default function TapGestures({ settings, updateSettings }: Props) {
   const { isUpdating } = useAppStore();
   const baseConfigured = useBaseConfigured();
-  const { data: deviceStatus } = useDeviceStatus();
   const sideId = useId();
   if (!settings) return null;
   const format = settings.temperatureFormat ?? 'fahrenheit';
-  const coverButtons = coverButtonsPath(deviceStatus?.hubVersion, deviceStatus?.coverVersion) === 'taps';
   return <Stack spacing={ 3 }>
     <Typography
       variant="body2"
       color="text.secondary">What a double, triple or quad tap does on each side.</Typography>
-    { coverButtons && <Typography
-      variant="body2"
-      color="text.secondary">
-      { `On your Pod 5 cover, plus is a ${gestureName(POD5_HUB_GESTURES.plus)} and minus a ${gestureName(POD5_HUB_GESTURES.minus)}. `
-        + 'Settings > Features > Cover buttons sets them too.' }
-    </Typography> }
     { SIDES.map(([side, title]) => {
       const taps = settings[side]?.taps;
       return <Stack

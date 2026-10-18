@@ -5,9 +5,9 @@ import { DeepPartial } from 'ts-essentials';
 import type { Settings, SideSettings } from '@api/settingsSchema.ts';
 import type { TemperatureFormat } from '@lib/temperatureConversions';
 import { weight } from '@design/tokens';
-import TemperatureStepper from '../../SchedulePage/TemperatureStepper';
-import TemperatureChangeSelect from '../TemperatureChangeSelect';
-import FeatureToggleRow from './FeatureToggleRow';
+import TemperatureStepper from '../SchedulePage/TemperatureStepper';
+import TemperatureChangeSelect from './TemperatureChangeSelect';
+import FeatureToggleRow from './FeaturesSection/FeatureToggleRow';
 import { coverButtonsPatch, DEFAULT_LOGO_F, readCoverButtons, type CoverButtonsPath, type CoverButtonValues } from './coverButtons';
 
 const SIDES = [['left', 'Left'], ['right', 'Right']] as const;
@@ -83,7 +83,8 @@ export default function CoverButtonOptions({ path, settings, disabled, save }: {
   const format = settings.temperatureFormat ?? 'fahrenheit';
   return <Stack
     spacing={ 3 }
-    sx={ { pl: 2, my: 2, borderLeft: 1, borderColor: 'divider' } }>
+    // Indented under the switch on a Pod 4 hub; a Pod 5 hub has no switch to sit under.
+    sx={ path === 'buttons' ? { pl: 2, my: 2, borderLeft: 1, borderColor: 'divider' } : { mt: 2 } }>
     { SIDES.map(([side, title]) => <SideButtons
       key={ side }
       title={ title }
