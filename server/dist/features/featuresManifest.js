@@ -21,7 +21,7 @@ export const FEATURES_MANIFEST = [
     {
         id: 'firmware-health', title: 'Firmware health',
         description: 'Shows selected firmware health messages and new sensor-loss counters on System status. Needs Biometrics.',
-        category: 'biometrics', version: '3.7.0', flag: 'firmwareHealth', default: false,
+        category: 'biometrics', version: '3.7.0', flag: 'firmwareHealth', default: true,
         touchpoints: ['biometrics/firmware_health.py', 'server/src/firmware/healthFeed.ts', 'app/src/pages/StatusPage/FirmwarePanel.tsx'],
         depends_on: ['biometrics'], reversible: true,
         tests: ['biometrics/__tests__/test_firmware_health.py', 'server/src/firmware/firmwareTelemetry.test.ts'],
@@ -498,16 +498,16 @@ export const FEATURES_MANIFEST = [
         default: false,
         touchpoints: [
             'server/src/8sleep/buttonMonitor.ts', 'server/src/8sleep/buttonEvents.ts',
-            'app/src/pages/SettingsPage/FeaturesSection',
-            'app/src/pages/SettingsPage/FeaturesSection/CoverButtonOptions.tsx',
-            'app/src/pages/SettingsPage/FeaturesSection/coverButtons.ts',
+            'app/src/pages/SettingsPage/CoverButtonsCard.tsx',
+            'app/src/pages/SettingsPage/CoverButtonOptions.tsx',
+            'app/src/pages/SettingsPage/coverButtons.ts',
         ],
         depends_on: [],
         reversible: true,
         tests: [
             'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/buttonEvents.test.ts',
-            'app/src/pages/SettingsPage/FeaturesSection/coverButtons.test.ts',
-            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.coverButtons.test.tsx',
+            'app/src/pages/SettingsPage/coverButtons.test.ts',
+            'app/src/pages/SettingsPage/CoverButtonsCard.test.tsx',
         ],
         upstream_offer: false,
         rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short cover clicks. '
@@ -925,7 +925,7 @@ export const FEATURES_MANIFEST = [
         category: 'platform',
         version: '3.5.0',
         flag: 'rhythms',
-        default: false,
+        default: true,
         touchpoints: [
             'server/src/db/settingsSchema.ts', 'server/src/db/rhythmsSchema.ts', 'server/src/db/rhythms.ts', 'server/src/jobs/rhythms',
             'server/src/routes/rhythms/rhythms.ts', 'server/src/jobs/jobScheduler.ts', 'server/src/jobs/scheduleQueries.ts',
@@ -969,7 +969,8 @@ export const FEATURES_MANIFEST = [
             'app/src/pages/SchedulePage/ScheduleTimeline.getUp.test.tsx', 'app/src/api/rhythmsLiveOff.test.ts',
         ],
         upstream_offer: false,
-        rationale: 'Off by default. Its data lives only in rhythmsDB.json and it never writes schedulesDB.json, so turning it '
+        rationale: 'On for a new install; an upgrade keeps the switch as it was. Its data lives only in rhythmsDB.json and '
+            + 'it never writes schedulesDB.json, so turning it '
             + 'off, rolling back or switching to upstream leaves the weekly schedule exactly as it was.'
             + ' A rhythm set to turn off when the person gets up carries one optional key, which 3.5.0 drops on read.',
     },
@@ -982,7 +983,7 @@ export const FEATURES_MANIFEST = [
         category: 'platform',
         version: '3.7.0',
         flag: 'rhythmSuggestions',
-        default: false,
+        default: true,
         touchpoints: [
             'server/src/db/settingsSchema.ts', 'server/src/db/suggestionRules.ts', 'server/src/db/rhythmsSchema.ts',
             'server/src/jobs/rhythms/handChanges.ts', 'server/src/jobs/rhythms/learn.ts', 'server/src/jobs/rhythms/history.ts',
@@ -1019,7 +1020,7 @@ export const FEATURES_MANIFEST = [
             'app/src/pages/SchedulePage/rhythms/rhythmOverlay.test.ts', 'server/src/jobs/rhythms/notesCompat.test.ts',
         ],
         upstream_offer: false,
-        rationale: 'Off by default. Learns only from hand changes, never from sleep data or presence, and only proposes: a rhythm '
+        rationale: 'On by default. Learns only from hand changes, never from sleep data or presence, and only proposes: a rhythm '
             + 'changes when the person adds a suggestion, through the ordinary rhythms save. The notes live in rhythms-changes.jsonl '
             + 'next to the lowdb folder, which older versions never read.',
     },

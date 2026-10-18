@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it, before, after, mock } from 'node:test';
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import nodeSchedule from 'node-schedule';
 // Same isolated-temp-DATA_FOLDER pattern as db/services.test.ts.
 const dataFolder = mkdtempSync(path.join(tmpdir(), 'free-sleep-jobsched-probe-'));
 mkdirSync(path.join(dataFolder, 'lowdb'));
+// An existing settings file, so Rhythms starts off as on an updated Pod.
+writeFileSync(path.join(dataFolder, 'lowdb', 'settingsDB.json'), '{}');
 process.env.DATA_FOLDER = `${dataFolder}/`;
 process.env.ENV = 'local';
 // The pod NTP-syncs some time after boot, so the clock starts invalid and

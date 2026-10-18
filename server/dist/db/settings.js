@@ -5,6 +5,10 @@ import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
 import { defaultFeatures } from './settingsSchema.js';
 import config from '../config.js';
+import logger from '../logger.js';
+import schedulesDB from './schedules.js';
+import { createRhythms, loadRhythms } from './rhythms.js';
+import { weeklyRhythms } from '../jobs/rhythms/convert.js';
 export const defaultSideSettings = {
     name: 'Side',
     awayMode: false,
@@ -76,13 +80,26 @@ const defaultData = {
 };
 const file = new JSONFile(`${config.lowDbFolder}settingsDB.json`);
 const settingsDB = new Low(file, defaultData);
-await settingsDB.read();
-// Allows us to add default values to the settings if users have existing settingsDB.json data
-const stored = settingsDB.data;
-settingsDB.data = _.merge({}, defaultData, stored);
+const stored = await file.read();
+// No file, or only the update channel install.sh and the migration installer write before the first start.
+const newInstall = !stored || _.isEqual(Object.keys(stored), ['updateChannel']);
+// Allows us to add default values to the settings if users have existing settingsDB.json data.
+// Rhythms starts on only for a new install, so an upgrade keeps its weekly schedule.
+settingsDB.data = _.merge({}, defaultData, newInstall ? {} : { features: { rhythms: false } }, stored);
 // A stored gesture is a whole action; merging would add the default's fields.
 for (const side of ['left', 'right'])
     Object.assign(settingsDB.data[side].taps, stored?.[side]?.taps);
+// Seeded before the settings are saved, as the Rhythms switch does, so the bed follows them from the first start.
+if (newInstall && settingsDB.data.features.rhythms && (await loadRhythms()).state === 'absent') {
+    const created = weeklyRhythms(schedulesDB.data);
+    if (created.success) {
+        await createRhythms(created.data);
+    }
+    else {
+        logger.warn(`Rhythms left off, the weekly schedule does not convert: ${created.error.message}`);
+        settingsDB.data.features.rhythms = false;
+    }
+}
 await settingsDB.write();
 export const updateSettings = createSerializedUpdate(settingsDB);
 export default settingsDB;

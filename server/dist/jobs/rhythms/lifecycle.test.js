@@ -7,6 +7,8 @@ import schedule from 'node-schedule';
 const folder = mkdtempSync(path.join(tmpdir(), 'nightstand-rhythms-lifecycle-'));
 const lowdb = path.join(folder, 'lowdb');
 mkdirSync(lowdb);
+// An existing settings file, so Rhythms starts off as on an updated Pod.
+writeFileSync(path.join(lowdb, 'settingsDB.json'), '{}');
 process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
 mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-28T12:00:00Z') });

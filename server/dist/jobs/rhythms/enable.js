@@ -2,8 +2,7 @@ import logger from '../../logger.js';
 import { updateSettings } from '../../db/settings.js';
 import schedulesDB from '../../db/schedules.js';
 import { createRhythms, loadRhythms, updateRhythms } from '../../db/rhythms.js';
-import { RHYTHMS_FILE_VERSION, RhythmsDBSchema } from '../../db/rhythmsSchema.js';
-import { convertLegacy } from './convert.js';
+import { weeklyRhythms } from './convert.js';
 import { legacyFingerprint } from './fingerprint.js';
 export const ENABLE_ERRORS = {
     unsupported: 'Rhythms data is from a newer version of Nightstand. Update Nightstand to turn Rhythms on.',
@@ -24,8 +23,7 @@ export async function enableRhythms(rebuild) {
         return { error: ENABLE_ERRORS.invalid };
     let converted = false;
     if (load.state === 'absent') {
-        const { left, right } = convertLegacy(schedulesDB.data);
-        const created = RhythmsDBSchema.safeParse({ version: RHYTHMS_FILE_VERSION, legacyFingerprint: fingerprint, left, right });
+        const created = weeklyRhythms(schedulesDB.data);
         if (!created.success) {
             logger.warn(`Rhythms not turned on, the weekly schedule does not convert: ${created.error.message}`);
             return { error: ENABLE_ERRORS.unconvertible };

@@ -25,10 +25,7 @@ it('publishes meaningful health transitions without broadcasting every repeated 
         assert.equal(messages.length, 2);
         firmwareHealthSummary(features, false, 171);
         assert.equal(messages.length, 3);
-        assert.deepEqual(messages[2], { firmwareHealth: {
-                name: 'Firmware health', description: 'Selected firmware messages and sensor freshness.',
-                status: 'waiting_for_data', message: 'Monitoring unavailable',
-            } });
+        assert.deepEqual(messages[2], { firmwareHealth: undefined });
     }
     finally {
         unsubscribe();

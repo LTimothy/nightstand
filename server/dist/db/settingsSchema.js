@@ -102,15 +102,15 @@ export const defaultFeatures = {
     oneOffAlarms: true,
     presenceAutoOff: true,
     nightstandTheme: true,
-    rhythms: false,
+    rhythms: true,
     biometricsV2: false,
     firmwareTargetReadout: false,
-    firmwareHealth: false,
+    firmwareHealth: true,
     tapDiagnostics: false,
     coolingWarning: false,
     metricsRetention: false,
     metricsLowDiskProtection: true,
-    rhythmSuggestions: false,
+    rhythmSuggestions: true,
     // The buttons on a Pod 5 cover (buttonMonitor.ts). Off: no RAW file is read.
     coverButtons: false,
 };

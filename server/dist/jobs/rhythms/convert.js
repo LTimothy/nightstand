@@ -1,8 +1,9 @@
-import { DEFAULT_SMART } from '../../db/rhythmsSchema.js';
+import { DEFAULT_SMART, RHYTHMS_FILE_VERSION, RhythmsDBSchema } from '../../db/rhythmsSchema.js';
 import { conversionName } from '../../db/rhythmDays.js';
 import { wakeFromNight } from '../../db/rhythmWake.js';
 import { SCHEDULE_DAYS } from '../../db/scheduleKeys.js';
 import { canonicalJson, normalizeNight } from './night.js';
+import { legacyFingerprint } from './fingerprint.js';
 const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'rhythm';
 // Ids follow RhythmIdSchema: at most 32 characters, suffixed -2, -3 on collision.
 export function uniqueRhythmId(name, used) {
@@ -45,5 +46,10 @@ function convertSide(side) {
 // Identical enabled nights share one rhythm named after its days; disabled nights plan no sleep.
 export function convertLegacy(schedules) {
     return { left: convertSide(schedules.left), right: convertSide(schedules.right) };
+}
+// The rhythms file turning Rhythms on first writes.
+export function weeklyRhythms(schedules) {
+    const { left, right } = convertLegacy(schedules);
+    return RhythmsDBSchema.safeParse({ version: RHYTHMS_FILE_VERSION, legacyFingerprint: legacyFingerprint(schedules), left, right });
 }
 //# sourceMappingURL=convert.js.map

@@ -85,7 +85,7 @@ export class ButtonMonitor {
                 this.tail = null;
                 this.machine = new ButtonEventMachine();
                 this.firstPoll = true;
-                this.markStatus('healthy', 'Off in Settings > Features');
+                this.markStatus('healthy', 'Off in Settings > Bed and sides > Cover buttons');
                 return;
             }
             const newest = await this.findNewestRawFile();

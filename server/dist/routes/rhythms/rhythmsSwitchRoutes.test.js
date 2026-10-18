@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it, mock } from 'node:test';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import express from 'express';
 const folder = mkdtempSync(path.join(tmpdir(), 'nightstand-rhythms-routes-'));
 mkdirSync(path.join(folder, 'lowdb'));
+// An existing settings file, so Rhythms starts off as on an updated Pod.
+writeFileSync(path.join(folder, 'lowdb', 'settingsDB.json'), '{}');
 process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
 const calls = [];
