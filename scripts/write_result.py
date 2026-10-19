@@ -4,6 +4,7 @@ import binascii
 import json
 import os
 import sys
+import tempfile
 import time
 
 
@@ -18,11 +19,19 @@ def main(argv):
         "message": message[:300],
         "finishedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    tmp = path + ".tmp"
-    with open(tmp, "w") as handle:
-        json.dump(record, handle)
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, path)
+    # mkstemp never follows a link the server user left in its folder.
+    descriptor, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
+                                       prefix=os.path.basename(path) + ".")
+    try:
+        with os.fdopen(descriptor, "w") as handle:
+            json.dump(record, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+            os.fchmod(handle.fileno(), 0o644)
+        os.replace(tmp, path)
+    except BaseException:
+        os.unlink(tmp)
+        raise
 
 
 if __name__ == "__main__":

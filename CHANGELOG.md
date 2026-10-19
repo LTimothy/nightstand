@@ -167,6 +167,10 @@ is a hard fork; for the history of the projects it descends from, see
   database migration output to a file in `/home/dac`. Rolling back keeps
   these units, so an earlier release's Logs page shows an older copy of
   these logs, or none.
+- The update result and the update swap marker in
+  `/persistent/free-sleep-data` are written through a new, randomly named
+  temporary file. Before, root wrote a fixed `.tmp` name there, so a link
+  the server user left at that name made root overwrite another file.
 
 ### Installation and fork migration
 

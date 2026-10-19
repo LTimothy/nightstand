@@ -43,19 +43,25 @@ PY
 case "${1:-}" in
   --arm)
     python3 -I - "$MARKER" "$LIVE" "${2:-inactive}" "${3:-}" <<'PY'
-import json, os, sys
+import json, os, sys, tempfile
 path, live, stream, target = sys.argv[1:]
 stream = "active" if stream == "active" else "inactive"
 if os.path.exists(path):
     sys.exit("An earlier update swap still needs recovery")
 info = os.stat(live)
 version = json.load(open(live + "/server/src/serverInfo.json"))["version"]
-with open(path + ".tmp", "w") as handle:
-    json.dump({"device": info.st_dev, "inode": info.st_ino, "version": version,
-               "stream": stream, "toVersion": target or None}, handle)
-    handle.flush()
-    os.fsync(handle.fileno())
-os.replace(path + ".tmp", path)
+descriptor, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=os.path.basename(path) + ".")
+try:
+    with os.fdopen(descriptor, "w") as handle:
+        json.dump({"device": info.st_dev, "inode": info.st_ino, "version": version,
+                   "stream": stream, "toVersion": target or None}, handle)
+        handle.flush()
+        os.fsync(handle.fileno())
+        os.fchmod(handle.fileno(), 0o644)
+    os.replace(tmp, path)
+except BaseException:
+    os.unlink(tmp)
+    raise
 descriptor = os.open(os.path.dirname(path), os.O_RDONLY)
 try:
     os.fsync(descriptor)
@@ -90,25 +96,30 @@ if [ "${SETTLE_RESTORED:-no}" != yes ] || [ "${NIGHTSTAND_OPERATION_OWNER:-}" !=
   fi
 fi
 [ -f "$MARKER" ] || exit 0
-STREAM_WAS_ACTIVE=$(python3 -I - "$MARKER" 2>/dev/null <<'PY'
-import json, sys
-marker = json.load(open(sys.argv[1]))
+# Read once, and only as a plain file: the data folder is the server user's.
+MARKER_JSON=$(python3 -I - "$MARKER" 2>/dev/null <<'PY'
+import json, os, stat, sys
+descriptor = os.open(sys.argv[1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+with os.fdopen(descriptor) as handle:
+    assert stat.S_ISREG(os.fstat(descriptor).st_mode)
+    marker = json.loads(handle.read(65536))
 assert isinstance(marker["device"], int) and isinstance(marker["inode"], int)
 assert isinstance(marker["version"], str)
 assert marker.get("toVersion") is None or isinstance(marker["toVersion"], str)
 assert marker["stream"] in ("active", "inactive", "failed", "unknown", "")
-print(marker["stream"])
+print(json.dumps(marker))
 PY
 ) || fail "unreadable swap marker; manual recovery required"
 
-RECOVERY_FROM=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$MARKER")
-RECOVERY_TO=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1])).get("toVersion") or "")' "$MARKER")
+STREAM_WAS_ACTIVE=$(python3 -I -c 'import json, sys; print(json.loads(sys.argv[1])["stream"])' "$MARKER_JSON")
+RECOVERY_FROM=$(python3 -I -c 'import json, sys; print(json.loads(sys.argv[1])["version"])' "$MARKER_JSON")
+RECOVERY_TO=$(python3 -I -c 'import json, sys; print(json.loads(sys.argv[1]).get("toVersion") or "")' "$MARKER_JSON")
 
 # The original tree may already be live if recovery itself was interrupted.
 matches_marker() {
-  python3 -I - "$MARKER" "$1" 2>/dev/null <<'PYMARKER'
+  python3 -I - "$MARKER_JSON" "$1" 2>/dev/null <<'PYMARKER'
 import json, os, sys
-marker = json.load(open(sys.argv[1]))
+marker = json.loads(sys.argv[1])
 info = os.stat(sys.argv[2])
 assert (info.st_dev, info.st_ino) == (marker["device"], marker["inode"])
 assert json.load(open(sys.argv[2] + "/server/src/serverInfo.json"))["version"] == marker["version"]
