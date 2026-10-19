@@ -38,26 +38,6 @@ RESULT_PY=$(cat "$(dirname "${BASH_SOURCE[0]}")/write_result.py" 2>/dev/null || 
 RESULT_PHASE=preflight
 RESULT_REASON=""
 UP_TO_DATE=no
-record_result() {
-  local status=$1 outcome
-  if [ "$status" -eq 0 ]; then
-    if [ "$UP_TO_DATE" = yes ]; then outcome=up-to-date; else outcome=success; fi
-  else
-    case "$RESULT_PHASE" in
-      preflight) outcome=stopped ;;
-      restored) outcome=rolled-back ;;
-      *) outcome=failed ;;
-    esac
-    if [ -z "$RESULT_REASON" ]; then
-      case "$status" in
-        129|130|143) RESULT_REASON="it was interrupted before it finished" ;;
-        *) RESULT_REASON="it ended without giving a reason (exit status $status). See the update log." ;;
-      esac
-    fi
-  fi
-  python3 -I -c "$RESULT_PY" "$RESULT_FILE" "$RESULT_OPERATION" "$outcome" \
-    "${CUR_VERSION:-}" "${EXPECTED_VERSION:-${TARGET_VERSION:-${STAGED_VERSION:-}}}" "$RESULT_REASON" >/dev/null 2>&1 || true
-}
 
 DATA_CHANGED=no
 RESTORE_ATTEMPTED=no
@@ -102,27 +82,7 @@ restore_switch_data_or_fail() {
 WAN_OPEN=no
 source "$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh" || exit 1
 init_update_firewall
-# Stops a service that writes the data and confirms it is not running. Kept
-# identical in the update, rollback, switch, reset and install scripts.
-# systemd refuses to stop a unit that is not installed or does not load, even
-# one that is not running, so the unit's state decides, not the stop.
-stop_writer() {
-  systemctl stop "$1" 2>/dev/null
-  case "$(systemctl is-active "$1" 2>/dev/null)" in
-    inactive|failed|unknown) return 0 ;;
-  esac
-  return 1
-}
-# Until the server has stopped, its Biometrics switch can start the stream
-# again, so the stream is checked once more after the server stops. A stream
-# started meanwhile is stopped for the swap and started again after it.
-stop_late_stream() {
-  case "$(systemctl is-active free-sleep-stream 2>/dev/null)" in
-    inactive|failed|unknown) return 0 ;;
-  esac
-  STREAM_WAS_ACTIVE=active
-  stop_writer free-sleep-stream
-}
+stop_writer() { restore_stop_writer "$@"; }
 
 # Set from the moment the services stop for a swap until upstream passes its
 # health check: the tree that goes back to LIVE if the run ends before then.
@@ -197,21 +157,12 @@ node_fetch_mb() {
 }
 
 # Keep the descriptor across updater exec handoffs; all three operations share it.
-if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
-  OPERATION_LOCK="${NIGHTSTAND_OPERATION_LOCK:-/run/lock/free-sleep-operation.lock}"
-  if [ -z "${NIGHTSTAND_OPERATION_LOCK:-}" ] && [ ! -d /run/lock ]; then
-    OPERATION_LOCK=/tmp/free-sleep-operation.lock
-  fi
-  if [ -e "$OPERATION_LOCK" ]; then exec 9<"$OPERATION_LOCK"; else exec 9>>"$OPERATION_LOCK"; fi \
-    || fail "cannot open the update lock"
-  if command -v flock >/dev/null 2>&1; then
-    flock -n 9 || fail "another update, rollback or switch is already running"
-  else
-    python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
-      || fail "another update, rollback or switch is already running (or lock unavailable)"
-  fi
-  export NIGHTSTAND_OPERATION_OWNER=$$
-fi
+take_operation_lock
+case $? in
+  0) ;;
+  1) fail "cannot open the update lock" ;;
+  *) fail "another update, rollback or switch is already running" ;;
+esac
 trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
@@ -225,42 +176,6 @@ if [ -f "/persistent/free-sleep-data/operation-request.json" ]; then
     || fail "could not read the confirmed upstream target; live install untouched"
 fi
 
-# Bed-in-use helpers, kept identical in update.sh, rollback_pod.sh and
-# switch-to-upstream.sh. The app writes REQUEST_FILE as it starts one of them.
-# A request the owner did not confirm while the bed was in use is checked
-# again just before the services stop, as the bed may have come into use
-# since. Without the file or its field, as from an older server, an older
-# updater or SSH, nothing is checked again. A file older than ten minutes
-# was left by a request whose run never started, so it is ignored too.
-REQUEST_FILE=/persistent/free-sleep-data/operation-request.json
-RECHECK_IN_USE=no
-IN_USE_REASON="the bed came into use while it was getting ready"
-read_request() {
-  [ -f "$REQUEST_FILE" ] || return 0
-  RECHECK_IN_USE=$(python3 -I -c '
-import json, os, sys, time
-try:
-    if time.time() - os.path.getmtime(sys.argv[1]) > 600:
-        raise ValueError("stale")
-    with open(sys.argv[1]) as handle:
-        request = json.load(handle)
-    print("yes" if request.get("source") == "app" and request.get("confirmInUse") is False else "no")
-except Exception:
-    print("no")' "$REQUEST_FILE" 2>/dev/null) || RECHECK_IN_USE=no
-  rm -f "$REQUEST_FILE"
-}
-recheck_in_use() {
-  [ "$RECHECK_IN_USE" = yes ] || return 0
-  local reasons
-  reasons=$(curl -fsS --max-time 20 http://127.0.0.1:3000/api/update/in-use 2>/dev/null | python3 -I -c '
-import json, sys
-reasons = json.load(sys.stdin)["reasons"]
-assert isinstance(reasons, list)
-print(" ".join(str(reason) for reason in reasons))' 2>/dev/null) || reasons=status-unknown
-  [ -n "$reasons" ] || return 0
-  RESULT_REASON=$IN_USE_REASON
-  fail "the bed may be in use ($reasons); live install untouched"
-}
 read_request
 
 # Tests can ask for more room than this needs, to see the refusal without

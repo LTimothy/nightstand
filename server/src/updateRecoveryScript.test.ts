@@ -654,7 +654,8 @@ describe('recovery settlement', () => {
         box.prepare();
         if (!healthy) rmSync(path.join(box.prev, 'restored'));
         const update = readFileSync(path.join(repo, 'scripts/update.sh'), 'utf8');
-        const helpers = update.slice(update.indexOf('stop_writer()'), update.indexOf('cleanup() {'));
+        const helpers = `source "${path.join(repo, 'scripts/restore_helpers.sh')}"\n`
+          + update.slice(update.indexOf('stop_writer()'), update.indexOf('cleanup() {'));
         const result = box.run([], { healthy }, `
 LIVE='${box.live}'; PREV='${box.prev}'; STAGE='${box.stage}'; FAILED='${box.failed}'
 SWAP_MARKER='${box.marker}'; RECOVERY_HELPER='${box.recoveryFile}'

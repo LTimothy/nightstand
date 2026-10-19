@@ -87,8 +87,10 @@ class SwitchScriptContractTests(unittest.TestCase):
     def run_preflight(self, manifest, request, expired=False, raw_request=None):
         scripts = Path(__file__).resolve().parents[1]
         source = (scripts / 'switch-to-upstream.sh').read_text()
-        target_block = source[source.index('# Read the confirmed target'):source.index('# Bed-in-use helpers')]
-        request_block = target_block + source[source.index('\nREQUEST_FILE=') + 1:source.index('# Tests can ask')]
+        target_block = source[source.index('# Read the confirmed target'):source.index('\nread_request\n') + 1]
+        helpers = (scripts / 'restore_helpers.sh').read_text()
+        bed_in_use = helpers[helpers.index('\nREQUEST_FILE=') + 1:helpers.index('\n}\n', helpers.index('recheck_in_use() {')) + 3]
+        request_block = target_block + bed_in_use + 'read_request\n'
         selection = source[source.index('SWITCH_MANIFEST=$('):source.index('say "Downloading upstream')]
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

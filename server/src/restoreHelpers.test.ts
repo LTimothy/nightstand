@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,5 +58,46 @@ LIVE="$1"; STREAM_WAS_ACTIVE=inactive; source "$2"; restore_restart_services bes
     assert.ok(existsSync(path.join(dir, 'blocked')), result.stdout + result.stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const SHARED = ['record_result', 'read_request', 'recheck_in_use', 'stop_late_stream', 'restore_stop_writer'];
+const shellFiles = (dir: string): string[] => readdirSync(path.join(repoRoot, dir), { withFileTypes: true })
+  .flatMap(entry => (entry.isDirectory() ? (entry.name === 'migrate' ? shellFiles(`${dir}/${entry.name}`) : [])
+    : entry.name.endsWith('.sh') ? [`${dir}/${entry.name}`] : []));
+const ALL_SHELL = [...shellFiles('scripts'), ...shellFiles('ops')];
+
+it('defines each shared helper once, in restore_helpers.sh', () => {
+  for (const name of SHARED) {
+    const definition = new RegExp(`^${name}\\(\\)\\s*\\{`, 'm');
+    assert.deepEqual(ALL_SHELL.filter(file => definition.test(read(file))), [HELPERS], name);
+  }
+  // The writer stop's body lives in restore_stop_writer; install.sh runs before any tree exists.
+  const body = /case "\$\(systemctl is-active "\$1" 2>\/dev\/null\)" in/;
+  assert.deepEqual(ALL_SHELL.filter(file => body.test(read(file))).sort(), ['scripts/install.sh', HELPERS].sort());
+});
+
+it('a staged updater sources the helpers from its own tree before it uses one', () => {
+  // A 3.6.x updater execs the staged update.sh, so the helpers must come from the staged tree.
+  for (const file of ['scripts/update.sh', 'scripts/rollback_pod.sh', 'scripts/switch-to-upstream.sh']) {
+    const src = read(file);
+    const source = src.indexOf('source "$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh"');
+    assert.ok(source > 0, `${file} does not source its own restore_helpers.sh`);
+    for (const call of ['\nread_request\n', 'take_operation_lock', 'open_wan\n']) {
+      const at = src.indexOf(call);
+      assert.ok(at === -1 || at > source, `${file} uses ${call.trim()} before sourcing the helpers`);
+    }
+  }
+  const stage = mkdtempSync(path.join(tmpdir(), 'nightstand-staged-'));
+  try {
+    mkdirSync(path.join(stage, 'scripts'));
+    for (const file of ['update.sh', 'restore_helpers.sh']) {
+      copyFileSync(path.join(repoRoot, 'scripts', file), path.join(stage, 'scripts', file));
+    }
+    const types = spawnSync('bash', ['-c', `source "${stage}/scripts/restore_helpers.sh"; for f in ${SHARED.join(' ')}; do type -t "$f"; done`],
+      { encoding: 'utf8' });
+    assert.deepEqual(types.stdout.trim().split('\n'), SHARED.map(() => 'function'), types.stderr);
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
   }
 });

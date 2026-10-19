@@ -219,3 +219,74 @@ take_operation_lock() {
   fi
   export NIGHTSTAND_OPERATION_OWNER=$$
 }
+
+# How an update, rollback or switch ended, for the app to show. The caller
+# sets the RESULT_* variables.
+record_result() {
+  local status=$1 outcome
+  if [ "$status" -eq 0 ]; then
+    if [ "$UP_TO_DATE" = yes ]; then outcome=up-to-date; else outcome=success; fi
+  else
+    case "$RESULT_PHASE" in
+      preflight) outcome=stopped ;;
+      restored) outcome=rolled-back ;;
+      *) outcome=failed ;;
+    esac
+    if [ -z "$RESULT_REASON" ]; then
+      case "$status" in
+        129|130|143) RESULT_REASON="it was interrupted before it finished" ;;
+        *) RESULT_REASON="it ended without giving a reason (exit status $status). See the update log." ;;
+      esac
+    fi
+  fi
+  python3 -I -c "$RESULT_PY" "$RESULT_FILE" "$RESULT_OPERATION" "$outcome" \
+    "${CUR_VERSION:-}" "${EXPECTED_VERSION:-${TARGET_VERSION:-${STAGED_VERSION:-}}}" "$RESULT_REASON" >/dev/null 2>&1 || true
+}
+
+# Bed-in-use helpers for the updater, the rollback and the switch. The app
+# writes REQUEST_FILE as it starts one of them.
+# A request the owner did not confirm while the bed was in use is checked
+# again just before the services stop, as the bed may have come into use
+# since. Without the file or its field, as from an older server, an older
+# updater or SSH, nothing is checked again. A file older than ten minutes
+# was left by a request whose run never started, so it is ignored too.
+REQUEST_FILE=/persistent/free-sleep-data/operation-request.json
+RECHECK_IN_USE=no
+IN_USE_REASON="the bed came into use while it was getting ready"
+read_request() {
+  [ -f "$REQUEST_FILE" ] || return 0
+  RECHECK_IN_USE=$(python3 -I -c '
+import json, os, sys, time
+try:
+    if time.time() - os.path.getmtime(sys.argv[1]) > 600:
+        raise ValueError("stale")
+    with open(sys.argv[1]) as handle:
+        request = json.load(handle)
+    print("yes" if request.get("source") == "app" and request.get("confirmInUse") is False else "no")
+except Exception:
+    print("no")' "$REQUEST_FILE" 2>/dev/null) || RECHECK_IN_USE=no
+  rm -f "$REQUEST_FILE"
+}
+recheck_in_use() {
+  [ "$RECHECK_IN_USE" = yes ] || return 0
+  local reasons
+  reasons=$(curl -fsS --max-time 20 http://127.0.0.1:3000/api/update/in-use 2>/dev/null | python3 -I -c '
+import json, sys
+reasons = json.load(sys.stdin)["reasons"]
+assert isinstance(reasons, list)
+print(" ".join(str(reason) for reason in reasons))' 2>/dev/null) || reasons=status-unknown
+  [ -n "$reasons" ] || return 0
+  RESULT_REASON=$IN_USE_REASON
+  fail "the bed may be in use ($reasons); live install untouched"
+}
+
+# Until the server has stopped, its Biometrics switch can start the stream
+# again, so the stream is checked once more after the server stops. A stream
+# started meanwhile is stopped for the swap and started again after it.
+stop_late_stream() {
+  case "$(systemctl is-active free-sleep-stream 2>/dev/null)" in
+    inactive|failed|unknown) return 0 ;;
+  esac
+  STREAM_WAS_ACTIVE=active
+  stop_writer free-sleep-stream
+}

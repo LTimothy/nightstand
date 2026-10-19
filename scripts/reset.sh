@@ -4,6 +4,7 @@
 # only the installer writes, so the server still reaches the Pod afterwards.
 if [ -z "${BASH_VERSION:-}" ]; then exec bash "$0" "$@"; fi
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh" || exit 1
 
 DATA_DIR=/persistent/free-sleep-data
 SOCK_FILE="$DATA_DIR/dac_sock_path.txt"
@@ -66,29 +67,7 @@ restart_services() {
 }
 trap restart_services EXIT
 
-# Stops a service that writes the data and confirms it is not running. Kept
-# identical in the update, rollback, switch, reset and install scripts.
-# systemd refuses to stop a unit that is not installed or does not load, even
-# one that is not running, so the unit's state decides, not the stop.
-stop_writer() {
-  systemctl stop "$1" 2>/dev/null
-  case "$(systemctl is-active "$1" 2>/dev/null)" in
-    inactive|failed|unknown) return 0 ;;
-  esac
-  return 1
-}
-# Shared with the updaters; after a reset the stream restarts only if no
-# data was deleted.
-# Until the server has stopped, its Biometrics switch can start the stream
-# again, so the stream is checked once more after the server stops. A stream
-# started meanwhile is stopped for the swap and started again after it.
-stop_late_stream() {
-  case "$(systemctl is-active free-sleep-stream 2>/dev/null)" in
-    inactive|failed|unknown) return 0 ;;
-  esac
-  STREAM_WAS_ACTIVE=active
-  stop_writer free-sleep-stream
-}
+stop_writer() { restore_stop_writer "$@"; }
 
 echo "Stopping Nightstand"
 systemctl stop free-sleep-archive-raw.timer 2>/dev/null || true
