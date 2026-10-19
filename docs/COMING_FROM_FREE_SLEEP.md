@@ -109,7 +109,7 @@ services before making changes. Removing those cron jobs and the ambient-light
 service requires a separate typed confirmation. Declining it refuses the
 switch. Other unknown `free-sleep*` units are stopped before the database
 checkpoint and are not restarted by the tool. Copies of removed artifacts
-stay in `/home/dac/free-sleep-migrate-artifacts/backup.*`; the installer prints
+stay in `/persistent/nightstand-migrate-artifacts/backup.*`; the installer prints
 the exact directory. A failed switch restores the cron and removed files,
 but leaves foreign units disabled or stopped for you to review.
 

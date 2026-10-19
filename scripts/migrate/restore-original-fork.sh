@@ -86,7 +86,7 @@ restore_iptables() {
 }
 
 restore_legacy_artifacts() {
-  [ -f /home/dac/free-sleep-migrate-artifacts/pending ] || return 0
+  [ -f /persistent/nightstand-migrate-artifacts/pending ] || [ -f /home/dac/free-sleep-migrate-artifacts/pending ] || return 0
   bash /usr/local/lib/nightstand/migrate/fork-artifacts.sh restore || {
     say "WARNING: legacy artifact restore failed; keeping the sentinel for another attempt"
     return 1

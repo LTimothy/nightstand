@@ -317,7 +317,7 @@ bash "$TEST_BASE/restore.sh"
         self.assertIn('rm -rf "$STAGE"\n  if [ -n "$WORK" ]; then rm -rf "$WORK"; fi', installer)
 
 
-    def run_artifacts(self, mode, consent="no", cron_error=False, stop_error=False, empty=False, driver=None, missing_helper=False, restore_after=False, still_active=False, restore_driver=False, cron_text=None, unit_text=None, ambient_unit=True):
+    def run_artifacts(self, mode, consent="no", cron_error=False, stop_error=False, empty=False, driver=None, missing_helper=False, restore_after=False, still_active=False, restore_driver=False, cron_text=None, unit_text=None, ambient_unit=True, setup=None):
         helper = ROOT / 'scripts/migrate/fork-artifacts.sh'
         self.assertTrue(helper.exists(), 'fork artifact inspection and cleanup is missing')
         with tempfile.TemporaryDirectory() as folder:
@@ -340,6 +340,7 @@ bash "$TEST_BASE/restore.sh"
             script = base / 'helper.sh'
             script.write_text(helper.read_text().replace('/etc/systemd/system', str(systemd))
                 .replace('/home/dac/', str(base) + '/').replace('/usr/local/lib/nightstand/', str(base) + '/')
+                .replace('/persistent/', str(base) + '/persistent/')
                 .replace('/usr/local/bin/', str(base) + '/local-bin/')
                 .replace('/etc/sysctl.conf', str(base / 'sysctl.conf')))
             restore_script = base / 'restore.sh'
@@ -357,6 +358,8 @@ bash "$TEST_BASE/restore.sh"
             if not empty:
                 legacy_script.write_text('legacy time sync fixture')
             (base / 'sysctl.conf').write_text('# net.ipv6.conf.all.disable_ipv6=1\nnet.ipv6.conf.all.disable_ipv6 = 1\n')
+            if setup:
+                setup(base)
             wrapper = r'''
 crontab() {
   echo "crontab $*" >> "$TEST_LOG"
@@ -493,6 +496,45 @@ LIVE="$TEST_BASE"
         self.assertTrue(ambient)
         self.assertNotIn('systemctl enable', log)
         self.assertNotIn('systemctl start', log)
+
+    def test_cleanup_never_backs_up_through_a_folder_the_server_user_planted(self):
+        for planted in ('free-sleep-migrate-artifacts', 'persistent/nightstand-migrate-artifacts'):
+            with self.subTest(planted=planted):
+                def plant(base):
+                    (base / 'victim').mkdir()
+                    (base / planted).parent.mkdir(parents=True, exist_ok=True)
+                    (base / planted).symlink_to(base / 'victim')
+                    self.victim = base / 'victim'
+                result, cron, ambient, _ = self.run_artifacts('clean', 'yes', setup=plant)
+                self.assertFalse(self.victim.exists() and any(self.victim.iterdir()), 'backup written through the link')
+                if planted.startswith('persistent/'):
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(cron, (ROOT / 'fixtures/migrate/root.crontab').read_text())
+                    self.assertTrue(ambient)
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+
+    def legacy_backup(self, base, mode=0o700, link=False):
+        folder = base / ('elsewhere' if link else 'free-sleep-migrate-artifacts')
+        backup = folder / 'backup.legacy'
+        backup.mkdir(parents=True)
+        (backup / 'root.crontab').write_text('legacy cron\n')
+        (folder / 'pending').write_text(str(base / 'free-sleep-migrate-artifacts/backup.legacy'))
+        if link:
+            (base / 'free-sleep-migrate-artifacts').symlink_to(folder)
+        folder.chmod(mode)
+
+    def test_restore_takes_an_older_release_backup_only_from_a_folder_only_root_writes(self):
+        result, cron, _, _ = self.run_artifacts('restore', empty=True, setup=self.legacy_backup)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(cron, 'legacy cron\n')
+        for options in ({'mode': 0o777}, {'link': True}):
+            with self.subTest(**options):
+                result, cron, _, _ = self.run_artifacts('restore', empty=True,
+                                                        setup=lambda base: self.legacy_backup(base, **options))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(cron, '', 'installed a crontab the server user could have written')
+                self.assertIn('skipped', result.stderr)
 
     def test_pre_swap_restore_recovers_removed_artifacts(self):
         result, cron, ambient, log = self.run_artifacts('clean', 'yes', restore_after=True, restore_driver=True)

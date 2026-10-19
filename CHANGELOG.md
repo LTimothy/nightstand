@@ -180,6 +180,12 @@ is a hard fork; for the history of the projects it descends from, see
   name, and reads it only when it is a plain file, not a link. Before, a
   link left there made root write to its target, or print the first line
   of a file only root can read into the update log.
+- The fork migration keeps its copies of removed cron jobs and files in
+  `/persistent/nightstand-migrate-artifacts`, a folder only root can write,
+  and refuses that folder if it is a link or not root's. Before, they lived
+  in `/home/dac`, so a failed migration could install a crontab the server
+  user wrote. Copies an earlier release left in `/home/dac` are restored
+  only when that folder is root's and nobody else can write to it.
 
 ### Installation and fork migration
 

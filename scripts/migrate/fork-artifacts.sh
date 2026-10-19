@@ -4,14 +4,35 @@ set -uo pipefail
 
 fail() { echo "Refusing switch: $*" >&2; exit 1; }
 
-BACKUP_ROOT=/home/dac/free-sleep-migrate-artifacts
+# Root restores these as its crontab, so they live where only root can write.
+BACKUP_ROOT=/persistent/nightstand-migrate-artifacts
+# Older releases kept them in the server user's home; trusted only as root's.
+LEGACY_ROOT=/home/dac/free-sleep-migrate-artifacts
 AMBIENT_UNIT=/etc/systemd/system/free-sleep-ambient-light.service
 SYNC_SCRIPT=/usr/local/bin/sync-time-with-internet.sh
 MODE=${1:-inspect}
+
+# Enters folder $1 if it is a real folder this user owns that nobody else can
+# write, so the paths used after it cannot be swapped through a link.
+enter_own() {
+  [ -d "$1" ] && [ ! -L "$1" ] && cd "$1" && [ -O . ] && [ "$(LC_ALL=C ls -ld . | cut -c6,9)" = -- ]
+}
+
 if [ "$MODE" = restore ]; then
-  [ -f "$BACKUP_ROOT/pending" ] || exit 0
-  BACKUP_DIR=$(cat "$BACKUP_ROOT/pending") || fail "could not read artifact backup path"
-  case "$BACKUP_DIR" in "$BACKUP_ROOT"/backup.*) ;; *) fail "invalid artifact backup path" ;; esac
+  ROOT_DIR=$BACKUP_ROOT
+  if [ ! -f "$BACKUP_ROOT/pending" ]; then
+    [ -f "$LEGACY_ROOT/pending" ] || exit 0
+    ROOT_DIR=$LEGACY_ROOT
+  fi
+  if ! enter_own "$ROOT_DIR"; then
+    [ "$ROOT_DIR" = "$LEGACY_ROOT" ] || fail "$ROOT_DIR is not a folder only root can write"
+    echo "WARNING: skipped the artifact backups in $LEGACY_ROOT, which root does not own alone" >&2
+    exit 0
+  fi
+  BACKUP_DIR=$(cat pending) || fail "could not read artifact backup path"
+  case "$BACKUP_DIR" in "$ROOT_DIR"/backup.*) ;; *) fail "invalid artifact backup path" ;; esac
+  BACKUP_DIR=./${BACKUP_DIR#"$ROOT_DIR"/}
+  case "$BACKUP_DIR" in */*/*) fail "invalid artifact backup path" ;; esac
   if [ -f "$BACKUP_DIR/root.crontab" ]; then
     crontab -u root "$BACKUP_DIR/root.crontab" || fail "could not restore root cron"
   fi
@@ -23,7 +44,7 @@ if [ "$MODE" = restore ]; then
     systemctl daemon-reload || fail "could not reload restored unit file"
   fi
   # Foreign units stay stopped. The owner can review and enable them separately.
-  rm -f "$BACKUP_ROOT/pending" || fail "could not clear artifact restore marker"
+  rm -f pending || fail "could not clear artifact restore marker"
   exit 0
 fi
 if [ "$MODE" = finish ]; then
@@ -113,11 +134,15 @@ if { [ -n "$RISKY_CRON" ] || [ "$REMOVE_AMBIENT" = yes ]; } && [ "${2:-no}" != y
   fail "consent is required to remove firewall cron jobs and the ambient-light unit; nothing was changed"
 fi
 [ ! -f "$BACKUP_ROOT/pending" ] || fail "an earlier artifact cleanup needs restoration before retrying"
+if [ -f "$LEGACY_ROOT/pending" ] && ( enter_own "$LEGACY_ROOT" ); then
+  fail "an earlier artifact cleanup needs restoration before retrying"
+fi
 [ "$MODE" = clean ] || exit 0
 
 # Retain copies before stopping units or editing cron, including on a failed switch.
 if [ -n "$RISKY_CRON" ] || [ "$REMOVE_AMBIENT" = yes ]; then
   mkdir -p "$BACKUP_ROOT" || fail "could not create artifact backup directory"
+  [ ! -L "$BACKUP_ROOT" ] && [ -O "$BACKUP_ROOT" ] || fail "$BACKUP_ROOT is not a folder only root can write"
   chmod 700 "$BACKUP_ROOT" || fail "could not protect artifact backups"
   BACKUP_DIR=$(mktemp -d "$BACKUP_ROOT/backup.XXXXXX") || fail "could not create artifact backup"
   if [ -n "$RISKY_CRON" ]; then
