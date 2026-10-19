@@ -93,12 +93,14 @@ case "${1:-}" in
     BIO_TGZ="/tmp/fs-biometrics.tgz"
     tar --exclude='__pycache__' --exclude='*.pyc' \
         -czf "$BIO_TGZ" -C "$REPO_ROOT" biometrics
-    scp "${SCP_OPTS[@]}" -q "$BIO_TGZ" "${SSH_TARGET}:/tmp/fs-biometrics.tgz" \
+    # A fresh name on the Pod, so root's copy never lands on a planted link.
+    POD_TGZ=$(pod mktemp) || fail "could not create a temporary file on the Pod."
+    scp "${SCP_OPTS[@]}" -q "$BIO_TGZ" "${SSH_TARGET}:$POD_TGZ" \
       || fail "scp of biometrics tarball failed."
     pod "set -e
-         tar -xzf /tmp/fs-biometrics.tgz -C /home/dac/free-sleep/
+         tar -xzf '$POD_TGZ' -C /home/dac/free-sleep/
          chown -hR dac:dac /home/dac/free-sleep/biometrics
-         rm -f /tmp/fs-biometrics.tgz
+         rm -f '$POD_TGZ'
          systemctl restart free-sleep-stream || true
          systemctl is-active free-sleep-stream" \
       && ok "Biometrics synced and free-sleep-stream restarted." \
