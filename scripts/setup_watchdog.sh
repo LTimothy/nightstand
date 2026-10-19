@@ -112,6 +112,40 @@ pod5_revision() {
   [ -n "$1" ] && [ "$(printf '%s\n%s\n' "$POD5_REVISION" "$1" | LC_ALL=C sort | head -n 1)" = "$POD5_REVISION" ]
 }
 
+# The trial file sits in the server user's folder, so root replaces it with
+# a new file rather than writing through a link left at its name.
+write_mark() {
+  python3 -I - "$TRIAL_MARK" "${1:-}" 2>/dev/null <<'PY'
+import os, sys, tempfile
+path, text = sys.argv[1:]
+descriptor, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=os.path.basename(path) + ".")
+try:
+    with os.fdopen(descriptor, "w") as handle:
+        handle.write(text + "\n" if text else "")
+        handle.flush()
+        os.fsync(handle.fileno())
+        os.fchmod(handle.fileno(), 0o644)
+    os.replace(tmp, path)
+except BaseException:
+    os.unlink(tmp)
+    raise
+PY
+}
+# Prints the trial file's first line, or nothing for a link or anything but a
+# plain file, so root never shows what another file holds.
+read_mark() {
+  python3 -I - "$TRIAL_MARK" 2>/dev/null <<'PY'
+import os, stat, sys
+try:
+    descriptor = os.open(sys.argv[1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+except OSError:
+    sys.exit(0)
+with os.fdopen(descriptor) as handle:
+    if stat.S_ISREG(os.fstat(descriptor).st_mode):
+        print(handle.readline(500).rstrip("\n"))
+PY
+}
+
 # Writes the drop-in into directory $1, replacing any earlier copy at once.
 write_dropin() {
   mkdir -p "$1" || return 1
@@ -129,7 +163,7 @@ EOF
 # device only at the next restart.
 abandon() {
   rm -f "$TRIAL_DROPIN"
-  echo "$*" > "$TRIAL_MARK" 2>/dev/null
+  write_mark "$*"
   if pid1_holds; then
     echo "WARNING: the hardware watchdog is NOT active as set up: $*. Nightstand's setting was removed, and PID 1 lets go of the device at the next restart." >&2
   else
@@ -154,7 +188,7 @@ removed() {
     echo "WARNING: could not write $TRIAL_MARK, so the next install or update turns the watchdog on again" >&2
     exit 1
   fi
-  if [ "$(head -n 1 "$TRIAL_MARK" 2>/dev/null)" = "$OWNER_NOTE" ]; then
+  if [ "$(read_mark)" = "$OWNER_NOTE" ]; then
     echo "Hardware watchdog: installs and updates leave it off; run this script without arguments to turn it on again."
   else
     echo "Hardware watchdog: installs and updates leave it off after the earlier trial; delete $TRIAL_MARK to try again."
@@ -166,7 +200,7 @@ if [ "$MODE" = remove ] || [ "$MODE" = switching ]; then
   # An earlier failed trial already keeps it off, and its reason is kept.
   NOTE=kept
   if [ "$MODE" = remove ] && [ ! -e "$TRIAL_MARK" ]; then
-    echo "$OWNER_NOTE" 2>/dev/null > "$TRIAL_MARK" || NOTE=failed
+    write_mark "$OWNER_NOTE" || NOTE=failed
   fi
   if ! ours && [ ! -f "$TRIAL_DROPIN" ]; then
     echo "Hardware watchdog: no Nightstand setting to remove."
@@ -193,7 +227,7 @@ if [ -f "$DROPIN" ]; then
   exit 0
 fi
 if [ -e "$TRIAL_MARK" ]; then
-  REASON=$(head -n 1 "$TRIAL_MARK" 2>/dev/null)
+  REASON=$(read_mark)
   if [ "$REASON" = "$OWNER_NOTE" ] && [ "$MODE" = hand ]; then
     rm -f "$TRIAL_MARK" || { echo "WARNING: could not remove $TRIAL_MARK; the hardware watchdog stays off" >&2; exit 1; }
     echo "Hardware watchdog: cleared the note left by --remove."
@@ -258,7 +292,7 @@ fi
 OTHERS=$(holders | grep -vx 1 | tr '\n' ' ')
 [ -z "$OTHERS" ] || skip "another program (PID ${OTHERS% }) already uses the watchdog"
 
-: > "$TRIAL_MARK" || { echo "WARNING: could not write $TRIAL_MARK; the hardware watchdog stays off" >&2; exit 1; }
+write_mark || { echo "WARNING: could not write $TRIAL_MARK; the hardware watchdog stays off" >&2; exit 1; }
 # On disk before the re-exec, so a reset straight after it cannot lose it.
 sync
 if ! write_dropin "$TRIAL_DIR"; then

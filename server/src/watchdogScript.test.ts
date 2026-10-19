@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync,
+  chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -157,6 +157,8 @@ exit 0
     trialDropin: () => existsSync(trialPath),
     writeTrialDropin: () => { mkdirSync(runConf, { recursive: true }); writeFileSync(trialPath, MANUAL_DROPIN); },
     mark: () => (existsSync(mark) ? readFileSync(mark, 'utf8') : null),
+    markPath: mark,
+    dir,
     reexecs: () => (existsSync(calls) ? readFileSync(calls, 'utf8').split('\n').filter((l) => l === 'daemon-reexec').length : 0),
     calls: () => (existsSync(calls) ? readFileSync(calls, 'utf8').split('\n') : []),
     setLabel: (text: string) => writeFileSync(labelFile, text),
@@ -335,6 +337,44 @@ describe('setup_watchdog.sh', () => {
     assert.equal(p.dropin(), null);
     assert.equal(p.trialDropin(), false);
     p.cleanup();
+  });
+
+  describe('a link the server user plants at the trial file', () => {
+    const plant = (p: ReturnType<typeof pod>, victim: string) => symlinkSync(victim, p.markPath);
+    it('--remove writes its note in place of the link, not through it', () => {
+      const p = pod();
+      try {
+        const victim = path.join(p.dir, 'victim');
+        plant(p, victim);
+        assert.equal(p.run('--remove').status, 0);
+        assert.equal(existsSync(victim), false);
+        assert.equal(lstatSync(p.markPath).isFile(), true);
+        assert.match(p.mark() ?? '', /turned off by the owner/);
+      } finally { p.cleanup(); }
+    });
+    it('a failed trial records its reason in place of the link, not through it', () => {
+      const p = pod({ arm: 'no' });
+      try {
+        const victim = path.join(p.dir, 'victim');
+        plant(p, victim);
+        assert.equal(p.run('--auto').status, 1);
+        assert.equal(existsSync(victim), false);
+        assert.equal(lstatSync(p.markPath).isFile(), true);
+        assert.notEqual(p.mark(), '');
+      } finally { p.cleanup(); }
+    });
+    it('is never read, so root prints nothing from the file it points to', () => {
+      const p = pod();
+      try {
+        const secret = path.join(p.dir, 'secret');
+        writeFileSync(secret, 'root-only line\n');
+        plant(p, secret);
+        const result = p.run('--auto');
+        assert.doesNotMatch(result.stdout + result.stderr, /root-only line/);
+        assert.equal(p.reexecs(), 0);
+        assert.equal(readFileSync(secret, 'utf8'), 'root-only line\n');
+      } finally { p.cleanup(); }
+    });
   });
 
   it('writes the trial file to disk before the re-exec that could reset the Pod', () => {

@@ -175,6 +175,11 @@ is a hard fork; for the history of the projects it descends from, see
   saves the server's answer in a new temporary file only root can write,
   removed when the run ends. Before, it used a fixed name in `/home/dac` or
   `/tmp`.
+- The hardware watchdog's trial file stays in `/persistent/free-sleep-data`,
+  but root now replaces it with a new file instead of writing through its
+  name, and reads it only when it is a plain file, not a link. Before, a
+  link left there made root write to its target, or print the first line
+  of a file only root can read into the update log.
 
 ### Installation and fork migration
 
