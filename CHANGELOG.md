@@ -243,6 +243,11 @@ is a hard fork; for the history of the projects it descends from, see
   These migration changes have not been checked on a Pod.
 - Switching a Pod from another fork installs the newest release's tag and
   checks it against the checksum in `releases.json`, as `install.sh` does.
+- Switching to upstream checks the staged release against its confirmed
+  checksum again once the server has stopped, before root runs or copies
+  any of its files, and installs its dependencies with `npm ci` so its
+  lockfile stays as checked. Before, the server user could change the
+  staged files after the first check.
 
 ### Firmware readouts
 

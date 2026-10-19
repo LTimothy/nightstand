@@ -23,6 +23,7 @@ UPSTREAM_TARGET = dict(version='3.0.3', commit='a' * 40, treeSha256='b' * 64, da
 import recover_switch
 import switch_services
 from switch_transaction import TransactionStore
+from tree_digest import _dir_entries, tree_digest
 
 
 def runner():
@@ -110,6 +111,12 @@ def create_tree(path, fork, version):
         (path / 'scripts' / name).write_text('original ' + fork)
 
 
+def confirmed(stage):
+    # What the shell checked: the download, before npm adds its dependencies.
+    entries = (entry for entry in _dir_entries(stage) if not entry[0].startswith(b'server/node_modules/'))
+    return dict(UPSTREAM_TARGET, treeSha256=tree_digest(entries))
+
+
 def populate(system):
     create_tree(system.live, 'LTimothy/nightstand', '3.6.1')
     stage = system.live.parent / 'stage'
@@ -153,8 +160,27 @@ class InstallationTests(unittest.TestCase):
         self.addCleanup(self.command_patch.stop)
 
     def forward(self):
-        return self.runner.install(self.system, self.stage, target=UPSTREAM_TARGET,
+        return self.runner.install(self.system, self.stage, target=confirmed(self.stage),
                                    operation='free-sleep-revert.service')
+
+    def test_forward_refuses_a_stage_changed_after_its_checksum_check(self):
+        target = confirmed(self.stage)
+        stop = self.system.stop
+        def tamper():
+            # The server user can still write the stage until its writers stop.
+            (self.stage / 'scripts/block_internet_access.sh').write_text('changed')
+            stop()
+        self.system.stop = tamper
+        with self.assertRaisesRegex(ValueError, 'confirmed artifact'):
+            self.runner.install(self.system, self.stage, target=target, operation='free-sleep-revert.service')
+        offline_recover(self.system)
+        self.assertEqual(self.runner.fork(self.system.live), 'nightstand')
+        self.assertEqual([journal['phase'] for journal in recover_switch.journals(self.system.store)], ['recovered'])
+
+    def test_forward_installs_dependencies_from_the_checked_lockfile(self):
+        source = (SCRIPTS / 'switch-to-upstream.sh').read_text()
+        self.assertIn('NPM_INSTALL=ci', source)
+        self.assertIn('\'$NPM\' $NPM_INSTALL --no-audit --no-fund', source)
 
     def test_installer_without_companion_uses_legacy_migration_regardless_of_source_metadata(self):
         source = (SCRIPTS / 'migrate/pod-installer.sh').read_text()
@@ -190,7 +216,7 @@ python3() {
         stage = populate(other)
         other.store = self.system.store
         with patch.object(switch_services, 'execute', side_effect=other.command):
-            self.runner.install(other, stage, target=UPSTREAM_TARGET, operation='free-sleep-revert.service')
+            self.runner.install(other, stage, target=confirmed(stage), operation='free-sleep-revert.service')
         with patch.object(self.runner, 'System', return_value=self.system), \
                 patch.object(sys, 'argv', ['switch_installation.py', 'return-companion']), \
                 redirect_stdout(io.StringIO()) as output, self.assertRaises(SystemExit) as stopped:
@@ -274,8 +300,7 @@ restore_cross_fork_rollback() {
     def test_recorded_upstream_without_fork_field_requires_companion_rollback(self):
         metadata = self.stage / 'server/src/serverInfo.json'
         metadata.write_text('{"version":"3.0.3","branch":"main"}')
-        target = dict(version='3.0.3', commit='a' * 40, treeSha256='b' * 64, date='2026-01-01')
-        forward = self.runner.install(self.system, self.stage, target=target)
+        forward = self.runner.install(self.system, self.stage, target=confirmed(self.stage))
         create_tree(self.stage, 'LTimothy/nightstand', '3.7.0')
         returned = self.runner.install(self.system, self.stage, retained=forward,
                                        operation='free-sleep-migrate.service')
@@ -647,7 +672,7 @@ bash "$TEST_ROLLBACK"
         next_upstream = self.system.live.parent / 'next-upstream'
         create_tree(next_upstream, 'throwaway31265/free-sleep', '3.0.3')
         with patch.object(self.runner, 'transaction_id', return_value='switch-' + '1' * 32):
-            latest = self.runner.install(self.system, next_upstream, target=UPSTREAM_TARGET,
+            latest = self.runner.install(self.system, next_upstream, target=confirmed(next_upstream),
                                          operation='free-sleep-revert.service')
         self.assertEqual(self.runner.return_companion(self.system.store, self.system.live), latest)
 

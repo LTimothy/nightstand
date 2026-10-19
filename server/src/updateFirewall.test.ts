@@ -272,7 +272,7 @@ for (const file of ['scripts/update.sh', 'scripts/switch-to-upstream.sh']) {
     });
 
     it('puts a time limit on the dependency install', () => {
-      assert.match(src, /run_limited 900 sudo -u dac bash -c "cd '\$STAGE\/server' && '\$NPM' install/);
+      assert.match(src, /run_limited 900 sudo -u dac bash -c "cd '\$STAGE\/server' && '\$NPM' (install|\$NPM_INSTALL)/);
     });
 
     for (const tailscale of [false, true]) {

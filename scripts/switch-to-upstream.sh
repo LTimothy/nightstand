@@ -316,9 +316,12 @@ ROOT_FREE=$(free_mb /)
 [ "${ROOT_FREE:-0}" -ge "$DEPS_NEED" ] \
   || fail "low disk on / (${ROOT_FREE:-unknown}M free, ${DEPS_NEED}M needed for upstream's dependencies); live install untouched"
 if [ "$LOCK_SAME" = no ]; then
-  say "package-lock.json differs from upstream's: running npm install in staging"
-  run_limited 900 sudo -u dac bash -c "cd '$STAGE/server' && '$NPM' install --no-audit --no-fund" \
-    || fail "npm install failed or took over 15 minutes; live install untouched"
+  say "package-lock.json differs from upstream's: installing its dependencies in staging"
+  # A checked artifact's lockfile must not change after its checksum check.
+  NPM_INSTALL=install
+  [ "$TRANSACTIONAL_SWITCH" != yes ] || NPM_INSTALL=ci
+  run_limited 900 sudo -u dac bash -c "cd '$STAGE/server' && '$NPM' $NPM_INSTALL --no-audit --no-fund" \
+    || fail "npm $NPM_INSTALL failed or took over 15 minutes; live install untouched"
 else
   say "package-lock.json matches: reusing existing node_modules"
 fi

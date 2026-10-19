@@ -412,7 +412,7 @@ echo PASSED`;
     assert.ok(update.indexOf('DEPS_NEED') < update.indexOf('# --- backup'));
     const revert = read('scripts/switch-to-upstream.sh');
     assert.ok(revert.indexOf('PERS_NEED') < revert.indexOf('open_wan\n'));
-    assert.ok(revert.indexOf('DEPS_NEED') < revert.indexOf('npm install'));
+    assert.ok(revert.indexOf('DEPS_NEED') < revert.indexOf('$NPM_INSTALL --no-audit'));
     const installer = read('scripts/migrate/pod-installer.sh');
     assert.ok(installer.indexOf('PERS_NEED') < installer.indexOf('curl -fL --max-time 300'));
     assert.ok(installer.indexOf('DEPS_NEED') < installer.indexOf('ensure-node.sh" dac'));
