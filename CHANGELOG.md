@@ -186,6 +186,21 @@ is a hard fork; for the history of the projects it descends from, see
   in `/home/dac`, so a failed migration could install a crontab the server
   user wrote. Copies an earlier release left in `/home/dac` are restored
   only when that folder is root's and nobody else can write to it.
+- The fork migration and agent bootstrap keep their swap marker, restore
+  progress, lock, firewall snapshot and temperature baseline in
+  `/persistent/nightstand-migrate`, and their logs in
+  `/persistent/nightstand-logs`, both folders only root can write. Before,
+  root wrote them at fixed names in `/home/dac` and
+  `/persistent/free-sleep-data/logs`, and restored its firewall from a file
+  the server user could replace. The migration status file stays where the
+  switch tool reads it, but root replaces it instead of writing through it.
+  The pre-switch backup is staged and written in
+  `/persistent/free-sleep-backups` only when root owns that folder.
+  A migration or bootstrap refuses to start while one an earlier release's
+  tool left unfinished still has its markers in `/home/dac` or its restore
+  timer armed.
+  The database compatibility check copies the snapshot into a folder root
+  creates in `/persistent`, not into the server user's staging folder.
 
 ### Installation and fork migration
 

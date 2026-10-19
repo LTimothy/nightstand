@@ -378,6 +378,37 @@ ssh_cmd() { command bash -c "$2"; }
   assert.match(result.marker, /free-sleep\/server\/node_modules\/dependency/);
 });
 
+it('fork migration backups stage and land only in a folder root owns', () => {
+  const backupScript = section('scripts/migrate/switch-to-this-fork.sh', 'say "Stage 4:', 'say "Pulling the backup');
+  const staged = run(backupScript, `
+mktemp() { echo "$*" >> "$FIXTURE/marker"; command mktemp "$@"; }
+export -f mktemp
+ssh_cmd() { command bash -c "$2"; }
+`);
+  assert.equal(staged.status, 0, staged.stdout + staged.stderr);
+  assert.match(staged.marker, /^-d \S*\/persistent\/free-sleep-backups\/\.staging\.XXXXXX\n$/);
+  const planted = run(backupScript, `
+mkdir -p "$FIXTURE/outside"; ln -s "$FIXTURE/outside" "$FIXTURE/persistent/free-sleep-backups"
+ssh_cmd() { command bash -c "$2"; }
+`);
+  assert.notEqual(planted.status, 0, planted.stdout + planted.stderr);
+  assert.deepEqual(planted.outside, []);
+});
+
+it('fork migration backups clear stale staging copies a dropped session left', () => {
+  const backupScript = section('scripts/migrate/switch-to-this-fork.sh', 'say "Stage 4:', 'say "Pulling the backup');
+  const result = run(backupScript + '\nls -A "$REMOTE_BACKUP_DIR" > "$FIXTURE/marker"; ls -A "$FIXTURE/outside" >> "$FIXTURE/marker"', `
+B="$FIXTURE/persistent/free-sleep-backups"; mkdir -p "$B/.staging.old/free-sleep" "$B/.staging.new" "$FIXTURE/outside/kept"
+touch -t 202001010000 "$B/.staging.old"; ln -s "$FIXTURE/outside" "$B/.staging.link"
+ssh_cmd() { command bash -c "$2"; }
+`);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const left = result.marker.split('\n').filter(Boolean);
+  assert.ok(!left.includes('.staging.old'), result.marker);
+  for (const kept of ['.staging.new', '.staging.link', 'kept']) assert.ok(left.includes(kept), `${kept}: ${result.marker}`);
+  assert.equal(left.filter(name => name.startsWith('.staging.')).length, 2, result.marker);
+});
+
 it('a failed rollback bookkeeping move recovers shared dependencies before starting', () => {
   const result = run(section('scripts/rollback_pod.sh', 'fix_shared_node_modules() {', '# --- preflight') +
     section('scripts/rollback_pod.sh', '# --- swap back on failure'), `

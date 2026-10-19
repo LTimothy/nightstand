@@ -77,9 +77,88 @@ class InstallerPreflightTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 status = json.loads((root / 'persistent/free-sleep-data/migration-status.json').read_text())
                 self.assertEqual((status['stage'], status['outcome']), ('preflight', 'refused'))
-                logs = list((root / 'persistent/free-sleep-data/logs').glob('migration-*.log'))
+                logs = list((root / 'persistent/nightstand-logs').glob('migration-*.log'))
                 self.assertEqual(len(logs), 1)
                 self.assertIn('Refusing switch:', logs[0].read_text())
+
+
+class MigrationStateTests(unittest.TestCase):
+    def test_status_is_replaced_not_written_through_a_link(self):
+        source = read('migrate/pod-installer.sh')
+        source = source[:source.index('# Share admission')]
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            migrate = root / 'scripts/migrate'
+            migrate.mkdir(parents=True)
+            data = root / 'persistent/free-sleep-data'
+            data.mkdir(parents=True)
+            victim = root / 'victim'
+            victim.write_text('keep')
+            (data / 'migration-status.json').symlink_to(victim)
+            script = migrate / 'pod-installer.sh'
+            script.write_text(source.replace('/persistent/', str(root / 'persistent') + '/')
+                              .replace('/home/dac/', str(root) + '/')
+                              .replace('exec > >(tee -a "$LOG_FILE") 2>&1', 'exec >> "$LOG_FILE" 2>&1'))
+            result = subprocess.run(['bash', str(script)], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual(victim.read_text(), 'keep')
+            self.assertEqual(json.loads((data / 'migration-status.json').read_text())['outcome'], 'refused')
+
+    def test_status_writers_leave_no_temporary_file_when_the_rename_fails(self):
+        for script in ('pod-installer.sh', 'agent-bootstrap-installer.sh', 'restore-original-fork.sh'):
+            source = read('migrate/' + script)
+            start = source.index('write_status() {')
+            function = source[start:source.index('\n}\n', start) + 3]
+            with self.subTest(script=script), tempfile.TemporaryDirectory() as folder:
+                data = Path(folder) / 'persistent/free-sleep-data'
+                (data / 'migration-status.json').mkdir(parents=True)
+                shell = function.replace('/persistent/', folder + '/persistent/') \
+                    + 'STATUS_FILE="$FIXTURE/persistent/free-sleep-data/migration-status.json"\nwrite_status a b c\n'
+                result = subprocess.run(['bash', '-c', shell], capture_output=True, text=True, timeout=5,
+                                        env=dict(os.environ, FIXTURE=folder))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(sorted(path.name for path in data.iterdir()), ['migration-status.json'])
+
+    def test_preflight_refuses_a_migration_an_older_tool_left_unfinished(self):
+        names = ('free-sleep-migrate.lock', 'free-sleep-migrate-restore-state', 'free-sleep-migrate-swapped',
+                 'free-sleep-agent-bootstrap.lock', None)
+        for script in ('pod-installer.sh', 'agent-bootstrap-installer.sh'):
+            source = read('migrate/' + script)
+            start = source.index('# An older migration tool')
+            block = source[start:source.index(': > "$LOCK_FILE"', start)]
+            for name in names + ('sentinel',):
+                with self.subTest(script=script, name=name), tempfile.TemporaryDirectory() as folder:
+                    root = Path(folder)
+                    if name not in (None, 'sentinel'):
+                        (root / name).symlink_to(root / 'missing')
+                    shell = 'say() { echo "$*"; }\nwrite_status() { echo "status $*"; }\n' \
+                        'systemctl() { [ "$1 $3" = "is-active free-sleep-migrate-sentinel.timer" ] && [ "$SENTINEL" = yes ]; }\n' \
+                        'LOCK_FILE="$FIXTURE/new.lock"; SENTINEL_TIMER=free-sleep-migrate-sentinel.timer\n' \
+                        + block.replace('/home/dac/', folder + '/') + 'echo passed\n'
+                    result = subprocess.run(['bash', '-c', shell], capture_output=True, text=True, timeout=5,
+                                            env=dict(os.environ, FIXTURE=folder, SENTINEL='yes' if name == 'sentinel' else 'no'))
+                    if name is None:
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertIn('passed', result.stdout)
+                    else:
+                        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                        self.assertIn('/usr/local/lib/nightstand/restore-original-fork.sh', result.stdout)
+                        self.assertIn('/home/dac', result.stdout)
+                        self.assertIn('status preflight refused', result.stdout)
+
+    def test_root_keeps_migration_state_out_of_the_server_users_home(self):
+        names = ('SWAP_MARKER', 'RESTORE_STATE', 'LOCK_FILE', 'PID_FILE', 'IPTABLES_SNAPSHOT', 'BASELINE_FILE')
+        for name in ('pod-installer.sh', 'restore-original-fork.sh', 'agent-bootstrap-installer.sh', 'switch-to-this-fork.sh'):
+            source = read('migrate/' + name)
+            if '# An older migration tool' in source:
+                # Only reads, to refuse while an older tool's migration is unfinished.
+                start = source.index('# An older migration tool')
+                source = source[:start] + source[source.index('\ndone\n', start):]
+            for line in source.splitlines():
+                if line.split('=')[0] in names:
+                    self.assertTrue(line.split('=', 1)[1].startswith('$MIGRATE_STATE/'), f'{name}: {line}')
+            self.assertNotRegex(source, r'/home/dac/free-sleep-(migrate-(swapped|restore-state|baseline|iptables)|migrate\.(lock|pid)|agent-bootstrap\.lock)')
+            self.assertNotRegex(source, r'free-sleep-data/logs/(migration|agent-bootstrap)-')
 
 
 class InstallerCompletionTests(unittest.TestCase):
@@ -112,7 +191,8 @@ class InstallerCompletionTests(unittest.TestCase):
                 for tree, identity in ((live, 'nightstand'), (previous, 'original')):
                     (tree / 'scripts').mkdir(parents=True)
                     (tree / 'identity').write_text(identity)
-                marker = root / 'free-sleep-migrate-swapped'
+                marker = root / 'persistent/nightstand-migrate/free-sleep-migrate-swapped'
+                marker.parent.mkdir(parents=True)
                 marker.touch()
                 artifacts = root / 'free-sleep-migrate-artifacts'
                 backup = artifacts / 'backup.fixture'
@@ -128,7 +208,7 @@ LIVE="$FIXTURE/free-sleep"; PREV="$FIXTURE/free-sleep-prev"; STAGED_VERSION=3.7.
 ARTIFACT_HELPER="$FIXTURE/migrate/fork-artifacts.sh"
 IPTABLES_SNAPSHOT="$FIXTURE/snapshot"; BASELINE_FILE="$FIXTURE/baseline"
 RESTORE_SCRIPT_DEST="$FIXTURE/restore-original-fork.sh"
-PREEXISTING_PREV="$FIXTURE/older"; SWAP_MARKER="$FIXTURE/free-sleep-migrate-swapped"
+PREEXISTING_PREV="$FIXTURE/older"; SWAP_MARKER="$FIXTURE/persistent/nightstand-migrate/free-sleep-migrate-swapped"
 say() { :; }
 sh() { :; }
 restore_and_report() { echo "unexpected restore: $*" >&2; exit 98; }

@@ -634,3 +634,29 @@ echo "HEALTHY=$HEALTHY"`], { encoding: 'utf8' });
     });
   }
 });
+
+describe('pod-installer.sh database preflight', () => {
+  it('copies the snapshot into a folder root made, never into the server user\'s stage', () => {
+    const src = read('scripts/migrate/pod-installer.sh');
+    const start = src.indexOf('say "Database compatibility preflight');
+    const block = src.slice(start, src.indexOf('\nfi\n', src.indexOf('say "Database snapshot retained', start)) + 4);
+    const dir = mkdtempSync(path.join(tmpdir(), 'db-preflight-'));
+    try {
+      mkdirSync(path.join(dir, 'persistent/free-sleep-data'), { recursive: true });
+      writeFileSync(path.join(dir, 'persistent/free-sleep-data/free-sleep.db'), 'db');
+      mkdirSync(path.join(dir, 'copy/scripts'), { recursive: true });
+      writeFileSync(path.join(dir, 'copy/scripts/sqlite-safety.py'), '');
+      const result = spawnSync('bash', ['-c', `set -uo pipefail
+say() { :; }; fail() { echo "FAIL $*"; exit 1; }
+python3() { echo "python3 $*" >> '${dir}/calls'; }
+chown() { :; }; sudo() { :; }
+mktemp() { echo "mktemp $*" >> '${dir}/calls'; command mktemp "$@"; }
+COPY='${dir}/copy'; STAGE='${dir}/stage'; NPX=npx
+${block.replaceAll('/persistent/', `${dir}/persistent/`)}`], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      const calls = readFileSync(path.join(dir, 'calls'), 'utf8');
+      assert.doesNotMatch(calls, /\/stage\//);
+      assert.match(calls, /^mktemp -d \S+\/persistent\/\.nightstand-db-preflight\.XXXXXX$/m);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});

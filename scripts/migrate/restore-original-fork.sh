@@ -51,25 +51,44 @@ PREV=/home/dac/free-sleep-prev
 # The installer stashes any pre-existing $PREV here so we can put the pod's own
 # rollback slot back exactly as we found it; $SWAP_MARKER is its swap-in-progress flag.
 PREEXISTING_PREV=/home/dac/free-sleep-prev-preexisting
-SWAP_MARKER=/home/dac/free-sleep-migrate-swapped
-RESTORE_STATE=/home/dac/free-sleep-migrate-restore-state
+MIGRATE_STATE=/persistent/nightstand-migrate
+SWAP_MARKER=$MIGRATE_STATE/free-sleep-migrate-swapped
+RESTORE_STATE=$MIGRATE_STATE/free-sleep-migrate-restore-state
 ABORTED_QUARANTINE=/home/dac/free-sleep-migrate-aborted
-IPTABLES_SNAPSHOT=/home/dac/free-sleep-migrate-iptables-snapshot.rules
+IPTABLES_SNAPSHOT=$MIGRATE_STATE/free-sleep-migrate-iptables-snapshot.rules
 STATUS_FILE=/persistent/free-sleep-data/migration-status.json
 SENTINEL_UNIT=free-sleep-migrate-sentinel.timer
 SYSTEMD_DIR=/etc/systemd/system
-PID_FILE=/home/dac/free-sleep-migrate.pid
+PID_FILE=$MIGRATE_STATE/free-sleep-migrate.pid
 STAGE=/home/dac/free-sleep-migrate-staging
 ZIP=/home/dac/free-sleep-migrate.zip
 
 say() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] restore-original-fork: $*"; }
 
 write_status() {
-  # Best-effort JSON write, this script must never fail because the status
-  # file couldn't be written; the directory swap is what actually matters.
-  mkdir -p "$(dirname "$STATUS_FILE")" 2>/dev/null || true
-  printf '{"stage":"restore","outcome":"%s","message":"%s","timestamp":"%s"}\n' \
-    "$1" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATUS_FILE" 2>/dev/null || true
+  # $1=outcome $2=message, best-effort, never fatal. Replaced, never
+  # written through, since the data folder belongs to the server user.
+  python3 -I - "$STATUS_FILE" "$(printf '{"stage":"%s","outcome":"%s","message":"%s","timestamp":"%s"}' \
+    "restore" "$1" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")" 2>/dev/null <<'PY' || true
+import os, sys, tempfile
+path, text = sys.argv[1:]
+os.makedirs(os.path.dirname(path), exist_ok=True)
+descriptor, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".migration-status.")
+try:
+    with os.fdopen(descriptor, "w") as handle:
+        handle.write(text + "\n")
+        os.fchmod(handle.fileno(), 0o644)
+    os.replace(tmp, path)
+except BaseException:
+    os.unlink(tmp)
+    raise
+PY
+}
+# Root keeps its migration state and logs where the server user cannot add
+# links: a real folder under /persistent that root owns.
+own_folder() {
+  [ ! -L "$1" ] || rm -f "$1"
+  mkdir -p "$1" && [ ! -L "$1" ] && [ -O "$1" ] && chmod "$2" "$1"
 }
 
 disarm_sentinel() {
@@ -94,7 +113,8 @@ restore_legacy_artifacts() {
 }
 
 record_restore_state() {
-  if ! printf '%s\n' "$1" > "$RESTORE_STATE.tmp" || ! mv "$RESTORE_STATE.tmp" "$RESTORE_STATE"; then
+  if ! own_folder "$MIGRATE_STATE" 700 || ! printf '%s\n' "$1" > "$RESTORE_STATE.tmp" \
+    || ! mv "$RESTORE_STATE.tmp" "$RESTORE_STATE"; then
     say "FATAL: could not record restore progress; keeping the recovery markers"
     write_status "restore_failed" "could not record restore progress"
     exit 1
@@ -143,8 +163,8 @@ start_stream_if_enabled() {
 
 cleanup_temporary_files() {
   rm -rf "$ABORTED_QUARANTINE" "$STAGE" "$STAGE.unzip"
-  rm -f "$ZIP" "$PID_FILE" "$IPTABLES_SNAPSHOT" /home/dac/free-sleep-migrate.lock \
-    /home/dac/free-sleep-migrate-baseline.json /tmp/free-sleep-migrate-health
+  rm -f "$ZIP" "$PID_FILE" "$IPTABLES_SNAPSHOT" "$MIGRATE_STATE/free-sleep-migrate.lock" \
+    "$MIGRATE_STATE/free-sleep-migrate-baseline.json"
 }
 
 stop_active_installer() {

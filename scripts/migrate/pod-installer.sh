@@ -29,23 +29,24 @@ PREV=/home/dac/free-sleep-prev
 # mutating $LIVE so restore-original-fork.sh keys off "did WE swap", not the
 # mere existence of $PREV, which could be the pod's own pre-existing slot.
 PREEXISTING_PREV=/home/dac/free-sleep-prev-preexisting
-SWAP_MARKER=/home/dac/free-sleep-migrate-swapped
-RESTORE_STATE=/home/dac/free-sleep-migrate-restore-state
+MIGRATE_STATE=/persistent/nightstand-migrate
+SWAP_MARKER=$MIGRATE_STATE/free-sleep-migrate-swapped
+RESTORE_STATE=$MIGRATE_STATE/free-sleep-migrate-restore-state
 STAGE=/home/dac/free-sleep-migrate-staging
 SYSTEM_DIR=/usr/local/lib/nightstand
 WORK=""
-LOCK_FILE=/home/dac/free-sleep-migrate.lock
-PID_FILE=/home/dac/free-sleep-migrate.pid
+LOCK_FILE=$MIGRATE_STATE/free-sleep-migrate.lock
+PID_FILE=$MIGRATE_STATE/free-sleep-migrate.pid
 DB_PREFLIGHT=""
 STATUS_FILE=/persistent/free-sleep-data/migration-status.json
-IPTABLES_SNAPSHOT=/home/dac/free-sleep-migrate-iptables-snapshot.rules
+IPTABLES_SNAPSHOT=$MIGRATE_STATE/free-sleep-migrate-iptables-snapshot.rules
 RESTORE_SCRIPT_SRC="$REPO_DIR_SELF/migrate/restore-original-fork.sh"
 RESTORE_SCRIPT_DEST=/usr/local/lib/nightstand/restore-original-fork.sh
-BASELINE_FILE=/home/dac/free-sleep-migrate-baseline.json
+BASELINE_FILE=$MIGRATE_STATE/free-sleep-migrate-baseline.json
 SENTINEL_SERVICE=free-sleep-migrate-sentinel.service
 SENTINEL_TIMER=free-sleep-migrate-sentinel.timer
 SENTINEL_MINUTES=12
-LOG_FILE="/persistent/free-sleep-data/logs/migration-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="/persistent/nightstand-logs/migration-$(date +%Y%m%d-%H%M%S).log"
 NPM=/home/dac/.volta/bin/npm
 NPX=/home/dac/.volta/bin/npx
 
@@ -57,16 +58,38 @@ TAG_ZIP_URL_PREFIX="https://github.com/LTimothy/nightstand/archive/refs/tags/v"
 REMOVE_FOREIGN=${1:-no}
 ARTIFACT_HELPER="$REPO_DIR_SELF/migrate/fork-artifacts.sh"
 
-mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+# Root keeps its migration state and logs where the server user cannot add
+# links: a real folder under /persistent that root owns.
+own_folder() {
+  [ ! -L "$1" ] || rm -f "$1"
+  mkdir -p "$1" && [ ! -L "$1" ] && [ -O "$1" ] && chmod "$2" "$1"
+}
+if ! own_folder "$MIGRATE_STATE" 700 || ! own_folder "$(dirname "$LOG_FILE")" 755; then
+  echo "FATAL: $MIGRATE_STATE and $(dirname "$LOG_FILE") must be folders only root can write" >&2
+  exit 1
+fi
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 say() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 write_status() {
-  # $1=stage $2=outcome $3=message, best-effort, never fatal.
-  mkdir -p "$(dirname "$STATUS_FILE")" 2>/dev/null || true
-  printf '{"stage":"%s","outcome":"%s","message":"%s","timestamp":"%s"}\n' \
-    "$1" "$2" "$3" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATUS_FILE" 2>/dev/null || true
+  # $1=stage $2=outcome $3=message, best-effort, never fatal. Replaced, never
+  # written through, since the data folder belongs to the server user.
+  python3 -I - "$STATUS_FILE" "$(printf '{"stage":"%s","outcome":"%s","message":"%s","timestamp":"%s"}' \
+    "$1" "$2" "$3" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")" 2>/dev/null <<'PY' || true
+import os, sys, tempfile
+path, text = sys.argv[1:]
+os.makedirs(os.path.dirname(path), exist_ok=True)
+descriptor, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".migration-status.")
+try:
+    with os.fdopen(descriptor, "w") as handle:
+        handle.write(text + "\n")
+        os.fchmod(handle.fileno(), 0o644)
+    os.replace(tmp, path)
+except BaseException:
+    os.unlink(tmp)
+    raise
+PY
 }
 
 if [ ! -f "$ARTIFACT_HELPER" ]; then
@@ -93,6 +116,21 @@ if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
 fi
 
 # --- lock: refuse concurrent runs, refuse if any fork's updater is active ----
+# An older migration tool kept its markers in /home/dac. Let its restore
+# finish before starting over.
+for old in /home/dac/free-sleep-migrate.lock /home/dac/free-sleep-migrate-restore-state \
+  /home/dac/free-sleep-migrate-swapped /home/dac/free-sleep-agent-bootstrap.lock; do
+  if [ -e "$old" ] || [ -L "$old" ]; then
+    say "FATAL: $old is left from an earlier migration; let its restore sentinel finish, or run its restore script (/usr/local/lib/nightstand/restore-original-fork.sh, or restore-original-fork.sh in /home/dac from older releases), then retry."
+    write_status "preflight" "refused" "an earlier migration is unfinished"
+    exit 1
+  fi
+done
+if systemctl is-active --quiet "$SENTINEL_TIMER" 2>/dev/null; then
+  say "FATAL: $SENTINEL_TIMER is still armed from an earlier migration; let /usr/local/lib/nightstand/restore-original-fork.sh (or restore-original-fork.sh in /home/dac from older releases) finish, then retry."
+  write_status "preflight" "refused" "an earlier migration's restore sentinel is still armed"
+  exit 1
+fi
 if [ -e "$LOCK_FILE" ]; then
   say "FATAL: $LOCK_FILE exists, a migration is already in progress or a previous run left it behind."
   write_status "preflight" "refused" "lock file present; refusing to start a second migration"
@@ -293,7 +331,9 @@ if [ -f "$DATABASE" ]; then
   DATABASE_BACKUP="/persistent/free-sleep-database-backups/$(date -u +%Y%m%dT%H%M%SZ)-$$-migration.db"
   python3 "$COPY/scripts/sqlite-safety.py" backup "$DATABASE" "$DATABASE_BACKUP" \
     || fail "database snapshot failed; original install was not changed"
-  DB_PREFLIGHT=$(mktemp -d "$STAGE/.database-preflight.XXXXXX") \
+  # Made by root on the database's filesystem, not in the server user's stage,
+  # and handed to that user only after root has written the copy.
+  DB_PREFLIGHT=$(mktemp -d /persistent/.nightstand-db-preflight.XXXXXX) \
     || fail "could not create database preflight directory"
   python3 "$COPY/scripts/sqlite-safety.py" backup "$DATABASE_BACKUP" "$DB_PREFLIGHT/check.db" \
     || fail "could not prepare database preflight snapshot"
@@ -531,7 +571,9 @@ fi
 
 if [ "$HEALTHY" != yes ]; then
   say "Health check FAILED. Last 60 log lines:"
-  tail -n 60 /persistent/free-sleep-data/logs/free-sleep.log 2>/dev/null || say "  (no log available)"
+  # The server's own log, never a link the server user put in its place.
+  { [ ! -L /persistent/free-sleep-data/logs/free-sleep.log ] && tail -n 60 /persistent/free-sleep-data/logs/free-sleep.log 2>/dev/null; } \
+    || say "  (no log available)"
   restore_and_report "post-swap health check failed"
   exit 1
 fi

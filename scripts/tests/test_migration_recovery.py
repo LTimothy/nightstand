@@ -70,12 +70,14 @@ class MigrationRecovery(unittest.TestCase):
             for tree, identity in ((live, 'failed-first-migration'), (prev, 'original-install'), (older, 'older-rollback')):
                 tree.mkdir()
                 (tree / 'identity').write_text(identity)
-            marker = base / 'free-sleep-migrate-swapped'
+            state_dir = base / 'persistent/nightstand-migrate'
+            state_dir.mkdir(parents=True)
+            marker = state_dir / 'free-sleep-migrate-swapped'
             marker.touch()
-            lock = base / 'free-sleep-migrate.lock'
+            lock = state_dir / 'free-sleep-migrate.lock'
             lock.touch()
-            state = base / 'free-sleep-migrate-restore-state'
-            snapshot = base / 'free-sleep-migrate-iptables-snapshot.rules'
+            state = state_dir / 'free-sleep-migrate-restore-state'
+            snapshot = state_dir / 'free-sleep-migrate-iptables-snapshot.rules'
             snapshot.write_text('first firewall')
             artifacts = base / 'free-sleep-migrate-artifacts'
             backup = artifacts / 'backup.fixture'
@@ -105,7 +107,7 @@ crontab() {
 rm() {
   if [ "$TEST_INTERRUPT" = yes ]; then
     for target in "$@"; do
-      [ "$target" != "$TEST_BASE/free-sleep-migrate-restore-state" ] || exit 97
+      [ "$target" != "$TEST_BASE/persistent/nightstand-migrate/free-sleep-migrate-restore-state" ] || exit 97
     done
   fi
   command rm "$@"
@@ -191,10 +193,12 @@ bash "$TEST_SCRIPT" yes
                 for tree, contents in trees:
                     tree.mkdir()
                     (tree / 'identity').write_text(contents)
-                swap = base / 'free-sleep-migrate-swapped'
+                state_dir = base / 'persistent/nightstand-migrate'
+                state_dir.mkdir(parents=True)
+                swap = state_dir / 'free-sleep-migrate-swapped'
                 if swapped:
                     swap.touch()
-                (base / 'free-sleep-migrate-iptables-snapshot.rules').write_text('saved firewall')
+                (state_dir / 'free-sleep-migrate-iptables-snapshot.rules').write_text('saved firewall')
                 artifacts = base / 'free-sleep-migrate-artifacts'
                 backup = artifacts / 'backup.fixture'
                 backup.mkdir(parents=True)
@@ -253,7 +257,7 @@ bash "$TEST_BASE/restore.sh"
                     self.assertFalse(quarantine.exists())
                 self.assertFalse(swap.exists(), 'tree swap marker must be retired after essential recovery')
                 self.assertTrue((artifacts / 'pending').exists())
-                state = base / 'free-sleep-migrate-restore-state'
+                state = state_dir / 'free-sleep-migrate-restore-state'
                 self.assertEqual(state.read_text(), 'artifacts-pending\n')
                 self.assertEqual((base / 'restored-firewall').read_text(), 'saved firewall')
                 self.assertIn('systemctl start free-sleep\n', calls.read_text())

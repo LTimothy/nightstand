@@ -564,9 +564,16 @@ ssh_cmd "$SSH_PORT" "
       nice -n 19 \"\$@\"
     fi
   }
+  # Staged and written only in a folder root owns, never in the server user's.
   mkdir -p '$REMOTE_BACKUP_DIR'
-  STAGE=/home/dac/free-sleep-backup-staging
-  rm -rf \"\$STAGE\" && mkdir -p \"\$STAGE/free-sleep\"
+  [ ! -L '$REMOTE_BACKUP_DIR' ] && [ -O '$REMOTE_BACKUP_DIR' ] \
+    || { echo '$REMOTE_BACKUP_DIR is not a folder only root can write' >&2; exit 1; }
+  # A session that dropped mid-copy left its stage; clear those over a day old.
+  find '$REMOTE_BACKUP_DIR' -mindepth 1 -maxdepth 1 -name '.staging.*' -type d -user \$(id -u) -mtime +0 \
+    -exec rm -rf {} \\; 2>/dev/null || true
+  STAGE=\$(mktemp -d '$REMOTE_BACKUP_DIR/.staging.XXXXXX')
+  trap 'rm -rf \"\$STAGE\"' EXIT
+  mkdir \"\$STAGE/free-sleep\"
   low_priority cp -a /home/dac/free-sleep/. \"\$STAGE/free-sleep/\"
   mkdir -p \"\$STAGE/free-sleep-data\"
   if [ -f /persistent/free-sleep-data/free-sleep.db ]; then
@@ -608,7 +615,10 @@ for side in ("left", "right"):
         out[side] = t
 print(json.dumps(out))
 ' 2>/dev/null || echo "{}")
-printf '%s' "$BASELINE_JSON" | ssh_cmd "$SSH_PORT" "cat > /home/dac/free-sleep-migrate-baseline.json"
+# Root's migration state lives in a folder only root can write.
+ssh_cmd "$SSH_PORT" 'd=/persistent/nightstand-migrate; [ ! -L "$d" ] || rm -f "$d"; mkdir -p "$d" && [ ! -L "$d" ] && [ -O "$d" ] && chmod 700 "$d"' \
+  || fail "could not create /persistent/nightstand-migrate on the pod; nothing else was touched"
+printf '%s' "$BASELINE_JSON" | ssh_cmd "$SSH_PORT" "cat > /persistent/nightstand-migrate/free-sleep-migrate-baseline.json"
 
 # ==============================================================================
 # Stage 5, push pod-installer.sh, start it detached, poll status
@@ -624,7 +634,7 @@ ssh_cmd "$SSH_PORT" "chmod +x /usr/local/lib/nightstand/migrate/pod-installer.sh
 # pod-installer.sh take a fresh one later, every abort path must restore
 # the state the pod was actually in when the user typed "switch", not
 # whatever it drifts to during Stage 4/5.
-scp_to_pod "$SSH_PORT" "$IPTABLES_SNAPSHOT_LOCAL" "/home/dac/free-sleep-migrate-iptables-snapshot.rules"
+scp_to_pod "$SSH_PORT" "$IPTABLES_SNAPSHOT_LOCAL" "/persistent/nightstand-migrate/free-sleep-migrate-iptables-snapshot.rules"
 
 ssh_cmd "$SSH_PORT" "
   rm -f /persistent/free-sleep-data/migration-status.json
@@ -646,7 +656,7 @@ while [ "$ATTEMPTS" -lt 200 ]; do
   ATTEMPTS=$((ATTEMPTS + 1))
   STATUS_JSON=$(ssh_cmd "$SSH_PORT" "if [ -f '$STATUS_FILE_REMOTE' ]; then cat '$STATUS_FILE_REMOTE'; fi") || { say "  (reconnecting...)"; continue; }
   if [ -z "$STATUS_JSON" ] || printf '%s' "$STATUS_JSON" | grep -q '"in_progress"'; then
-    ssh_cmd "$SSH_PORT" 'systemctl is-active --quiet free-sleep-migrate.service || { pid=$(cat /home/dac/free-sleep-migrate.pid 2>/dev/null); case "$pid" in ""|*[!0-9]*) exit 1;; esac; kill -0 "$pid"; }' \
+    ssh_cmd "$SSH_PORT" 'systemctl is-active --quiet free-sleep-migrate.service || { pid=$(cat /persistent/nightstand-migrate/free-sleep-migrate.pid 2>/dev/null); case "$pid" in ""|*[!0-9]*) exit 1;; esac; kill -0 "$pid"; }' \
       || {
         # The installer can publish its outcome and exit between these probes.
         STATUS_JSON=$(ssh_cmd "$SSH_PORT" "if [ -f '$STATUS_FILE_REMOTE' ]; then cat '$STATUS_FILE_REMOTE'; fi") \
@@ -678,7 +688,7 @@ while [ "$ATTEMPTS" -lt 200 ]; do
 Pod:              http://$POD_IP:3000/
 Backup (pod):      $REMOTE_BACKUP_TARBALL
 Backup (laptop):    $LOCAL_BACKUP_TARBALL
-Migration log:      /persistent/free-sleep-data/logs/migration-*.log (on the pod)
+Migration log:      /persistent/nightstand-logs/migration-*.log (on the pod)
 Instant rollback to your old fork is now in the app:
 Settings > Software > Recovery.
 

@@ -143,4 +143,4 @@ ssh_pod "chmod +x /usr/local/lib/nightstand/migrate/agent-bootstrap-installer.sh
   || fail "could not start the installer on the pod"
 
 say "Started. It stages, swaps, health-checks and restores on failure by itself."
-say "Watch: ssh -p $SSH_PORT root@$POD_IP 'tail -f /persistent/free-sleep-data/logs/agent-bootstrap-*.log'"
+say "Watch: ssh -p $SSH_PORT root@$POD_IP 'tail -f /persistent/nightstand-logs/agent-bootstrap-*.log'"
