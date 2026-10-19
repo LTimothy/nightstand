@@ -350,14 +350,14 @@ fi
 # Upstream imports this even when the existing services record says installed.
 if [ -x /home/dac/venv/bin/python ]; then
   # Upstream leaves this unpinned; keep our revert dependency reproducible.
-  VENV_OWNER=$(stat -c '%U' /home/dac/venv) || fail "cannot identify the biometrics venv owner"
-  PIP_RUNNER=(env)
-  if sudo -u "$VENV_OWNER" /home/dac/venv/bin/python -I -c 'import os,sysconfig; assert all(os.access(sysconfig.get_path(key), os.W_OK) for key in ("purelib", "platlib"))' 2>/dev/null; then
-    PIP_RUNNER=(sudo -u "$VENV_OWNER")
-  else
-    say "Venv owner cannot write packages; installing the upstream dependency as root"
+  # Root never runs the venv. Earlier releases made it as root; hand that one
+  # over without following links.
+  [ -L /home/dac/venv ] || chown -hR dac:dac /home/dac/venv
+  if [ "$(stat -L -c '%U' /home/dac/venv)" != dac ] \
+    || ! sudo -u dac /home/dac/venv/bin/python -I -c 'import os,sysconfig; assert all(os.access(sysconfig.get_path(key), os.W_OK) for key in ("purelib", "platlib"))' 2>/dev/null; then
+    fail "the server user cannot install into /home/dac/venv; live install untouched"
   fi
-  run_limited 600 "${PIP_RUNNER[@]}" /home/dac/venv/bin/python -I -m pip install sentry-sdk==2.71.0 \
+  run_limited 600 sudo -H -u dac /home/dac/venv/bin/python -I -m pip install sentry-sdk==2.71.0 \
     || fail "could not install the upstream biometrics dependency; live install untouched"
 fi
 close_wan

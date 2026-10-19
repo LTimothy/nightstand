@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -10,6 +10,12 @@ import { fileURLToPath } from 'node:url';
 // and curl replaced by stubs that record what ran. A first install used to
 // leave Biometrics reading off in the app while the stream ran.
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+// Records the user a command runs as, then runs it.
+const SUDO = (calls: string) => `echo "sudo $*" >> "${calls}"\n[ "$1" != -H ] || shift\n[ "$1" != -u ] || shift 2\nexec "$@"`;
+// The server user runs every file in its own tree.
+const asDac = (log: string[], pattern: RegExp) => log.some((line, at) =>
+  /^sudo (?:-H )?-u dac /.test(line) && pattern.test(line) && log[at + 1]?.startsWith('python '));
 
 function run({ installed = false, calibrationFails = false, refuseOn = false, natsImports = true, pipFails = false,
   lock = '', shell = '', logTimeout = false } = {}) {
@@ -42,6 +48,7 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
   ].join('\n'));
   if (logTimeout) executable(path.join(bin, 'timeout'), `echo "timeout $*" >> "${calls}"\nshift\nexec "$@"`);
   executable(path.join(bin, 'systemctl'), `echo "systemctl $*" >> "${calls}"`);
+  executable(path.join(bin, 'sudo'), SUDO(calls));
   const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8')
     .replaceAll('/usr/local/lib/nightstand/live/scripts', scripts).replaceAll('/home/dac', home);
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_OPERATION_LOCK: lock || path.join(dir, 'operation.lock'),
@@ -161,6 +168,14 @@ describe('enable_biometrics.sh', () => {
     assert.ok(result.log.some(turnsOn), result.log.join('\n'));
   });
 
+  it('runs the venv and the calibration only as the server user', () => {
+    const result = run();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(asDac(result.log, /calibrate_sensor_thresholds\.py$/), result.log.join('\n'));
+    const installed = run({ installed: true });
+    assert.ok(asDac(installed.log, /venv\/bin\/python -I -c .*\/free-sleep\/biometrics$/), installed.log.join('\n'));
+  });
+
   it('finds the bundled nats-py with the venv check, without site-packages', () => {
     const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8');
     const code = script.match(/venv\/bin\/python -I -c '([^']*import vendored, nats)'/);
@@ -204,4 +219,50 @@ describe('setup_python.sh', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+describe('install_python_packages.sh', () => {
+  function install(venv: 'none' | 'dir' | 'link') {
+    const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-python-packages-'));
+    try {
+      const home = path.join(dir, 'home');
+      const scripts = path.join(dir, 'scripts');
+      const bin = path.join(dir, 'bin');
+      const calls = path.join(dir, 'calls');
+      for (const folder of [home, path.join(scripts, 'python'), bin]) mkdirSync(folder, { recursive: true });
+      writeFileSync(path.join(scripts, 'python', 'requirements.txt'), 'numpy\n');
+      const python = `#!/bin/sh\necho "python $*" >> "${calls}"\n`;
+      if (venv === 'link') {
+        mkdirSync(path.join(dir, 'envs', 'bin'), { recursive: true });
+        symlinkSync(path.join(dir, 'envs'), path.join(home, 'venv'));
+      } else if (venv === 'dir') mkdirSync(path.join(home, 'venv', 'bin'), { recursive: true });
+      const executable = (file: string, body: string) => { writeFileSync(file, body); chmodSync(file, 0o755); };
+      executable(path.join(bin, 'python3'), `${python}case "$*" in *" -m venv "*) mkdir -p "$4/bin"; `
+        + `printf '%s' '${python}' > "$4/bin/python"; chmod 755 "$4/bin/python" ;; *) echo 312 ;; esac\n`);
+      if (venv !== 'none') executable(path.join(home, 'venv', 'bin', 'python'), python);
+      executable(path.join(bin, 'sudo'), `#!/bin/sh\n${SUDO(calls)}\n`);
+      executable(path.join(bin, 'chown'), `#!/bin/sh\necho "chown $*" >> "${calls}"\n`);
+      const file = path.join(scripts, 'install_python_packages.sh');
+      writeFileSync(file, readFileSync(path.join(repoRoot, 'scripts/install_python_packages.sh'), 'utf8').replaceAll('/home/dac', home));
+      const result = spawnSync('bash', [file], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
+      return { ...result, home, log: readFileSync(calls, 'utf8').trim().split('\n') };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  for (const venv of ['none', 'dir', 'link'] as const) {
+    it(`creates the venv and installs into it only as the server user (existing venv: ${venv})`, () => {
+      const result = install(venv);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.ok(asDac(result.log, / -m venv \S*\/home\/venv$/), result.log.join('\n'));
+      // -H: pip keeps its cache in the server user's home.
+      assert.ok(asDac(result.log, /^sudo -H -u dac \S*venv\/bin\/python -I -m pip install -r \S*\/scripts\/python\/requirements\.txt$/),
+        result.log.join('\n'));
+      // A venv an earlier release made as root is handed over first, without following a link.
+      const handed = result.log.indexOf(`chown -hR dac:dac ${result.home}/venv`);
+      assert.equal(handed >= 0, venv === 'dir', result.log.join('\n'));
+      if (handed >= 0) assert.ok(handed < result.log.findIndex(line => / -m venv /.test(line)), result.log.join('\n'));
+    });
+  }
 });

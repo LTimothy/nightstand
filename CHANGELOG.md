@@ -151,10 +151,9 @@ is a hard fork; for the history of the projects it descends from, see
   place, and root's inline Python runs in isolated mode so it never picks
   up modules from the folder it was started in. The unused sudo rule for
   `enable_biometrics.sh` is removed; run the installer as
-  `sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh`. The
-  Biometrics installer, run by hand, still uses the Python environment in
-  `/home/dac`. After rolling back to an earlier release, turning Biometrics
-  off in the app works again after the next update.
+  `sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh`. After
+  rolling back to an earlier release, turning Biometrics off in the app
+  works again after the next update.
 
 - `ops/deploy.sh` backs up the database with a consistent snapshot and
   stops if it cannot, and swaps the install only while no update, rollback
@@ -220,6 +219,12 @@ is a hard fork; for the history of the projects it descends from, see
 - Installing a release from before 3.7 still works, and brings back that
   release's own services and sudo rules, which run scripts from `/home/dac`
   as root. Updating to 3.7 or later removes them again.
+- The Biometrics installer creates the Python environment in
+  `/home/dac/venv`, installs its packages and runs the sensor calibration as
+  the server user, not root. An environment an earlier release made as root
+  is handed to the server user first. Switching back to upstream installs
+  its extra package the same way, and stops instead of installing it as
+  root when the server user cannot write to the environment.
 
 ### Installation and fork migration
 

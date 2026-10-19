@@ -24,9 +24,13 @@ else
   echo -e "\033[33mWARNING: Biometrics may or may not work!! \033[0m"
 fi
 
+# The venv is the server user's, so root never runs it. Earlier releases
+# made it as root; hand that one over without following links.
+[ -L /home/dac/venv ] || [ ! -d /home/dac/venv ] || chown -hR dac:dac /home/dac/venv
+cd /
 echo "Creating new python venv..."
-python3 -I -m venv /home/dac/venv
+sudo -u dac python3 -I -m venv /home/dac/venv
 
 set -x
-/home/dac/venv/bin/python -I -m pip install -r "$BUNDLED/requirements.txt"
+sudo -H -u dac /home/dac/venv/bin/python -I -m pip install -r "$BUNDLED/requirements.txt"
 set +x

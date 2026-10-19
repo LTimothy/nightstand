@@ -213,6 +213,26 @@ describe('root runs nothing from the server user\'s folders', () => {
     }
   });
 
+  it('runs the biometrics venv only as the server user', () => {
+    // Each command that starts the venv's python or makes the venv must itself be
+    // the one sudo runs as dac; a file test and a unit's ExecStart run nothing as root.
+    const offenders = (file: string, text: string) => text.split('\n')
+      .filter(line => !/^\s*#/.test(line))
+      .filter(line => [...line.matchAll(/\/home\/dac\/venv\/bin\/python|\bpython3(?: -\w+)* -m venv \/home\/dac/g)]
+        .some(match => !/(?:sudo (?:-H )?-u dac |-x |ExecStart=)$/.test(line.slice(0, match.index))))
+      .map(line => `${file}: ${line.trim()}`);
+    assert.deepEqual(ROOT_RUN.flatMap(file => offenders(file, read(file))), []);
+    for (const probe of ['/home/dac/venv/bin/python -I -m pip install x', 'cd x && /home/dac/venv/bin/python calibrate.py',
+      'python3 -I -m venv /home/dac/venv', 'run_limited 600 "${RUNNER[@]}" /home/dac/venv/bin/python -I -m pip install x',
+      'sudo -u dac true && /home/dac/venv/bin/python -I -m pip install x', 'sudo -u dac true; python3 -I -m venv /home/dac/venv',
+      'sudo -u dac /home/dac/venv/bin/python -c pass && /home/dac/venv/bin/python calibrate.py']) {
+      assert.notDeepEqual(offenders('scripts/x.sh', probe), [], probe);
+    }
+    const upstream = read('scripts/switch-to-upstream.sh');
+    assert.match(upstream, /stat -L -c '%U' \/home\/dac\/venv/);
+    assert.doesNotMatch(upstream, /installing the upstream dependency as root/);
+  });
+
   it('runs inline Python as root only in isolated mode', () => {
     assert.deepEqual(ROOT_RUN.flatMap(file => unisolatedOffenders(file, read(file))), []);
     for (const probe of ["python3 -c 'import json'", 'python3 - "$1" <<\'PY\'', 'x=$(printf x | python3 -c "', 'python3 -B -c pass',

@@ -161,27 +161,29 @@ cat "$FIXTURE"/backups/*-reset-raw.db
                 self.assertTrue(result.stdout.endswith('damaged\n'), result.stdout)
                 self.assertIn('start free-sleep\n', log)
 
-    def test_sentry_install_is_pinned_and_uses_writable_venv_owner(self):
+    def test_sentry_install_is_pinned_and_runs_only_as_dac(self):
         script = read('switch-to-upstream.sh')
         block = section(script, '# Upstream imports', '\nclose_wan\n')
-        for writable in (True, False):
-            with self.subTest(writable=writable):
+        for owner, writable, ok in (('dac', True, True), ('dac', False, False), ('root', True, False)):
+            with self.subTest(owner=owner, writable=writable):
                 setup = """
 mkdir -p "$FIXTURE/venv/bin"
 cat > "$FIXTURE/venv/bin/python" <<'STUB'
 #!/bin/bash
 if [ "$2" = -c ]; then exit "$WRITABLE_STATUS"; fi
-printf '%s %s\\n' "${RUN_AS:-root}" "$*"
+printf '%s%s %s\\n' "${HOME_SET:+H:}" "${RUN_AS:-root}" "$*"
 STUB
 chmod +x "$FIXTURE/venv/bin/python"
-stat() { echo fixture_owner; }
-sudo() ( export RUN_AS="$2"; shift 2; "$@"; )
+stat() { [ "$1" = -L ] && echo "$OWNER"; }
+chown() { echo "chown $*"; }
+sudo() ( [ "$1" != -H ] || { export HOME_SET=1; shift; }; export RUN_AS="$2"; shift 2; "$@"; )
 run_limited() { shift; "$@"; }
-export WRITABLE_STATUS=""" + ('0' if writable else '1')
+export OWNER=""" + owner + ' WRITABLE_STATUS=' + ('0' if writable else '1')
                 result, _ = self.run_shell(block.replace('/home/dac/venv', '$FIXTURE/venv'), setup)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                expected_owner = 'fixture_owner' if writable else 'root'
-                self.assertIn(expected_owner + ' -I -m pip install sentry-sdk==2.71.0', result.stdout)
+                self.assertEqual(result.returncode == 0, ok, result.stderr)
+                self.assertIn('chown -hR dac:dac ', result.stdout)
+                self.assertNotIn('root -I -m pip', result.stdout)
+                self.assertEqual('H:dac -I -m pip install sentry-sdk==2.71.0' in result.stdout, ok, result.stdout)
 
     def test_finished_migration_is_read_after_failed_liveness_probe(self):
         script = read('migrate/switch-to-this-fork.sh')

@@ -14,7 +14,7 @@ check_nats_python_package() {
     return 0
   fi
 
-  if /home/dac/venv/bin/python -I -c 'import sys; sys.path.append(sys.argv[1]); import vendored, nats' \
+  if sudo -u dac /home/dac/venv/bin/python -I -c 'import sys; sys.path.append(sys.argv[1]); import vendored, nats' \
     /home/dac/free-sleep/biometrics >/dev/null 2>&1; then
     echo "nats-py is available."
   else
@@ -115,7 +115,8 @@ curl -X POST http://127.0.0.1:3000/api/services \
     }
   }'
 
-cd /home/dac/free-sleep/biometrics/sleep_detection && /home/dac/venv/bin/python calibrate_sensor_thresholds.py
+# Root never runs the server user's files.
+cd /home/dac/free-sleep/biometrics/sleep_detection && sudo -u dac /home/dac/venv/bin/python calibrate_sensor_thresholds.py
 
 
 # Installed: turn Biometrics on in the app too. The server enables and starts
