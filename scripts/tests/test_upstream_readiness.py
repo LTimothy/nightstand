@@ -1,5 +1,9 @@
 """Readiness must outlast delayed startup and prove ongoing processing."""
 import importlib.util
+import os
+import signal
+import tempfile
+from unittest.mock import patch
 from pathlib import Path
 import sys
 import unittest
@@ -27,6 +31,24 @@ class UpstreamReadinessTests(unittest.TestCase):
 
     def check(self, enabled=True):
         return self.module.Readiness('3.0.3', enabled, 'launch-token')
+
+    def sample_probe(self, probe):
+        service = dict(active=True, pid=20, invocation='a' * 32, start=1, restarts=0, procStartTicks=100)
+        replies = {'deviceStatus': {'freeSleep': {'version': '3.0.3'}},
+                   'services': {'biometrics': {'enabled': True, 'jobs': {}}}}
+        signal.signal(signal.SIGALRM, lambda *_: self.fail('Reading the probe blocked'))
+        signal.alarm(5)
+        self.addCleanup(signal.alarm, 0)
+        with patch.object(self.module, 'service_state', return_value=service), \
+                patch.object(self.module, 'http_json', side_effect=replies.__getitem__):
+            return self.module.sample_system(probe, True)
+
+    def test_a_fifo_probe_is_refused_without_blocking(self):
+        with tempfile.TemporaryDirectory() as folder:
+            probe = Path(folder) / 'probe.json'
+            os.mkfifo(str(probe))
+            with self.assertRaisesRegex(ValueError, 'regular file'):
+                self.sample_probe(probe)
 
     def test_enabled_requires_ninety_seconds_of_sustained_success(self):
         check = self.check()

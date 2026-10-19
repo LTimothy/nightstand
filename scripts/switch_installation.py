@@ -22,7 +22,7 @@ import recover_switch
 import switch_services
 from prepare_upstream_env import prepare, flush_environment, allocated_bytes, HEADROOM_BYTES, owned_directory, current_user
 from switch_transaction import (TransactionStore, DEFAULT_ROOT, absolute_path, digest,
-                                fsync_directory, publish, validate_snapshot_parent)
+                                fsync_directory, publish, read_regular, validate_snapshot_parent)
 from tree_digest import _dir_entries, tree_digest
 from upstream_target import validate_target
 import upstream_readiness
@@ -36,7 +36,7 @@ spec.loader.exec_module(calibration)
 
 def fork(path, store=None):
     path = absolute_path(str(path))
-    info = json.loads((path / 'server/src/serverInfo.json').read_text())
+    info = json.loads(read_regular(path / 'server/src/serverInfo.json'))
     repository = info.get('fork')
     if repository == 'LTimothy/nightstand':
         return 'nightstand'
@@ -76,7 +76,7 @@ def artifact_digest(path):
 def identity(path, commit=None, store=None, known_fork=None):
     path = absolute_path(str(path))
     checksum = code_digest(path)
-    info = json.loads((path / 'server/src/serverInfo.json').read_text())
+    info = json.loads(read_regular(path / 'server/src/serverInfo.json'))
     # Installed archives do not carry git objects. Zero means no commit was
     # recorded; the observed tree checksum and inode identify that source.
     return dict(fork=known_fork or fork(path, store), version=info['version'], commit=commit or '0' * 40,
@@ -273,7 +273,7 @@ class System:
         return result
 
     def biometrics(self):
-        enabled = json.loads((self.data / 'servicesDB.json').read_text())['biometrics']['enabled']
+        enabled = json.loads(read_regular(self.data / 'servicesDB.json'))['biometrics']['enabled']
         if type(enabled) is not bool:
             raise ValueError('Stored biometrics choice is not a boolean')
         return enabled
@@ -364,8 +364,8 @@ def install(system, stage, target=None, retained=None, operation='free-sleep-rev
     if retained and not (stage / 'server/node_modules').is_dir():
         original = retained_tree(prior)
         modules = original / 'server/node_modules'
-        if (not modules.is_dir() or (original / 'server/package-lock.json').read_bytes()
-                != (stage / 'server/package-lock.json').read_bytes()):
+        if (not modules.is_dir() or read_regular(original / 'server/package-lock.json')
+                != read_regular(stage / 'server/package-lock.json')):
             raise ValueError('Retained Node dependencies do not match the target')
         shutil.copytree(modules, stage / 'server/node_modules', symlinks=True)
     enabled = system.biometrics()
@@ -436,7 +436,7 @@ def install(system, stage, target=None, retained=None, operation='free-sleep-rev
     move(stage, live)
     if not (live / 'server/node_modules').is_dir():
         if ((saved / 'server/node_modules').is_dir()
-                and (saved / 'server/package-lock.json').read_bytes() == (live / 'server/package-lock.json').read_bytes()):
+                and read_regular(saved / 'server/package-lock.json') == read_regular(live / 'server/package-lock.json')):
             store.intent(transaction, 'copy-dependencies', {})
             shutil.copytree(saved / 'server/node_modules', live / 'server/node_modules', symlinks=True)
         else:

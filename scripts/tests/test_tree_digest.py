@@ -79,6 +79,16 @@ class TreeDigestTests(unittest.TestCase):
                 'link': b'link:a.txt',
             }))
 
+    def test_a_fifo_is_refused_without_blocking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'scripts').mkdir()
+            os.mkfifo(str(root / 'scripts' / 'pipe'))
+            result = subprocess.run([sys.executable, str(SCRIPT), str(root)],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('not a regular file, directory or link: scripts/pipe', result.stderr)
+
     def test_a_missing_directory_is_an_error_not_an_empty_digest(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = subprocess.run([sys.executable, str(SCRIPT), str(Path(tmp) / 'absent')],

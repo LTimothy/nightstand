@@ -56,6 +56,15 @@ def is_published(directory):
     return os.path.lexists(str(directory / 'journal.json'))
 
 
+def read_regular(path):
+    """Read a file another user can replace, refusing links, FIFOs and devices."""
+    descriptor = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with open(descriptor, 'rb') as handle:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError('Not a regular file: ' + str(path))
+        return handle.read()
+
+
 def fsync_directory(path):
     descriptor = os.open(str(path), os.O_RDONLY | os.O_DIRECTORY)
     try:
@@ -262,7 +271,7 @@ class TransactionStore:
             record = {'path': str(path), 'mode': stat.S_IMODE(status.st_mode), 'uid': status.st_uid,
                       'gid': status.st_gid, 'atimeNs': status.st_atime_ns, 'mtimeNs': status.st_mtime_ns}
             if stat.S_ISREG(status.st_mode):
-                data = path.read_bytes()
+                data = read_regular(path)
                 backup = 'snapshot-' + uuid.uuid4().hex
                 publish(self.directory(transaction_id) / backup, data)
                 record.update(kind='file', backup=backup, sha256=digest(data))

@@ -639,7 +639,7 @@ scp_to_pod "$SSH_PORT" "$IPTABLES_SNAPSHOT_LOCAL" "/persistent/nightstand-migrat
 ssh_cmd "$SSH_PORT" "
   rm -f /persistent/free-sleep-data/migration-status.json
   if command -v systemd-run >/dev/null 2>&1; then
-    systemd-run --unit=free-sleep-migrate --collect --property=KillMode=control-group \
+    systemd-run --unit=free-sleep-migrate --collect --property=KillMode=control-group --property=RuntimeMaxSec=2h \
       --property=ExecStopPost='-/bin/systemctl restart --no-block free-sleep-recover-switch.service' bash /usr/local/lib/nightstand/migrate/pod-installer.sh \"$REMOVE_FOREIGN\" \
       || systemd-run --unit=free-sleep-migrate --collect bash /usr/local/lib/nightstand/migrate/pod-installer.sh \"$REMOVE_FOREIGN\"
   else

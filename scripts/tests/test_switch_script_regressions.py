@@ -44,6 +44,8 @@ export count
         calls = [call.strip().splitlines() for call in result.stdout.split('CALL\n')[1:]]
         self.assertEqual(len(calls), 2, result.stdout)
         self.assertIn('--property=ExecStopPost=-/bin/systemctl restart --no-block free-sleep-recover-switch.service', calls[0])
+        # A simple service has no start timeout; this bounds the whole installer.
+        self.assertIn('--property=RuntimeMaxSec=2h', calls[0])
         self.assertEqual(calls[1], ['--unit=free-sleep-migrate', '--collect', 'bash',
                                    '/usr/local/lib/nightstand/migrate/pod-installer.sh', 'yes'])
 

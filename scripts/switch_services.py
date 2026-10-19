@@ -17,7 +17,7 @@ import subprocess
 import tempfile
 
 import system_scripts
-from switch_transaction import TransactionStore, durable_directory, fsync_directory, publish
+from switch_transaction import TransactionStore, durable_directory, fsync_directory, publish, read_regular
 
 FORK_UNITS = tuple('free-sleep-' + name + suffix for name, suffixes in (
     ('rollback', ('.service',)), ('revert', ('.service',)),
@@ -163,13 +163,13 @@ def apply(store, transaction, config, direction):
         for unit in ('free-sleep-archive-raw.service', 'free-sleep-archive-raw.timer'):
             source = scripts / 'systemd' / unit
             if source.is_file():
-                write(config.systemd / unit, source.read_bytes())
+                write(config.systemd / unit, read_regular(source))
         limits = scripts / 'setup_resource_limits.sh'
         if limits.is_file():
             execute(['bash', str(limits)], env=environment)
     else:
         for name, mode in (('update_service.sh', 0o755), ('sqlite_maintenance.py', 0o644)):
-            write(config.maintenance / name, (config.live / 'scripts' / name).read_bytes(), mode)
+            write(config.maintenance / name, read_regular(config.live / 'scripts' / name), mode)
         # Recovery startup gates remain installed independently of either fork.
         write(config.systemd / 'free-sleep-update.service', (
             '[Unit]\nDescription=Free Sleep updater\nAfter=free-sleep.service\n'

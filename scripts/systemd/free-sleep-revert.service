@@ -15,5 +15,7 @@ ExecStopPost=-/bin/systemctl restart --no-block free-sleep-recover-switch.servic
 User=root
 Group=root
 KillMode=process
+# The longest switch, with every download, install and check at its own limit, is about an hour.
+TimeoutStartSec=2h
 StandardOutput=append:/persistent/nightstand-logs/free-sleep-revert.log
 StandardError=append:/persistent/nightstand-logs/free-sleep-revert.log

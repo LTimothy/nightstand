@@ -20,6 +20,7 @@ sticks to the standard library and to Python versions older Pods ship.
 """
 import hashlib
 import os
+import stat
 import sys
 import tarfile
 
@@ -56,11 +57,19 @@ def _dir_entries(root):
         for name in names:
             full = os.path.join(dirpath, name)
             rel = os.path.relpath(full, root).replace(os.sep.encode(), b"/")
-            if os.path.islink(full):
+            mode = os.lstat(full).st_mode
+            if stat.S_ISLNK(mode):
                 yield rel, _link_digest(os.readlink(full))
-            else:
-                with open(full, "rb") as handle:
-                    yield rel, _stream_digest(handle)
+                continue
+            # Root digests trees another user writes: never block on a FIFO
+            # or follow a link swapped in after the lstat.
+            if stat.S_ISREG(mode):
+                descriptor = os.open(full, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(descriptor, "rb") as handle:
+                    if stat.S_ISREG(os.fstat(descriptor).st_mode):
+                        yield rel, _stream_digest(handle)
+                        continue
+            raise ValueError("not a regular file, directory or link: %s" % os.fsdecode(rel))
 
 
 def _tar_entries(path):
@@ -99,6 +108,9 @@ if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--tar":
         print(tree_digest(_tar_entries(sys.argv[2])))
     elif len(sys.argv) == 2 and not sys.argv[1].startswith("--"):
-        print(tree_digest(_dir_entries(sys.argv[1])))
+        try:
+            print(tree_digest(_dir_entries(sys.argv[1])))
+        except ValueError as error:
+            raise SystemExit(str(error))
     else:
         raise SystemExit("usage: tree_digest.py DIR | tree_digest.py --tar FILE")

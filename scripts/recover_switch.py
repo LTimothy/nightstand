@@ -19,7 +19,7 @@ import re
 import subprocess
 import time
 
-from switch_transaction import TransactionStore, absolute_path, fsync_directory, digest, is_published
+from switch_transaction import TransactionStore, absolute_path, fsync_directory, digest, is_published, read_regular
 from switch_services import (Configuration, CONFIG_UNITS as FORK_CONFIG_UNITS,
                              restore as restore_configuration, restore_enablement)
 
@@ -173,7 +173,7 @@ def restore_paths(journal, record):
             import json
             if source.is_symlink() or not source.is_dir():
                 raise ValueError('Original tree is not a directory')
-            if json.loads((source / 'server/src/serverInfo.json').read_text())['version'] != journal['source']['version']:
+            if json.loads(read_regular(source / 'server/src/serverInfo.json'))['version'] != journal['source']['version']:
                 raise ValueError('Original tree version mismatch')
     for mapping in record['paths']:
         live, saved, failed = (Path(mapping[key]) for key in ('live', 'saved', 'failed'))

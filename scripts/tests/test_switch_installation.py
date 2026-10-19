@@ -163,6 +163,29 @@ class InstallationTests(unittest.TestCase):
         return self.runner.install(self.system, self.stage, target=confirmed(self.stage),
                                    operation='free-sleep-revert.service')
 
+    def test_fifos_in_server_user_trees_are_refused_without_blocking(self):
+        signal.signal(signal.SIGALRM, lambda *_: self.fail('Reading a FIFO blocked'))
+        signal.alarm(10)
+        self.addCleanup(signal.alarm, 0)
+        self.forward()
+        previous = self.system.live.parent / 'free-sleep-prev'
+        os.mkfifo(str(previous / 'scripts/pipe'))
+        with self.assertRaisesRegex(ValueError, 'not a regular file'):
+            self.runner.find_companion(self.system.store, previous)
+        info = self.stage / 'server/src/serverInfo.json'
+        create_tree(self.stage, 'throwaway31265/free-sleep', '3.0.3')
+        info.unlink()
+        os.mkfifo(str(info))
+        with self.assertRaisesRegex(ValueError, 'regular file'):
+            self.runner.fork(self.stage, self.system.store)
+
+    def test_switch_units_time_out_after_their_longest_run(self):
+        unit = (SCRIPTS / 'systemd/free-sleep-revert.service').read_text()
+        self.assertIn('\nTimeoutStartSec=2h\n', unit)
+        rollback = (SCRIPTS / 'systemd/free-sleep-rollback.service').read_text()
+        self.assertIn('\nTimeoutStartSec=1h\n', rollback)
+        self.assertIn('ExecStopPost=-/bin/systemctl restart --no-block free-sleep-recover-switch.service', rollback)
+
     def test_forward_refuses_a_stage_changed_after_its_checksum_check(self):
         target = confirmed(self.stage)
         stop = self.system.stop

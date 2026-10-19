@@ -6,6 +6,8 @@ from pathlib import Path
 import sys
 import tempfile
 
+from switch_transaction import read_regular
+
 DAYS = ('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')
 
 
@@ -83,7 +85,7 @@ def restore_baselines(store, transaction, retained_transaction, folder):
 def prepare(folder):
     folder = Path(folder)
     paths = [folder / 'settingsDB.json', folder / 'schedulesDB.json']
-    settings, schedules = [json.loads(path.read_text()) for path in paths]
+    settings, schedules = [json.loads(read_regular(path)) for path in paths]
     if settings.get('temperatureFormat') == 'level':
         settings['temperatureFormat'] = 'fahrenheit'
     for side in ('left', 'right'):

@@ -55,6 +55,19 @@ class UpstreamEnvironmentTests(unittest.TestCase):
             return self.module.prepare(self.stage, self.env_root, 'switch', self.original,
                                        'python3', self.module.current_user(), 1)
 
+
+    def test_flush_refuses_a_fifo_without_blocking(self):
+        import signal
+        signal.signal(signal.SIGALRM, lambda *_: self.fail('Flushing a FIFO blocked'))
+        signal.alarm(5)
+        self.addCleanup(signal.alarm, 0)
+        with tempfile.TemporaryDirectory() as folder:
+            tree = Path(folder) / 'parent/tree'
+            (tree / 'scripts').mkdir(parents=True)
+            (tree / 'scripts/file').write_text('code')
+            os.mkfifo(str(tree / 'scripts/pipe'))
+            with self.assertRaisesRegex(ValueError, 'regular file'):
+                self.module.flush_environment(tree)
     def test_nightstand_return_prepares_pinned_packages_without_touching_upstream(self):
         before = self.hashes()
         (self.stage / 'scripts/python').mkdir(parents=True)

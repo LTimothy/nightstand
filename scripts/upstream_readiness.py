@@ -15,6 +15,7 @@ import time
 import urllib.error
 import urllib.request
 
+from switch_transaction import read_regular
 from upstream_stream_probe import process_start_ticks
 
 WINDOW = 90
@@ -152,7 +153,7 @@ def sample_system(probe_path, enabled):
     health = None
     if enabled:
         try:
-            probe = json.loads(Path(probe_path).read_text())
+            probe = json.loads(read_regular(probe_path))
         except FileNotFoundError:
             pass
         stored = biometrics.get('jobs', {}).get('stream')

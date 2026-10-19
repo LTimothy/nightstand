@@ -14,7 +14,10 @@ import pwd
 import re
 import shutil
 import signal
+import stat
 import subprocess
+
+from switch_transaction import read_regular
 
 ENVIRONMENT_BYTES = 512 * 1024 * 1024
 CACHE_BYTES = 256 * 1024 * 1024
@@ -99,12 +102,15 @@ def flush_environment(destination):
             path = Path(directory) / name
             if path.is_symlink():
                 continue
-            descriptor = os.open(str(path), os.O_RDONLY)
+            # The server user writes these trees: never block on a FIFO or follow a swapped link.
+            descriptor = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
             try:
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise ValueError('Not a regular file: ' + str(path))
                 os.fsync(descriptor)
             finally:
                 os.close(descriptor)
-        descriptor = os.open(directory, os.O_RDONLY)
+        descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
             os.fsync(descriptor)
         finally:
@@ -134,11 +140,11 @@ def prepare(stage, env_root, transaction, original, python, user, timeout, direc
     requirements = stage / ('biometrics/requirements.txt' if direction == 'upstream' else 'scripts/python/requirements.txt')
     if direction == 'nightstand':
         constraints = HERE / 'python/requirements.txt'
-        if requirements.is_symlink() or requirements.read_bytes() != constraints.read_bytes():
+        if requirements.is_symlink() or read_regular(requirements) != constraints.read_bytes():
             raise ValueError('Unreviewed Nightstand Python requirements')
     else:
         constraints = HERE / 'python/upstream-constraints.txt'
-        lines = {line.strip().lower() for line in requirements.read_text().splitlines()
+        lines = {line.strip().lower() for line in read_regular(requirements).decode().splitlines()
                  if line.strip() and not line.lstrip().startswith('#')}
         if requirements.is_symlink() or lines != REQUIREMENTS:
             raise ValueError('Unreviewed upstream Python requirements')
@@ -180,7 +186,7 @@ def prepare(stage, env_root, transaction, original, python, user, timeout, direc
     flush_environment(destination)
     record = dict(schemaVersion=1, transaction=transaction, path=str(destination),
                   stage=str(stage), pythonVersion=version,
-                  requirementsSha256=hashlib.sha256(requirements.read_bytes()).hexdigest(),
+                  requirementsSha256=hashlib.sha256(read_regular(requirements)).hexdigest(),
                   constraintsSha256=hashlib.sha256(constraints.read_bytes()).hexdigest(),
                   resolvedSha256=hashlib.sha256(resolved.encode()).hexdigest(), reservedBytes=required)
     durable_record(destination / 'prepared.json', (json.dumps(record, sort_keys=True) + '\n').encode())
