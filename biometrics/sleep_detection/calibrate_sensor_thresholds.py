@@ -188,7 +188,7 @@ def calibrate_sensor_thresholds(side: Side, start_time: datetime, end_time: date
             raw_data_types=['capSense', 'piezo-dual'],
             cap_formats=cap_formats,
         )
-        provenance = calibration.cap_provenance(cap_formats, calibration.source_hash(data['cap_senses']))
+        cap_hash = calibration.source_hash(data['cap_senses'])
 
         # with_p2p=True adds the within-second p98-p2 range column. That is the
         # quantity both presence detectors threshold, so it is the only one
@@ -262,7 +262,8 @@ def calibrate_sensor_thresholds(side: Side, start_time: datetime, end_time: date
                 f'record a stretch of empty bed.'
             )
         cap_baseline = create_cap_baseline_from_cap_df(merged_df, baseline_start_time, baseline_end_time, side)
-        cap_baseline['provenance'] = provenance
+        # After the empty-window checks, so a window without capacitance waits for data.
+        cap_baseline['provenance'] = calibration.cap_provenance(cap_formats, cap_hash)
         if presence_v2:
             # The capacitance presence detector keeps its entry level clear of
             # this. Readers of the channel means ignore the extra key.

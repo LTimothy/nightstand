@@ -156,8 +156,15 @@ class LegacyCalibrationTest(unittest.TestCase):
         records = [dict(record, type='capSense3') if record['type'] == 'capSense' else record
                    for record in empty_records()]
         _, runs = self.calibrate(enabled=True, records=records)
-        self.assertIn(runs[0][0], ('insufficient_data', 'failed'))
+        self.assertEqual(runs[0][0], 'insufficient_data')
         self.assertEqual(json.loads(runs[0][1]), {'format': 'unknown'})
+
+    def test_a_window_without_capacitance_waits_for_data(self):
+        records = [record for record in empty_records() if record['type'] != 'capSense']
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                _, runs = self.calibrate(enabled=enabled, records=records)
+                self.assertEqual([status for status, _ in runs], ['insufficient_data'])
 
 
 class FormatPayloadTest(unittest.TestCase):

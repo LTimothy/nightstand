@@ -457,6 +457,8 @@ is a hard fork; for the history of the projects it descends from, see
   warning a minute, and goes on with the rest of the file or NATS message.
   Before, such a record in a RAW file stopped the stream at that point of
   the file and re-sent the records before it on every retry.
+- A calibration over a window with no capacitance records reports that it
+  is waiting for data again, instead of failing.
 
 ### Schedules
 
