@@ -156,8 +156,9 @@ exit 7`], { encoding: 'utf8', env: { ...process.env, FIXTURE: dir } });
         assert.equal(readFileSync(path.join(dir, 'calls'), 'utf8'), 'interrupted\nrecorded 7\n');
       } finally { rmSync(dir, { recursive: true, force: true }); }
     }
-    assert.match(read('scripts/rollback_pod.sh'),
-      /^trap 'status=\$\?; trap "" HUP INT TERM; finish_interrupted_swap; record_result "\$status"' EXIT$/m);
+    const trap = 'trap \'status=$?; trap "" HUP INT TERM; finish_interrupted_swap;'
+      + ' [ -z "${HBODY:-}" ] || rm -f "$HBODY"; record_result "$status"\' EXIT';
+    assert.ok(read('scripts/rollback_pod.sh').split('\n').includes(trap));
   });
 
   // The outcome from where the run stood when it ended.

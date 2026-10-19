@@ -171,6 +171,10 @@ is a hard fork; for the history of the projects it descends from, see
   `/persistent/free-sleep-data` are written through a new, randomly named
   temporary file. Before, root wrote a fixed `.tmp` name there, so a link
   the server user left at that name made root overwrite another file.
+- The health check after an update, rollback, switch or fork migration
+  saves the server's answer in a new temporary file only root can write,
+  removed when the run ends. Before, it used a fixed name in `/home/dac` or
+  `/tmp`.
 
 ### Installation and fork migration
 

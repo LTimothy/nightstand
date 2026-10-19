@@ -37,7 +37,7 @@ case $? in
   1) fail "cannot open the update lock" ;;
   *) fail "another update, rollback or switch is already running" ;;
 esac
-trap 'status=$?; trap "" HUP INT TERM; finish_interrupted_swap; record_result "$status"' EXIT
+trap 'status=$?; trap "" HUP INT TERM; finish_interrupted_swap; [ -z "${HBODY:-}" ] || rm -f "$HBODY"; record_result "$status"' EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -190,8 +190,8 @@ RESTORE_TREE=
 # --- health check (same shape as update.sh) -----------------------------------
 say "Health check (up to 90s)"
 HEALTHY=no
-HBODY=/tmp/free-sleep-rollback-health
-for _ in $(seq 1 30); do
+HBODY=$(mktemp) || { say "WARNING: could not create a temporary file for the health check; treating it as failed"; HBODY=; }
+[ -z "$HBODY" ] || for _ in $(seq 1 30); do
   sleep 3
   CODE=$(curl -s -o "$HBODY" -w '%{http_code}' --max-time 5 "http://127.0.0.1:3000/api/deviceStatus" 2>/dev/null || echo 000)
   say "  health attempt: HTTP $CODE"
@@ -208,7 +208,7 @@ except Exception:
     print('no')" 2>/dev/null)
   [ "$OK" = yes ] && { HEALTHY=yes; break; }
 done
-rm -f "$HBODY"
+[ -z "$HBODY" ] || rm -f "$HBODY"
 [ "$HEALTHY" = yes ] && systemctl is-active free-sleep >/dev/null || HEALTHY=no
 
 if [ "$HEALTHY" = yes ]; then

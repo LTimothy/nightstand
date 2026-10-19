@@ -1042,7 +1042,7 @@ ${onSystemctl('stop free-sleep', 'staged', 'TERM_ON="stop free-sleep"')}`));
 it('update.sh checks the new version with a sensor reading', () => {
   const src = readFileSync(path.join(root, 'scripts/update.sh'), 'utf8');
   const calls = src.match(/^.*\bserves_version "[^\n]*$/gm) ?? [];
-  assert.deepEqual(calls, ['if [ "$MIGRATION_FAILED" != yes ] && serves_version "$STAGED_VERSION" temperature; then']);
+  assert.deepEqual(calls, ['if [ -n "$HBODY" ] && [ "$MIGRATION_FAILED" != yes ] && serves_version "$STAGED_VERSION" temperature; then']);
 });
 
 it('serves_version refuses a requirement it does not know', () => {

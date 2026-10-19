@@ -135,7 +135,8 @@ cleanup() {
   finish_interrupted_swap
   # A marked swap may still need dependencies from the stage at boot.
   [ -f "$SWAP_MARKER" ] || rm -rf "$STAGE"
-  rm -rf "$STAGE.unzip" "$STAGE.health" "$STAGE.migrate.log" "$ZIP" "${WORK:-}"
+  rm -rf "$STAGE.unzip" "$STAGE.migrate.log" "$ZIP" "${WORK:-}"
+  [ -z "${HBODY:-}" ] || rm -f "$HBODY"
   record_result "$status"
 }
 
@@ -665,8 +666,8 @@ except Exception:
 }
 say "Health check (up to 90s)"
 HEALTHY=no
-HBODY="$STAGE.health"
-if [ "$MIGRATION_FAILED" != yes ] && serves_version "$STAGED_VERSION" temperature; then
+HBODY=$(mktemp) || { say "WARNING: could not create a temporary file for the health check; treating it as failed"; HBODY=; }
+if [ -n "$HBODY" ] && [ "$MIGRATION_FAILED" != yes ] && serves_version "$STAGED_VERSION" temperature; then
   HEALTHY=yes
 fi
 

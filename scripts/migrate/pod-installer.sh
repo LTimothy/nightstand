@@ -106,7 +106,8 @@ fi
 : > "$LOCK_FILE"
 echo "$$" > "$PID_FILE"
 cleanup_lock() {
-  rm -f "$LOCK_FILE" "$PID_FILE" /tmp/free-sleep-migrate-health
+  rm -f "$LOCK_FILE" "$PID_FILE"
+  [ -z "${HBODY:-}" ] || rm -f "$HBODY"
   rm -rf "$STAGE"
   if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
   if [ -n "$DB_PREFLIGHT" ]; then rm -rf "$DB_PREFLIGHT"; fi
@@ -489,8 +490,8 @@ systemctl enable --now free-sleep-archive-raw.timer >/dev/null 2>&1 || true
 say "Health check (up to 90s)"
 HEALTHY=no
 TEMP_LAGGING=""
-HBODY=/tmp/free-sleep-migrate-health
-for _ in $(seq 1 30); do
+HBODY=$(mktemp) || { say "WARNING: could not create a temporary file for the health check; treating it as failed"; HBODY=; }
+[ -z "$HBODY" ] || for _ in $(seq 1 30); do
   sleep 3
   CODE=$(curl -s -o "$HBODY" -w '%{http_code}' --max-time 5 "http://127.0.0.1:3000/api/deviceStatus" 2>/dev/null || echo 000)
   say "  health attempt: HTTP $CODE"
@@ -525,7 +526,7 @@ except Exception:
     print('')
 " 2>/dev/null)
 fi
-rm -f "$HBODY"
+[ -z "$HBODY" ] || rm -f "$HBODY"
 [ "$HEALTHY" = yes ] && systemctl is-active free-sleep >/dev/null || HEALTHY=no
 
 if [ "$HEALTHY" != yes ]; then

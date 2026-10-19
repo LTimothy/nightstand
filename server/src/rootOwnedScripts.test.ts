@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import {
-  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync,
+  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -573,4 +573,64 @@ describe('rollback_pod.sh', () => {
       + ' /etc/systemd/system/free-sleep-update.service';
     assert.ok(otherFork.includes(own), otherFork);
   });
+});
+
+describe('health checks', () => {
+  // Each script's health loop, with its fixed paths moved into a temp tree.
+  const HEALTH: [string, string][] = [
+    ['scripts/update.sh', 'home/free-sleep-staging.health'],
+    ['scripts/switch-to-upstream.sh', 'home/free-sleep-revert-staging.health'],
+    ['scripts/rollback_pod.sh', 'tmp/free-sleep-rollback-health'],
+    ['scripts/migrate/pod-installer.sh', 'tmp/free-sleep-migrate-health'],
+  ];
+  const healthBlock = (file: string) => {
+    const src = read(file);
+    const start = src.lastIndexOf('say "Health check (up to 90s)"');
+    const end = file === 'scripts/update.sh' ? src.indexOf('\nfi\n', start) + 4 : src.indexOf('rm -f "$HBODY"\n', start) + 15;
+    const helper = file === 'scripts/update.sh' ? src.slice(src.indexOf('serves_version() {'), start) : '';
+    assert.ok(start > 0 && end > start, file);
+    return helper + src.slice(start, end);
+  };
+
+  for (const [file, planted] of HEALTH) {
+    it(`${file} saves the answer in a fresh file, never through a link at a fixed name`, () => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'health-body-'));
+      try {
+        mkdirSync(path.join(dir, 'tmp'));
+        mkdirSync(path.join(dir, 'home'));
+        const victim = path.join(dir, 'victim');
+        writeFileSync(victim, 'keep');
+        symlinkSync(victim, path.join(dir, planted));
+        const block = healthBlock(file).replaceAll('/tmp/', `${dir}/tmp/`).replaceAll('/home/dac', `${dir}/home`);
+        const result = spawnSync('bash', ['-c', `set -uo pipefail
+say() { :; }; sleep() { :; }; systemctl() { :; }
+curl() {
+  local out=/dev/null; while [ $# -gt 0 ]; do [ "$1" != -o ] || out=$2; shift; done
+  printf '{"freeSleep":{"version":"9.9.9"},"left":{"currentTemperatureF":80}}' > "$out"; printf 200
+}
+STAGE='${dir}/home/${path.basename(planted).replace(/\.health$/, '')}'
+STAGED_VERSION=9.9.9 TARGET_VERSION=9.9.9 MIGRATION_FAILED=no BASELINE_FILE=
+${block}
+echo "HEALTHY=$HEALTHY"`], { encoding: 'utf8', env: { ...process.env, TMPDIR: path.join(dir, 'tmp') } });
+        assert.match(result.stdout, /HEALTHY=yes/, result.stdout + result.stderr);
+        assert.equal(readFileSync(victim, 'utf8'), 'keep');
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
+
+    it(`${file} fails the health check at once when it cannot make the temp file`, () => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'health-body-'));
+      try {
+        const block = healthBlock(file).replaceAll('/tmp/', `${dir}/`).replaceAll('/home/dac', dir);
+        const result = spawnSync('bash', ['-c', `set -uo pipefail
+say() { echo "$*"; }; sleep() { :; }; systemctl() { :; }; mktemp() { return 1; }
+curl() { echo called >> '${dir}/curl'; printf 200; }
+STAGE='${dir}/stage'; STAGED_VERSION=9.9.9 TARGET_VERSION=9.9.9 MIGRATION_FAILED=no BASELINE_FILE=
+${block}
+echo "HEALTHY=$HEALTHY"`], { encoding: 'utf8' });
+        assert.match(result.stdout, /HEALTHY=no/, result.stdout + result.stderr);
+        assert.match(result.stdout, /could not create a temporary file/);
+        assert.equal(existsSync(path.join(dir, 'curl')), false);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
+  }
 });

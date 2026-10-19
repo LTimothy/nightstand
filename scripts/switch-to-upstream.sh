@@ -127,7 +127,7 @@ finish_interrupted_swap() {
     systemctl start free-sleep-stream
   fi
 }
-cleanup() { local status=$?; trap '' HUP INT TERM; close_wan; finish_interrupted_swap; rm -rf "$STAGE" "$STAGE.health" "${WORK:-}"; record_result "$status"; }
+cleanup() { local status=$?; trap '' HUP INT TERM; close_wan; finish_interrupted_swap; rm -rf "$STAGE" "${WORK:-}"; [ -z "${HBODY:-}" ] || rm -f "$HBODY"; record_result "$status"; }
 
 fail() { say "FATAL: $*"; [ -n "${RESULT_REASON:-}" ] || RESULT_REASON="$*"; exit 1; }
 
@@ -444,8 +444,8 @@ fi
 # cycles after a cold reconnect (see pod-installer.sh's health check).
 say "Health check (up to 90s)"
 HEALTHY=no
-HBODY="$STAGE.health"
-for _ in $(seq 1 30); do
+HBODY=$(mktemp) || { say "WARNING: could not create a temporary file for the health check; treating it as failed"; HBODY=; }
+[ -z "$HBODY" ] || for _ in $(seq 1 30); do
   sleep 3
   CODE=$(curl -s -o "$HBODY" -w '%{http_code}' --max-time 5 "http://127.0.0.1:3000/api/deviceStatus" 2>/dev/null || echo 000)
   say "  health attempt: HTTP $CODE"
@@ -461,7 +461,7 @@ except Exception:
     print('no')" 2>/dev/null)
   [ "$OK" = yes ] && { HEALTHY=yes; break; }
 done
-rm -f "$HBODY"
+[ -z "$HBODY" ] || rm -f "$HBODY"
 [ "$HEALTHY" = yes ] && systemctl is-active free-sleep >/dev/null || HEALTHY=no
 
 if [ "$HEALTHY" = yes ]; then
