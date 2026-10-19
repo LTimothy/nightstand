@@ -1,4 +1,5 @@
 """Cross-fork configuration changes retain recoverable system state."""
+import hashlib
 import importlib.util
 import os
 from pathlib import Path
@@ -61,7 +62,14 @@ class SwitchServicesTests(unittest.TestCase):
             return 'ActiveState=inactive\nUnitFileState=enabled\n'
         return ''
 
+    def pin(self):
+        # The switch pins the checked upstream scripts before it snapshots.
+        self.module.pin_scripts(self.store, 'switch', {
+            'scripts/' + name: hashlib.sha256((self.live / 'scripts' / name).read_bytes()).hexdigest()
+            for name in self.module.PINNED})
+
     def snapshot(self):
+        self.pin()
         with patch.object(self.module, 'execute', side_effect=self.execute):
             self.module.snapshot(self.store, 'switch', self.config)
         self.store.advance('switch', 'snapshots-ready')
@@ -83,7 +91,6 @@ class SwitchServicesTests(unittest.TestCase):
         self.assertTrue(any(item['name'] == 'reconcile-system' for item in self.store.load('switch')['intents']))
 
     def test_reject_failure_reaches_drop_fallback_in_both_families(self):
-        self.snapshot()
         bindir = self.root / 'bin'
         bindir.mkdir()
         firewall = """#!/bin/sh
@@ -106,12 +113,13 @@ ip6tables -A OUTPUT -j REJECT
 ip6tables -C OUTPUT -j REJECT || ip6tables -A OUTPUT -j DROP
 iptables -C OUTPUT -j DROP && ip6tables -C OUTPUT -j DROP
 """)
+        self.snapshot()
         environment = dict(os.environ, PATH=str(bindir) + os.pathsep + os.environ['PATH'],
                            TEST_FIREWALL=str(self.root))
         def apply_command(command, **kwargs):
             if command[0] in ('sh', 'iptables', 'ip6tables'):
                 return self.module.subprocess.run(command, check=True, capture_output=True, text=True,
-                                                  env=environment).stdout
+                                                  env=environment, input=kwargs.get('input')).stdout
             return self.execute(command, **kwargs)
         with patch.object(self.module, 'execute', side_effect=apply_command):
             self.module.apply(self.store, 'switch', self.config, 'upstream')
@@ -219,6 +227,7 @@ iptables -C OUTPUT -j DROP && ip6tables -C OUTPUT -j DROP
                 raise subprocess.CalledProcessError(1, command)
             return self.execute(command, **kwargs)
         # The updater is present; the optional fork-only units have never existed.
+        self.pin()
         with patch.object(self.module, 'execute', side_effect=absent):
             self.module.snapshot(self.store, 'switch', self.config)
             self.store.advance('switch', 'snapshots-ready')
@@ -273,8 +282,9 @@ iptables -C OUTPUT -j DROP && ip6tables -C OUTPUT -j DROP
         with patch.object(self.module, 'execute', side_effect=self.execute):
             self.module.restore(self.store, 'switch', self.config)
         self.assertFalse(tmpfiles.exists())
-        self.assertIn('free-sleep-recover-switch.service',
-                      self.store.load('switch')['intents'][0]['details']['states'])
+        configuration = next(item for item in self.store.load('switch')['intents']
+                             if item['name'] == 'system-configuration')
+        self.assertIn('free-sleep-recover-switch.service', configuration['details']['states'])
 
     def test_failed_return_disables_newly_created_timers_before_removing_units(self):
         enabled = set()

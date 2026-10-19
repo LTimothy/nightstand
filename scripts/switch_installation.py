@@ -68,11 +68,6 @@ def code_digest(path):
     return tree_digest(entries)
 
 
-def artifact_digest(path):
-    # The shell checked the download before npm ci added server/node_modules.
-    return tree_digest(entry for entry in _dir_entries(path) if not entry[0].startswith(b'server/node_modules/'))
-
-
 def identity(path, commit=None, store=None, known_fork=None):
     path = absolute_path(str(path))
     checksum = code_digest(path)
@@ -407,9 +402,13 @@ def install(system, stage, target=None, retained=None, operation='free-sleep-rev
     system.handoff('revert' if destination['fork'] == 'upstream' else 'rollback')
     system.stop()
     store.advance(transaction, 'writers-stopped')
-    # The server user could write the stage until its writers stopped.
-    if target is not None and artifact_digest(stage) != target['treeSha256']:
-        raise ValueError('Staged tree differs from the confirmed artifact')
+    if destination['fork'] == 'upstream':
+        # The server user could write the stage until its writers stopped. The
+        # shell checked the download before npm ci added server/node_modules.
+        entries = [entry for entry in _dir_entries(stage) if not entry[0].startswith(b'server/node_modules/')]
+        if target is not None and tree_digest(entries) != target['treeSha256']:
+            raise ValueError('Staged tree differs from the confirmed artifact')
+        switch_services.pin_scripts(store, transaction, {name.decode(): checksum for name, checksum in entries})
     # Record absence for known watched files, plus any other stopped settings.
     names = {'settingsDB.json', 'schedulesDB.json', 'servicesDB.json'}
     names.update(path.name for path in system.data.iterdir() if path.is_file() or path.is_symlink())

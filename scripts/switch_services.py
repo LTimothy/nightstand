@@ -17,7 +17,7 @@ import subprocess
 import tempfile
 
 import system_scripts
-from switch_transaction import TransactionStore, durable_directory, fsync_directory, publish, read_regular
+from switch_transaction import TransactionStore, digest, durable_directory, fsync_directory, publish, read_regular
 
 FORK_UNITS = tuple('free-sleep-' + name + suffix for name, suffixes in (
     ('rollback', ('.service',)), ('revert', ('.service',)),
@@ -144,6 +144,27 @@ def nightstand_scripts(config):
     return (copy if copy and copy.is_dir() else config.system / 'live') / 'scripts'
 
 
+PINNED = ('update_service.sh', 'sqlite_maintenance.py', 'block_internet_access.sh')
+
+
+def pin_scripts(store, transaction, checksums):
+    """Record the checked content of the upstream files root later uses."""
+    if any('scripts/' + name not in checksums for name in PINNED):
+        raise ValueError('Staged upstream tree lacks a script root needs')
+    store.intent(transaction, 'pinned-scripts', {name: checksums['scripts/' + name] for name in PINNED})
+
+
+def pinned(journal, config, name):
+    # The server user can replace the live tree after the check; use only the checked bytes.
+    records = [item['details'] for item in journal['intents'] if item['name'] == 'pinned-scripts']
+    if len(records) != 1 or not isinstance(records[0], dict) or name not in records[0]:
+        raise ValueError('Upstream scripts were not pinned at the checksum check')
+    data = read_regular(config.live / 'scripts' / name)
+    if digest(data) != records[0][name]:
+        raise ValueError('Upstream ' + name + ' changed after its checksum check')
+    return data
+
+
 def apply(store, transaction, config, direction):
     journal, captured = record(store, transaction, config)
     if journal['phase'] != 'installing' or direction not in ('upstream', 'nightstand'):
@@ -168,8 +189,9 @@ def apply(store, transaction, config, direction):
         if limits.is_file():
             execute(['bash', str(limits)], env=environment)
     else:
+        firewall = pinned(journal, config, 'block_internet_access.sh')
         for name, mode in (('update_service.sh', 0o755), ('sqlite_maintenance.py', 0o644)):
-            write(config.maintenance / name, read_regular(config.live / 'scripts' / name), mode)
+            write(config.maintenance / name, pinned(journal, config, name), mode)
         # Recovery startup gates remain installed independently of either fork.
         write(config.systemd / 'free-sleep-update.service', (
             '[Unit]\nDescription=Free Sleep updater\nAfter=free-sleep.service\n'
@@ -205,8 +227,9 @@ def apply(store, transaction, config, direction):
     if direction == 'nightstand':
         execute(['sh', str(nightstand_scripts(config) / 'block_internet_access.sh')])
     else:
-        # Upstream gets its own firewall script back, as before Nightstand.
-        execute(['sh', str(config.live / 'scripts/block_internet_access.sh')])
+        # Upstream gets its own firewall script back, as before Nightstand. It
+        # runs from the checked bytes on stdin; the script never reads stdin or $0.
+        execute(['sh', '-s'], input=firewall.decode())
     for family in ('iptables', 'ip6tables'):
         try:
             execute([family, '-C', 'OUTPUT', '-j', 'REJECT'])

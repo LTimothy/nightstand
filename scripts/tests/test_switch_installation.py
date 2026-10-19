@@ -200,6 +200,33 @@ class InstallationTests(unittest.TestCase):
         self.assertEqual(self.runner.fork(self.system.live), 'nightstand')
         self.assertEqual([journal['phase'] for journal in recover_switch.journals(self.system.store)], ['recovered'])
 
+    def test_forward_refuses_root_scripts_swapped_after_the_checksum_check(self):
+        target = confirmed(self.stage)
+        move = self.runner.move
+        def swapped(source, destination):
+            move(source, destination)
+            if destination == self.system.live and source == self.stage:
+                # A surviving server process plants its own copy in the published tree.
+                (destination / 'scripts/block_internet_access.sh').write_text('planted')
+        with patch.object(self.runner, 'move', side_effect=swapped), \
+                self.assertRaisesRegex(ValueError, 'changed after its checksum check'):
+            self.runner.install(self.system, self.stage, target=target, operation='free-sleep-revert.service')
+        self.assertNotIn(['sh', '-s'], self.system.calls)
+        offline_recover(self.system)
+        self.assertEqual(self.runner.fork(self.system.live), 'nightstand')
+
+    def test_forward_runs_and_installs_the_checked_script_bytes(self):
+        inputs = []
+        command = self.system.command
+        def recorded(arguments, **kwargs):
+            if arguments == ['sh', '-s']:
+                inputs.append(kwargs.get('input'))
+            return command(arguments, **kwargs)
+        with patch.object(switch_services, 'execute', side_effect=recorded):
+            self.forward()
+        self.assertEqual(inputs, ['original throwaway31265/free-sleep'])
+        self.assertEqual(self.system.config.guard.read_text(), 'original throwaway31265/free-sleep')
+
     def test_forward_installs_dependencies_from_the_checked_lockfile(self):
         source = (SCRIPTS / 'switch-to-upstream.sh').read_text()
         self.assertIn('NPM_INSTALL=ci', source)
