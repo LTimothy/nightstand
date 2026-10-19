@@ -459,6 +459,9 @@ is a hard fork; for the history of the projects it descends from, see
   the file and re-sent the records before it on every retry.
 - A calibration over a window with no capacitance records reports that it
   is waiting for data again, instead of failing.
+- The nightly analysis skips a night only when Biometrics is switched off.
+  A missing or unreadable `servicesDB.json` no longer reads as off; the
+  analysis runs as before and the error is logged.
 
 ### Schedules
 

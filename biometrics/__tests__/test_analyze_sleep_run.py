@@ -189,5 +189,15 @@ class MainTest(unittest.TestCase):
         analysis.assert_not_called()
 
 
+    def test_runs_when_the_switch_cannot_be_read(self):
+        argv = ['analyze_sleep.py', '--side', 'left', '--start_time', '2026-09-28 19:00:00', '--end_time', '2026-09-29 20:00:00']
+        with unittest.mock.patch.object(sys, 'argv', argv), \
+                unittest.mock.patch.object(self.module, 'is_biometrics_enabled', return_value=None), \
+                unittest.mock.patch.object(self.module, 'update_health') as health, \
+                unittest.mock.patch.object(self.module, 'run_analysis', return_value=('healthy', '')) as analysis:
+            self.module.main()
+        analysis.assert_called_once()
+        health.assert_called_with('analyzeSleepLeft', 'healthy', '')
+
 if __name__ == '__main__':
     unittest.main()

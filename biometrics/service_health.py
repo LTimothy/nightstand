@@ -48,7 +48,8 @@ def frz_record_epoch(record: dict):
     return None
 
 
-def is_biometrics_enabled() -> bool:
+def is_biometrics_enabled():
+    """The Biometrics switch, or None when servicesDB.json is missing or unreadable."""
     try:
         services_db_file_path = os.path.join(logger.folder_path, 'lowdb', 'servicesDB.json')
         if os.path.isfile(services_db_file_path):
@@ -58,11 +59,10 @@ def is_biometrics_enabled() -> bool:
                 return services_db["biometrics"]["enabled"]
         else:
             logger.error(f'File not found! {services_db_file_path}')
-            return False
+            return None
     except Exception as error:
-        logger.error('Error checking if biometrics is enabled, returning false')
-        logger.error(error)
-        return False
+        logger.error(f'Could not read whether biometrics is enabled: {error}')
+        return None
 
 
 

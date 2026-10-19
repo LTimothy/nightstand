@@ -44,6 +44,16 @@ class DataFolderPathsTest(unittest.TestCase):
                 self.assertTrue(service_health.is_biometrics_enabled())
 
 
+    def test_a_missing_or_unreadable_switch_reads_as_unknown(self):
+        for content in (None, '{not json', '{}'):
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as folder:
+                os.makedirs(os.path.join(folder, 'lowdb'))
+                if content is not None:
+                    with open(os.path.join(folder, 'lowdb', 'servicesDB.json'), 'w') as file:
+                        file.write(content)
+                with unittest.mock.patch.object(service_health.logger, 'folder_path', os.path.join(folder, '')):
+                    self.assertIsNone(service_health.is_biometrics_enabled())
+
 class ScriptsRunOffPodTest(unittest.TestCase):
     def _run(self, script, *args):
         with tempfile.TemporaryDirectory() as folder:

@@ -138,7 +138,8 @@ def run_analysis(side: str, start_time: datetime, end_time: datetime, folder_pat
 def main():
     args = _parse_args()
     job_key = f'analyzeSleep{args.side.capitalize()}'
-    if not is_biometrics_enabled():
+    # An unreadable switch (None) runs the analysis; only an explicit off skips it.
+    if is_biometrics_enabled() is False:
         logger.info('Not analyzing sleep, biometrics is disabled')
         update_health(job_key, 'failed', 'Biometrics is off')
         return
