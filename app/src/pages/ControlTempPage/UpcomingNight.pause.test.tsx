@@ -108,7 +108,8 @@ it.each(['legacy', 'rhythms'] as const)('changes a %s pause end with one active 
     left: { scheduleOverrides: { pause: { active: true, expiresAt: '2026-09-28T21:10:00-07:00' } } },
   }]]);
   expect(fixture.postDeviceStatus).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', { name: 'Change pause' })).toHaveFocus();
+  // The dialog leaves the DOM before MUI lifts aria-hidden off the page, so wait for the button to be reachable.
+  expect(await screen.findByRole('button', { name: 'Change pause' })).toHaveFocus();
 });
 
 it('edits an open-ended pause without first resuming it', async () => {
@@ -133,7 +134,7 @@ it('cancels a pause edit without changing settings or the device', async () => {
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(fixture.postSettings).not.toHaveBeenCalled();
   expect(fixture.postDeviceStatus).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', { name: 'Change pause' })).toHaveFocus();
+  expect(await screen.findByRole('button', { name: 'Change pause' })).toHaveFocus();
 });
 
 it('keeps the current pause when saving its new end fails', async () => {
