@@ -17,11 +17,15 @@ type Change = { minute: number; fromF: number; targetF: number; plannedF: number
 // The app's TypeScript lib predates Object.hasOwn.
 const hasOwn = (object: object, key: string) => Object.prototype.hasOwnProperty.call(object, key);
 
-// Off days' last 14 nights, oldest first: which ones made each change. Night 6 starts left out.
-const DOWN_NIGHTS = [1, 2, 4, 5, 6, 8, 9, 11, 13];
-const BACK_NIGHTS = [1, 2, 4, 5, 6, 8, 9, 11];
-const UP_NIGHTS = [0, 2, 5, 7, 9, 10, 12];
+// Off days' last 14 nights, oldest first, as minutes after the 11 PM start: when each turned down, went back and turned up.
+// Nights 3 and 12 stay untouched, and night 6 is the left-out odd one.
+const DOWN_AT: Record<number, number> = { 0: 12, 1: 18, 2: 10, 4: 15, 5: 20, 7: 14, 8: 16, 9: 12, 10: 18, 11: 15, 13: 20 };
+const UP_AT: Record<number, number> = { 0: 400, 1: 410, 2: 405, 4: 395, 5: 415, 8: 400, 10: 410, 11: 405 };
+const BACK_NIGHTS = [2, 5, 9];
 const ONE_OFF_NIGHT = 6;
+const ENDS: Record<number, number> = { 1: 455, 5: 455, 9: 470 };
+const DOWN_NIGHTS = Object.keys(DOWN_AT).map(Number);
+const UP_NIGHTS = Object.keys(UP_AT).map(Number);
 const SEEDED_HIDE: Hidden = { id: 'a1b2c3d4e5f6', side: 'right', rhythmId: 'off-days', key: 'on:up', time: null, scope: 'plan', nightsLeft: 0 };
 
 let hidden: Hidden[] = [{ ...SEEDED_HIDE }];
@@ -90,24 +94,29 @@ const newestFirst = (a: NightLog, b: NightLog) => b.date.localeCompare(a.date) |
 function rightSample(now: Date): SuggestionsResponse {
   const { dates, today } = nightDates(now);
   const plan = [{ offsetMin: 0, temperatureF: 82 }, { offsetMin: 240, temperatureF: 79 }];
-  const offDays = dates.map((date, index) => nightLog('right', 'off-days', date, '23:00', plan, 480, [
-    ...(DOWN_NIGHTS.includes(index) ? [{ minute: 45, fromF: 82, targetF: 79, plannedF: 82, tap: index === 9 }] : []),
-    ...(BACK_NIGHTS.includes(index) ? [{ minute: 180, fromF: 79, targetF: 82, plannedF: 82, held: index === 5 }] : []),
-    ...(UP_NIGHTS.includes(index) ? [{ minute: 360, fromF: 79, targetF: 84, plannedF: 79 }] : []),
-  ], false, index === ONE_OFF_NIGHT));
+  const offDays = dates.map((date, index) => nightLog('right', 'off-days', date, '23:00', plan, ENDS[index] ?? 480,
+    index === ONE_OFF_NIGHT ? [
+      { minute: 150, fromF: 82, targetF: 86, plannedF: 82 },
+      { minute: 240, fromF: 86, targetF: 82, plannedF: 79 },
+      { minute: 300, fromF: 82, targetF: 79, plannedF: 79 },
+    ] : [
+      ...(index in DOWN_AT ? [{ minute: DOWN_AT[index], fromF: 82, targetF: 79, plannedF: 82, tap: index === 9 }] : []),
+      ...(BACK_NIGHTS.includes(index) ? [{ minute: 180, fromF: 79, targetF: 82, plannedF: 82, held: index === 5 }] : []),
+      ...(index in UP_AT ? [{ minute: UP_AT[index], fromF: BACK_NIGHTS.includes(index) ? 82 : 79, targetF: 84, plannedF: 79 }] : []),
+    ], false, index === ONE_OFF_NIGHT));
   const shift = dates.slice(-3).map(date => nightLog('right', 'night-shift', date, '08:00', [{ offsetMin: 0, temperatureF: 83 }], 450, []));
   const pick = (indexes: number[]) => indexes.map(index => dates[index]);
   const rows: SuggestionRow[] = [
     {
-      kind: 'step', key: 'step:down', direction: 'down', ...evidence(pick(DOWN_NIGHTS)), time: '23:45', temperatureF: 79, plannedF: 82,
+      kind: 'step', key: 'step:down', direction: 'down', ...evidence(pick(DOWN_NIGHTS)), time: '23:15', temperatureF: 79, plannedF: 82,
       thenBack: { time: '02:00', temperatureF: 82, supporting: BACK_NIGHTS.length },
     },
-    { kind: 'step', key: 'step:up', direction: 'up', ...evidence(pick(UP_NIGHTS)), time: '05:00', temperatureF: 84, plannedF: 79 },
+    { kind: 'step', key: 'step:up', direction: 'up', ...evidence(pick(UP_NIGHTS)), time: '05:45', temperatureF: 84, plannedF: 79 },
   ];
   const counted = offDays.filter(night => !night.excluded).length;
   return {
     enabled: true,
-    nights: { 'off-days': counting(counted, 'suggested', 12), 'night-shift': counting(3) },
+    nights: { 'off-days': counting(counted, 'suggested', DOWN_NIGHTS.length), 'night-shift': counting(3) },
     suggestions: [{ rhythmId: 'off-days', near: false, rows }],
     dismissed: [],
     log: [nightLog('right', 'off-days', today, '23:00', plan, 480, [], true), ...offDays, ...shift].sort(newestFirst),

@@ -88,3 +88,20 @@ it('records what each demo night was set to, ending with the power-off', () => {
   expect(tonight?.start).toBeDefined();
   expect(tonight?.sets).toBeUndefined();
 });
+
+it('varies the off days nights so most turn down early and up near dawn', () => {
+  const nights = getMockSuggestions('right', NOW).log.filter(night => night.rhythmId === 'off-days' && !night.tonight && !night.excluded);
+  const minutes = (night: (typeof nights)[number], to: number) => night.changes
+    .filter(change => change.targetF === to).map(change => Math.round((Date.parse(change.at) - Date.parse(night.start!)) / 60000));
+  const downs = nights.flatMap(night => minutes(night, 79).slice(0, 1));
+  const ups = nights.flatMap(night => minutes(night, 84));
+  expect(nights).toHaveLength(13);
+  expect(nights.filter(night => night.changes.length === 0)).toHaveLength(2);
+  expect(downs.length).toBeGreaterThan(nights.length / 2);
+  expect(ups.length).toBeGreaterThan(nights.length / 2);
+  expect(Math.min(...downs)).toBeGreaterThanOrEqual(5);
+  expect(Math.max(...downs)).toBeLessThanOrEqual(25);
+  expect(Math.min(...ups)).toBeGreaterThanOrEqual(390);
+  expect(Math.max(...ups)).toBeLessThanOrEqual(420);
+  expect(new Set(downs).size).toBeGreaterThan(5);
+});
