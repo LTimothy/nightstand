@@ -50,7 +50,8 @@ is a hard fork; for the history of the projects it descends from, see
   the Pod for 90 days and can be deleted in Settings.
 - Each rhythm card on the Schedule page draws its schedule and, where a
   typical night of the last 14 differs from it, what the bed was set to
-  instead, with a sentence saying what most nights did. What the schedule
+  instead, with a sentence saying what half or more of the
+  nights did. What the schedule
   sets during a rhythm night is kept with the notes for 90 days.
 - Checked on: the server and app test suites and the demo layout sweep.
 

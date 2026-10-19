@@ -264,37 +264,37 @@ describe('the sentence under a rhythm card\'s chart', () => {
   it('says what most nights did, in order, with the time rounded to 15 minutes', () => {
     const blocks = [block({ from: 17 }), block({ from: 410, to: 480, f: 84, farF: 79, schedule: [{ x: 410, f: 79 }], turned: 'up' })];
     expect(typicalNightText(blocks, '23:00', 'fahrenheit', false))
-      .toBe('Most nights you turned it down to 79°F around 11:15 PM and up to 84°F around 5:45 AM.');
+      .toBe('On half or more nights you turned it down to 79°F around 11:15 PM and up to 84°F around 5:45 AM.');
     expect(typicalNightText(blocks, '23:00', 'level', false))
-      .toBe('Most nights you turned it down to −1 around 11:15 PM and up to +1 around 5:45 AM.');
+      .toBe('On half or more nights you turned it down to −1 around 11:15 PM and up to +1 around 5:45 AM.');
     expect(typicalNightText(blocks, '23:00', 'celsius', false))
-      .toBe('Most nights you turned it down to 26°C around 11:15 PM and up to 29°C around 5:45 AM.');
+      .toBe('On half or more nights you turned it down to 26°C around 11:15 PM and up to 29°C around 5:45 AM.');
   });
 
   it('reads a value held while the schedule moved as kept', () => {
-    expect(typicalNightText([kept], '23:00', 'fahrenheit', false)).toBe('Most nights you kept it at 82°F while the schedule went down to 79°F.');
+    expect(typicalNightText([kept], '23:00', 'fahrenheit', false)).toBe('On half or more nights you kept it at 82°F while the schedule went down to 79°F.');
     expect(typicalNightText([block({ f: 85, farF: 88, turned: 'up' }), block({ from: 300, turned: 'down' })], '23:00', 'fahrenheit', false))
-      .toBe('Most nights you turned it up to 85°F around 11:15 PM and down to 79°F around 4:00 AM.');
+      .toBe('On half or more nights you turned it up to 85°F around 11:15 PM and down to 79°F around 4:00 AM.');
   });
 
   it('gives the bed the credit on a Smart rhythm, which the nights may differ from with no hand change', () => {
-    expect(typicalNightText([kept], '23:00', 'fahrenheit', true)).toBe('Most nights the bed stayed at 82°F while the curve went down to 79°F.');
+    expect(typicalNightText([kept], '23:00', 'fahrenheit', true)).toBe('On half or more nights the bed stayed at 82°F while the curve went down to 79°F.');
     expect(typicalNightText([block({}), kept], '23:00', 'fahrenheit', true))
-      .toBe('Most nights the bed went down to 79°F around 11:15 PM and stayed at 82°F while the curve went down to 79°F.');
+      .toBe('On half or more nights the bed went down to 79°F around 11:15 PM and stayed at 82°F while the curve went down to 79°F.');
     expect(typicalNightText([block({}), block({ from: 300, f: 84, turned: 'up' })], '23:00', 'fahrenheit', true))
-      .toBe('Most nights the bed went down to 79°F around 11:15 PM and up to 84°F around 4:00 AM.');
+      .toBe('On half or more nights the bed went down to 79°F around 11:15 PM and up to 84°F around 4:00 AM.');
     expect(typicalNightText([block({}), kept], '23:00', 'fahrenheit', true)).not.toMatch(/\byou\b/);
   });
 
   it('reads a block that starts the night by how it sits against the schedule there', () => {
     const early = block({ from: 0, f: 88, farF: 82, schedule: [{ x: 0, f: 82 }], turned: 'up' });
-    expect(typicalNightText([early], '23:00', 'fahrenheit', false)).toBe('Most nights you turned it up to 88°F around 11:00 PM.');
-    expect(typicalNightText([early], '23:00', 'fahrenheit', true)).toBe('Most nights the bed went up to 88°F around 11:00 PM.');
+    expect(typicalNightText([early], '23:00', 'fahrenheit', false)).toBe('On half or more nights you turned it up to 88°F around 11:00 PM.');
+    expect(typicalNightText([early], '23:00', 'fahrenheit', true)).toBe('On half or more nights the bed went up to 88°F around 11:00 PM.');
   });
 
   it('names the bed again when a turn follows a held value on a Smart rhythm', () => {
     expect(typicalNightText([kept, block({ from: 300, f: 84, turned: 'up' })], '23:00', 'fahrenheit', true))
-      .toBe('Most nights the bed stayed at 82°F while the curve went down to 79°F and the bed went up to 84°F around 4:00 AM.');
+      .toBe('On half or more nights the bed stayed at 82°F while the curve went down to 79°F and the bed went up to 84°F around 4:00 AM.');
     expect(typicalNightText([block({}), block({ from: 300, f: 84, turned: 'up' })], '23:00', 'fahrenheit', true))
       .not.toMatch(/and the bed/);
   });
@@ -302,12 +302,12 @@ describe('the sentence under a rhythm card\'s chart', () => {
   it('gives the two values of a held clause the same unit', () => {
     // 82 and 83 share a level but 83 and 80 do not.
     const held = block({ f: 83, farF: 80, schedule: [{ x: 15, f: 82 }], turned: null });
-    expect(typicalNightText([held], '23:00', 'level', false)).toBe('Most nights you kept it at 83°F while the schedule went down to 80°F.');
+    expect(typicalNightText([held], '23:00', 'level', false)).toBe('On half or more nights you kept it at 83°F while the schedule went down to 80°F.');
   });
 
   it('shows both values in °F when two levels would read the same', () => {
     expect(typicalNightText([block({ f: 83, turned: 'up' })], '23:00', 'level', false))
-      .toBe('Most nights you turned it up to 83°F around 11:15 PM.');
+      .toBe('On half or more nights you turned it up to 83°F around 11:15 PM.');
   });
 
   it('says when the nights match, and counts them before there are five', () => {

@@ -63,7 +63,7 @@ describe('the chart on a rhythm card', () => {
     expect(labels.map(label => label.textContent)).toEqual(['79°F', '84°F']);
     expect(labels[0]).toHaveAttribute('aria-hidden', 'true');
     expect(document.getElementById('caption'))
-      .toHaveTextContent('Most nights you turned it down to 79°F around 11:45 PM and up to 84°F around 5:30 AM.');
+      .toHaveTextContent('On half or more nights you turned it down to 79°F around 11:45 PM and up to 84°F around 5:30 AM.');
   });
 
   it('prints no value in a block too narrow or too flat for it', () => {
@@ -74,7 +74,7 @@ describe('the chart on a rhythm card', () => {
     const { container } = draw(flat, 'level');
     expect(container.querySelectorAll('[data-block]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-block-label]')).toHaveLength(0);
-    expect(screen.getByText('Most nights you turned it up to 83°F around 11:45 PM.')).toBeInTheDocument();
+    expect(screen.getByText('On half or more nights you turned it up to 83°F around 11:45 PM.')).toBeInTheDocument();
   });
 
   it('prints no value where a schedule step runs through the middle of the block', () => {

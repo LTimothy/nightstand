@@ -62,9 +62,11 @@ function typicalNight(nights: Night[], plan: Step[], endMin: number): Array<numb
       .map(night => valueAt(night.points, minute)).sort((a, b) => a - b);
     if (values.length * 2 < nights.length) return null;
     const middle = values.length >> 1;
-    if (values.length % 2) return values[middle];
     const planned = valueAt(plan, minute);
-    return Math.abs(values[middle - 1] - planned) >= Math.abs(values[middle] - planned) ? values[middle - 1] : values[middle];
+    const picked = values.length % 2 ? values[middle]
+      : Math.abs(values[middle - 1] - planned) >= Math.abs(values[middle] - planned) ? values[middle - 1] : values[middle];
+    // Late in the night the median counts only nights still running, so the pick must still hold on half of all nights.
+    return values.filter(value => value === picked).length * 2 < nights.length ? null : picked;
   });
 }
 

@@ -62,6 +62,15 @@ describe('the chart on a rhythm card', () => {
     expect(overlay(log).blocks).toEqual([]);
   });
 
+  it('shows only a value half or more of all the nights hold, late in the night too', () => {
+    const short = (date: string) => night(date, [], {
+      endMin: 300, sets: [{ at: at(date, 0), temperatureF: 82 }, { at: at(date, 4), temperatureF: 79 }, { at: at(date, 5), temperatureF: null }],
+    });
+    const log = [...dates.slice(0, 3).map(short), night(dates[3], [change(dates[3], 5.5, 70, 79)]),
+      night(dates[4], [change(dates[4], 5.5, 70, 79)]), night(dates[5])];
+    expect(overlay(log).blocks).toEqual([]);
+  });
+
   it('counts the last 14 nights and widens the range to the typical night', () => {
     const log = dates.map(date => night(date, [change(date, 2, 70)]));
     expect(overlay(log)).toMatchObject({ nights: 14, loF: 70, hiF: 86, blocks: [expect.objectContaining({ from: 120, f: 70 })] });

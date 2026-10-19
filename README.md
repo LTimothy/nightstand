@@ -249,7 +249,7 @@ rhythm's last 14 nights shows on the Schedule page with the nights behind
 it, and one action adds it to the rhythm. Nothing changes until you add it.
 Each rhythm's card on the Schedule page draws its schedule and, where a
 typical night of the last 14 differs from it, what the bed was set to
-instead, with one sentence saying what most nights did. For that,
+instead, with one sentence saying what half or more of the nights did. For that,
 Nightstand also writes down what the schedule set during each rhythm
 night.
 

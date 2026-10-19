@@ -149,7 +149,7 @@ export function typicalNightText(blocks: Block[], on: string, format: Temperatur
     const verb = previous?.turned ? '' : smart ? (previous ? 'the bed went ' : 'went ') : 'turned it ';
     return `${verb}${block.turned} to ${value} around ${clockAfterOn(on, Math.round(block.from / round) * round)}`;
   });
-  return `Most nights ${smart ? 'the bed' : 'you'} ${joinAnd(clauses)}.`;
+  return `On half or more nights ${smart ? 'the bed' : 'you'} ${joinAnd(clauses)}.`;
 }
 
 // The value a row writes, read against the one it replaces.
