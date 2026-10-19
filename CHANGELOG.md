@@ -55,6 +55,8 @@ is a hard fork; for the history of the projects it descends from, see
   sets during a rhythm night is kept with the notes for 90 days.
 - "Hide for 14 nights" also ends after 90 days, so a rhythm used about once a
   week no longer stays hidden until someone taps Show again.
+- A hand change made on the night the clocks change is timed on the bedtime
+  clock, so it no longer moves a suggested step time by an hour.
 - Checked on: the server and app test suites and the demo layout sweep.
 
 ### Cover taps

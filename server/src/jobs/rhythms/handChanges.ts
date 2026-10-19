@@ -3,6 +3,7 @@
 // folder, never inside it, so the job watcher ignores it.
 import { createHash, randomUUID } from 'node:crypto';
 import { appendFile, readFile, rm } from 'node:fs/promises';
+import moment from 'moment-timezone';
 import config from '../../config.js';
 import logger from '../../logger.js';
 import settingsDB from '../../db/settings.js';
@@ -10,6 +11,7 @@ import type { DailySchedule, Side } from '../../db/schedulesSchema.js';
 import type { Rhythm } from '../../db/rhythmsSchema.js';
 import type { Settings } from '../../db/settingsSchema.js';
 import { levelAt, levelToF, phaseAt, type CurvePoint } from '../../db/smartCurve.js';
+import { minutesAfterOn } from '../../db/rhythmWake.js';
 import { NOTE_DAYS } from '../../db/suggestionRules.js';
 import { MAX_TEMPERATURE_F, MIN_TEMPERATURE_F } from '../../routes/deviceStatus/deviceStatusSchema.js';
 import { isSchedulePaused } from '../schedulePause.js';
@@ -171,7 +173,8 @@ function changeLine(settings: Settings, side: Side, change: HandChange, now: Dat
     v: 1, kind: 'change', at: now.toISOString(), side: driver, rhythmId: sleep.rhythmId, mode: sleep.mode,
     planKey: planKeyOf(sleep.night, sleep.mode, baseLevel), date: sleep.date,
     sleepStart: sleep.start.toISOString(), sleepEnd: sleep.end.toISOString(),
-    offsetMin: Math.max(0, Math.floor((now.getTime() - sleep.start.getTime()) / 60_000)),
+    // On the bedtime clock, as suggestedTime reads it, so a clock change does not shift the hour.
+    offsetMin: minutesAfterOn(moment.tz(now, settings.timeZone).format('HH:mm'), sleep.night.power.on),
     plannedF,
     holdF: curve ? nightLevelF(curve, baseLevel) : null,
     fromF: change.fromF === null ? null : Math.round(change.fromF),
