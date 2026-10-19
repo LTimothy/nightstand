@@ -123,6 +123,8 @@ is a hard fork; for the history of the projects it descends from, see
   runs at startup. The newer target is published only after the checks in
   [TESTING.md](docs/TESTING.md#upstream-switch-publication-gate) pass on a
   VM and on hardware.
+- The update, rollback and switch scripts share one copy of their common
+  steps, and the deploy script's download window uses the same copy.
 
 ### Network and security
 
@@ -372,6 +374,8 @@ is a hard fork; for the history of the projects it descends from, see
 - The app ships one copy of zod and moment-timezone instead of two, about
   70 KB less to download.
 - The compact side picker no longer polls presence.
+- The app drops the date pickers and d3, which nothing used. The script
+  bundle is about 8 KB smaller.
 
 ### Fixes
 
