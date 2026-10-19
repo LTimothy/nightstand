@@ -6,30 +6,101 @@ main file: committed data can still be in its WAL.
 """
 from contextlib import closing
 import hashlib
+import io
+import json
 from pathlib import Path
 import os
 import re
+import shutil
 import sqlite3
+import stat
 import sys
 import tempfile
 import time
 
 
 def connect(database):
-    return sqlite3.connect(Path(database).resolve().as_uri() + '?mode=rw', uri=True, timeout=5)
+    # Root opens this read-write and SQLite creates its side files without
+    # O_NOFOLLOW, so a link the server user left at any of them is refused.
+    path = Path(database).absolute()
+    for name in (path.name, path.name + '-wal', path.name + '-shm', path.name + '-journal'):
+        if path.with_name(name).is_symlink():
+            raise ValueError(f'{path.with_name(name)} is a link; refusing to open the database')
+    return sqlite3.connect(path.as_uri() + '?mode=rw', uri=True, timeout=5)
+
+
+def hand_over(database, owner):
+    """Gives the folder's owner any database file root left owned by itself.
+
+    Only a plain file with one name is changed, through a descriptor opened
+    without following links, so this never reaches another file.
+    """
+    path = os.path.abspath(database)
+    for name in (path, path + '-wal', path + '-shm', path + '-journal'):
+        try:
+            descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        except OSError:
+            continue
+        try:
+            info = os.fstat(descriptor)
+            if stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and info.st_uid != owner.st_uid:
+                os.fchown(descriptor, owner.st_uid, owner.st_gid)
+        finally:
+            os.close(descriptor)
+
+
+def as_owner(database, step, output):
+    """Runs step(output) as the owner of the database's folder when root runs this.
+
+    The database and its side files belong to that user, so a link left
+    there only reaches what that user could already write. The step's
+    bytes come back over a pipe into output, which root opened itself.
+    """
+    owner = os.stat(os.path.dirname(os.path.abspath(database)))
+    if os.geteuid() != 0 or owner.st_uid == 0:
+        step(output)
+        return
+    hand_over(database, owner)
+    read_end, write_end = os.pipe()
+    child = os.fork()
+    if child == 0:
+        status = 1
+        try:
+            # Keep only stdio and the pipe: nothing root holds open, such as
+            # its backup file or the operation lock, reaches the other user.
+            os.closerange(3, write_end)
+            os.closerange(write_end + 1, os.sysconf('SC_OPEN_MAX'))
+            os.setgroups([])
+            os.setgid(owner.st_gid)
+            os.setuid(owner.st_uid)
+            with os.fdopen(write_end, 'wb') as pipe:
+                step(pipe)
+            status = 0
+        except BaseException as error:
+            print(f'Database safety check failed: {error}', file=sys.stderr)
+        finally:
+            os._exit(status)
+    os.close(write_end)
+    with os.fdopen(read_end, 'rb') as pipe:
+        shutil.copyfileobj(pipe, output)
+    _, status = os.waitpid(child, 0)
+    if status != 0:
+        raise RuntimeError('the database step failed')
 
 
 def checkpoint(database):
-    with closing(connect(database)) as source:
-        busy, _, _ = source.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
-        if busy:
-            raise RuntimeError('Database checkpoint is busy; keep the database and WAL together and retry after stopping writers.')
+    def step(_output):
+        with closing(connect(database)) as source:
+            busy, _, _ = source.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
+            if busy:
+                raise RuntimeError('Database checkpoint is busy; keep the database and WAL together and retry after stopping writers.')
+    as_owner(database, step, io.BytesIO())
 
 
-def backup(database, destination):
-    destination = Path(destination)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix='.sqlite-backup-', dir=destination.parent)
+def snapshot(database, output):
+    """Writes a consistent copy of the database to output."""
+    path = Path(database).absolute()
+    descriptor, temporary = tempfile.mkstemp(prefix='.sqlite-snapshot-', dir=path.parent)
     os.close(descriptor)
     source = target = None
     try:
@@ -42,12 +113,33 @@ def backup(database, destination):
                 raise RuntimeError('Database backup timed out; no snapshot was published.')
 
         source.backup(target, pages=256, progress=progress, sleep=0.1)
+        target.close()
+        target = None
+        with open(temporary, 'rb') as copy:
+            shutil.copyfileobj(copy, output)
+    finally:
+        if target is not None:
+            target.close()
+        if source is not None:
+            source.close()
+        os.unlink(temporary)
+
+
+def backup(database, destination):
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix='.sqlite-backup-', dir=destination.parent)
+    target = None
+    try:
+        with os.fdopen(descriptor, 'wb') as output:
+            as_owner(database, lambda pipe: snapshot(database, pipe), output)
+            output.flush()
+            os.fsync(output.fileno())
+        target = sqlite3.connect(temporary)
         if target.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
             raise RuntimeError('Database backup failed integrity_check')
         target.close()
         target = None
-        with open(temporary, 'rb') as snapshot:
-            os.fsync(snapshot.fileno())
         # A hard link publishes the complete file atomically without replacing
         # an existing recovery copy, even if two callers choose the same name.
         os.link(temporary, destination)
@@ -59,8 +151,6 @@ def backup(database, destination):
     finally:
         if target is not None:
             target.close()
-        if source is not None:
-            source.close()
         os.unlink(temporary)
 
 
@@ -108,8 +198,13 @@ def atomic_additive(sql):
 
 
 def recoverable_migrations(database, directory):
-    with closing(connect(database)) as source:
-        rows = source.execute('SELECT migration_name, checksum FROM _prisma_migrations WHERE finished_at IS NULL AND rolled_back_at IS NULL').fetchall()
+    def step(output):
+        with closing(connect(database)) as source:
+            rows = source.execute('SELECT migration_name, checksum FROM _prisma_migrations WHERE finished_at IS NULL AND rolled_back_at IS NULL').fetchall()
+        output.write(json.dumps(rows).encode())
+    found = io.BytesIO()
+    as_owner(database, step, found)
+    rows = json.loads(found.getvalue())
     if not rows:
         raise ValueError('No failed migrations found')
     names = []

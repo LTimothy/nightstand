@@ -51,7 +51,12 @@ if [[ "$confirm" =~ ^[Yy]$ ]]; then
       echo "The database could not be copied cleanly and may be damaged; copying the file as it is instead."
       mkdir -p "$BACKUPS"
       for suffix in "" -wal -journal; do
-        if [ -f "$DATABASE$suffix" ] && ! cp "$DATABASE$suffix" "$RAW$suffix"; then
+        # Root never copies through a link the server user left in its folder.
+        if [ -L "$DATABASE$suffix" ]; then
+          echo "Skipped $DATABASE$suffix, which is a link."
+          continue
+        fi
+        if [ -f "$DATABASE$suffix" ] && ! cp -P "$DATABASE$suffix" "$RAW$suffix"; then
           echo "Could not copy $DATABASE$suffix aside; nothing was deleted."
           exit 1
         fi

@@ -208,6 +208,15 @@ is a hard fork; for the history of the projects it descends from, see
 - `reset.sh` keeps the socket path and the watchdog trial file only when
   they are plain files. Before, a link left at either name made root copy
   the file it pointed to into the new data folder.
+- The database snapshot and checkpoint helper refuses to open the
+  database when it or its `-wal`, `-shm` or `-journal` file is a link, and
+  `reset_db.sh` skips a linked file when it keeps a damaged database as it
+  is. When root runs it, the helper opens the database only in a process
+  running as the user that owns the data folder and copies the snapshot
+  back over a pipe, so a link planted after that check reaches only what
+  the server user could already write. Database files root left owned by
+  itself are handed to that user first. Before, root could open, write or
+  copy the file a link pointed to.
 
 ### Installation and fork migration
 

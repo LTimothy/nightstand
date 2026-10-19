@@ -83,6 +83,131 @@ class DatabaseSafety(unittest.TestCase):
         finally:
             reader.close()
 
+    def test_refuses_a_database_or_side_file_that_is_a_link(self):
+        linked = self.folder / 'linked.db'
+        linked.symlink_to(self.database)
+        for operation in (('checkpoint', linked), ('backup', linked, self.folder / 'out.db')):
+            self.assertNotEqual(self.run_helper(*operation).returncode, 0, operation)
+        self.assertFalse((self.folder / 'out.db').exists())
+        for suffix in ('-wal', '-shm', '-journal'):
+            with self.subTest(suffix=suffix):
+                other = self.folder / f'other{suffix}.db'
+                sqlite3.connect(other).close()
+                victim = self.folder / f'victim{suffix}'
+                Path(str(other) + suffix).symlink_to(victim)
+                for operation in (('checkpoint', other), ('backup', other, self.folder / f'out{suffix}.db')):
+                    result = self.run_helper(*operation)
+                    self.assertNotEqual(result.returncode, 0, operation)
+                    self.assertIn('link', result.stderr)
+                self.assertFalse(victim.exists())
+
+    def test_root_hands_root_owned_database_files_to_the_folder_owner(self):
+        # Files left owned by root would stop the owner's process opening
+        # them. Only plain, singly linked files are handed over, never links.
+        victim = self.folder / 'victim'
+        victim.write_text('keep')
+        Path(str(self.database) + '-journal').symlink_to(victim)
+        program = r"""
+import importlib.util, io, os, sys
+spec = importlib.util.spec_from_file_location('safety', sys.argv[1])
+safety = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(safety)
+os.geteuid = lambda: 0
+os.setgroups = lambda groups: None
+os.setgid = lambda gid: None
+os.setuid = lambda uid: None
+opened, handed = {}, []
+real_open, real_fstat = os.open, os.fstat
+def recording_open(path, flags, *args, **kwargs):
+    descriptor = real_open(path, flags, *args, **kwargs)
+    opened[descriptor] = os.path.basename(str(path))
+    return descriptor
+def root_fstat(descriptor):
+    info = list(real_fstat(descriptor))
+    if opened.get(descriptor, '').startswith('live.db'):
+        info[4] = 0
+    return os.stat_result(info)
+os.open, os.fstat = recording_open, root_fstat
+os.fchown = lambda descriptor, uid, gid: handed.append(opened[descriptor])
+try:
+    safety.checkpoint(sys.argv[2])
+finally:
+    print(sorted(handed))
+"""
+        result = subprocess.run([sys.executable, '-c', program, str(HELPER), str(self.database)],
+                                capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(result.returncode, 0, 'the linked journal is still refused')
+        self.assertEqual(result.stdout.strip(), "['live.db', 'live.db-shm', 'live.db-wal']", result.stderr)
+        self.assertEqual(victim.read_text(), 'keep')
+
+    def test_the_owner_step_inherits_no_other_open_files(self):
+        program = r"""
+import importlib.util, io, os, sys
+spec = importlib.util.spec_from_file_location('safety', sys.argv[1])
+safety = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(safety)
+os.geteuid = lambda: 0
+os.setgroups = lambda groups: None
+os.setgid = lambda gid: None
+os.setuid = lambda uid: None
+held = open(sys.argv[2], 'wb')
+def step(output):
+    others = []
+    for descriptor in range(3, 1024):
+        if descriptor == output.fileno():
+            continue
+        try:
+            os.fstat(descriptor)
+            others.append(descriptor)
+        except OSError:
+            pass
+    output.write(repr(others).encode())
+found = io.BytesIO()
+safety.as_owner(sys.argv[3], step, found)
+print(found.getvalue().decode(), held.fileno())
+"""
+        result = subprocess.run([sys.executable, '-c', program, str(HELPER), str(self.folder / 'held'), str(self.database)],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.startswith('[] '), result.stdout)
+
+    def test_root_opens_the_server_users_database_only_as_that_user(self):
+        # Run as "root" with the drop recorded: any SQLite open of the
+        # database, where a link planted after the check would lead, must
+        # happen in a process that already switched to the folder's owner.
+        program = r"""
+import importlib.util, os, sqlite3, sys
+spec = importlib.util.spec_from_file_location('safety', sys.argv[1])
+safety = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(safety)
+database, destination, marker = sys.argv[2:5]
+switched = []
+os.geteuid = lambda: 0
+os.setgroups = lambda groups: None
+os.setgid = lambda gid: None
+os.setuid = lambda uid: switched.append(uid)
+real_connect = sqlite3.connect
+def connect(target, *args, **kwargs):
+    if os.path.dirname(database) in str(target) and switched != [os.stat(os.path.dirname(database)).st_uid]:
+        open(marker, 'a').write(str(target) + '\\n')
+    return real_connect(target, *args, **kwargs)
+sqlite3.connect = connect
+safety.checkpoint(database)
+safety.backup(database, destination)
+"""
+        outside = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside)
+        destination = outside / 'root-only/snapshot.db'
+        marker = self.folder.parent / (self.folder.name + '-root-opened')
+        self.addCleanup(lambda: marker.unlink() if marker.exists() else None)
+        result = subprocess.run([sys.executable, '-c', program, str(HELPER), str(self.database), str(destination), str(marker)],
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(marker.exists(), marker.read_text() if marker.exists() else '')
+        with sqlite3.connect(destination) as conn:
+            self.assertEqual(conn.execute('SELECT count(*) FROM records').fetchone()[0], 201)
+        self.assertEqual([path.name for path in self.folder.iterdir() if path.name.startswith('.')], [])
+
     def test_missing_database_is_not_created(self):
         missing = self.folder / 'missing.db'
         self.assertNotEqual(self.run_helper('backup', missing, self.folder / 'out.db').returncode, 0)
