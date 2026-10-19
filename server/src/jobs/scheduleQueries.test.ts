@@ -114,3 +114,21 @@ describe('Rhythms engine answers', () => {
     assert.equal(settingsDB.data.left.scheduleOverrides.temperatureSchedules.disabled, true);
   });
 });
+
+describe('isInScheduledSleep with the weekly engine', () => {
+  for (const [on, off, time, expected] of [
+    ['21:00', '07:00', '2026-09-28T20:59:00Z', false], ['21:00', '07:00', '2026-09-28T21:00:00Z', true],
+    ['21:00', '07:00', '2026-09-29T06:59:00Z', true], ['21:00', '07:00', '2026-09-29T07:00:00Z', false],
+    ['13:00', '15:00', '2026-09-28T14:00:00Z', true], ['13:00', '15:00', '2026-09-28T15:00:00Z', false],
+    ['07:00', '07:00', '2026-09-29T06:59:00Z', true],
+  ] as const) {
+    it(`${on} to ${off} at ${time.slice(11, 16)} is ${expected ? 'inside' : 'outside'}`, () => {
+      for (const day of SCHEDULE_DAYS) schedulesDB.data.left[day] = testNight(on, off);
+      assert.equal(queries.isInScheduledSleep('left', at(time)), expected);
+    });
+  }
+  it('is outside on a day whose power is off', () => {
+    for (const day of SCHEDULE_DAYS) schedulesDB.data.left[day] = testNight('21:00', '07:00', { enabled: false });
+    assert.equal(queries.isInScheduledSleep('left', at('2026-09-28T23:00:00Z')), false);
+  });
+});

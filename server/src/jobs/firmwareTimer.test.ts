@@ -8,7 +8,7 @@ const folder = mkdtempSync(path.join(tmpdir(), 'nightstand-firmware-timer-'));
 mkdirSync(path.join(folder, 'lowdb'));
 process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
-const { firmwareSecondsUntil, secondsUntilScheduledOff, WEEKLY_FIRMWARE_MARGIN_SECONDS } = await import('./firmwareTimer.js');
+const { firmwareSecondsUntil, nextScheduledOff, secondsUntilScheduledOff, WEEKLY_FIRMWARE_MARGIN_SECONDS } = await import('./firmwareTimer.js');
 const { MAX_ON_DURATION_SECONDS } = await import('../routes/deviceStatus/deviceStatusSchema.js');
 after(() => rmSync(folder, { recursive: true, force: true }));
 
@@ -40,5 +40,17 @@ describe('secondsUntilScheduledOff', () => {
 describe('firmwareSecondsUntil', () => {
   it('falls back to the firmware maximum for an end that is not a time', () => {
     assert.equal(firmwareSecondsUntil(new Date(Number.NaN), new Date()), MAX_ON_DURATION_SECONDS);
+  });
+});
+
+describe('nextScheduledOff', () => {
+  const UTC = 'UTC';
+  it('is later today until the minute itself, then tomorrow', () => {
+    assert.equal(nextScheduledOff(new Date('2026-10-05T06:59:59Z'), '07:00', UTC).toISOString(), '2026-10-05T07:00:00.000Z');
+    assert.equal(nextScheduledOff(new Date('2026-10-05T07:00:00Z'), '07:00', UTC).toISOString(), '2026-10-06T07:00:00.000Z');
+  });
+  it('lands on the local wall clock across a daylight-saving change', () => {
+    // 2026-11-01 is the fall change in Los Angeles; 07:00 that day is 15:00 UTC.
+    assert.equal(nextScheduledOff(new Date('2026-11-01T05:00:00Z'), '07:00', LA).toISOString(), '2026-11-01T15:00:00.000Z');
   });
 });

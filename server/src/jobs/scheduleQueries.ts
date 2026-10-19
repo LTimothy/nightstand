@@ -4,12 +4,13 @@ import moment from 'moment-timezone';
 import settingsDB from '../db/settings.js';
 import schedulesDB from '../db/schedules.js';
 import type { Settings } from '../db/settingsSchema.js';
-import type { DayOfWeek, Schedules, Side, Time } from '../db/schedulesSchema.js';
+import type { Side } from '../db/schedulesSchema.js';
 import { SCHEDULE_DAYS } from '../db/scheduleKeys.js';
-import { compareTimes, isValidTime, scheduleWrapsToNextDay } from './utils.js';
+import { compareTimes, isValidTime } from './utils.js';
 import type { Activation } from './rhythms/activation.js';
 import { resolveLegacySleeps, resolveSleeps, type ResolvedSleep, type RhythmEvent } from './rhythms/resolve.js';
 import { smartResolveHooks } from './rhythms/curveController.js';
+import { runningNight } from './nightBounds.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 const CHANGE_LOOKAHEAD_MS = 48 * HOUR_MS;
@@ -42,26 +43,6 @@ export function drivingSide(settings: Settings, side: Side): Side | null {
 
 function podTimeZone(): string {
   return settingsDB.data.timeZone || 'UTC';
-}
-
-// Weekly engine: a window opens at power.on and closes at power.off, on the
-// next day when it wraps. Yesterday's and today's windows cover overnights.
-function legacyIsInPowerWindow(side: Side, now: moment.Moment, schedules: Schedules): boolean {
-  const parseAt = (anchor: moment.Moment, hhmm: Time): moment.Moment => {
-    const [h, m] = hhmm.split(':').map(Number);
-    return anchor.clone().startOf('day').hour(h).minute(m).second(0).millisecond(0);
-  };
-  for (const daysAgo of [1, 0]) {
-    const anchor = now.clone().subtract(daysAgo, 'day');
-    const dayName = anchor.format('dddd').toLowerCase() as DayOfWeek;
-    const daySchedule = schedules[side]?.[dayName];
-    if (!daySchedule?.power.enabled) continue;
-    const start = parseAt(anchor, daySchedule.power.on);
-    const end = parseAt(anchor, daySchedule.power.off);
-    if (scheduleWrapsToNextDay(daySchedule.power)) end.add(1, 'day');
-    if (now.isSameOrAfter(start) && now.isBefore(end)) return true;
-  }
-  return false;
 }
 
 // Weekly engine: yesterday's schedule is included because its after-midnight rows run today.
@@ -115,7 +96,7 @@ export function sleepAround(side: Side, at: Date): ResolvedSleep | null {
 }
 
 export function isInScheduledSleep(side: Side, now: Date): boolean {
-  if (!engine.active) return legacyIsInPowerWindow(side, moment.tz(now, podTimeZone()), schedulesDB.data);
+  if (!engine.active) return runningNight(schedulesDB.data, side, now, podTimeZone()) !== null;
   return currentSleep(side, now) !== null;
 }
 

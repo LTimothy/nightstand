@@ -1,8 +1,6 @@
-import moment from 'moment-timezone';
 import schedule from 'node-schedule';
 import type { Settings } from '../db/settingsSchema.js';
 import type { Schedules, Side } from '../db/schedulesSchema.js';
-import { SCHEDULE_DAYS } from '../db/scheduleKeys.js';
 import settingsDB from '../db/settings.js';
 import schedulesDB from '../db/schedules.js';
 import { connectFrankenWithin } from '../8sleep/frankenServer.js';
@@ -13,22 +11,8 @@ import { MAX_ON_DURATION_SECONDS } from '../routes/deviceStatus/deviceStatusSche
 import { armedNight, forgetWeeklyArmed, nextScheduledOff, noteWeeklyArmed, weeklyFirmwareEnd, type Night } from './firmwareTimer.js';
 import { isRebuilding } from './rebuildState.js';
 import { engineActivation } from './scheduleQueries.js';
-import { nightBounds } from './nightBounds.js';
+import { runningNight } from './nightBounds.js';
 import { isSchedulePaused } from './schedulePause.js';
-
-// Today's night, or the one that began yesterday, if the schedule has it running now.
-export function runningNight(schedules: Schedules, side: Side, now: Date, timeZone: string): Night | null {
-  let found: Night | null = null;
-  for (const daysAgo of [1, 0]) {
-    const anchor = moment.tz(now, timeZone).subtract(daysAgo, 'day');
-    const day = SCHEDULE_DAYS[anchor.day()];
-    const power = schedules[side]?.[day]?.power;
-    if (!power?.enabled) continue;
-    const { start, end } = nightBounds(anchor, power);
-    if (!start.isAfter(now) && end.isAfter(now)) found = { day, start: start.toDate() };
-  }
-  return found;
-}
 
 const MANUAL_ON_MS = MAX_ON_DURATION_SECONDS * 1000;
 
