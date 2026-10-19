@@ -1,6 +1,8 @@
 #!/bin/bash
 # Restores uncommitted switches offline, before systemd releases writer startup.
 set -euo pipefail
+# Root runs this; never resolve tools or Python modules from the caller's environment.
+export PATH="${NIGHTSTAND_RECOVERY_PATH:-/usr/sbin:/usr/bin:/sbin:/bin}"
 TRANSACTIONS="${NIGHTSTAND_TRANSACTION_ROOT:-/persistent/free-sleep-maintenance/nightstand-transactions}"
 # Ordinary startup needs no Python, service state or maintenance lock.
 RECOVERY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,26 +19,26 @@ if [ -z "${NIGHTSTAND_OPERATION_LOCK:-}" ] && [ ! -d /run/lock ]; then
   OPERATION_LOCK=/tmp/free-sleep-operation.lock
 fi
 case "${1:-}" in
-  --startup-check) exec python3 -B "$HELPER" --root "$TRANSACTIONS" startup-check --unit "${2:-}" --operation-lock "$OPERATION_LOCK" ;;
-  --check) exec python3 -B "$HELPER" --root "$TRANSACTIONS" check ;;
+  --startup-check) exec python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" startup-check --unit "${2:-}" --operation-lock "$OPERATION_LOCK" ;;
+  --check) exec python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" check ;;
   "") ;;
   *) echo 'Unknown switch recovery argument' >&2; exit 1 ;;
 esac
 
 # Ordinary updates may restart services while holding the same lock. With no
 # unfinished switch there is no live restoration to serialize.
-if python3 -B "$HELPER" --root "$TRANSACTIONS" check 2>/dev/null; then
+if python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" check 2>/dev/null; then
   exit 0
 fi
 
 # Controlled starts can pull in this unit through Wants after a journal is
 # armed. The writer gates still enforce the separate validation permission.
-if python3 -B "$HELPER" --root "$TRANSACTIONS" operation-active --operation-lock "$OPERATION_LOCK" 2>/dev/null; then
+if python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" operation-active --operation-lock "$OPERATION_LOCK" 2>/dev/null; then
   exit 0
 fi
 
 # Descendants can retain the operation lock after their parent was killed.
-python3 -B "$HELPER" --root "$TRANSACTIONS" stop-operations
+python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" stop-operations
 if [ -e "$OPERATION_LOCK" ]; then
   exec 9<"$OPERATION_LOCK"
 else

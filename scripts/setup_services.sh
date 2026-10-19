@@ -128,8 +128,10 @@ else:
         metadata = dict(uid=os.geteuid(), gid=os.getegid(), mode=0o644, atimeNs=stamp, mtimeNs=stamp)
         unit = path.parent.name[:-2]
         # A broken helper may block only a known transaction, never ordinary startup.
+        # The + line keeps the unit's environment, so drop it: PATH starts with dac's Volta folder.
         check = ('for journal in ' + shlex.quote(root) + '/*/journal.json; do '
-                 'if [ -e "$journal" ] || [ -L "$journal" ]; then exec /bin/bash '
+                 'if [ -e "$journal" ] || [ -L "$journal" ]; then '
+                 'exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /bin/bash '
                  + shlex.quote(recovery + '/recover_switch.sh') + ' --startup-check ' + unit
                  + '; fi; done; exit 0')
         check = check.replace('$', '$$').replace('%', '%%')

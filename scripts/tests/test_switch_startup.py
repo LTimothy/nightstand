@@ -225,6 +225,42 @@ class InstalledStartupGateTests(unittest.TestCase):
                     self.assertEqual(marker.read_text(), '--startup-check\n' + unit + '\n')
                     marker.unlink()
 
+    def test_journal_gate_runs_the_helper_without_the_server_users_environment(self):
+        directory = self.transactions / 'switch'
+        directory.mkdir(parents=True)
+        (directory / 'journal.json').write_text('corrupt')
+        marker = self.root / 'helper-environment'
+        (self.recovery / 'recover_switch.sh').write_text(
+            '#!/bin/bash\nprintf "%s|%s|%s\\n" "$PATH" "${HOME-unset}" "${PYTHONPATH-unset}" > '
+            + shlex.quote(str(marker)) + '\n')
+        # The writer units run with dac's Volta folder first on PATH.
+        self.environment.update(PATH='/home/dac/.volta/bin:' + os.environ['PATH'], HOME='/home/dac',
+                                PYTHONPATH='/home/dac')
+        for unit, command in self.commands.items():
+            with self.subTest(unit=unit):
+                self.assertEqual(self.start(command).returncode, 0)
+                self.assertEqual(marker.read_text(), '/usr/sbin:/usr/bin:/sbin:/bin|unset|unset\n')
+
+    def test_helper_ignores_the_callers_path_and_python_environment(self):
+        directory = self.transactions / 'switch'
+        directory.mkdir(parents=True)
+        (directory / 'journal.json').write_text('corrupt')
+        planted = self.root / 'planted'
+        planted.mkdir()
+        marker = self.root / 'planted-ran'
+        (planted / 'python3').write_text('#!/bin/sh\ntouch ' + shlex.quote(str(marker)) + '\n')
+        (planted / 'python3').chmod(0o755)
+        (planted / 'argparse.py').write_text('open(' + repr(str(marker)) + ', "w").close()\n')
+        script = Path(__file__).resolve().parents[1] / 'recover_switch.sh'
+        environment = dict(os.environ, PATH=str(planted) + ':' + os.environ['PATH'], PYTHONPATH=str(planted),
+                           NIGHTSTAND_TRANSACTION_ROOT=str(self.transactions))
+        environment.pop('NIGHTSTAND_RECOVERY_PATH', None)
+        result = subprocess.run(['/bin/bash', str(script), '--check'], env=environment,
+                                capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Switch recovery stopped', result.stderr)
+        self.assertFalse(marker.exists())
+
     def test_root_install_allows_dac_writer_start_and_keeps_recovery_private(self):
         result = self.start()
         self.assertEqual(result.returncode, 0, result.stderr)

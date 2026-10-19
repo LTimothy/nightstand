@@ -251,6 +251,12 @@ is a hard fork; for the history of the projects it descends from, see
 - Coming back to Nightstand from upstream after the kept Nightstand copy
   in `/home/dac` was deleted logs a warning and installs the release fresh,
   as a migration from another fork does. Before, the return was refused.
+- The check that runs as root before each Nightstand service starts, once a
+  switch journal exists, clears the service's environment and runs the
+  recovery helper with a fixed system `PATH`, and the helper starts Python
+  without reading `PYTHON*` variables or user site packages. Before, it kept
+  the server's `PATH`, which starts with the server user's Volta folder, so
+  that user's `python3` or `systemctl` could run as root.
 
 ### Firmware readouts
 

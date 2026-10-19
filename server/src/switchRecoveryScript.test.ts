@@ -62,6 +62,7 @@ exit 0
 `);
   chmodSync(path.join(bin, 'systemctl'), 0o755);
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`,
+    NIGHTSTAND_RECOVERY_PATH: `${bin}:${process.env.PATH}`,
     NIGHTSTAND_TRANSACTION_ROOT: transactions, NIGHTSTAND_OPERATION_LOCK: path.join(root, 'lock') };
   function arm(phase = 'installing', streamActive = false, streamEnabled = false) {
     const result = spawnSync('python3', ['-c', `
