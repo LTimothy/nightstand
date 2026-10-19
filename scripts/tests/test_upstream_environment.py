@@ -198,7 +198,7 @@ elif 'freeze' in args:
         before = self.hashes()
         for mode in ('failure', 'timeout', 'interrupt', 'bootstrap'):
             with self.subTest(mode=mode):
-                result = subprocess.run(['bash', str(ROOT / 'scripts/prepare_upstream_env.sh'),
+                result = subprocess.run([sys.executable, '-B', str(ROOT / 'scripts/prepare_upstream_env.py'),
                     '--stage', str(self.stage), '--env-root', str(self.env_root), '--original', str(self.original),
                     '--transaction', mode, '--python', str(executable), '--user', self.module.current_user(),
                     '--timeout', '1'], env={**os.environ, 'INSTALL_CASE': mode},
@@ -212,7 +212,7 @@ elif 'freeze' in args:
         import signal
         executable = self.fake_python()
         before = self.hashes()
-        process = subprocess.Popen(['bash', str(ROOT / 'scripts/prepare_upstream_env.sh'),
+        process = subprocess.Popen([sys.executable, '-B', str(ROOT / 'scripts/prepare_upstream_env.py'),
             '--stage', str(self.stage), '--env-root', str(self.env_root), '--original', str(self.original),
             '--transaction', 'kill', '--python', str(executable), '--user', self.module.current_user()],
             env={**os.environ, 'INSTALL_CASE': 'kill-parent'}, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
