@@ -26,7 +26,7 @@ import NotesSheet from './NotesSheet';
 import RhythmEditor from './RhythmEditor';
 import RhythmList from './RhythmList';
 import SuggestionCard from './SuggestionCard';
-import SuggestionSheet from './SuggestionSheet';
+import SuggestionSheet, { sheetKey } from './SuggestionSheet';
 import SuggestionsSection from './SuggestionsSection';
 import UndoBar from './UndoBar';
 import UseRhythmSheet from './UseRhythmSheet';
@@ -381,7 +381,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
           setNotes({});
         } }/> }
       { reviewEntry && reviewRhythm && suggestions.data && <SuggestionSheet
-        key={ reviewEntry.rhythmId }
+        key={ sheetKey(reviewEntry) }
         entry={ reviewEntry }
         rhythm={ reviewRhythm }
         side={ side }

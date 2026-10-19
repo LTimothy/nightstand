@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
 import { DEFAULT_SMART, type NightLog, type SuggestionRow } from '@api/rhythmsSchema';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
-import SuggestionSheet from './SuggestionSheet';
+import SuggestionSheet, { sheetKey } from './SuggestionSheet';
 
 vi.mock('@mui/x-charts/LineChart', () => ({
   LineChart: () => <div data-testid="chart"/>,
@@ -154,4 +155,21 @@ it('explains the unchecked rows and holds Add when nothing is checked', async ()
   await user.click(screen.getByRole('checkbox', { name: /^9 of 14 nights/ }));
   await user.click(screen.getByRole('checkbox', { name: /^7 of 14 nights/ }));
   expect(screen.getByText('The unchecked changes start counting again after you add.')).toBeInTheDocument();
+});
+
+it('starts the checks over when a refetch changes its rows', async () => {
+  const Refetch = ({ keyed }: { keyed: boolean }) => {
+    const [rows, setRows] = useState([down, up]);
+    const entry = { rhythmId: 'off-days', near: false, rows };
+    return <>
+      <button onClick={ () => setRows([up]) }>refetch</button>
+      <SuggestionSheet key={ keyed ? sheetKey(entry) : undefined } entry={ entry } rhythm={ offDays } side="right" counted={ 14 } log={ log }
+        sleeps={ sleeps } today="2026-10-17" timeZone="UTC" format="fahrenheit" trackingOn={ false } error="" busy={ false }
+        onAdd={ vi.fn() } onDontSuggest={ vi.fn() } onShowNights={ vi.fn() } onClose={ vi.fn() }/>
+    </>;
+  };
+  const { user } = renderWithProviders(<Refetch keyed/>);
+  await user.click(screen.getByRole('checkbox', { name: /^9 of 14 nights/ }));
+  await user.click(screen.getByRole('button', { name: 'refetch', hidden: true }));
+  expect(screen.getByRole('button', { name: 'Add to Off days' })).not.toHaveAttribute('aria-disabled', 'true');
 });

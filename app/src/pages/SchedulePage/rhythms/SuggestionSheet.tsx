@@ -33,6 +33,10 @@ type Props = {
   onClose: () => void;
 };
 
+// Keyed on its rows, so a refetch that changes them starts the checks over instead of leaving them on the wrong rows.
+export const sheetKey = ({ rhythmId, rows }: RhythmSuggestion) =>
+  `${rhythmId}|${rows.map(row => `${row.key}@${row.kind === 'step' ? row.time : ''}`).join(',')}`;
+
 const subheading = { fontSize: 16, fontWeight: weight.heading, mt: 3 } as const;
 
 // One sheet per rhythm, for a card or a near miss. Add writes only the checked rows, in one save.
