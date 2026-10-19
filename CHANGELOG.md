@@ -8,6 +8,10 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-10-19
+
+Adds suggestions from your hand changes, editors for tap gestures and cover buttons, firmware readouts and fewer flash writes, and keeps the scripts and files root uses where only root can write.
+
 ### Fewer flash writes
 
 - The biometrics services now honour `LOG_LEVEL`. Before, they always logged
@@ -56,7 +60,6 @@ is a hard fork; for the history of the projects it descends from, see
   week no longer stays hidden until someone taps Show again.
 - A hand change made on the night the clocks change is timed on the bedtime
   clock, so it no longer moves a suggested step time by an hour.
-- Checked on: the server and app test suites and the demo layout sweep.
 
 ### Cover taps
 
@@ -88,9 +91,16 @@ is a hard fork; for the history of the projects it descends from, see
   its log in batches. The switch is shown only on that hardware. By @2-X.
 - On a Pod 5 hub with a Pod 5 cover, which handles its buttons itself, the
   same Cover buttons options change the tap actions instead, with no
-  switch. The Pod's logs show a plus click counting
-  as a triple tap and a minus click as a double tap; the logo as a quad tap
-  still needs a check on a Pod 5. Other hardware shows no Cover buttons row.
+  switch: plus is a triple tap and minus a double tap. The hub does nothing
+  with a logo click but stop an alarm, so Nightstand reads logo clicks from
+  the Pod's log and, when the logo is set to a temperature, applies it 15 to
+  25 s later. Other hardware shows no Cover buttons row.
+- On a Pod 5 hub a plus click no longer moves the bed by the hub's own step
+  and the triple tap's step together. The hub steps the target itself and
+  also reports the click as a tap; the tap's step now replaces the hub's.
+- A temperature change the hub makes by itself, such as a Pod 5 hub's own
+  step for a cover click, now counts as a hand change: it holds the
+  schedule and shows in the Suggestions notes like a tap.
 
 ### Alarms
 
@@ -129,6 +139,9 @@ is a hard fork; for the history of the projects it descends from, see
   VM and on hardware.
 - The update, rollback and switch scripts share one copy of their common
   steps, and the deploy script's download window uses the same copy.
+- The journal no longer gets a skipped switch recovery line every minute.
+  The health, network and RAW archive timers stopped pulling that unit in
+  on each run; it still runs at boot and after a rollback or revert.
 
 ### Network and security
 
@@ -493,6 +506,12 @@ is a hard fork; for the history of the projects it descends from, see
 - The compact side picker no longer polls presence.
 - The app drops the date pickers and d3, which nothing used. The script
   bundle is about 8 KB smaller.
+- Firmware target, Firmware health and Tap diagnostics moved to a
+  Diagnostics card under Settings > Pod and diagnostics, and Cover buttons
+  to Settings > Bed and sides.
+- Settings describes Biometrics and New sleep tracking by what they do. The
+  "Experimental on this Pod" and "Not checked on this Pod model" lines are
+  gone.
 
 ### Fixes
 
@@ -502,6 +521,10 @@ is a hard fork; for the history of the projects it descends from, see
   gives the side its planned off time back. If that time has passed, the
   side turns off, unless someone is in bed and presence auto-off is on:
   then presence auto-off turns it off after they get up.
+- A power-off that waits for a night's alarms no longer leaves a listener
+  behind for the life of the server.
+
+Checked on: the server, app and Python test suites and the demo layout sweep; Pod 5 checks before release are listed in the release notes.
 
 ## [3.6.1] - 2026-10-07
 

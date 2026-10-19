@@ -1,6 +1,7 @@
 const CODE_TO_BUTTON = { 97: 'top', 98: 'middle', 99: 'bottom' };
 const PRESS_RE = /\[tca8418([RL])\]\s+gpi\s+(press|release)\s+(\d+)/i;
 const IGNORED_RE = /\[TTC\]\s+ignoring\s+(\d+)\s+short clicks/i;
+const HUB_LOGO_RE = /\[TTC\][^\n]*?\b(left|right)\b[^\n]*?\bmiddle button clicked/i;
 const HANDLED_RE = /\[TTC\]|\[thermostat\]\s+temp_(?:up|down)/i;
 // Only the firmware's ignored-click result authorizes a temperature change.
 export class ButtonEventMachine {
@@ -18,6 +19,11 @@ export class ButtonEventMachine {
             const events = count > 0 ? candidates.slice(-count).map(event => ({ ...event, at: tsMs })) : [];
             this.pending = [];
             return events;
+        }
+        const logo = HUB_LOGO_RE.exec(message);
+        if (logo) {
+            this.pending = [];
+            return [{ side: logo[1].toLowerCase(), button: 'middle', kind: 'click', at: tsMs, hub: true }];
         }
         if (HANDLED_RE.test(message)) {
             this.pending = [];

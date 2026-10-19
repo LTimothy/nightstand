@@ -81,7 +81,9 @@ export class ButtonMonitor {
         this.pollError = null;
         try {
             await settingsDB.read();
-            if (!settingsDB.data.features.coverButtons) {
+            // A Pod 5 hub's logo click is read here too, so a logo set to a temperature keeps the reader on.
+            const logoSetsTemperature = ['left', 'right'].some(side => settingsDB.data[side].taps.quadTap.type === 'set_temperature');
+            if (!settingsDB.data.features.coverButtons && !logoSetsTemperature) {
                 this.tail = null;
                 this.machine = new ButtonEventMachine();
                 this.firstPoll = true;
@@ -276,19 +278,26 @@ export class ButtonMonitor {
     async dispatch(event) {
         try {
             await settingsDB.read();
-            if (!settingsDB.data.features.coverButtons || Date.now() - event.at > MAX_PRESS_AGE_MS)
+            // A Pod 5 hub's logo click follows the side's quad tap, as Cover buttons sets it there.
+            const logoTap = event.hub ? settingsDB.data[event.side].taps.quadTap : null;
+            if ((!settingsDB.data.features.coverButtons && !event.hub) || Date.now() - event.at > MAX_PRESS_AGE_MS)
                 return;
             const side = event.side;
             const buttons = settingsDB.data[side].buttons ?? defaultSideSettings.buttons;
             if (event.button === 'middle') {
-                if (activeAlarms.has(side) || hasSnooze(side)) {
+                const favoriteF = logoTap ? (logoTap.type === 'set_temperature' ? logoTap.temperatureF : null) : buttons.favoriteTemperatureF;
+                if ((activeAlarms.has(side) || hasSnooze(side)) && event.hub) {
+                    // The hub stops the alarm itself.
+                    this.logoStoppedAlarmAt[side] = event.at;
+                }
+                else if (activeAlarms.has(side) || hasSnooze(side)) {
                     logger.info(`[buttonMonitor] ${side} logo button: stopping the alarm`);
                     await handleAlarmTap(side, { type: 'alarm', behavior: 'dismiss', snoozeDuration: 60, inactiveAlarmBehavior: 'none' });
                     this.logoStoppedAlarmAt[side] = event.at;
                 }
-                else if (Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS
+                else if (favoriteF !== null && Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS
                     && (alarmEndedAt.get(side) ?? -Infinity) <= event.at) {
-                    await this.setFavorite(side, buttons.favoriteTemperatureF, event.at);
+                    await this.setFavorite(side, favoriteF, event.at);
                 }
                 return;
             }

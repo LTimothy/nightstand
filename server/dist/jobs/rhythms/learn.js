@@ -5,7 +5,7 @@ import { MAX_TEMPERATURES_PER_DAY, SideSchema, TemperatureSchema, TimeSchema } f
 import { CURVE_PHASES, InstantSchema, IsoDateSchema, RhythmIdSchema, } from '../../db/rhythmsSchema.js';
 import { minutesAfterOn, nightMinutes, temperatureInPowerWindow } from '../../db/rhythmWake.js';
 import { F_PER_LEVEL, levelToF } from '../../db/smartCurve.js';
-import { BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, NEAR_MIN_NIGHTS, NEAR_MIN_SUPPORT, NEAR_SHARE, ON_WINDOW_MIN, REPLACE_MIN, SNOOZE_NIGHTS, TIME_ROUND_MIN, WINDOW_NIGHTS, } from '../../db/suggestionRules.js';
+import { BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, NEAR_MIN_NIGHTS, NEAR_MIN_SUPPORT, NEAR_SHARE, NOTE_DAYS, ON_WINDOW_MIN, REPLACE_MIN, SNOOZE_NIGHTS, TIME_ROUND_MIN, WINDOW_NIGHTS, } from '../../db/suggestionRules.js';
 const MINUTE = 60_000;
 const ModeSchema = z.enum(['manual', 'smart']);
 const PlanKeySchema = z.string().regex(/^[0-9a-f]{12}$/);
@@ -442,6 +442,7 @@ function reasonOf(counted, full, showing) {
         return 'dismissed';
     return full.stages.reduce((best, stage) => (STAGE_ORDER.indexOf(stage) > STAGE_ORDER.indexOf(best) ? stage : best), full.stages[0] ?? 'inconsistent');
 }
+const DAY = 24 * 60 * 60 * 1000;
 const byNightOrder = (a, b) => a.at - b.at;
 // Every ended night of a rhythm id, under any plan or mode, by its latest end.
 function nightEnds(lines, rhythmId, now) {
@@ -462,7 +463,8 @@ function hiddenFor(lines, { rhythm, planKey }, now) {
         plan: own.filter(line => line.scope === 'plan' && line.planKey === planKey),
         later: own.filter(line => line.scope === 'later')
             .map(line => ({ line, nightsLeft: SNOOZE_NIGHTS - ends.filter(end => end > Date.parse(line.at)).length }))
-            .filter(entry => entry.nightsLeft > 0),
+            // The notes prune night lines at NOTE_DAYS but keep the hide, so a rare rhythm could never count 14.
+            .filter(entry => entry.nightsLeft > 0 && Date.parse(entry.line.at) >= now.getTime() - NOTE_DAYS * DAY),
     };
 }
 // A per-plan hide matches the kind and direction, and for a step a time within CLUSTER_MIN, both after the power-on.

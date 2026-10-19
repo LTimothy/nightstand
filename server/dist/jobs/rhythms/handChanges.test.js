@@ -251,6 +251,14 @@ describe('hand change', () => {
         assert.equal(line.plannedF, 79);
         assert.equal(line.offsetMin, 310);
     });
+    it('measures the offset on the bedtime clock across a clock change', async () => {
+        settingsDB.data.timeZone = 'America/Los_Angeles';
+        // 03:00 local is 300 minutes after 22:00, though 360 and 240 real minutes passed.
+        for (const at of ['2026-11-01T11:00:00.000Z', '2027-03-14T10:00:00.000Z']) {
+            const [line] = (await record('left', {}, new Date(at))).slice(-1);
+            assert.equal(line.offsetMin, 300, at);
+        }
+    });
     it('stores a converted target as a whole degree', async () => {
         const [line] = await record('left', { targetF: 78.8, fromF: 81.6 });
         assert.equal(line.targetF, 79);

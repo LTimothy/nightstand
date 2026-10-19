@@ -251,7 +251,7 @@ for (const file of ['scripts/update.sh', 'scripts/switch-to-upstream.sh']) {
             assert.doesNotMatch(executable, /unblock_internet_access/);
         });
         it('puts a time limit on the dependency install', () => {
-            assert.match(src, /run_limited 900 sudo -u dac bash -c "cd '\$STAGE\/server' && '\$NPM' install/);
+            assert.match(src, /run_limited 900 sudo -u dac bash -c "cd '\$STAGE\/server' && '\$NPM' (install|\$NPM_INSTALL)/);
         });
         for (const tailscale of [false, true]) {
             it(`opens only HTTPS and DNS and restores the block on success${tailscale ? ' with Tailscale' : ''}`, () => {
@@ -392,7 +392,7 @@ fail "download failed"`)], { env: f.env, encoding: 'utf8', timeout: 10000 });
     });
 }
 it('switch-to-upstream.sh puts a time limit on the biometrics package install', () => {
-    assert.match(read('scripts/switch-to-upstream.sh'), /run_limited 600 "\$\{PIP_RUNNER\[@\]\}" \/home\/dac\/venv\/bin\/python -I -m pip install/);
+    assert.match(read('scripts/switch-to-upstream.sh'), /run_limited 600 sudo -H -u dac \/home\/dac\/venv\/bin\/python -I -m pip install/);
 });
 // An updater killed outright never runs its cleanup; the units' ExecStopPost
 // runs this script instead.

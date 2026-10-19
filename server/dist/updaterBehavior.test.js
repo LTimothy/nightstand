@@ -355,6 +355,36 @@ ssh_cmd() { command bash -c "$2"; }
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.marker, /free-sleep\/server\/node_modules\/dependency/);
 });
+it('fork migration backups stage and land only in a folder root owns', () => {
+    const backupScript = section('scripts/migrate/switch-to-this-fork.sh', 'say "Stage 4:', 'say "Pulling the backup');
+    const staged = run(backupScript, `
+mktemp() { echo "$*" >> "$FIXTURE/marker"; command mktemp "$@"; }
+export -f mktemp
+ssh_cmd() { command bash -c "$2"; }
+`);
+    assert.equal(staged.status, 0, staged.stdout + staged.stderr);
+    assert.match(staged.marker, /^-d \S*\/persistent\/free-sleep-backups\/\.staging\.XXXXXX\n$/);
+    const planted = run(backupScript, `
+mkdir -p "$FIXTURE/outside"; ln -s "$FIXTURE/outside" "$FIXTURE/persistent/free-sleep-backups"
+ssh_cmd() { command bash -c "$2"; }
+`);
+    assert.notEqual(planted.status, 0, planted.stdout + planted.stderr);
+    assert.deepEqual(planted.outside, []);
+});
+it('fork migration backups clear stale staging copies a dropped session left', () => {
+    const backupScript = section('scripts/migrate/switch-to-this-fork.sh', 'say "Stage 4:', 'say "Pulling the backup');
+    const result = run(backupScript + '\nls -A "$REMOTE_BACKUP_DIR" > "$FIXTURE/marker"; ls -A "$FIXTURE/outside" >> "$FIXTURE/marker"', `
+B="$FIXTURE/persistent/free-sleep-backups"; mkdir -p "$B/.staging.old/free-sleep" "$B/.staging.new" "$FIXTURE/outside/kept"
+touch -t 202001010000 "$B/.staging.old"; ln -s "$FIXTURE/outside" "$B/.staging.link"
+ssh_cmd() { command bash -c "$2"; }
+`);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const left = result.marker.split('\n').filter(Boolean);
+    assert.ok(!left.includes('.staging.old'), result.marker);
+    for (const kept of ['.staging.new', '.staging.link', 'kept'])
+        assert.ok(left.includes(kept), `${kept}: ${result.marker}`);
+    assert.equal(left.filter(name => name.startsWith('.staging.')).length, 2, result.marker);
+});
 it('a failed rollback bookkeeping move recovers shared dependencies before starting', () => {
     const result = run(section('scripts/rollback_pod.sh', 'fix_shared_node_modules() {', '# --- preflight') +
         section('scripts/rollback_pod.sh', '# --- swap back on failure'), `
@@ -862,6 +892,17 @@ echo original > ${settingsFile}; echo original > "$FIXTURE/persistent/free-sleep
 python3() { case "$1" in -I|-c) command python3 "$@";; *prepare-upstream.py) echo converted > "$2/settingsDB.json";; esac; }
 eval "inner_$(declare -f systemctl)"
 systemctl() { [ "$*" != "start free-sleep" ] || echo "start on $(cat ${settingsFile})" >> "$FIXTURE/ssh"; inner_systemctl "$@"; }`;
+// The staging path sits in the server user's home, where it could leave a
+// link that root's migration log would write through.
+it('update.sh never writes the migration log through a link the server user left', () => {
+    const script = withExitHandling('scripts/update.sh', systemFiles(section('scripts/update.sh', '# --- atomic swap')));
+    const result = run(script, `${stubs}\n${statefulServices()}\n${lentModules}\nfw4() { :; }; fw6() { :; }; sh() { :; }
+IS_DOWNGRADE=no; STAGED_VERSION=3.2.0; ${staged}\n${pendingMigrations}\n${answering('3.2.0')}
+mkdir -p "$FIXTURE/outside"; ln -s "$FIXTURE/outside/target" "$STAGE.migrate.log"`);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(result.liveVersion.trim(), 'staged', result.stdout);
+    assert.deepEqual(result.outside, []);
+});
 for (const [file, staging, healthyVersion] of [
     ['scripts/update.sh', `IS_DOWNGRADE=no; STAGED_VERSION=3.2.0; ${staged}\n${pendingMigrations}`, '3.2.0'],
     ['scripts/switch-to-upstream.sh', `RESULT_PHASE=preflight; STAGED_VERSION=1.0.0; BK="$FIXTURE/bk"; mkdir -p "$BK/lowdb"; ${staged}
@@ -964,7 +1005,7 @@ ${onSystemctl('stop free-sleep', 'staged', 'TERM_ON="stop free-sleep"')}`));
 it('update.sh checks the new version with a sensor reading', () => {
     const src = readFileSync(path.join(root, 'scripts/update.sh'), 'utf8');
     const calls = src.match(/^.*\bserves_version "[^\n]*$/gm) ?? [];
-    assert.deepEqual(calls, ['if [ "$MIGRATION_FAILED" != yes ] && serves_version "$STAGED_VERSION" temperature; then']);
+    assert.deepEqual(calls, ['if [ -n "$HBODY" ] && [ "$MIGRATION_FAILED" != yes ] && serves_version "$STAGED_VERSION" temperature; then']);
 });
 it('serves_version refuses a requirement it does not know', () => {
     const fn = section('scripts/update.sh', 'serves_version() {', '\nsay "Health check (up to 90s)"');

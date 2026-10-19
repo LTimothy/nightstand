@@ -11,6 +11,7 @@ import { INVERTED_SETTINGS_KEY_MAPPING } from '../../8sleep/loadDeviceStatus.js'
 import { forgetKeptAlarms } from '../../jobs/rhythms/keptAlarms.js';
 import { forgetActiveAlarm } from '../../jobs/activeAlarms.js';
 import { firmwareSecondsUntil } from '../../jobs/firmwareTimer.js';
+import { noteSentTarget } from '../../8sleep/sentTargets.js';
 // Inverse of loadDeviceStatus.ts's calculateTempInF. Same fixed firmware
 // level scale, so the two files must be changed together.
 const calculateLevelFromF = (temperatureF) => {
@@ -70,10 +71,19 @@ const updateSide = async (side, sideStatus, options, onUntil) => {
     if (targetTemperatureF !== undefined) {
         const boundedTemperatureF = Math.max(MIN_TEMPERATURE_F, Math.min(MAX_TEMPERATURE_F, targetTemperatureF));
         const level = calculateLevelFromF(boundedTemperatureF);
+        // Noted again after the send, since a write can wait out an outage.
+        const noteSent = () => {
+            if (updateLeft)
+                noteSentTarget('left', boundedTemperatureF);
+            if (updateRight)
+                noteSentTarget('right', boundedTemperatureF);
+        };
+        noteSent();
         if (updateLeft)
             await executeFunction('TEMP_LEVEL_LEFT', level, stateOptions);
         if (updateRight)
             await executeFunction('TEMP_LEVEL_RIGHT', level, stateOptions);
+        noteSent();
     }
     if (secondsRemaining) {
         const seconds = Math.round(secondsRemaining).toString();

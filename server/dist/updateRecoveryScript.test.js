@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync, } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { UpdateResultSchema } from './routes/update/updateSchema.js';
@@ -280,6 +280,42 @@ ${writer}`);
             assert.equal(result.status, 1, result.stdout + result.stderr);
             assert.equal(readFileSync(resultFile, 'utf8'), previous);
             assert.ok(existsSync(box.marker));
+        }
+        finally {
+            box.dispose();
+        }
+    });
+    it('writes the swap marker and the result without following links planted at fixed temp names', () => {
+        const box = fixture();
+        try {
+            const data = path.dirname(box.marker);
+            const victims = ['marker', 'result'].map(name => path.join(box.root, `victim-${name}`));
+            for (const victim of victims)
+                writeFileSync(victim, 'keep');
+            symlinkSync(victims[0], `${box.marker}.tmp`);
+            symlinkSync(victims[1], path.join(data, 'update-result.json.tmp'));
+            box.prepare();
+            const result = box.run([], { healthy: true });
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            for (const victim of victims)
+                assert.equal(readFileSync(victim, 'utf8'), 'keep');
+            assert.equal(JSON.parse(readFileSync(path.join(data, 'update-result.json'), 'utf8')).outcome, 'success');
+        }
+        finally {
+            box.dispose();
+        }
+    });
+    it('refuses a swap marker that is a link, without moving trees', () => {
+        const box = fixture();
+        try {
+            box.prepare();
+            const elsewhere = path.join(box.root, 'elsewhere.json');
+            renameSync(box.marker, elsewhere);
+            symlinkSync(elsewhere, box.marker);
+            const result = box.run([], { healthy: true });
+            assert.equal(result.status, 1, result.stdout + result.stderr);
+            assert.match(result.stdout + result.stderr, /unreadable swap marker/);
+            assert.equal(box.version(box.live), '3.7.0');
         }
         finally {
             box.dispose();

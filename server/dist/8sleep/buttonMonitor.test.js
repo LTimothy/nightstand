@@ -383,6 +383,22 @@ describe('ButtonMonitor', () => {
         assert.deepEqual(alarmTaps, []);
         assert.deepEqual(updates, []);
     });
+    it('sets a Pod 5 hub logo click to the quad tap temperature, with Cover buttons off', async () => {
+        settingsDB.data.features.coverButtons = false;
+        settingsDB.data.left.taps.quadTap = { type: 'set_temperature', temperatureF: 78 };
+        await settingsDB.write();
+        writeRaw('001.RAW', logRecord('[TTC] left middle button clicked 1 times'), Date.now() / 1000);
+        await monitor.poll();
+        assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 78 } }]);
+    });
+    it('leaves a Pod 5 hub logo click alone when the quad tap sets no temperature', async () => {
+        settingsDB.data.features.coverButtons = false;
+        settingsDB.data.left.taps.quadTap = { type: 'base_control', behavior: 'toggle_preset' };
+        await settingsDB.write();
+        writeRaw('001.RAW', logRecord('[TTC] left middle button clicked 1 times'), Date.now() / 1000);
+        await monitor.poll();
+        assert.deepEqual(updates, []);
+    });
     it('uses the default options when a side has no buttons settings', async () => {
         delete settingsDB.data.right.buttons;
         await settingsDB.write();

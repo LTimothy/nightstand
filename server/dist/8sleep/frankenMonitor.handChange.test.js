@@ -37,9 +37,11 @@ mock.module(new URL('../jobs/scheduleOverride.js', import.meta.url).href, {
 let FrankenMonitor;
 let lastDeviceStatus;
 let settingsDB;
+let noteSentTarget;
 before(async () => {
     ({ FrankenMonitor, lastDeviceStatus } = await import('./frankenMonitor.js'));
     ({ default: settingsDB } = await import('../db/settings.js'));
+    ({ noteSentTarget } = await import('./sentTargets.js'));
 });
 const sideStatus = (targetTemperatureF, doubleTap) => ({
     currentTemperatureLevel: 0, currentTemperatureF: 80, targetTemperatureF, secondsRemaining: 0, isOn: true,
@@ -95,6 +97,63 @@ describe('cover taps as hand changes', () => {
         for (let i = 0; i < 20 && changes.length === 0; i++)
             await new Promise(resolve => setTimeout(resolve, 5));
         assert.deepEqual(changes, [['left', { targetF: 75, fromF: 82, on: true, setsOn: true, source: 'tap' }]]);
+    });
+    it('notes a target the bed changed by itself, as a Pod 5 hub does for cover clicks', async () => {
+        changes.length = 0;
+        const monitor = new FrankenMonitor();
+        monitor.deviceStatus = status(78, 0);
+        monitor.processGestures(status(80, 0));
+        await new Promise(resolve => setTimeout(resolve, 5));
+        assert.deepEqual(changes, [['left', { targetF: 80, fromF: 78, on: true, setsOn: false, source: 'tap' }]]);
+    });
+    it('leaves out targets Nightstand sent and sides that are off', async () => {
+        changes.length = 0;
+        const monitor = new FrankenMonitor();
+        noteSentTarget('left', 84);
+        monitor.deviceStatus = status(78, 0);
+        monitor.processGestures(status(84, 0));
+        const off = status(78, 0);
+        off.left.isOn = false;
+        monitor.deviceStatus = off;
+        monitor.processGestures(status(86, 0));
+        await new Promise(resolve => setTimeout(resolve, 5));
+        assert.deepEqual(changes, []);
+    });
+    it('counts a target sent while the reads were failing as ours, however long ago', async () => {
+        changes.length = 0;
+        const monitor = new FrankenMonitor();
+        monitor.deviceStatus = status(78, 0);
+        monitor.readAt = Date.now() - 120_000;
+        noteSentTarget('left', 90, Date.now() - 90_000);
+        monitor.processGestures(status(90, 0));
+        await new Promise(resolve => setTimeout(resolve, 5));
+        assert.deepEqual(changes, []);
+    });
+    it('notes a press back to a value sent before the previous read', async () => {
+        changes.length = 0;
+        const monitor = new FrankenMonitor();
+        noteSentTarget('left', 76, Date.now() - 30_000);
+        monitor.deviceStatus = status(77, 0);
+        monitor.readAt = Date.now();
+        monitor.processGestures(status(76, 0));
+        await new Promise(resolve => setTimeout(resolve, 5));
+        assert.deepEqual(changes, [['left', { targetF: 76, fromF: 77, on: true, setsOn: false, source: 'tap' }]]);
+    });
+    it('steps a tap from before the hub\'s own step when both land in one read, and notes it once', async () => {
+        changes.length = 0;
+        await settingsDB.read();
+        settingsDB.data.left.taps.tripleTap = { type: 'temperature', change: 'increment', amount: 2 };
+        await settingsDB.write();
+        const monitor = new FrankenMonitor();
+        const before = status(83, 0);
+        monitor.deviceStatus = before;
+        const after = status(86, 0);
+        after.left.taps = { doubleTap: 0, tripleTap: 1, quadTap: 0 };
+        before.left.taps = { doubleTap: 0, tripleTap: 0, quadTap: 0 };
+        monitor.processGestures(after);
+        for (let i = 0; i < 20 && changes.length === 0; i++)
+            await new Promise(resolve => setTimeout(resolve, 5));
+        assert.deepEqual(changes, [['left', { targetF: 85, fromF: 83, on: true, setsOn: false, source: 'tap' }]]);
     });
 });
 //# sourceMappingURL=frankenMonitor.handChange.test.js.map

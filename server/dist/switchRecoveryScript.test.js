@@ -57,6 +57,7 @@ exit 0
 `);
     chmodSync(path.join(bin, 'systemctl'), 0o755);
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`,
+        NIGHTSTAND_RECOVERY_PATH: `${bin}:${process.env.PATH}`,
         NIGHTSTAND_TRANSACTION_ROOT: transactions, NIGHTSTAND_OPERATION_LOCK: path.join(root, 'lock') };
     function arm(phase = 'installing', streamActive = false, streamEnabled = false) {
         const result = spawnSync('python3', ['-c', `
@@ -116,7 +117,8 @@ describe('switch recovery', () => {
             }
             assert.equal(readFileSync(box.data, 'utf8'), 'original settings');
             assert.equal(JSON.parse(readFileSync(path.join(box.live, 'server/src/serverInfo.json'), 'utf8')).version, '3.6.1');
-            assert.ok(existsSync(box.failed));
+            // The failed tree is removed once the source is back.
+            assert.ok(!existsSync(box.failed));
             assert.equal(box.journal().phase, 'recovered');
             const log = readFileSync(box.calls, 'utf8');
             assert.doesNotMatch(log, /(?:start|restart) (?!.*--no-block).*free-sleep|--now /);
@@ -307,7 +309,7 @@ store._write(journal)
             assert.equal(result.status, 0, result.stdout + result.stderr);
             assert.equal(spawnSync(path.join(venv, 'bin/python'), [], { encoding: 'utf8' }).stdout, 'original-interpreter');
             assert.ok(existsSync(prepared));
-            assert.ok(existsSync(failed));
+            assert.ok(!existsSync(failed));
         }
         finally {
             box.dispose();
@@ -464,7 +466,7 @@ with open(sys.argv[1], 'a') as lock:
             assert.ok(existsSync(path.join(recovery, 'recover_switch.sh')));
             for (const writer of ['free-sleep', 'free-sleep-stream', 'free-sleep-update', 'free-sleep-archive-raw', 'free-sleep-health']) {
                 const gate = readFileSync(path.join(systemd, `${writer}.service.d/nightstand-switch-recovery.conf`), 'utf8');
-                assert.match(gate, /^Wants=free-sleep-recover-switch.service$/m);
+                assert.doesNotMatch(gate, /^Wants=/m, 'Timer starts must not re-queue the skipped recovery unit');
                 assert.match(gate, /^After=free-sleep-recover-switch.service$/m);
                 const command = /^ExecStartPre=(.+)$/m.exec(gate)?.[1];
                 assert.ok(command, 'Every start must validate journals even when the boot gate is active');

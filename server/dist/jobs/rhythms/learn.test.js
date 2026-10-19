@@ -487,6 +487,13 @@ describe('hiding suggestions', () => {
         assert.equal(entryOf(expired)?.rows.length, 1);
         assert.deepEqual(expired.dismissed, []);
     });
+    it('ends a hide for 14 nights by age when a rare rhythm never counts them, as the notes are pruned', () => {
+        const later = dismissal('aaaaaaaaaaa1', 'later', null, null, 9);
+        const stillHidden = learn([...every, later], new Date(afterNight(9).getTime() + 89 * DAY));
+        assert.equal(stillHidden.dismissed.length, 1);
+        const aged = learn([...every, later], new Date(afterNight(9).getTime() + 91 * DAY));
+        assert.deepEqual(aged.dismissed, []);
+    });
     it('hides a row for this plan by kind, direction and a time within two hours', () => {
         assert.equal(entryOf(learn([...every, dismissal('aaaaaaaaaaa2', 'plan', 'step:down', '01:00', 9)], afterNight(9))), undefined);
         assert.equal(entryOf(learn([...every, dismissal('aaaaaaaaaaa2', 'plan', 'step:down', '02:00', 9)], afterNight(9)))?.rows.length, 1);

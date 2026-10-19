@@ -102,10 +102,10 @@ describe('ButtonEventMachine', () => {
         click(machine, 'R', 97);
         assert.deepEqual(machine.push('[TTC] ignoring 2 short clicks', 1000), [{ ...bottomLeft, button: 'middle' }, topRight]);
     });
-    it('never emits a logo click the firmware handled itself', () => {
+    it('marks a logo click the Pod 5 hub logged as the hub\'s, never as an ignored click', () => {
         const machine = new ButtonEventMachine();
         click(machine, 'L', 98);
-        assert.deepEqual(machine.push('[TTC] left middle button clicked 1 times', 1000), []);
+        assert.deepEqual(machine.push('[TTC] left middle button clicked 1 times', 1000), [{ side: 'left', button: 'middle', kind: 'click', at: 1000, hub: true }]);
         assert.deepEqual(machine.push('[TTC] ignoring 1 short clicks', 1000), []);
     });
     it('leaves firmware long presses without an ignoring result alone', () => {

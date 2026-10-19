@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync, } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -200,6 +200,25 @@ describe('root runs nothing from the server user\'s folders', () => {
             ['scripts/install.sh', 'UNZIP_DIR="free-sleep-unzip"'], ['scripts/migrate/pod-installer.sh', 'SYSTEM_DIR=/home/dac/system']]) {
             assert.notDeepEqual(trustedOffenders(file, `${read(file)}\n${probe}\n`), [], probe);
         }
+    });
+    it('runs the biometrics venv only as the server user', () => {
+        // Each command that starts the venv's python or makes the venv must itself be
+        // the one sudo runs as dac; a file test and a unit's ExecStart run nothing as root.
+        const offenders = (file, text) => text.split('\n')
+            .filter(line => !/^\s*#/.test(line))
+            .filter(line => [...line.matchAll(/\/home\/dac\/venv\/bin\/python|\bpython3(?: -\w+)* -m venv \/home\/dac/g)]
+            .some(match => !/(?:sudo (?:-H )?-u dac |-x |ExecStart=)$/.test(line.slice(0, match.index))))
+            .map(line => `${file}: ${line.trim()}`);
+        assert.deepEqual(ROOT_RUN.flatMap(file => offenders(file, read(file))), []);
+        for (const probe of ['/home/dac/venv/bin/python -I -m pip install x', 'cd x && /home/dac/venv/bin/python calibrate.py',
+            'python3 -I -m venv /home/dac/venv', 'run_limited 600 "${RUNNER[@]}" /home/dac/venv/bin/python -I -m pip install x',
+            'sudo -u dac true && /home/dac/venv/bin/python -I -m pip install x', 'sudo -u dac true; python3 -I -m venv /home/dac/venv',
+            'sudo -u dac /home/dac/venv/bin/python -c pass && /home/dac/venv/bin/python calibrate.py']) {
+            assert.notDeepEqual(offenders('scripts/x.sh', probe), [], probe);
+        }
+        const upstream = read('scripts/switch-to-upstream.sh');
+        assert.match(upstream, /stat -L -c '%U' \/home\/dac\/venv/);
+        assert.doesNotMatch(upstream, /installing the upstream dependency as root/);
     });
     it('runs inline Python as root only in isolated mode', () => {
         assert.deepEqual(ROOT_RUN.flatMap(file => unisolatedOffenders(file, read(file))), []);
@@ -562,6 +581,198 @@ describe('rollback_pod.sh', () => {
         const own = 'sed -i \'s#/usr/local/lib/nightstand/live/scripts/#/home/dac/free-sleep/scripts/#g\''
             + ' /etc/systemd/system/free-sleep-update.service';
         assert.ok(otherFork.includes(own), otherFork);
+    });
+});
+describe('health checks', () => {
+    // Each script's health loop, with its fixed paths moved into a temp tree.
+    const HEALTH = [
+        ['scripts/update.sh', 'home/free-sleep-staging.health'],
+        ['scripts/switch-to-upstream.sh', 'home/free-sleep-revert-staging.health'],
+        ['scripts/rollback_pod.sh', 'tmp/free-sleep-rollback-health'],
+        ['scripts/migrate/pod-installer.sh', 'tmp/free-sleep-migrate-health'],
+    ];
+    const healthBlock = (file) => {
+        const src = read(file);
+        const start = src.lastIndexOf('say "Health check (up to 90s)"');
+        const end = file === 'scripts/update.sh' ? src.indexOf('\nfi\n', start) + 4 : src.indexOf('rm -f "$HBODY"\n', start) + 15;
+        const helper = file === 'scripts/update.sh' ? src.slice(src.indexOf('serves_version() {'), start) : '';
+        assert.ok(start > 0 && end > start, file);
+        return helper + src.slice(start, end);
+    };
+    for (const [file, planted] of HEALTH) {
+        it(`${file} saves the answer in a fresh file, never through a link at a fixed name`, () => {
+            const dir = mkdtempSync(path.join(tmpdir(), 'health-body-'));
+            try {
+                mkdirSync(path.join(dir, 'tmp'));
+                mkdirSync(path.join(dir, 'home'));
+                const victim = path.join(dir, 'victim');
+                writeFileSync(victim, 'keep');
+                symlinkSync(victim, path.join(dir, planted));
+                const block = healthBlock(file).replaceAll('/tmp/', `${dir}/tmp/`).replaceAll('/home/dac', `${dir}/home`);
+                const result = spawnSync('bash', ['-c', `set -uo pipefail
+say() { :; }; sleep() { :; }; systemctl() { :; }
+curl() {
+  local out=/dev/null; while [ $# -gt 0 ]; do [ "$1" != -o ] || out=$2; shift; done
+  printf '{"freeSleep":{"version":"9.9.9"},"left":{"currentTemperatureF":80}}' > "$out"; printf 200
+}
+STAGE='${dir}/home/${path.basename(planted).replace(/\.health$/, '')}'
+STAGED_VERSION=9.9.9 TARGET_VERSION=9.9.9 MIGRATION_FAILED=no BASELINE_FILE=
+${block}
+echo "HEALTHY=$HEALTHY"`], { encoding: 'utf8', env: { ...process.env, TMPDIR: path.join(dir, 'tmp') } });
+                assert.match(result.stdout, /HEALTHY=yes/, result.stdout + result.stderr);
+                assert.equal(readFileSync(victim, 'utf8'), 'keep');
+            }
+            finally {
+                rmSync(dir, { recursive: true, force: true });
+            }
+        });
+        it(`${file} fails the health check at once when it cannot make the temp file`, () => {
+            const dir = mkdtempSync(path.join(tmpdir(), 'health-body-'));
+            try {
+                const block = healthBlock(file).replaceAll('/tmp/', `${dir}/`).replaceAll('/home/dac', dir);
+                const result = spawnSync('bash', ['-c', `set -uo pipefail
+say() { echo "$*"; }; sleep() { :; }; systemctl() { :; }; mktemp() { return 1; }
+curl() { echo called >> '${dir}/curl'; printf 200; }
+STAGE='${dir}/stage'; STAGED_VERSION=9.9.9 TARGET_VERSION=9.9.9 MIGRATION_FAILED=no BASELINE_FILE=
+${block}
+echo "HEALTHY=$HEALTHY"`], { encoding: 'utf8' });
+                assert.match(result.stdout, /HEALTHY=no/, result.stdout + result.stderr);
+                assert.match(result.stdout, /could not create a temporary file/);
+                assert.equal(existsSync(path.join(dir, 'curl')), false);
+            }
+            finally {
+                rmSync(dir, { recursive: true, force: true });
+            }
+        });
+    }
+});
+describe('root writes into the server user\'s data folder', () => {
+    const between = (file, from, to) => {
+        const src = read(file);
+        const start = src.indexOf(from);
+        const end = src.indexOf(to, start);
+        assert.ok(start >= 0 && end > start, `${file}: ${from}`);
+        return src.slice(start, end + to.length);
+    };
+    const box = (body) => {
+        const dir = mkdtempSync(path.join(tmpdir(), 'data-writes-'));
+        try {
+            const data = path.join(dir, 'persistent/free-sleep-data');
+            mkdirSync(path.join(data, 'lowdb'), { recursive: true });
+            body(dir, data);
+        }
+        finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    };
+    const run = (dir, block, prelude = '') => spawnSync('bash', ['-c', `set -uo pipefail
+say() { echo "$*"; }
+systemctl() { [ "$1" != is-active ] || { echo inactive; return 3; }; }
+${prelude}
+${block.replaceAll('/persistent/', `${dir}/persistent/`).replaceAll('/home/dac', `${dir}/home`)}`], { encoding: 'utf8' });
+    // The server user puts the link back right after root removes it.
+    const racingRm = (links) => `rm() {
+  command rm "$@"; local a
+  for a in "$@"; do
+${links.map(([at, to]) => `    [ "$a" != '${at}' ] || ln -s '${to}' '${at}'`).join('\n')}
+  done
+}
+`;
+    it('install.sh records the socket path and moves old settings without following links', () => {
+        box((dir, data) => {
+            mkdirSync(path.join(dir, 'home/free-sleep-database'), { recursive: true });
+            writeFileSync(path.join(dir, 'home/free-sleep-database/settingsDB.json'), 'old settings');
+            writeFileSync(path.join(dir, 'frank.sh'), 'DAC_SOCKET=/run/dac.sock\n');
+            mkdirSync(path.join(dir, 'outside'));
+            const settings = path.join(data, 'lowdb/settingsDB.json');
+            const sock = path.join(data, 'dac_sock_path.txt');
+            symlinkSync(path.join(dir, 'outside'), settings);
+            symlinkSync(path.join(dir, 'created'), sock);
+            const block = between('scripts/install.sh', '# Puts text $2', '\ndone\n')
+                .replace('/opt/eight/bin/frank.sh', path.join(dir, 'frank.sh'));
+            const race = racingRm([[settings, path.join(dir, 'outside')], [sock, path.join(dir, 'created')]]);
+            const result = run(dir, `grep() { echo /run/dac.sock; }\n${block}`, race);
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            assert.deepEqual(readdirSync(path.join(dir, 'outside')), []);
+            assert.equal(existsSync(path.join(dir, 'created')), false);
+            assert.equal(readFileSync(sock, 'utf8'), '/run/dac.sock\n');
+            assert.equal(readFileSync(settings, 'utf8'), 'old settings');
+            assert.equal(existsSync(path.join(dir, 'home/free-sleep-database/settingsDB.json')), false);
+        });
+    });
+    it('install.sh reads an old settings file without following a link swapped in after its check', () => {
+        box((dir, data) => {
+            const source = path.join(dir, 'home/free-sleep-database/settingsDB.json');
+            mkdirSync(path.dirname(source), { recursive: true });
+            writeFileSync(source, 'old settings');
+            writeFileSync(path.join(dir, 'secret'), 'root only');
+            const block = between('scripts/install.sh', '# Puts text $2', '\ndone\n')
+                .replace('/opt/eight/bin/frank.sh', path.join(dir, 'missing'));
+            // Whatever reads the source next finds a link to a root-only file.
+            const swap = `swap() { case "$*" in *'${source}'*) command rm -f '${source}'; ln -s '${path.join(dir, 'secret')}' '${source}';; esac; }
+cp() { swap "$@"; command cp "$@"; }
+python3() { swap "$@"; command python3 "$@"; }`;
+            run(dir, block, swap);
+            const settings = path.join(data, 'lowdb/settingsDB.json');
+            assert.ok(!existsSync(settings) || !readFileSync(settings, 'utf8').includes('root only'));
+        });
+    });
+    it('install.sh leaves no temporary file in /persistent when it cannot put one in place', () => {
+        box((dir, data) => {
+            writeFileSync(path.join(dir, 'frank.sh'), 'DAC_SOCKET=/run/dac.sock\n');
+            mkdirSync(path.join(data, 'dac_sock_path.txt', 'busy'), { recursive: true });
+            const block = between('scripts/install.sh', '# Puts text $2', '\ndone\n')
+                .replace('/opt/eight/bin/frank.sh', path.join(dir, 'frank.sh'));
+            run(dir, `grep() { echo /run/dac.sock; }\n${block}`);
+            assert.deepEqual(readdirSync(path.join(dir, 'persistent')).filter(name => name.startsWith('.')), []);
+        });
+    });
+    it('switch-to-upstream.sh puts the settings back without following links', () => {
+        box((dir, data) => {
+            const bk = path.join(dir, 'bk');
+            mkdirSync(path.join(bk, 'lowdb'), { recursive: true });
+            for (const name of ['settingsDB.json', 'schedulesDB.json'])
+                writeFileSync(path.join(bk, 'lowdb', name), `saved ${name}`);
+            writeFileSync(path.join(dir, 'victim'), 'keep');
+            const settings = path.join(data, 'lowdb/settingsDB.json');
+            symlinkSync(path.join(dir, 'victim'), settings);
+            const fn = between('scripts/switch-to-upstream.sh', 'restore_switch_data() {', '\n}\n');
+            const race = racingRm([[settings, path.join(dir, 'victim')]]);
+            const result = run(dir, `${fn}
+DATA_CHANGED=yes RESTORE_ATTEMPTED=no ARCHIVE_WAS_ACTIVE=inactive BK='${bk}'\nrestore_switch_data`, race);
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            assert.equal(readFileSync(path.join(dir, 'victim'), 'utf8'), 'keep');
+            assert.equal(readFileSync(settings, 'utf8'), 'saved settingsDB.json');
+            assert.deepEqual(readdirSync(path.join(dir, 'persistent')).filter(name => name.startsWith('.')), []);
+        });
+    });
+});
+describe('pod-installer.sh database preflight', () => {
+    it('copies the snapshot into a folder root made, never into the server user\'s stage', () => {
+        const src = read('scripts/migrate/pod-installer.sh');
+        const start = src.indexOf('say "Database compatibility preflight');
+        const block = src.slice(start, src.indexOf('\nfi\n', src.indexOf('say "Database snapshot retained', start)) + 4);
+        const dir = mkdtempSync(path.join(tmpdir(), 'db-preflight-'));
+        try {
+            mkdirSync(path.join(dir, 'persistent/free-sleep-data'), { recursive: true });
+            writeFileSync(path.join(dir, 'persistent/free-sleep-data/free-sleep.db'), 'db');
+            mkdirSync(path.join(dir, 'copy/scripts'), { recursive: true });
+            writeFileSync(path.join(dir, 'copy/scripts/sqlite-safety.py'), '');
+            const result = spawnSync('bash', ['-c', `set -uo pipefail
+say() { :; }; fail() { echo "FAIL $*"; exit 1; }
+python3() { echo "python3 $*" >> '${dir}/calls'; }
+chown() { :; }; sudo() { :; }
+mktemp() { echo "mktemp $*" >> '${dir}/calls'; command mktemp "$@"; }
+COPY='${dir}/copy'; STAGE='${dir}/stage'; NPX=npx
+${block.replaceAll('/persistent/', `${dir}/persistent/`)}`], { encoding: 'utf8' });
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            const calls = readFileSync(path.join(dir, 'calls'), 'utf8');
+            assert.doesNotMatch(calls, /\/stage\//);
+            assert.match(calls, /^mktemp -d \S+\/persistent\/\.nightstand-db-preflight\.XXXXXX$/m);
+        }
+        finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
     });
 });
 //# sourceMappingURL=rootOwnedScripts.test.js.map

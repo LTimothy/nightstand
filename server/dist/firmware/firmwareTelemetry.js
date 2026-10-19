@@ -11,6 +11,8 @@ export class FirmwareTelemetry {
     taps = [];
     health = new HealthFeed();
     seen = new Set();
+    // Sticky for the server's life, so the readouts never drop out between sessions.
+    reported = { target: false, health: false };
     ingest(batch, features, now) {
         if (batch.session !== this.session) {
             this.session = batch.session;
@@ -33,6 +35,10 @@ export class FirmwareTelemetry {
             if (this.seen.has(key))
                 continue;
             this.seen.add(key);
+            if (record.kind === 'thermostat')
+                this.reported.target = true;
+            if (record.kind === 'pump')
+                this.reported.health = true;
             if (this.seen.size > 5000)
                 this.seen.delete(this.seen.values().next().value);
             if (features.coolingWarning && record.kind === 'water'
@@ -117,7 +123,7 @@ export class FirmwareTelemetry {
         return { availability: biometrics ? 'Monitoring active' : 'Monitoring unavailable', targets, cooling,
             taps: features.tapDiagnostics ? this.taps.map(item => ({ ...item })) : [],
             incidents: features.firmwareHealth ? health.incidents : [], sensorFresh: biometrics && health.sensorFresh,
-            interrupted: features.firmwareHealth && biometrics && health.interrupted };
+            interrupted: features.firmwareHealth && biometrics && health.interrupted, reported: { ...this.reported } };
     }
 }
 //# sourceMappingURL=firmwareTelemetry.js.map

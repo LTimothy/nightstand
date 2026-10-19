@@ -1,7 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -91,6 +91,20 @@ describe('the writer', () => {
         assert.deepEqual(readdirSync(root).filter(name => name.includes('.tmp')), []);
         assert.equal(statSync(resultPath).mode & 0o777, 0o644);
     });
+    it('never writes through a link planted at a fixed temp name', () => {
+        const victim = path.join(root, 'victim');
+        writeFileSync(victim, 'keep');
+        symlinkSync(victim, `${resultPath}.tmp`);
+        try {
+            assert.equal(write('update', 'success', '3.5.1', '3.6.0', '').status, 0);
+            assert.equal(readFileSync(victim, 'utf8'), 'keep');
+            assert.equal(JSON.parse(readFileSync(resultPath, 'utf8')).outcome, 'success');
+            assert.equal(statSync(resultPath).mode & 0o777, 0o644);
+        }
+        finally {
+            rmSync(`${resultPath}.tmp`, { force: true });
+        }
+    });
 });
 describe('how each script records its ending', () => {
     before(() => { root = mkdtempSync(path.join(tmpdir(), 'nightstand-result-')); });
@@ -130,7 +144,9 @@ exit 7`], { encoding: 'utf8', env: { ...process.env, FIXTURE: dir } });
                 rmSync(dir, { recursive: true, force: true });
             }
         }
-        assert.match(read('scripts/rollback_pod.sh'), /^trap 'status=\$\?; trap "" HUP INT TERM; finish_interrupted_swap; record_result "\$status"' EXIT$/m);
+        const trap = 'trap \'status=$?; trap "" HUP INT TERM; finish_interrupted_swap;'
+            + ' [ -z "${HBODY:-}" ] || rm -f "$HBODY"; record_result "$status"\' EXIT';
+        assert.ok(read('scripts/rollback_pod.sh').split('\n').includes(trap));
     });
     // The outcome from where the run stood when it ended.
     const outcomes = [

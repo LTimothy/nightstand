@@ -49,6 +49,7 @@ mock.module(new URL('./trimixBaseControl.js', import.meta.url).href, {
         },
     },
 });
+let noteSentTarget;
 let FrankenMonitor;
 let settingsDB;
 let serverStatus;
@@ -56,6 +57,7 @@ before(async () => {
     ({ FrankenMonitor } = await import('./frankenMonitor.js'));
     ({ default: settingsDB } = await import('../db/settings.js'));
     ({ default: serverStatus } = await import('../serverStatus.js'));
+    ({ noteSentTarget } = await import('./sentTargets.js'));
 });
 const side = (taps) => ({
     currentTemperatureLevel: 0,
@@ -320,12 +322,16 @@ describe('FrankenMonitor gestures in one read', () => {
         reported.left.targetTemperatureF = 80;
         const changedInApp = deviceStatus(taps(3, 0));
         changedInApp.left.targetTemperatureF = 90;
+        // The app's write goes through updateDeviceStatus, which notes it as sent.
+        noteSentTarget('left', 90);
         await runGestureTicks([deviceStatus(taps(1, 0)), deviceStatus(taps(2, 0)), reported, changedInApp]);
         assert.deepEqual(writtenLeftTargets, [80, 88]);
     });
     it('steps from the read when something else changed the target first', async () => {
         const changedInApp = deviceStatus(taps(3, 0));
         changedInApp.left.targetTemperatureF = 90;
+        // The app's write goes through updateDeviceStatus, which notes it as sent.
+        noteSentTarget('left', 90);
         await runGestureTicks([deviceStatus(taps(1, 0)), deviceStatus(taps(2, 0)), changedInApp]);
         assert.deepEqual(writtenLeftTargets, [80, 88]);
     });

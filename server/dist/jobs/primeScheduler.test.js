@@ -32,13 +32,21 @@ mock.module(new URL('./reboot.js', import.meta.url).href, {
     defaultExport: async () => { if (rebootError)
         throw rebootError; },
 });
+let retentionRuns = 0;
+mock.module(new URL('./runMetricsRetention.js', import.meta.url).href, {
+    namedExports: { runMetricsRetention: async () => { retentionRuns++; } },
+});
 // Captures the callbacks instead of scheduling them, so no real timer can fire.
 const jobs = new Map();
+const rules = new Map();
 mock.module('node-schedule', { defaultExport: {
         RecurrenceRule: class {
         },
         scheduledJobs: {},
-        scheduleJob: (name, _rule, callback) => { jobs.set(name, callback); },
+        scheduleJob: (name, rule, callback) => {
+            jobs.set(name, callback);
+            rules.set(name, `${rule.hour}:${rule.minute}`);
+        },
     } });
 const { schedulePrimingRebootAndCalibration } = await import('./primeScheduler.js');
 const { default: settingsDB } = await import('../db/settings.js');
@@ -46,6 +54,8 @@ const { default: serverStatus } = await import('../serverStatus.js');
 after(() => { rmSync(folder, { recursive: true, force: true }); });
 beforeEach(async () => {
     jobs.clear();
+    rules.clear();
+    retentionRuns = 0;
     rebootError = undefined;
     primeError = undefined;
     statusError = undefined;
@@ -134,5 +144,40 @@ it('reports a prime command failure without waiting to read status', async () =>
     assert.equal(serverStatus.status.primeSchedule.status, 'failed');
     assert.equal(serverStatus.status.primeSchedule.message, 'Prime unavailable');
     assert.equal(statusReads, 0);
+});
+it('runs metrics retention as its own daily job, apart from calibration', async () => {
+    schedulePrimingRebootAndCalibration(settingsDB.data);
+    const retention = jobs.get('daily-metrics-retention');
+    assert.ok(retention, 'expected a daily retention job');
+    await retention();
+    assert.equal(retentionRuns, 1);
+    const calibration = jobs.get('daily-calibration-18:30-left');
+    assert.ok(calibration);
+    await calibration();
+    assert.equal(retentionRuns, 1);
+});
+it('schedules retention even when daily priming is off', () => {
+    settingsDB.data.primePodDaily = { enabled: false, time: '14:00' };
+    schedulePrimingRebootAndCalibration(settingsDB.data);
+    assert.ok(jobs.has('daily-metrics-retention'));
+});
+it('keeps retention at 17:30 by default', () => {
+    schedulePrimingRebootAndCalibration(settingsDB.data);
+    assert.equal(rules.get('daily-metrics-retention'), '17:30');
+});
+it('moves retention off the reboot minute when priming is 18:30', () => {
+    settingsDB.data.primePodDaily = { enabled: true, time: '18:30' };
+    schedulePrimingRebootAndCalibration(settingsDB.data);
+    assert.equal(rules.get('daily-metrics-retention'), '16:30');
+});
+it('moves retention off the prime minute when priming is 17:30', () => {
+    settingsDB.data.primePodDaily = { enabled: true, time: '17:30' };
+    schedulePrimingRebootAndCalibration(settingsDB.data);
+    assert.equal(rules.get('daily-metrics-retention'), '15:30');
+});
+it('keeps 17:30 when priming is off', () => {
+    settingsDB.data.primePodDaily = { enabled: false, time: '18:30' };
+    schedulePrimingRebootAndCalibration(settingsDB.data);
+    assert.equal(rules.get('daily-metrics-retention'), '17:30');
 });
 //# sourceMappingURL=primeScheduler.test.js.map

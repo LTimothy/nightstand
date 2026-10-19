@@ -10,6 +10,7 @@ import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js
 import { markManualTempChange } from '../jobs/scheduleOverride.js';
 import { drivingSide } from '../jobs/scheduleQueries.js';
 import { noteDeviceStatus } from './lastDeviceStatus.js';
+import { wasSentSince } from './sentTargets.js';
 import serverStatus from '../serverStatus.js';
 import { trimixBase } from './trimixBaseControl.js';
 import { BASE_PRESETS } from './basePresets.js';
@@ -32,9 +33,14 @@ const POLL_MS = 2_000;
 // when the Pod has not reported it yet. Past this the latest read wins, so a
 // write the Pod refused cannot keep steering gestures.
 const WRITTEN_TARGET_MS = 10_000;
+// A write sent this long before the previous read may still have reached the
+// Pod after it, so it counts as ours when a later read shows it.
+const SENT_SLACK_MS = 10_000;
 export class FrankenMonitor {
     isRunning;
     deviceStatus;
+    // When deviceStatus was read.
+    readAt = 0;
     currentBasePreset = 'flat';
     // The last tap counters read as numbers. A read missing a counter keeps the
     // one before it, so a tap made across that read is still seen.
@@ -69,6 +75,7 @@ export class FrankenMonitor {
     }
     setDeviceStatus(next) {
         this.deviceStatus = next;
+        this.readAt = Date.now();
         noteDeviceStatus(next);
     }
     markStatus(status, message = '') {
@@ -213,7 +220,8 @@ export class FrankenMonitor {
             }
         }
     }
-    processGesturesForSide(nextDeviceStatus, side) {
+    // `hubFromF` is the target before a change the hub made by itself in this read, if any.
+    processGesturesForSide(nextDeviceStatus, side, hubFromF = null) {
         try {
             const gestures = [];
             for (const gesture of GestureSchema.options) {
@@ -231,19 +239,45 @@ export class FrankenMonitor {
                 if (previous !== undefined && current > previous)
                     gestures.push(gesture);
             }
-            if (gestures.length === 0)
+            if (gestures.length === 0) {
+                if (hubFromF !== null)
+                    this.noteHubChange(side, hubFromF, nextDeviceStatus[side].targetTemperatureF);
                 return;
+            }
+            // A Pod 5 hub steps a plus click itself and also reports it as a tap, so
+            // the tap steps from the target before the hub's step and replaces it.
+            // Assumes both land in one read, as seen on a Pod 5; a step and tap split across reads still stack.
+            const readTarget = hubFromF ?? nextDeviceStatus[side].targetTemperatureF;
             // Deliberately detached: a base move takes seconds over BLE and this
             // loop doubles as the tap-detection cadence, so awaiting here would
             // delay the next read. Detached means the surrounding try cannot see a
             // rejection, and an unhandled one takes the whole server down (the
             // process-level handler shuts it down), so each gesture is caught in
             // processGesturesInOrder.
-            void this.processGesturesInOrder(side, gestures, nextDeviceStatus[side].targetTemperatureF);
+            void this.processGesturesInOrder(side, gestures, readTarget);
         }
         catch (error) {
             logger.error(error);
         }
+    }
+    // A target that moved while the side stayed on, and that Nightstand did not
+    // send, was changed on the bed itself: a Pod 5 hub acts on cover clicks.
+    // Returns the target before that change.
+    hubStepFrom(nextDeviceStatus, side) {
+        const before = this.deviceStatus?.[side];
+        const after = nextDeviceStatus[side];
+        if (!before?.isOn || !after.isOn || before.targetTemperatureF === after.targetTemperatureF)
+            return null;
+        // Anything sent since the previous read is ours, however long the reads were failing.
+        if (wasSentSince(side, after.targetTemperatureF, this.readAt - SENT_SLACK_MS)
+            || this.writtenTargets[side]?.written.has(after.targetTemperatureF))
+            return null;
+        return before.targetTemperatureF;
+    }
+    noteHubChange(side, fromF, targetF) {
+        logger.info(`[frankenMonitor] ${side} target changed on the bed: ${fromF} -> ${targetF} F`);
+        markManualTempChange(side, { targetF, fromF, on: true, setsOn: false, source: 'tap' })
+            .catch(error => logger.error(`Failed to note the ${side} side's change: ${error instanceof Error ? error.message : String(error)}`));
     }
     // Not async: it awaits nothing, and an async function called without await
     // is the same floating-promise trap the gesture calls above just closed.
@@ -252,9 +286,11 @@ export class FrankenMonitor {
             logger.warn('Missing current deviceStatus, exiting...');
             return;
         }
+        // Read before settling, which forgets targets the gestures wrote.
+        const hubFrom = { left: this.hubStepFrom(nextDeviceStatus, 'left'), right: this.hubStepFrom(nextDeviceStatus, 'right') };
         this.settleWrittenTargets(nextDeviceStatus);
-        this.processGesturesForSide(nextDeviceStatus, 'left');
-        this.processGesturesForSide(nextDeviceStatus, 'right');
+        this.processGesturesForSide(nextDeviceStatus, 'left', hubFrom.left);
+        this.processGesturesForSide(nextDeviceStatus, 'right', hubFrom.right);
     }
     // Cheap deep-equality for the status payload. The shape is stable so a
     // JSON round-trip is the simplest correct comparison.

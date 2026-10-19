@@ -237,4 +237,17 @@ it('keeps an incident that is still being reported a day after it began', () => 
     assert.equal(incidents[0].count, 2);
     assert.equal(incidents[0].firstSeen, 1000);
 });
+it('reports which firmware readings this Pod sends and keeps them across stream sessions', () => {
+    const store = new FirmwareTelemetry();
+    const flags = { ...features, coolingWarning: true };
+    assert.deepEqual(store.snapshot(flags, true, 100).reported, { target: false, health: false });
+    store.ingest({ session: 'a'.repeat(32), records: [sample(1)] }, flags, 100);
+    assert.deepEqual(store.snapshot(flags, true, 100).reported, { target: false, health: false });
+    store.ingest({ session: 'a'.repeat(32), records: [sample()] }, flags, 100);
+    assert.deepEqual(store.snapshot(flags, true, 100).reported, { target: true, health: false });
+    const pump = { kind: 'pump', side: 'left', rpm: 200, water: true, loopC: 25,
+        timestamp: 110, receivedAt: 110, source: 'RAW', sequence: 2, index: 0 };
+    store.ingest(FirmwareBatchSchema.parse({ session: 'b'.repeat(32), records: [pump] }), flags, 110);
+    assert.deepEqual(store.snapshot(flags, true, 9999).reported, { target: true, health: true });
+});
 //# sourceMappingURL=firmwareTelemetry.test.js.map

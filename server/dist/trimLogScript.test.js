@@ -60,7 +60,7 @@ it('trims each operation log before its unit starts, from root\'s copy', () => {
     for (const [file, log] of [['scripts/systemd/free-sleep-rollback.service', 'rollback'],
         ['scripts/systemd/free-sleep-revert.service', 'revert'], ['scripts/setup_services.sh', 'update']]) {
         const line = '^ExecStartPre=-/bin/bash /usr/local/lib/nightstand/live/scripts/trim_log\\.sh '
-            + `/persistent/free-sleep-data/logs/free-sleep-${log}\\.log$`;
+            + `/persistent/nightstand-logs/free-sleep-${log}\\.log$`;
         assert.match(read(file), new RegExp(line, 'm'), file);
     }
 });

@@ -4,7 +4,9 @@ import fs from 'fs';
 import logger from '../../logger.js';
 import { isLogFilename, isSafeLogFilename, linesFromAppendedChunk, readTail, tailLines } from './logsHelpers.js';
 const router = express.Router();
-const LOGS_DIRS = ['/persistent/free-sleep-data/logs', '/var/log'];
+// Root's operation logs come first: releases before they moved left copies
+// with the same names in the server's folder.
+const LOGS_DIRS = ['/persistent/nightstand-logs', '/persistent/free-sleep-data/logs', '/var/log'];
 const TAIL_LINES = 1000;
 // Comfortably holds TAIL_LINES of the longest lines these logs carry.
 const TAIL_BYTES = 512 * 1024;
@@ -50,7 +52,7 @@ router.get('/', async (req, res) => {
         }));
         const allLogFiles = logFilesPerDir.flat().sort((a, b) => b.mtime - a.mtime);
         res.json({
-            logs: allLogFiles.map(log => log.name),
+            logs: [...new Set(allLogFiles.map(log => log.name))],
         });
     }
     catch (error) {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -26,7 +26,7 @@ function damage(file) {
     bytes.fill(0xff, 4096 * 3, 4096 * 3 + 2048);
     writeFileSync(file, bytes);
 }
-function run(answer, { database = 'good', services = '{"biometrics":{"enabled":false}}', migrateFails = false, wal = false, backupsBlocked = false, safetyFails = false, } = {}) {
+function run(answer, { database = 'good', services = '{"biometrics":{"enabled":false}}', migrateFails = false, wal = false, backupsBlocked = false, safetyFails = false, walLink = false, walRace = false, } = {}) {
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-reset-db-'));
     const persistent = path.join(dir, 'persistent');
     const data = path.join(persistent, 'free-sleep-data');
@@ -48,6 +48,10 @@ function run(answer, { database = 'good', services = '{"biometrics":{"enabled":f
     }
     if (wal)
         writeFileSync(`${db}-wal`, 'wal bytes');
+    if (walLink) {
+        writeFileSync(path.join(dir, 'secret'), 'root only');
+        symlinkSync(path.join(dir, 'secret'), `${db}-wal`);
+    }
     if (backupsBlocked)
         writeFileSync(backups, 'a file where the folder goes');
     const original = existsSync(db) ? readFileSync(db) : null;
@@ -61,6 +65,15 @@ function run(answer, { database = 'good', services = '{"biometrics":{"enabled":f
     for (const helper of ['sqlite-safety.py', 'prune_db_snapshots.sh']) {
         copyFileSync(path.join(repoRoot, 'scripts', helper), path.join(scripts, helper));
     }
+    if (walRace) {
+        // The WAL appears as a plain file, passes the check, then becomes a link.
+        writeFileSync(path.join(dir, 'secret'), 'root only');
+        stub('cp', `for a in "$@"; do
+  [ "$a" != '${db}' ] || echo 'wal bytes' > '${db}-wal'
+  [ "$a" != '${db}-wal' ] || { /bin/rm -f "$a"; /bin/ln -s '${path.join(dir, 'secret')}' "$a"; }
+done
+exec /bin/cp "$@"`);
+    }
     if (safetyFails)
         writeFileSync(path.join(scripts, 'sqlite-safety.py'), 'raise SystemExit(1)\n');
     const script = path.join(scripts, 'reset_db.sh');
@@ -70,7 +83,10 @@ function run(answer, { database = 'good', services = '{"biometrics":{"enabled":f
     });
     const log = existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n') : [];
     const saved = existsSync(backups) && !backupsBlocked ? readdirSync(backups) : [];
-    const read = (name) => readFileSync(path.join(backups, name));
+    const read = (name) => {
+        const file = path.join(backups, name);
+        return lstatSync(file).isSymbolicLink() ? Buffer.from('') : readFileSync(file);
+    };
     const out = { ...result, log, saved, read, original, dbLeft: existsSync(db), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
     return out;
 }
@@ -84,6 +100,29 @@ const integrity = (bytes) => {
     return answer;
 };
 describe('reset_db.sh', () => {
+    it('copies nothing through a link swapped in after its check', () => {
+        const result = run('y', { walRace: true, database: 'garbage' });
+        try {
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            assert.ok(result.saved.some(name => name.endsWith('-reset-raw.db-wal')), `${result.saved.join(' ')} ${result.log.join(' ')}`);
+            for (const name of result.saved)
+                assert.doesNotMatch(result.read(name).toString(), /root only/, name);
+        }
+        finally {
+            result.cleanup();
+        }
+    });
+    it('copies nothing through a link at the database files', () => {
+        const result = run('y', { walLink: true });
+        try {
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            for (const name of result.saved)
+                assert.doesNotMatch(result.read(name).toString(), /root only/, name);
+        }
+        finally {
+            result.cleanup();
+        }
+    });
     it('parses', () => {
         assert.equal(spawnSync('bash', ['-n', path.join(repoRoot, 'scripts/reset_db.sh')]).status, 0);
     });
