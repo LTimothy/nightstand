@@ -5,7 +5,7 @@ import type { TemperatureFormat } from '@lib/temperatureConversions';
 export default function FirmwareReadout({ data, format }: { data: FirmwareSnapshot; format: TemperatureFormat }) {
   return <Paper variant="outlined" sx={ { p: 2 } }>
     <Stack spacing={ 1 }>
-      <Typography variant="h6">Firmware target</Typography>
+      <Typography component="h2" variant="h6">Firmware target</Typography>
       { data.availability === 'Monitoring unavailable' && <Typography>Monitoring unavailable</Typography> }
       { (['left', 'right'] as const).map(side => {
         const sample = data.targets[side];

@@ -24,6 +24,7 @@ it('shows an independent firmware target to a tenth in Fahrenheit', () => {
   />);
   expect(screen.getByText('Left firmware target: 77.1°F')).toBeInTheDocument();
   expect(screen.getByText('Right firmware target: Disabled')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Firmware target', level: 2 })).toBeInTheDocument();
 });
 it('distinguishes stale, unavailable and monitoring off', () => {
   renderWithProviders(<FirmwareReadout
@@ -76,6 +77,8 @@ it.each([
   expect(await screen.findByText('Firmware health details')).toBeInTheDocument();
   expect(screen.queryByText('Firmware target') !== null).toBe(target);
   expect(screen.queryByText('Cooling warning') !== null).toBe(cooling);
+  expect(screen.getByRole('heading', { name: 'Firmware health details', level: 2 })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Cooling warning', level: 2 }) !== null).toBe(cooling);
 });
 
 it('shows neither readout while the firmware readings are still loading', async () => {

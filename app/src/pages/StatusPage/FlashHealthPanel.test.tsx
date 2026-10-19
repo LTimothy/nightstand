@@ -22,6 +22,7 @@ describe('FlashHealthPanel', () => {
     expect(screen.getByText('Spare blocks: Normal')).toBeInTheDocument();
     expect(screen.getByText('Writes since the last restart: about 3.0 GB a day')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Flash memory', level: 2 })).toBeInTheDocument();
   });
 
   it('warns when the chip is near the end of its life', async () => {
