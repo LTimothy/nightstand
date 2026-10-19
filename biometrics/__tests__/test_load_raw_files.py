@@ -31,6 +31,7 @@ for _name in LOGGER_NAMES:
     get_logger(_name)
 
 from load_raw_files import _decode_cbor_file, _normalize_cap_sense2
+import load_raw_files
 
 
 def _cap_sense2_record():
@@ -116,3 +117,49 @@ class TestDecodeWindowTrim(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestDecodeRecovery(unittest.TestCase):
+    def setUp(self):
+        self.start = datetime(2026, 9, 28, 12, 0, 0, tzinfo=timezone.utc)
+        self.end = self.start + timedelta(hours=1)
+        self.ts = int((self.start + timedelta(minutes=1)).timestamp())
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def _load(self, content, types=('capSense',)):
+        path = os.path.join(self.tmp.name, 'test.RAW')
+        with open(path, 'wb') as handle:
+            handle.write(content)
+        data = {kind: [] for kind in types}
+        _decode_cbor_file(path, data, self.start, self.end, 'left', 1)
+        return data
+
+    def _record(self, inner):
+        return cbor2.dumps({'seq': 1, 'data': inner})
+
+    def test_skips_a_corrupt_span_with_one_warning(self):
+        content = (self._record(cbor2.dumps(_cap_sense_record(self.ts))) + b'\x01' * 3000
+                   + self._record(cbor2.dumps(_cap_sense_record(self.ts + 60))))
+        with self.assertLogs(load_raw_files.logger, 'WARNING') as logs:
+            data = self._load(content)
+        self.assertEqual(len(data['capSense']), 2)
+        self.assertLessEqual(len(logs.records), 2, logs.output[:5])
+        self.assertTrue(any('Skipped 3000 bytes' in line for line in logs.output), logs.output[:5])
+
+    def test_skips_a_record_whose_length_runs_past_the_end(self):
+        bad = b'\xa2\x63seq\x01\x64data\x5a\xff\xff\xff\x00'
+        content = (self._record(cbor2.dumps(_cap_sense_record(self.ts))) + bad
+                   + self._record(cbor2.dumps(_cap_sense_record(self.ts + 60))))
+        self.assertEqual(len(self._load(content)['capSense']), 2)
+
+    def test_keeps_every_record_of_a_bundled_payload(self):
+        payload = cbor2.dumps(_cap_sense_record(self.ts)) + cbor2.dumps(_cap_sense_record(self.ts + 60))
+        data = self._load(self._record(payload))
+        self.assertEqual(len(data['capSense']), 2)
+        self.assertNotIn('_firmware', data['capSense'][0])
+
+    def test_loads_records_that_carry_no_piezo_sides(self):
+        temperature = {'type': 'frzTemp', 'ts': self.ts, 'amb': 2100, 'hs': 1500, 'left': 1900, 'right': 1950}
+        data = self._load(self._record(cbor2.dumps(temperature)), types=('frzTemp', 'log'))
+        self.assertEqual(len(data['frzTemp']), 1)

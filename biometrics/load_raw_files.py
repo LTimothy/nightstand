@@ -1,6 +1,5 @@
 import numpy as np
 import struct
-import traceback
 from datetime import datetime, timedelta, timezone
 import cbor2
 from pathlib import Path
@@ -15,7 +14,7 @@ from collections import Counter
 sys.path.append(os.getcwd())
 from data_types import *
 from get_logger import get_logger
-from raw_decoder import decode_payload
+from raw_decoder import decode_payload, plain_records
 from presence.detector import piezo_range
 from presence.piezo import piezo_layout
 from presence.sensors import FORMATS, read_cap, unknown_cap_type
@@ -238,30 +237,15 @@ def load_piezo_row(data: dict, side: Side):
 
 
 def _delete_other_side(decoded_data: dict, side: Side, sensor_count: int):
-    """
-    Delete other sides data for saving memory space
-    """
-    try:
-        del_side = 'left'
-        if side == 'left':
-            del_side = 'right'
-
-        if decoded_data['type'] == 'capSense':
-            del decoded_data[del_side]
-        else:
-            if sensor_count == 1:
-                # Delete sensor 2 of the current side
-                if f'{side}2' in decoded_data:
-                    del decoded_data[f'{side}2']
-            # Delete opposite side
-            del decoded_data[f'{del_side}1']
-            if f'{del_side}2' in decoded_data:
-                del decoded_data[f'{del_side}2']
-    except Exception as error:
-        logger.error(error)
-        traceback.print_exc()
-        print(decoded_data)
-        raise error
+    """Drop the other side's data to save memory; records without per-sensor keys pass through."""
+    del_side = 'right' if side == 'left' else 'left'
+    if decoded_data['type'] == 'capSense':
+        decoded_data.pop(del_side, None)
+        return
+    if sensor_count == 1:
+        decoded_data.pop(f'{side}2', None)
+    decoded_data.pop(f'{del_side}1', None)
+    decoded_data.pop(f'{del_side}2', None)
 
 
 def _capture_presence(record: dict):
@@ -442,33 +426,40 @@ def _load_nats_window(data: dict, start_time, end_time, side: Side, sensor_count
 
 def _decode_cbor_file(file_path: str, data: dict, start_time, end_time, side: Side, sensor_count: int, presence_collector=None,
                       cap_formats=None, unknown_caps=None):
-    # logger.debug(f'Loading cbor data from: {file_path}')
     checked_timespan = False
     with open(file_path, 'rb') as raw_data:
         while True:
+            start = raw_data.tell()
             try:
-
                 # Manual reader instead of cbor2.load(), the C extension
                 # reads in 4096-byte chunks and skips most records (see
                 # _read_raw_record docstring).
                 data_bytes = _read_raw_record(raw_data)
                 if data_bytes is None:
                     continue  # empty placeholder record
-                decoded_data = cbor2.loads(data_bytes)
-                accepted = _ingest_record(decoded_data, data, start_time, end_time, side, sensor_count,
-                                          presence_collector, cap_formats, check_file_span=not checked_timespan,
-                                          unknown_caps=unknown_caps)
+                records = list(plain_records(data_bytes))
+            except (EOFError, ValueError, cbor2.CBORDecodeError) as error:
+                # Resync at the next whole record, as the live reader does.
+                next_pos = _find_next_raw_record(raw_data, start)
+                if next_pos is None:
+                    if not isinstance(error, EOFError):
+                        logger.warning(f'Stopped reading {file_path} at offset {start} after a RAW decode failure: {error}')
+                    break
+                logger.warning(f'Skipped {next_pos - start} bytes in {file_path} at offset {start} after a RAW decode failure: {error}')
+                continue
+            for decoded_data in records:
+                try:
+                    accepted = _ingest_record(decoded_data, data, start_time, end_time, side, sensor_count,
+                                              presence_collector, cap_formats, check_file_span=not checked_timespan,
+                                              unknown_caps=unknown_caps)
+                except Exception as error:
+                    logger.error(error)
+                    continue
                 if accepted is False:
                     return
                 if accepted is True:
                     checked_timespan = True
-
-            except EOFError:
-                break
-            except Exception as error:
-                logger.error(error)
-        raw_data.close()
-        gc.collect()
+    gc.collect()
     return data
 
 

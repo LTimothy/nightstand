@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import cbor2
 from get_logger import get_logger
+from raw_decoder import plain_records
 import vendored  # noqa: F401
 
 logger = get_logger()
@@ -58,11 +59,9 @@ def window_limits(start_time, end_time):
     )
 
 
-def _decode_record(payload):
+def _payload_records(payload):
     row = cbor2.loads(payload)
-    if isinstance(row, dict) and 'data' in row:
-        row = cbor2.loads(row['data']) if row['data'] else None
-    return row if isinstance(row, dict) else None
+    return plain_records(row['data'] if isinstance(row, dict) and 'data' in row else payload)
 
 
 async def _connect(nats, note_error):
@@ -190,13 +189,16 @@ async def _window_records(start_time, end_time, message_limit, deadline):
                 if count > message_limit:
                     raise RuntimeError(f'NATS history message limit exceeded ({message_limit}); window is incomplete')
                 try:
-                    record = _decode_record(message.data)
-                    in_window = record is not None and start_time <= datetime.fromtimestamp(
-                        record['ts'], timezone.utc) <= end_time
-                except (cbor2.CBORDecodeError, KeyError, TypeError, ValueError, OverflowError, OSError):
-                    in_window = False
-                if in_window:
-                    yield record
+                    records = list(_payload_records(message.data))
+                except (cbor2.CBORDecodeError, ValueError, TypeError):
+                    records = []
+                for record in records:
+                    try:
+                        in_window = start_time <= datetime.fromtimestamp(record['ts'], timezone.utc) <= end_time
+                    except (KeyError, TypeError, ValueError, OverflowError, OSError):
+                        in_window = False
+                    if in_window:
+                        yield record
                 if metadata.num_pending == 0 or sequence == last_sequence:
                     return
     finally:

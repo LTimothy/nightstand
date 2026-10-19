@@ -591,3 +591,12 @@ def test_nats_unknown_counts_kept_when_only_nats_saw_the_window(tmp_path, monkey
         loader.load_raw_files(str(tmp_path), START, END, 'left', sensor_count=1,
                               raw_data_types=['capSense', 'piezo-dual'], cap_formats=formats)
     assert formats == Counter(unknown=1)
+
+
+def test_bundled_payload_keeps_every_record(monkeypatch):
+    first = {'type': 'log', 'ts': scenarios.T0}
+    second = {'type': 'log', 'ts': scenarios.T0 + 1}
+    payload = cbor2.dumps(first) + cbor2.dumps(second)
+    source, client = source_records(monkeypatch, [payload, cbor2.dumps({'seq': 1, 'data': payload})])
+    assert list(source.iter_window_records(START, END)) == [first, second, first, second]
+    assert client.closed and client.deleted

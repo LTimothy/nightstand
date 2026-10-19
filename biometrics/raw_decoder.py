@@ -40,3 +40,10 @@ def decode_row(row, received_at=None):
         record['_firmware'] = {'sequence': row.get('seq'), 'index': 0,
                                'receivedAt': time.time() if received_at is None else received_at}
         yield record
+
+
+def plain_records(payload):
+    """Every record of a payload, without the envelope identity the live path keeps."""
+    for record in decode_payload(payload):
+        record.pop('_firmware', None)
+        yield record
