@@ -11,8 +11,8 @@ interface BedVisualizationProps {
 
 // A schematic side profile: two hinged panels (head, feet) either side of a
 // fixed centre platform, matching how adjustable bases are actually built.
-// Flat shapes in the same visual language as PresetGlyph, with no shading
-// or texture, since nothing here but the angles carries a state.
+// Flat shapes with no shading or texture, since nothing here but the
+// angles carries a state.
 const VIEW_W = 400;
 const BASELINE_Y = 96;
 const HEAD_PIVOT_X = 182;

@@ -7,8 +7,7 @@ import { expect, it } from 'vitest';
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Not reachable from any route, kept on purpose; left as they are.
 const UNREACHABLE = new Set([
-  'pages/DataPage/DataPage.tsx', 'pages/SettingsPage/Divider.tsx', 'components/SleepBarChart.tsx',
-  'components/PresetGlyph.tsx', 'components/MovementChart.tsx',
+  'pages/DataPage/DataPage.tsx', 'pages/SettingsPage/Divider.tsx', 'components/MovementChart.tsx',
 ]);
 // Pills sized to half their height: round in every look.
 const PILL_BY_HEIGHT = new Set([
