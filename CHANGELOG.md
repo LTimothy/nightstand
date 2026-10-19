@@ -53,6 +53,8 @@ is a hard fork; for the history of the projects it descends from, see
   instead, with a sentence saying what half or more of the
   nights did. What the schedule
   sets during a rhythm night is kept with the notes for 90 days.
+- "Hide for 14 nights" also ends after 90 days, so a rhythm used about once a
+  week no longer stays hidden until someone taps Show again.
 - Checked on: the server and app test suites and the demo layout sweep.
 
 ### Cover taps

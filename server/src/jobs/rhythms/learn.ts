@@ -11,7 +11,7 @@ import { minutesAfterOn, nightMinutes, temperatureInPowerWindow } from '../../db
 import { F_PER_LEVEL, levelToF, type CurvePhase } from '../../db/smartCurve.js';
 import {
   BASE_STEP, CLUSTER_MIN, COALESCE_MIN, HIDE_SHARE, MAX_SUGGESTIONS, MIN_NIGHTS, MIN_SHARE, NEAR_MIN_NIGHTS, NEAR_MIN_SUPPORT, NEAR_SHARE,
-  ON_WINDOW_MIN, REPLACE_MIN, SNOOZE_NIGHTS, TIME_ROUND_MIN, WINDOW_NIGHTS,
+  NOTE_DAYS, ON_WINDOW_MIN, REPLACE_MIN, SNOOZE_NIGHTS, TIME_ROUND_MIN, WINDOW_NIGHTS,
 } from '../../db/suggestionRules.js';
 
 const MINUTE = 60_000;
@@ -500,6 +500,8 @@ function reasonOf(counted: number, full: Analysis, showing: number): SuggestionR
     (best, stage) => (STAGE_ORDER.indexOf(stage) > STAGE_ORDER.indexOf(best) ? stage : best), full.stages[0] ?? 'inconsistent');
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+
 const byNightOrder = (a: Placed, b: Placed) => a.at - b.at;
 
 type Hidden = { plan: DismissLine[]; later: Array<{ line: DismissLine; nightsLeft: number }> };
@@ -524,7 +526,8 @@ function hiddenFor(lines: Line[], { rhythm, planKey }: PlannedRhythm, now: Date)
     plan: own.filter(line => line.scope === 'plan' && line.planKey === planKey),
     later: own.filter(line => line.scope === 'later')
       .map(line => ({ line, nightsLeft: SNOOZE_NIGHTS - ends.filter(end => end > Date.parse(line.at)).length }))
-      .filter(entry => entry.nightsLeft > 0),
+      // The notes prune night lines at NOTE_DAYS but keep the hide, so a rare rhythm could never count 14.
+      .filter(entry => entry.nightsLeft > 0 && Date.parse(entry.line.at) >= now.getTime() - NOTE_DAYS * DAY),
   };
 }
 
