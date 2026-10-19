@@ -13,8 +13,6 @@ import AppRoutes from './AppRoutes';
 import { AppStoreProvider } from '@state/appStore.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import { GlobalStyles } from '@mui/material';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterMoment } from '@mui/x-date-pickers/AdapterMoment';
 
 const queryClient = createQueryClient();
 
@@ -23,30 +21,28 @@ const App = () => {
 
     <QueryClientProvider client={ queryClient }>
       <ThemeProvider theme={ theme }>
-        <LocalizationProvider dateAdapter={ AdapterMoment }>
 
-          <AppStoreProvider>
-            <CssBaseline enableColorScheme/>
-            <GlobalStyles
-              styles={ {
-                // Split html / body styles deliberately. Applying
-                // overscroll-behavior:none to BOTH made Android Chrome create
-                // two nested scroll containers: single-finger drag would
-                // scroll one and require two fingers for the other. body is
-                // the single scroll container that gets the rubber-banding
-                // fix; html stays untouched.
-                'body': {
-                  overscrollBehavior: 'none',
-                },
-              } }
-            />
-            { /* BASE_URL is '/' in normal builds; the hosted demo is served
-                 from a subpath (GitHub Pages), where Vite sets it via --base. */ }
-            <BrowserRouter basename={ import.meta.env.BASE_URL }>
-              <AppRoutes />
-            </BrowserRouter>
-          </AppStoreProvider>
-        </LocalizationProvider>
+        <AppStoreProvider>
+          <CssBaseline enableColorScheme/>
+          <GlobalStyles
+            styles={ {
+              // Split html / body styles deliberately. Applying
+              // overscroll-behavior:none to BOTH made Android Chrome create
+              // two nested scroll containers: single-finger drag would
+              // scroll one and require two fingers for the other. body is
+              // the single scroll container that gets the rubber-banding
+              // fix; html stays untouched.
+              'body': {
+                overscrollBehavior: 'none',
+              },
+            } }
+          />
+          { /* BASE_URL is '/' in normal builds; the hosted demo is served
+               from a subpath (GitHub Pages), where Vite sets it via --base. */ }
+          <BrowserRouter basename={ import.meta.env.BASE_URL }>
+            <AppRoutes />
+          </BrowserRouter>
+        </AppStoreProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
