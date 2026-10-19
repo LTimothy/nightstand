@@ -3,8 +3,8 @@ import eventBus from '../events/eventBus.js';
 export const firmwareTelemetry = new FirmwareTelemetry();
 let lastSummary = '';
 export function firmwareHealthSummary(features, enabled, now = Date.now() / 1000) {
-    const summary = firmwareTelemetry.summary(features, enabled, now);
     const data = firmwareTelemetry.snapshot(features, enabled, now);
+    const summary = firmwareTelemetry.summary(features, enabled, now, data);
     const signature = JSON.stringify({ summary, incidents: data.incidents.map(item => ({
             code: item.code, side: item.side, firstSeen: item.firstSeen, recoveredAt: item.recoveredAt,
             freshness: item.freshness,

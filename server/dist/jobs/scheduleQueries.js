@@ -4,9 +4,10 @@ import moment from 'moment-timezone';
 import settingsDB from '../db/settings.js';
 import schedulesDB from '../db/schedules.js';
 import { SCHEDULE_DAYS } from '../db/scheduleKeys.js';
-import { compareTimes, isValidTime, scheduleWrapsToNextDay } from './utils.js';
+import { compareTimes, isValidTime } from './utils.js';
 import { resolveLegacySleeps, resolveSleeps } from './rhythms/resolve.js';
 import { smartResolveHooks } from './rhythms/curveController.js';
+import { runningNight } from './nightBounds.js';
 const HOUR_MS = 60 * 60 * 1000;
 const CHANGE_LOOKAHEAD_MS = 48 * HOUR_MS;
 const TEMPERATURE_LOOKAHEAD_MS = 7 * 24 * HOUR_MS;
@@ -33,28 +34,6 @@ export function drivingSide(settings, side) {
 }
 function podTimeZone() {
     return settingsDB.data.timeZone || 'UTC';
-}
-// Weekly engine: a window opens at power.on and closes at power.off, on the
-// next day when it wraps. Yesterday's and today's windows cover overnights.
-function legacyIsInPowerWindow(side, now, schedules) {
-    const parseAt = (anchor, hhmm) => {
-        const [h, m] = hhmm.split(':').map(Number);
-        return anchor.clone().startOf('day').hour(h).minute(m).second(0).millisecond(0);
-    };
-    for (const daysAgo of [1, 0]) {
-        const anchor = now.clone().subtract(daysAgo, 'day');
-        const dayName = anchor.format('dddd').toLowerCase();
-        const daySchedule = schedules[side]?.[dayName];
-        if (!daySchedule?.power.enabled)
-            continue;
-        const start = parseAt(anchor, daySchedule.power.on);
-        const end = parseAt(anchor, daySchedule.power.off);
-        if (scheduleWrapsToNextDay(daySchedule.power))
-            end.add(1, 'day');
-        if (now.isSameOrAfter(start) && now.isBefore(end))
-            return true;
-    }
-    return false;
 }
 // Weekly engine: yesterday's schedule is included because its after-midnight rows run today.
 function legacyNextTempChange(side, now, timeZone) {
@@ -109,7 +88,7 @@ export function sleepAround(side, at) {
 }
 export function isInScheduledSleep(side, now) {
     if (!engine.active)
-        return legacyIsInPowerWindow(side, moment.tz(now, podTimeZone()), schedulesDB.data);
+        return runningNight(schedulesDB.data, side, now, podTimeZone()) !== null;
     return currentSleep(side, now) !== null;
 }
 export function nextScheduledChange(side, now) {

@@ -743,35 +743,14 @@ read -r server stream <<< "${states}"; echo "$server" > "$FIXTURE/state-free-sle
         assert.equal(/refused/.test(result.stdout), settings === 'converted\n', result.stdout);
     }
 });
-it('the writer stop is the same in every script that stops the writers', () => {
-    const stopWriter = (file) => file === 'scripts/rollback_pod.sh'
-        ? section('scripts/restore_helpers.sh', 'restore_stop_writer() {', '\n}\n').replace('restore_stop_writer()', 'stop_writer()')
-        : section(file, 'stop_writer() {', '\n}\n');
-    const lateStream = (file) => section(file, '# Until the server has stopped, its Biometrics', '\n}\n');
-    const [firstLate, ...restLate] = ['scripts/update.sh', 'scripts/rollback_pod.sh', 'scripts/switch-to-upstream.sh',
-        'scripts/reset.sh'].map(lateStream);
-    for (const helper of restLate)
-        assert.equal(helper, firstLate);
-    const scripts = ['scripts/update.sh', 'scripts/rollback_pod.sh', 'scripts/switch-to-upstream.sh', 'scripts/reset.sh',
-        'scripts/install.sh'];
-    const [first, ...rest] = scripts.map(stopWriter);
-    for (const helper of rest)
-        assert.equal(helper, first);
-});
-// The bed-in-use helpers each script carries.
-function inUseHelpers(file) {
-    const src = readFileSync(path.join(root, file), 'utf8');
+// The bed-in-use helpers the three operations share from restore_helpers.sh.
+function inUseHelpers() {
+    const src = readFileSync(path.join(root, 'scripts/restore_helpers.sh'), 'utf8');
     const start = src.indexOf('# Bed-in-use helpers');
-    assert.ok(start >= 0, `${file} has no bed-in-use helpers`);
+    assert.ok(start >= 0, 'restore_helpers.sh has no bed-in-use helpers');
     const last = src.indexOf('recheck_in_use() {', start);
     return src.slice(start, src.indexOf('\n}\n', last) + 3);
 }
-const OPERATIONS = ['scripts/update.sh', 'scripts/rollback_pod.sh', 'scripts/switch-to-upstream.sh'];
-it('the bed-in-use helpers are the same in every script', () => {
-    const [first, ...rest] = OPERATIONS.map(inUseHelpers);
-    for (const helpers of rest)
-        assert.equal(helpers, first);
-});
 for (const [request, recheck] of [
     [null, 'no'],
     ['{"source":"app","confirmInUse":false}', 'yes'],
@@ -781,7 +760,7 @@ for (const [request, recheck] of [
     ['{not json', 'no'],
 ]) {
     it(`a request of ${request ?? 'none'} is checked again: ${recheck}`, () => {
-        const result = run(`${inUseHelpers('scripts/update.sh')}
+        const result = run(`${inUseHelpers()}
 read_request
 echo "recheck=$RECHECK_IN_USE"
 if [ -e "$REQUEST_FILE" ]; then echo kept; fi`, request === null ? '' : `mkdir -p "$FIXTURE/persistent/free-sleep-data"
@@ -792,7 +771,7 @@ printf '%s' '${request}' > "$FIXTURE/persistent/free-sleep-data/operation-reques
     });
 }
 it('a request left from a run that never started is not checked again', () => {
-    const result = run(`${inUseHelpers('scripts/update.sh')}
+    const result = run(`${inUseHelpers()}
 read_request
 echo "recheck=$RECHECK_IN_USE"`, `mkdir -p "$FIXTURE/persistent/free-sleep-data"
 printf '%s' '{"source":"app","confirmInUse":false}' > "$FIXTURE/persistent/free-sleep-data/operation-request.json"
@@ -808,7 +787,7 @@ for (const [file, from, to, setup] of [
     ['scripts/switch-to-upstream.sh', '# --- atomic swap', 'MOVED_MODULES=no',
         `STAGED_VERSION=1.0.0; BK="$FIXTURE/bk"; mkdir -p "$BK/lowdb"; ${staged}`],
 ]) {
-    const script = (recheck) => `${inUseHelpers(file)}\nRECHECK_IN_USE=${recheck}\n${withExitHandling(file, section(file, from, to))}`;
+    const script = (recheck) => `${inUseHelpers()}\nRECHECK_IN_USE=${recheck}\n${withExitHandling(file, section(file, from, to))}`;
     const answer = (body, status = 0) => `curl() { echo "curl $*" >> "$FIXTURE/services"; case "$*" in *in-use*) printf '%s' '${body}'; return ${status};; esac; }`;
     for (const [what, curl] of [
         ['a side came on', answer('{"reasons":["left-on"]}')],

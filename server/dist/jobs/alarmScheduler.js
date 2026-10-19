@@ -10,6 +10,7 @@ import { executeFunction } from '../8sleep/deviceApi.js';
 import { compareTimes, getDayIndexForTime, isValidTime, logJob } from './utils.js';
 import { connectFrankenWithin } from '../8sleep/frankenServer.js';
 import { nightBounds } from './nightBounds.js';
+import { nextScheduledOff } from './firmwareTimer.js';
 import { emitJobEvent } from './jobEvents.js';
 import { describePause, isAlarmPaused } from './schedulePause.js';
 import { ALARM_LATE_LIMIT_MS, trackAlarm } from './alarmActivity.js';
@@ -109,19 +110,6 @@ export function hasAlarmOccurrence(side, occurrenceId) {
 }
 // Test isolation only.
 export const resetAlarmOccurrences = () => alarmOccurrences.clear();
-/**
- * Next occurrence of HH:mm in tz (today or tomorrow depending on 'now').
- * If the HH:mm is already passed for 'now', schedule for tomorrow.
- */
-function nextOccurrenceHhMm(tz, hhmm) {
-    const now = moment.tz(tz);
-    const [h, m] = hhmm.split(':').map(Number);
-    const candidate = now.clone().hour(h).minute(m).second(0).millisecond(0);
-    if (candidate.isSameOrBefore(now)) {
-        candidate.add(1, 'day');
-    }
-    return candidate;
-}
 /**
  * One-off alarm: stand-alone alarm that fires once at a specific datetime then
  * auto-disables itself. Independent of the per-day-of-week recurring alarm.
@@ -226,7 +214,7 @@ export function scheduleAlarmOverride(settingsData, side, rhythmSleepAt) {
     const expiresAt = moment.tz(alarmOverride.expiresAt, settingsData.timeZone);
     if (!expiresAt.isAfter(now))
         return null;
-    const next = nextOccurrenceHhMm(settingsData.timeZone, alarmOverride.timeOverride);
+    const next = moment.tz(nextScheduledOff(now.toDate(), alarmOverride.timeOverride, settingsData.timeZone), settingsData.timeZone);
     if (next.isAfter(expiresAt))
         return null;
     const overrideKey = `${side}:${alarmOverride.timeOverride}:${alarmOverride.expiresAt}`;

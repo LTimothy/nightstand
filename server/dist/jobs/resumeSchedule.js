@@ -6,7 +6,7 @@ import { connectFrankenWithin, getDeviceStatusCoalesced } from '../8sleep/franke
 import logger from '../logger.js';
 import { lastManualPowerChange } from './manualPowerChange.js';
 import { engineActivation } from './scheduleQueries.js';
-import { runningNight } from './weeklyRearm.js';
+import { runningNight } from './nightBounds.js';
 import { weeklyPowerOnJob } from './powerScheduler.js';
 import { resolveSleeps } from './rhythms/resolve.js';
 import { hasRunningRhythmStart } from './rhythms/scheduleRhythms.js';

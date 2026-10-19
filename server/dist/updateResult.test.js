@@ -23,9 +23,10 @@ let runs = 0;
 function resultBlock(src) {
     const start = src.indexOf(BLOCK_START);
     assert.ok(start >= 0, 'missing the result block');
-    const fn = src.indexOf('record_result() {', start);
-    assert.ok(fn > start, 'missing record_result');
-    return src.slice(start, src.indexOf('\n}\n', fn) + 3);
+    const end = src.indexOf('\nUP_TO_DATE=no\n', start);
+    assert.ok(end > start, 'missing UP_TO_DATE');
+    // record_result itself lives in restore_helpers.sh.
+    return `${src.slice(start, end + 15)}source "${path.join(repoRoot, 'scripts/restore_helpers.sh')}"\n`;
 }
 // Lays out a fresh pod under the temp folder and runs a script text there.
 function runScript(src, name, disk, setup, lock) {

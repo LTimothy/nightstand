@@ -1,3 +1,5 @@
+import moment from 'moment-timezone';
+import { SCHEDULE_DAYS } from '../db/scheduleKeys.js';
 import { scheduleWrapsToNextDay } from './utils.js';
 export function nightBounds(date, power) {
     const [onHour, onMinute] = power.on.split(':').map(Number);
@@ -8,5 +10,20 @@ export function nightBounds(date, power) {
         end.add(1, 'day');
     end.hour(offHour).minute(offMinute);
     return { start, end };
+}
+// Today's night, or the one that began yesterday, if the schedule has it running now.
+export function runningNight(schedules, side, now, timeZone) {
+    let found = null;
+    for (const daysAgo of [1, 0]) {
+        const anchor = moment.tz(now, timeZone).subtract(daysAgo, 'day');
+        const day = SCHEDULE_DAYS[anchor.day()];
+        const power = schedules[side]?.[day]?.power;
+        if (!power?.enabled)
+            continue;
+        const { start, end } = nightBounds(anchor, power);
+        if (!start.isAfter(now) && end.isAfter(now))
+            found = { day, start: start.toDate() };
+    }
+    return found;
 }
 //# sourceMappingURL=nightBounds.js.map

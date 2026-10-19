@@ -59,6 +59,7 @@ function run(answer, { migrateExit = 0, stopFails = false, watchdogMark = undefi
 exec /bin/rm "$@"`);
     }
     const script = readFileSync(path.join(repoRoot, 'scripts/reset.sh'), 'utf8')
+        .replace('$(dirname "${BASH_SOURCE[0]}")/restore_helpers.sh', path.join(repoRoot, 'scripts/restore_helpers.sh'))
         .replaceAll('/persistent', persistent)
         .replaceAll('/home/dac', path.join(dir, 'home'));
     const result = spawnSync('bash', ['-c', script], {

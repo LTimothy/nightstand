@@ -85,11 +85,10 @@ export class FirmwareTelemetry {
                 rpm: pump.rpm, water: pump.water, loopC: pump.loopC, isOn: state[side], priming: state.priming });
         }
     }
-    summary(features, biometrics, now) {
+    summary(features, biometrics, now, data = this.snapshot(features, biometrics, now)) {
         // On by default, so a Pod without Biometrics gets no row rather than one that can never fill.
         if (!features.firmwareHealth || !biometrics)
             return undefined;
-        const data = this.snapshot(features, biometrics, now);
         const warnings = data.incidents.filter(item => item.severity === 'warning' && !item.recoveredAt && item.freshness === 'Recent');
         const message = data.interrupted ? 'Bed sensor readings are interrupted.'
             : warnings.length ? warnings.map(item => item.message).join(' ')

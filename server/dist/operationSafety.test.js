@@ -203,9 +203,10 @@ it('downgrades stay in the current updater instead of handing off safety checks'
 for (const name of ['update.sh', 'rollback_pod.sh', 'switch-to-upstream.sh']) {
     it(`${name} takes the same exclusive operation lock before preflight`, () => {
         const source = script(name);
-        assert.match(source, /NIGHTSTAND_OPERATION_LOCK.*\/run\/lock\/free-sleep-operation.lock/);
-        assert.ok(source.indexOf('flock -n 9') < source.indexOf('# --- preflight'));
-        assert.match(source, /flock -n 9.*(?:fail|exit)/);
+        // The lock itself is pinned with the helpers in restoreHelpers.test.ts.
+        const take = source.indexOf('\ntake_operation_lock\ncase $? in\n');
+        assert.ok(take > 0 && take < source.indexOf('# --- preflight'));
+        assert.match(source, /\ntake_operation_lock\ncase \$\? in\n {2}0\) ;;\n {2}1\) fail [^\n]+\n {2}\*\) fail /);
     });
 }
 it('an older archive script caps configured retention at fourteen days', () => {

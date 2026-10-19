@@ -11,14 +11,13 @@ import { rhythmNightAlarms, waitForNightAlarms } from '../alarmActivity.js';
 import { executeAnalyzeSleep } from '../analyzeSleep.js';
 import { notePowerOn, poweredOnSince } from '../powerScheduler.js';
 import { pauseHoldUntil } from '../pauseHold.js';
+import { firmwareSecondsUntil, WEEKLY_FIRMWARE_MARGIN_SECONDS } from '../firmwareTimer.js';
 import { isTempScheduleOverridden } from '../scheduleOverride.js';
 import { effectiveSides, engineActivation } from '../scheduleQueries.js';
 import { rhythmSkipReason } from './gates.js';
 import { smartOffDecision, smartPowerOffFor, smartTemperatureGate } from './curveController.js';
 import { recordNight, recordSet } from './handChanges.js';
 import { turnsOffWhenUp } from './resolve.js';
-export const FIRMWARE_MARGIN_SECONDS = 300;
-export const FIRMWARE_MAX_SECONDS = 43200;
 export const ANALYSIS_DELAY_MS = 15 * 60 * 1000;
 // A person still in bed at the first run gets a record cut off there; this
 // later, longer run replaces it.
@@ -30,13 +29,13 @@ const ANALYSIS_PADDING_MS = 60 * 60 * 1000;
 const DUPLICATE_ANALYSIS_MS = 10 * 60 * 1000;
 // Every Rhythms power-on hands the firmware its own off time, so the side
 // still turns off at the sleep's end if this server stops or is replaced.
-export function firmwareSeconds(sleepEnd, now, marginSeconds = FIRMWARE_MARGIN_SECONDS) {
-    return Math.min(Math.ceil((sleepEnd.getTime() - now.getTime()) / 1000) + marginSeconds, FIRMWARE_MAX_SECONDS);
+export function firmwareSeconds(sleepEnd, now, marginSeconds = WEEKLY_FIRMWARE_MARGIN_SECONDS) {
+    return firmwareSecondsUntil(new Date(sleepEnd.getTime() + marginSeconds * 1000), now);
 }
 // A "When I get up" sleep decides at its set off, after an alarm due then
 // has rung, so its timer leaves room for that wait.
 export const OFF_WHEN_UP_MARGIN_SECONDS = 900;
-const marginFor = (sleep) => (turnsOffWhenUp(sleep) ? OFF_WHEN_UP_MARGIN_SECONDS : FIRMWARE_MARGIN_SECONDS);
+const marginFor = (sleep) => (turnsOffWhenUp(sleep) ? OFF_WHEN_UP_MARGIN_SECONDS : WEEKLY_FIRMWARE_MARGIN_SECONDS);
 // The sleep end each side's firmware was last told. Memory only, so after a
 // restart a sleep in progress is told again.
 const armedEnds = new Map();
