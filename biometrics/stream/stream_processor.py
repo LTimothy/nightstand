@@ -378,10 +378,6 @@ class StreamProcessor:
                 if log:
                     logger.debug(f'Presence detected for left side @ {time.isoformat()}')
 
-                left2_signal = None
-                if self.sensor_count == 2:
-                    left2_signal = self.buffer.get_heart_rate_signal('left', 2)
-
                 # Heart rate calculation
                 self.left_processor.calculate_heart_rate(epoch, left1_signal, left2_signal)
 
@@ -399,10 +395,6 @@ class StreamProcessor:
             if self.right_processor.present_for > self.right_processor.heart_rate_window_seconds:
                 if log:
                     logger.debug(f'Presence detected for right side @ {time.isoformat()}')
-
-                right2_signal = None
-                if self.sensor_count == 2:
-                    right2_signal = self.buffer.get_heart_rate_signal('right', 2)
 
                 # Heart rate calculation
                 self.right_processor.calculate_heart_rate(epoch, right1_signal, right2_signal)
