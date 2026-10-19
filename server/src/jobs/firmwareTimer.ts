@@ -16,26 +16,12 @@ export function nextScheduledOff(now: Date, off: string, timeZone: string): Date
   return at.toDate();
 }
 
-// When the firmware should turn a side off after a scheduled power-on at
-// `now`: the next `off` plus a margin.
-export function firmwareOffAt(
-  now: Date, off: string, timeZone: string, marginSeconds = WEEKLY_FIRMWARE_MARGIN_SECONDS,
-): Date {
-  return new Date(nextScheduledOff(now, off, timeZone).getTime() + marginSeconds * 1000);
-}
-
 // Whole seconds of on time from `now` to `until`, between 1 and the firmware
 // maximum. An end that is not a time gets the maximum.
 export function firmwareSecondsUntil(until: Date, now: Date): number {
   const seconds = Math.ceil((until.getTime() - now.getTime()) / 1000);
   if (!Number.isFinite(seconds)) return MAX_ON_DURATION_SECONDS;
   return Math.min(Math.max(seconds, 1), MAX_ON_DURATION_SECONDS);
-}
-
-export function secondsUntilScheduledOff(
-  now: Date, off: string, timeZone: string, marginSeconds = WEEKLY_FIRMWARE_MARGIN_SECONDS,
-): number {
-  return firmwareSecondsUntil(firmwareOffAt(now, off, timeZone, marginSeconds), now);
 }
 
 // An alarm due just before the off can start up to ALARM_LATE_LIMIT_MS late

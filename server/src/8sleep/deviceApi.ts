@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import { connectFrankenWithin } from './frankenServer.js';
 import type { CommandOptions } from './frankenServer.js';
 import logger from '../logger.js';
@@ -24,7 +23,6 @@ export const frankenCommands = {
 } as const;
 
 
-export const invertedFrankenCommands = _.invert(frankenCommands);
 // eslint-disable-next-line @typescript-eslint/no-type-alias
 export type FrankenCommand = keyof typeof frankenCommands;
 
@@ -37,13 +35,5 @@ export async function executeFunction(
   logger.debug(`Executing command | command: ${command} | arg: ${typeof arg === 'string' ? arg : 'when sent'}`);
 
   const franken = await connectFrankenWithin(options, command);
-  // const frankenCommand = funcNameToFrankenCommand[name];
-  // if franken disconnects right before a function call this will throw
-  // the error will bubble up to the main loop of the device-api-client (protocol handling)
-  // and the client will crash disconnecting from device-api - this is safe, it's correctly cleaned-up,
-  // deviceApiLoop will take care of reconnecting to device-api
-  const response = await franken.callFunction(command, typeof arg === 'string' ? arg : arg());
-  logger.debug(response);
-
-  return response;
+  await franken.callFunction(command, typeof arg === 'string' ? arg : arg());
 }

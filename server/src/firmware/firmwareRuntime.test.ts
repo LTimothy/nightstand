@@ -29,3 +29,10 @@ it('publishes meaningful health transitions without broadcasting every repeated 
     assert.deepEqual(messages[2], { firmwareHealth: undefined });
   } finally { unsubscribe(); }
 });
+
+it('builds one snapshot per summary', t => {
+  const features = { firmwareTargetReadout: false, firmwareHealth: true, tapDiagnostics: false, coolingWarning: false };
+  const snapshot = t.mock.method(firmwareTelemetry, 'snapshot');
+  firmwareHealthSummary(features, true, 500);
+  assert.equal(snapshot.mock.callCount(), 1);
+});

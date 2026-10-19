@@ -46,7 +46,6 @@ async function rebuildJobs() {
     Object.keys(schedule.scheduledJobs).forEach((jobName) => {
       schedule.cancelJob(jobName);
     });
-    await schedule.gracefulShutdown();
 
     // A turn off that saved after this read keeps its alarms for the next pass.
     const keptUpTo = keptAlarmsGeneration();

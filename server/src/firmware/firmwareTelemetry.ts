@@ -74,10 +74,11 @@ export class FirmwareTelemetry {
     }
   }
 
-  summary(features: FirmwareFeatures, biometrics: boolean, now: number): StatusInfo | undefined {
+  summary(
+    features: FirmwareFeatures, biometrics: boolean, now: number, data = this.snapshot(features, biometrics, now),
+  ): StatusInfo | undefined {
     // On by default, so a Pod without Biometrics gets no row rather than one that can never fill.
     if (!features.firmwareHealth || !biometrics) return undefined;
-    const data = this.snapshot(features, biometrics, now);
     const warnings = data.incidents.filter(item => item.severity === 'warning' && !item.recoveredAt && item.freshness === 'Recent');
     const message = data.interrupted ? 'Bed sensor readings are interrupted.'
       : warnings.length ? warnings.map(item => item.message).join(' ')
