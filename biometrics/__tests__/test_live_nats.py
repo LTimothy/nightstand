@@ -125,6 +125,16 @@ class TestSession(LiveReaderTestCase):
         jetstream.delete_consumer.assert_awaited_once_with('raw', 'owned')
         connection.close.assert_awaited_once()
 
+    def test_a_record_that_fails_processing_does_not_drop_the_rest_of_its_message(self):
+        modules, _, _, _, subscription, _ = fake_client()
+        bad = dict(recent_piezo(seq=986), left1=b'\x01\x02\x03')
+        bundle = cbor2.dumps(bad) + cbor2.dumps(recent_piezo(seq=987))
+        subscription.fetch.side_effect = [[Mock(data=cbor2.dumps({'seq': 1, 'data': bundle}))],
+                                          asyncio.CancelledError()]
+        with patch.object(stream, 'update_health'), patch.object(stream, '_record_warning_at', {}):
+            self.run_session(modules)
+        self.assertEqual(stream.piezo_record_queue.get_nowait()['seq'], 987)
+
     def test_consumer_removed_when_binding_fails(self):
         modules, _, connection, jetstream, _, _ = fake_client()
         jetstream.pull_subscribe_bind.side_effect = RuntimeError('bind failed')

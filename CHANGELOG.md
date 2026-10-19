@@ -453,6 +453,10 @@ is a hard fork; for the history of the projects it descends from, see
   longer skipped if the firmware finished it and wrote the next record
   before the reader looked for where to resume. The live stream waits for
   it and the nightly analysis stops at it, as for any partial record.
+- The live stream skips a sensor record it cannot process, with at most one
+  warning a minute, and goes on with the rest of the file or NATS message.
+  Before, such a record in a RAW file stopped the stream at that point of
+  the file and re-sent the records before it on every retry.
 
 ### Schedules
 

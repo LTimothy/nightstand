@@ -701,6 +701,7 @@ class TestRawFileRecovery(StreamHelpersTestCase):
         self.frames = [recent_piezo(seq=sequence) for sequence in (1, 2)]
         self.records = [cbor2.dumps({'seq': sequence, 'data': cbor2.dumps(frame)})
                         for sequence, frame in enumerate(self.frames)]
+        self._real_ingest = stream._ingest_live_record
         patcher = unittest.mock.patch.object(stream, '_ingest_live_record')
         self.ingest = patcher.start()
         self.addCleanup(patcher.stop)
@@ -858,13 +859,31 @@ class TestRawFileRecovery(StreamHelpersTestCase):
         self.assertEqual(handler.latest_file, newer)
         self.assertEqual(handler.last_pos, len(self.records[1]))
 
-    def test_a_processing_failure_does_not_resync_past_a_decoded_record(self):
-        handler = self.handler(b''.join(self.records))
-        self.ingest.side_effect = RuntimeError('processor failed')
-        handler.follow_latest_file()
-        self.assertEqual(handler.last_pos, 0)
-        self.assertEqual(self.ingest.call_count, 1)
+    def test_a_record_that_fails_processing_is_skipped_once_with_one_warning(self):
+        bad = [dict(recent_piezo(seq=8), ts='x'), dict(recent_piezo(seq=9), left1=b'\x01\x02\x03')]
+        bundle = b''.join(cbor2.dumps(record) for record in [self.frames[0]] + bad)
+        fixture = cbor2.dumps({'seq': 0, 'data': bundle}) + self.records[1]
+        handler = self.handler(fixture)
+        self.ingest.side_effect = self._real_ingest
+        with unittest.mock.patch.object(stream, '_record_warning_at', {}), \
+                self.assertLogs(stream.logger, 'WARNING') as logs:
+            handler.follow_latest_file()
+            handler.follow_latest_file()
+        self.assertEqual(self.ingest.call_count, 4)
+        self.assertEqual(handler.last_pos, len(fixture))
+        self.assertEqual(len(logs.records), 1, logs.output)
+        self.assertEqual(stream.piezo_record_queue.qsize(), 2)
 
+
+class TestRecordWarnings(StreamHelpersTestCase):
+    def test_raw_and_nats_failures_each_warn_once_a_minute(self):
+        bad = dict(recent_piezo(seq=8), ts='x')
+        with unittest.mock.patch.object(stream, '_record_warning_at', {}), \
+                unittest.mock.patch.object(stream.time, 'monotonic', return_value=100), \
+                self.assertLogs(stream.logger, 'WARNING') as logs:
+            for source in ('RAW', 'NATS', 'RAW', 'NATS'):
+                self.assertFalse(stream._ingest_or_skip(dict(bad), source))
+        self.assertEqual([('RAW' in line, 'NATS' in line) for line in logs.output], [(True, False), (False, True)])
 
 class TestRawFileCapRecords(CapPresenceTestCase):
     def test_the_file_watcher_stores_capsense2_and_queues_piezo(self):

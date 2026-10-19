@@ -69,6 +69,7 @@ latest_cap = LatestCap()
 pump_speed = PumpSpeed()
 _pump_frame_warned = False
 _firmware_ingest_warning_at = None
+_record_warning_at = {}  # per source, so RAW and NATS warnings do not hide each other
 # A vitals switch that fails is retried every refresh; only the first failure is an error.
 _vitals_switch_failed = False
 # Capacitance presence runs only while capacitance records keep arriving, so a
@@ -332,6 +333,18 @@ def _ingest_live_record(record, source='RAW') -> bool:
     return fresh
 
 
+def _ingest_or_skip(record, source='RAW') -> bool:
+    """_ingest_live_record, skipping a record it cannot process so later records still arrive."""
+    try:
+        return _ingest_live_record(record, source)
+    except Exception as error:
+        now = time.monotonic()
+        if source not in _record_warning_at or now - _record_warning_at[source] >= 60:
+            _record_warning_at[source] = now
+            logger.warning(f'Skipping a {source} record that could not be processed: {error}')
+        return False
+
+
 def _report_stream_health(processing_thread) -> bool:
     if not processing_thread.is_alive():
         update_health('stream', 'failed', 'processing thread stopped')
@@ -424,14 +437,9 @@ class LatestRawFileHandler(FileSystemEventHandler):
                     logger.error(f'Error reading record: {error}')
                 break
 
-            try:
-                for decoded_data in decoded_records:
-                    _ingest_live_record(decoded_data)
-            except Exception as error:
-                logger.error(f'Error processing record: {error}')
-                self.latest_file_obj.seek(self.last_pos)
-                break
             self.last_pos = self.latest_file_obj.tell()
+            for decoded_data in decoded_records:
+                _ingest_or_skip(decoded_data)
 
 
 def process_biometrics(stop_event=None):
@@ -647,7 +655,7 @@ async def _nats_session(processing_thread, raw_files=None):
                 try:
                     row = cbor2.loads(message.data)
                     for record in _decode_raw_row(row):
-                        if _ingest_live_record(record, 'NATS'):
+                        if _ingest_or_skip(record, 'NATS'):
                             last_nats_record = time.monotonic()
                 except Exception as error:
                     logger.warning(f'Error decoding NATS raw message, skipping: {error}')
