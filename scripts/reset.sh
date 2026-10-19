@@ -40,12 +40,24 @@ if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
   export NIGHTSTAND_OPERATION_OWNER=$$
 fi
 
+# Prints file $1 only when it is a plain file, never through a link the
+# server user left in its folder.
+read_plain() {
+  python3 -I - "$1" <<'PY'
+import os, stat, sys
+descriptor = os.open(sys.argv[1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+with os.fdopen(descriptor, "rb") as handle:
+    assert stat.S_ISREG(os.fstat(descriptor).st_mode)
+    sys.stdout.buffer.write(handle.read(65536))
+PY
+}
+
 SOCK_PATH=""
-[ -f "$SOCK_FILE" ] && SOCK_PATH=$(cat "$SOCK_FILE")
+[ -f "$SOCK_FILE" ] && SOCK_PATH=$(read_plain "$SOCK_FILE" 2>/dev/null)
 # The watchdog's trial file is kept too, byte for byte, so a failed trial or
 # an owner's --remove still keeps it off. Empty means a trial never finished.
 MARK=""
-[ ! -f "$WATCHDOG_MARK" ] || MARK="$(cat "$WATCHDOG_MARK"; printf x)"
+[ ! -f "$WATCHDOG_MARK" ] || MARK="$(read_plain "$WATCHDOG_MARK" 2>/dev/null && printf x)"
 STREAM_WAS_ACTIVE=$(systemctl is-active free-sleep-stream 2>/dev/null || true)
 ARCHIVE_WAS_ACTIVE=$(systemctl is-active free-sleep-archive-raw.timer 2>/dev/null || true)
 

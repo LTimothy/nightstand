@@ -205,6 +205,9 @@ is a hard fork; for the history of the projects it descends from, see
   settings a failed switch to upstream puts back, are now written to a
   new file in `/persistent` and renamed into place, which replaces a link
   the server user left at the name instead of writing through it.
+- `reset.sh` keeps the socket path and the watchdog trial file only when
+  they are plain files. Before, a link left at either name made root copy
+  the file it pointed to into the new data folder.
 
 ### Installation and fork migration
 

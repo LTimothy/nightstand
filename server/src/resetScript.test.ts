@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -14,7 +14,7 @@ const SOCK = '/persistent/deviceinfo/dac.sock';
 function run(answer: string, {
   migrateExit = 0, stopFails = false, watchdogMark = undefined as string | undefined, rmKeepsServices = false,
   streamStopFails = false, staysActive = '', streamMissing = false, streamBroken = false,
-  lateStream = 'none' as 'none' | 'stops' | 'stays',
+  lateStream = 'none' as 'none' | 'stops' | 'stays', linkedFiles = false,
 } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-reset-'));
   const persistent = path.join(dir, 'persistent');
@@ -26,6 +26,12 @@ function run(answer: string, {
   writeFileSync(path.join(data, 'free-sleep.db'), 'db');
   writeFileSync(path.join(data, 'dac_sock_path.txt'), `${SOCK}\n`);
   if (watchdogMark !== undefined) writeFileSync(path.join(data, 'watchdog-trial'), watchdogMark);
+  // Links the server user could leave, pointing at a file only root can read.
+  if (linkedFiles) {
+    writeFileSync(path.join(dir, 'secret'), 'root only\n');
+    rmSync(path.join(data, 'dac_sock_path.txt'));
+    for (const name of ['dac_sock_path.txt', 'watchdog-trial']) symlinkSync(path.join(dir, 'secret'), path.join(data, name));
+  }
   const siblings = ['free-sleep-backups', 'free-sleep-database-backups', 'free-sleep-data-extra'];
   for (const name of siblings) {
     mkdirSync(path.join(persistent, name));
@@ -93,6 +99,13 @@ describe('reset.sh', () => {
     const head = readFileSync(file, 'utf8').split('\n').slice(0, 6).join('\n');
     assert.match(head, /BASH_VERSION/);
     assert.doesNotMatch(readFileSync(file, 'utf8'), /update\.sh/);
+  });
+
+  it('keeps nothing read through a link the server user left', () => {
+    const result = run('y', { linkedFiles: true });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(result.sock, null);
+    assert.equal(result.watchdogMark, null);
   });
 
   it('does nothing without a yes', () => {
