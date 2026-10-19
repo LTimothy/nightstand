@@ -61,7 +61,7 @@ LIVE="$1"; STREAM_WAS_ACTIVE=inactive; source "$2"; restore_restart_services bes
   }
 });
 
-const SHARED = ['record_result', 'read_request', 'recheck_in_use', 'stop_late_stream', 'restore_stop_writer'];
+const SHARED = [...WINDOW, 'record_result', 'read_request', 'recheck_in_use', 'stop_late_stream', 'restore_stop_writer'];
 const shellFiles = (dir: string): string[] => readdirSync(path.join(repoRoot, dir), { withFileTypes: true })
   .flatMap(entry => (entry.isDirectory() ? (entry.name === 'migrate' ? shellFiles(`${dir}/${entry.name}`) : [])
     : entry.name.endsWith('.sh') ? [`${dir}/${entry.name}`] : []));
@@ -100,4 +100,12 @@ it('a staged updater sources the helpers from its own tree before it uses one', 
   } finally {
     rmSync(stage, { recursive: true, force: true });
   }
+});
+
+it('deploy opens its window with the root-owned copy of the helpers', () => {
+  const deploy = read('ops/deploy.sh');
+  const deps = deploy.slice(deploy.indexOf("<<'DEPS'"), deploy.indexOf('\nDEPS\n'));
+  assert.match(deps, /source "\$COPY\/scripts\/restore_helpers\.sh"/);
+  assert.doesNotMatch(deps, /^(strip_top|run_limited|restore_output_policy|fw4|fw6)\(\)/m);
+  assert.doesNotMatch(deps, /^WAN_RULES=/m);
 });

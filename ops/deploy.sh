@@ -276,87 +276,15 @@ if [ "$LOCK_SAME" = "no" ] || [ "$NODE_MISSING" = "yes" ]; then
   say "Downloading dependencies in staging (HTTPS and DNS allowed out meanwhile)"
   SSH "bash -s -- $STAGE $NPM $LOCK_SAME $COPY" <<'DEPS' || deps_failed
 STAGE=$1; NPM=$2; LOCK_SAME=$3; COPY=$4
-WAN_RULES=("-p tcp --dport 443 -j ACCEPT" "-p udp --dport 53 -j ACCEPT" "-p tcp --dport 53 -j ACCEPT")
-WAN_RULE6="-p tcp --dport 443 -j REJECT --reject-with tcp-reset"
-# iptables 1.6.0 added "-w SECONDS"; older builds take a bare -w or no flag.
-IPT_W=
-for IPT_W in "-w 5" "-w" ""; do
-  # shellcheck disable=SC2086
-  iptables $IPT_W -S OUTPUT >/dev/null 2>&1 && break
-done
-# shellcheck disable=SC2086
-fw4() { iptables $IPT_W "$@"; }
-# shellcheck disable=SC2086
-fw6() { ip6tables $IPT_W "$@"; }
-# Clear an emergency policy only after both families have terminal blocks.
-restore_output_policy() {
-  if { fw4 -C OUTPUT -j REJECT 2>/dev/null || fw4 -C OUTPUT -j DROP 2>/dev/null; } &&
-     { fw6 -C OUTPUT -j REJECT 2>/dev/null || fw6 -C OUTPUT -j DROP 2>/dev/null; }; then
-    fw4 -P OUTPUT ACCEPT || echo "WARNING: could not restore IPv4 OUTPUT policy"
-    fw6 -P OUTPUT ACCEPT || echo "WARNING: could not restore IPv6 OUTPUT policy"
-  fi
-}
-# Removes the given rules only while one of them is the first rule in OUTPUT,
-# so the same rule further down (Tailscale's HTTPS allow) is left alone.
-strip_top() {
-  local tool=$1 first spec match removed=0
-  shift
-  while [ "$removed" -lt 10 ]; do
-    first=$("$tool" -S OUTPUT 2>/dev/null | awk '$1 == "-A" && $2 == "OUTPUT" { $1 = $2 = ""; $0 = $0; $1 = $1; print; exit }')
-    first=${first// -m tcp/}
-    first=${first// -m udp/}
-    match=
-    for spec in "$@"; do
-      [ "$first" = "$spec" ] && match=$spec
-    done
-    [ -n "$match" ] || break
-    # shellcheck disable=SC2086
-    "$tool" -D OUTPUT $match || break
-    removed=$((removed + 1))
-  done
-  echo "$removed"
-}
-# A stalled install must not hold the window open. Busybox builds that only
-# take "timeout -t SECS" fail the probe and get the watchdog instead.
-run_limited() {
-  local seconds=$1 pid watchdog status
-  shift
-  if timeout 1 true 2>/dev/null; then
-    timeout "$seconds" "$@"
-    return
-  fi
-  "$@" &
-  pid=$!
-  (
-    i=0
-    while [ "$i" -lt "$seconds" ]; do sleep 1; i=$((i + 1)); done
-    kill -TERM "$pid" 2>/dev/null
-  ) &
-  watchdog=$!
-  wait "$pid"
-  status=$?
-  kill "$watchdog" 2>/dev/null
-  wait "$watchdog" 2>/dev/null
-  return "$status"
-}
-close_window() {
-  trap '' HUP INT TERM
-  strip_top fw4 "${WAN_RULES[@]}" >/dev/null
-  strip_top fw6 "$WAN_RULE6" >/dev/null
-  sh "$COPY/scripts/block_internet_access.sh" >/dev/null 2>&1 || echo "WARNING: could not apply the block script again"
-  restore_output_policy
-}
-trap close_window EXIT
+WAN_OPEN=no
+say() { echo "$*"; }
+source "$COPY/scripts/restore_helpers.sh" || exit 1
+init_update_firewall
+trap 'trap "" HUP INT TERM; close_wan' EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-for rule in "${WAN_RULES[@]}"; do
-  # shellcheck disable=SC2086
-  fw4 -I OUTPUT 1 $rule || echo "WARNING: could not allow $rule out"
-done
-# shellcheck disable=SC2086
-fw6 -I OUTPUT 1 $WAN_RULE6 2>/dev/null
-restore_output_policy
+open_wan
 if [ "$LOCK_SAME" = no ]; then
   run_limited 900 sudo -u dac bash -c "cd '$STAGE/server' && '$NPM' install --no-audit --no-fund" || exit 1
 fi

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -187,6 +189,7 @@ function fixture(tailscale = false, blockScripts: 'root' | 'none' = 'root', unbl
   // ops/deploy.sh's copy of the shipped stage.
   writeFileSync(path.join(dir, 'copy/scripts/block_internet_access.sh'), block);
   writeFileSync(path.join(dir, 'copy/scripts/close_update_window.sh'), closeScript(dir));
+  copyFileSync(path.join(dir, 'restore_helpers.sh'), path.join(dir, 'copy/scripts/restore_helpers.sh'));
   const env = {
     ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_FW: path.join(dir, 'fw'),
     FAKE_TAILSCALE: tailscale ? 'yes' : 'no', F: dir, NIGHTSTAND_SYSTEM_DIR: path.join(dir, 'system'),

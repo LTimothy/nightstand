@@ -279,7 +279,7 @@ describe('deploy.sh runs root-owned copies', () => {
     assert.ok(publish > 0 && publish < stage && stage < src.indexOf('chown -hR dac:dac $STAGE'));
     assert.doesNotMatch(src, /\$STAGE\/scripts\/system_scripts\.py/);
     assert.match(src, /bash \$COPY\/scripts\/close_update_window\.sh/);
-    assert.match(src, /sh "\$COPY\/scripts\/block_internet_access\.sh"/);
+    assert.match(src, /source "\$COPY\/scripts\/restore_helpers\.sh" \|\| exit 1/);
     assert.match(src, /bash \$COPY\/scripts\/setup_resource_limits\.sh/);
     const start = src.indexOf('if [ "$HEALTHY" = "yes" ]; then\n  # Root runs the new copy');
     const healthy = src.slice(start, src.indexOf('# --- automatic rollback'));

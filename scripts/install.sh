@@ -186,8 +186,8 @@ move_tree() {
   [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
 }
 
-# Stops a service that writes the data and confirms it is not running. Kept
-# identical in the update, rollback, switch, reset and install scripts.
+# Stops a service that writes the data and confirms it is not running. The
+# same as restore_stop_writer, which the installer cannot source from a download.
 # systemd refuses to stop a unit that is not installed or does not load, even
 # one that is not running, so the unit's state decides, not the stop.
 stop_writer() {
