@@ -556,12 +556,15 @@ elif ! sudo -u dac bash -c "cd '$LIVE/server' && '$NPX' dotenv -e .env.pod -- np
   PRISMA_OK=no
   RESOLVED_FAILED=no
   for attempt in 1 2 3; do
-    if sudo -u dac bash -c "cd '$LIVE/server' && '$NPX' dotenv -e .env.pod -- npx prisma migrate deploy" 2>&1 | tee "$STAGE.migrate.log"; then
+    # Kept in memory: a file in the server user's home could be a planted link.
+    if MIGRATE_OUTPUT=$(sudo -u dac bash -c "cd '$LIVE/server' && '$NPX' dotenv -e .env.pod -- npx prisma migrate deploy" 2>&1); then
+      printf '%s\n' "$MIGRATE_OUTPUT"
       PRISMA_OK=yes
       break
     fi
+    printf '%s\n' "$MIGRATE_OUTPUT"
     say "prisma migrate attempt $attempt failed"
-    if grep -q P3009 "$STAGE.migrate.log"; then
+    if grep -q P3009 <<< "$MIGRATE_OUTPUT"; then
       [ "$RESOLVED_FAILED" = no ] || break
       MIGRATION_HELPER="$NEW_COPY/scripts/sqlite-safety.py"
       [ -f "$MIGRATION_HELPER" ] || MIGRATION_HELPER="$NIGHTSTAND_SCRIPTS/sqlite-safety.py"

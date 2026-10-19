@@ -1483,8 +1483,10 @@ the biometrics service; `/api/deviceStatus` converts them.
 
 ### GET `/api/logs`
 
-- Lists the `.log` files in `/persistent/free-sleep-data/logs` and
-  `/var/log`, newest first.
+- Lists the `.log` files in `/persistent/nightstand-logs` (the update,
+  rollback and revert logs), `/persistent/free-sleep-data/logs` and
+  `/var/log`, newest first. A name found in more than one folder is listed
+  once and read from the first.
 
 ```json
 { "logs": ["free-sleep-stream.log", "free-sleep.log", "sleep-analyzer.log"] }

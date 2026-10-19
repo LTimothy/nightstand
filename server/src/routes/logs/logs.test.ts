@@ -108,3 +108,26 @@ test('a client that hangs up mid-stream closes its watcher', async t => {
   assert.equal(watchCalls(), 1);
   assert.equal(openWatchers(), 0);
 });
+
+// Root's operation logs moved out of the server's log folder; older releases
+// left copies of the same names behind there.
+test('lists each log name once and reads root\'s operation logs first', async t => {
+  t.mock.method(fs.promises, 'access', async () => {});
+  t.mock.method(fs.promises, 'readdir', async (dir: string) =>
+    (dir === '/var/log' ? [] : ['free-sleep-update.log']));
+  t.mock.method(fs.promises, 'lstat', async () => ({ isFile: () => true, mtime: new Date(0) }));
+  const { url, stop } = await start();
+  t.after(stop);
+  const list = await (await fetch(url.replace(/\/free-sleep\.log$/, ''))).json();
+  assert.deepEqual(list, { logs: ['free-sleep-update.log'] });
+
+  const checked: string[] = [];
+  t.mock.method(fs.promises, 'access', async (file: string) => { checked.push(file); });
+  t.mock.method(fs.promises, 'open', async () => { throw new Error('no file'); });
+  t.mock.method(fs, 'watch', fakeWatch);
+  const controller = new AbortController();
+  const response = await fetch(url.replace('free-sleep.log', 'free-sleep-update.log'), { signal: controller.signal });
+  await response.body?.getReader().read();
+  controller.abort();
+  assert.deepEqual(checked, ['/persistent/nightstand-logs/free-sleep-update.log']);
+});

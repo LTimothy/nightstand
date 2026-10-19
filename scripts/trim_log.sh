@@ -4,9 +4,8 @@
 # unit's append handle stay valid.
 set -u
 LOG=${1:?usage: trim_log.sh LOG}
-# The server user owns the log folder and could swap the path between two
-# lookups, so root opens it once, never through a link, and works on that
-# descriptor only.
+# Root opens the log once, never through a link, and works on that descriptor
+# only, in case the log folder is ever one another user can write to.
 exec python3 -I -c '
 import os, stat, sys
 MAX_BYTES = 1048576

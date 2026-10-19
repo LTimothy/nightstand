@@ -5,11 +5,11 @@ After=free-sleep.service
 [Service]
 Type=oneshot
 # The leading - keeps a copy without the script working.
-ExecStartPre=-/bin/bash /usr/local/lib/nightstand/live/scripts/trim_log.sh /persistent/free-sleep-data/logs/free-sleep-rollback.log
+ExecStartPre=-/bin/bash /usr/local/lib/nightstand/live/scripts/trim_log.sh /persistent/nightstand-logs/free-sleep-rollback.log
 ExecStart=/bin/bash /usr/local/lib/nightstand/live/scripts/rollback_pod.sh
 ExecStopPost=-/bin/systemctl restart --no-block free-sleep-recover-switch.service
 User=root
 Group=root
 KillMode=process
-StandardOutput=append:/persistent/free-sleep-data/logs/free-sleep-rollback.log
-StandardError=append:/persistent/free-sleep-data/logs/free-sleep-rollback.log
+StandardOutput=append:/persistent/nightstand-logs/free-sleep-rollback.log
+StandardError=append:/persistent/nightstand-logs/free-sleep-rollback.log

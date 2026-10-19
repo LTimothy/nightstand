@@ -924,6 +924,18 @@ python3() { case "$1" in -I|-c) command python3 "$@";; *prepare-upstream.py) ech
 eval "inner_$(declare -f systemctl)"
 systemctl() { [ "$*" != "start free-sleep" ] || echo "start on $(cat ${settingsFile})" >> "$FIXTURE/ssh"; inner_systemctl "$@"; }`;
 
+// The staging path sits in the server user's home, where it could leave a
+// link that root's migration log would write through.
+it('update.sh never writes the migration log through a link the server user left', () => {
+  const script = withExitHandling('scripts/update.sh', systemFiles(section('scripts/update.sh', '# --- atomic swap')));
+  const result = run(script, `${stubs}\n${statefulServices()}\n${lentModules}\nfw4() { :; }; fw6() { :; }; sh() { :; }
+IS_DOWNGRADE=no; STAGED_VERSION=3.2.0; ${staged}\n${pendingMigrations}\n${answering('3.2.0')}
+mkdir -p "$FIXTURE/outside"; ln -s "$FIXTURE/outside/target" "$STAGE.migrate.log"`);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(result.liveVersion.trim(), 'staged', result.stdout);
+  assert.deepEqual(result.outside, []);
+});
+
 for (const [file, staging, healthyVersion] of [
   ['scripts/update.sh', `IS_DOWNGRADE=no; STAGED_VERSION=3.2.0; ${staged}\n${pendingMigrations}`, '3.2.0'],
   ['scripts/switch-to-upstream.sh', `RESULT_PHASE=preflight; STAGED_VERSION=1.0.0; BK="$FIXTURE/bk"; mkdir -p "$BK/lowdb"; ${staged}

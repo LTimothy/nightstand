@@ -176,6 +176,15 @@ for script in update.sh update_service.sh rollback_pod.sh switch-to-upstream.sh 
   [ -f "$COPY/scripts/$script" ] && chmod 755 "$COPY/scripts/$script"
 done
 
+# The units below log as root, so their folder must be a real one that only
+# root can put links in.
+OPS_LOGS="${NIGHTSTAND_OPS_LOG_DIR:-/persistent/nightstand-logs}"
+[ ! -L "$OPS_LOGS" ] || rm -f "$OPS_LOGS"
+if ! { mkdir -p "$OPS_LOGS" && chown root:root "$OPS_LOGS" && chmod 755 "$OPS_LOGS"; }; then
+  echo "WARNING: could not create $OPS_LOGS; the update, rollback and revert units were not installed"
+  exit 1
+fi
+
 cat > "$SYSTEMD_DIR/free-sleep-update.service" <<EOF || warn "could not write free-sleep-update.service"
 [Unit]
 Description=Nightstand Updater
@@ -183,7 +192,7 @@ After=free-sleep.service
 
 [Service]
 Type=oneshot
-ExecStartPre=-/bin/bash /usr/local/lib/nightstand/live/scripts/trim_log.sh /persistent/free-sleep-data/logs/free-sleep-update.log
+ExecStartPre=-/bin/bash /usr/local/lib/nightstand/live/scripts/trim_log.sh /persistent/nightstand-logs/free-sleep-update.log
 # Run via bash so the updater still works if the script's exec bit is lost
 # (systemd fails with 203/EXEC before writing anything to the log otherwise).
 ExecStart=/bin/bash /usr/local/lib/nightstand/live/scripts/update_service.sh
@@ -193,8 +202,8 @@ User=root
 Group=root
 KillMode=process
 # Also capture logs at the unit level (append so your file grows)
-StandardOutput=append:/persistent/free-sleep-data/logs/free-sleep-update.log
-StandardError=append:/persistent/free-sleep-data/logs/free-sleep-update.log
+StandardOutput=append:/persistent/nightstand-logs/free-sleep-update.log
+StandardError=append:/persistent/nightstand-logs/free-sleep-update.log
 
 EOF
 

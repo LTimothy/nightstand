@@ -1,7 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, statSync,
+  symlinkSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +31,7 @@ function sandbox(opts: {
   const lock = path.join(root, 'operation.lock');
   const tmpfilesCalls = path.join(root, 'tmpfiles-calls');
   const system = path.join(root, 'system');
+  const opsLogs = path.join(root, 'ops-logs');
   for (const dir of [bin, systemd, path.join(repo, 'scripts', 'systemd')]) mkdirSync(dir, { recursive: true });
   const units = ['free-sleep-rollback.service', 'free-sleep-revert.service'];
   if (!opts.withoutHealthCheck) {
@@ -57,6 +61,8 @@ function sandbox(opts: {
       `echo "watchdog $*" >> "${calls}"\nexit 0\n`,
     );
   }
+  writeFileSync(path.join(bin, 'chown'), '#!/bin/sh\nexit 0\n');
+  chmodSync(path.join(bin, 'chown'), 0o755);
   writeFileSync(path.join(bin, 'visudo'), `#!/bin/sh\nexit ${opts.visudoFails ? 1 : 0}\n`);
   writeFileSync(path.join(bin, 'systemd-tmpfiles'), `#!/bin/sh\necho "$*" >> "${tmpfilesCalls}"\n`);
   chmodSync(path.join(bin, 'systemd-tmpfiles'), 0o755);
@@ -78,10 +84,11 @@ function sandbox(opts: {
       NIGHTSTAND_TMPFILES_DIR: tmpfiles,
       NIGHTSTAND_OPERATION_LOCK: lock,
       NIGHTSTAND_SYSTEM_DIR: system,
+      NIGHTSTAND_OPS_LOG_DIR: opsLogs,
     },
   });
   const read = (file: string) => readFileSync(file, 'utf8');
-  return { run, publish, read, systemd, sudoers, calls, tmpfiles, lock, tmpfilesCalls, system, repo };
+  return { run, publish, read, systemd, sudoers, calls, tmpfiles, lock, tmpfilesCalls, system, repo, opsLogs };
 }
 
 // Every command the server runs through sudo, read from its source.
@@ -142,6 +149,41 @@ describe('setup_services.sh', () => {
     }
     const calls = box.read(box.calls).trim().split('\n');
     assert.deepEqual(calls, ['daemon-reload', 'enable --now free-sleep-health.timer', 'enable --now free-sleep-network-watchdog.timer']);
+  });
+
+  it('logs the root operations only into a folder the server user cannot plant links in', () => {
+    const box = sandbox();
+    const result = box.run();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(statSync(box.opsLogs).mode & 0o777, 0o755);
+    for (const [unit, log] of [['free-sleep-update.service', 'update'], ['free-sleep-rollback.service', 'rollback'],
+      ['free-sleep-revert.service', 'revert']]) {
+      const text = box.read(path.join(box.systemd, unit));
+      const targets = [...text.matchAll(/^(?:Standard(?:Output|Error)=(?:append|file|truncate):|ExecStartPre=-\S+ \S+trim_log\.sh )(.*)$/gm)]
+        .map(match => match[1]);
+      assert.deepEqual(targets, Array(3).fill(`/persistent/nightstand-logs/free-sleep-${log}.log`), unit);
+    }
+  });
+
+  it('replaces a link at the log folder with a real folder, leaving its target alone', () => {
+    const box = sandbox();
+    const target = path.join(box.system, '..', 'elsewhere');
+    mkdirSync(target, { mode: 0o700 });
+    symlinkSync(target, box.opsLogs);
+    const result = box.run();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(lstatSync(box.opsLogs).isDirectory());
+    assert.equal(statSync(target).mode & 0o777, 0o700);
+  });
+
+  it('installs no logging unit when the log folder cannot be made', () => {
+    const box = sandbox();
+    writeFileSync(box.opsLogs, 'a file, not a folder');
+    const result = box.run();
+    assert.notEqual(result.status, 0);
+    for (const unit of ['free-sleep-update.service', 'free-sleep-rollback.service', 'free-sleep-revert.service']) {
+      assert.equal(existsSync(path.join(box.systemd, unit)), false, unit);
+    }
   });
 
   it('installs and starts the health check timer after the reload', () => {

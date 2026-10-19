@@ -161,6 +161,12 @@ is a hard fork; for the history of the projects it descends from, see
   or switch holds the operation lock.
 - The update, rollback and revert logs are cut to their newest half once
   they pass 1 MiB. The trimming refuses a linked log file.
+- The update, rollback and revert logs, which root writes, moved to
+  `/persistent/nightstand-logs`, a folder the server user cannot add links
+  to. The Logs page reads them there first. The updater no longer writes its
+  database migration output to a file in `/home/dac`. Rolling back keeps
+  these units, so an earlier release's Logs page shows an older copy of
+  these logs, or none.
 
 ### Installation and fork migration
 
