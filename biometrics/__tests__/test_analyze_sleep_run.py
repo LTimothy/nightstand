@@ -173,5 +173,21 @@ class RunAnalysisTest(unittest.TestCase):
         warned.assert_called()
 
 
+class MainTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.module = _load_analyze_sleep()
+
+    def test_reports_failed_and_does_nothing_while_biometrics_is_off(self):
+        argv = ['analyze_sleep.py', '--side', 'left', '--start_time', '2026-09-28 19:00:00', '--end_time', '2026-09-29 20:00:00']
+        with unittest.mock.patch.object(sys, 'argv', argv), \
+                unittest.mock.patch.object(self.module, 'is_biometrics_enabled', return_value=False), \
+                unittest.mock.patch.object(self.module, 'update_health') as health, \
+                unittest.mock.patch.object(self.module, 'run_analysis') as analysis:
+            self.module.main()
+        health.assert_called_once_with('analyzeSleepLeft', 'failed', 'Biometrics is off')
+        analysis.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

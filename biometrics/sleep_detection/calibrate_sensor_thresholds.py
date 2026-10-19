@@ -45,7 +45,7 @@ from features import biometrics_v2_enabled
 from presence.sensors import CAPSENSE, majority_format
 from resource_usage import get_memory_usage_unix, get_available_memory_mb
 from biometrics_helpers import validate_datetime_utc
-from service_health import update_health, is_biometrics_enabled
+from service_health import update_health
 from insufficient_data import InsufficientDataError, outcome_for_exception
 import calibration
 
@@ -379,9 +379,6 @@ def _is_anyone_currently_present() -> Union[bool, None]:
 
 if __name__ == "__main__":
     try:
-        if not is_biometrics_enabled():
-            logger.warning('Not analyzing sleep, biometrics is disabled')
-
         logger.debug(f"START Free Memory: {get_available_memory_mb()} MB")
         logger.debug(f"START Memory Usage: {get_memory_usage_unix():.2f} MB")
         if get_available_memory_mb() < 400:

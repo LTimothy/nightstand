@@ -135,11 +135,13 @@ def run_analysis(side: str, start_time: datetime, end_time: datetime, folder_pat
     return outcome
 
 
-if __name__ == "__main__":
+def main():
     args = _parse_args()
     job_key = f'analyzeSleep{args.side.capitalize()}'
     if not is_biometrics_enabled():
         logger.info('Not analyzing sleep, biometrics is disabled')
+        update_health(job_key, 'failed', 'Biometrics is off')
+        return
 
     logger.debug(f"START Free Memory: {get_available_memory_mb()} MB")
     logger.debug(f"START Memory Usage: {get_memory_usage_unix():.2f} MB")
@@ -153,3 +155,7 @@ if __name__ == "__main__":
     update_health(job_key, status, message)
     logger.debug(f"END Memory Usage: {get_memory_usage_unix():.2f} MB")
     logger.debug(f"END Free Memory: {get_available_memory_mb()} MB")
+
+
+if __name__ == "__main__":
+    main()
