@@ -90,4 +90,5 @@ export function nightsChartModel(args: ModelArgs): NightsChartModel {
 export const yTickLabel = (value: number, top: number, format: TemperatureFormat) =>
   (value === top || format === 'level' ? formatDisplayValue(value, format) : String(value));
 
-export const clockAfterOn = (on: string, minutes: number) => moment(on, 'HH:mm').add(minutes, 'minutes').format('h:mm A');
+// UTC, since this is wall-clock arithmetic and a DST change in the browser zone must not shift it.
+export const clockAfterOn = (on: string, minutes: number) => moment.utc(on, 'HH:mm').add(minutes, 'minutes').format('h:mm A');

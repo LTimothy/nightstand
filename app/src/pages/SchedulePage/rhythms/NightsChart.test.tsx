@@ -86,6 +86,22 @@ describe('the nights chart model', () => {
   });
 });
 
+describe('clockAfterOn', () => {
+  it('counts wall-clock time, so a fall-back day in the browser zone does not shift it', () => {
+    const zone = process.env.TZ;
+    process.env.TZ = 'America/Los_Angeles';
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-01T20:00:00Z'));
+    try {
+      expect(clockAfterOn('00:30', 120)).toBe('2:30 AM');
+    } finally {
+      vi.useRealTimers();
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+  });
+});
+
 describe('the nights chart', () => {
   it('colours supporting nights by direction, others quietly, and names the figure', () => {
     render(<NightsChart
