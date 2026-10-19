@@ -202,7 +202,7 @@ class InstalledStartupGateTests(unittest.TestCase):
                       'free-sleep-rollback.service free-sleep-revert.service free-sleep-migrate.service\n', unit)
         for name in self.commands:
             gate = (self.systemd / (name + '.d') / 'nightstand-switch-recovery.conf').read_text()
-            self.assertIn('Wants=free-sleep-recover-switch.service\n', gate)
+            self.assertNotIn('Wants=', gate)
             self.assertIn('After=free-sleep-recover-switch.service\n', gate)
 
     def test_journal_or_dangling_symlink_runs_helper_and_preserves_failure_for_every_precheck(self):
@@ -228,7 +228,7 @@ class InstalledStartupGateTests(unittest.TestCase):
     def test_root_install_allows_dac_writer_start_and_keeps_recovery_private(self):
         result = self.start()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('Wants=free-sleep-recover-switch.service', self.gate)
+        self.assertNotIn('Wants=', self.gate)
         self.assertNotIn('Requires=free-sleep-recover-switch.service', self.gate)
 
     def test_no_journal_returns_without_reading_other_state_or_running_python(self):

@@ -422,7 +422,7 @@ with open(sys.argv[1], 'a') as lock:
       assert.ok(existsSync(path.join(recovery, 'recover_switch.sh')));
       for (const writer of ['free-sleep', 'free-sleep-stream', 'free-sleep-update', 'free-sleep-archive-raw', 'free-sleep-health']) {
         const gate = readFileSync(path.join(systemd, `${writer}.service.d/nightstand-switch-recovery.conf`), 'utf8');
-        assert.match(gate, /^Wants=free-sleep-recover-switch.service$/m);
+        assert.doesNotMatch(gate, /^Wants=/m, 'Timer starts must not re-queue the skipped recovery unit');
         assert.match(gate, /^After=free-sleep-recover-switch.service$/m);
         const command = /^ExecStartPre=(.+)$/m.exec(gate)?.[1];
         assert.ok(command, 'Every start must validate journals even when the boot gate is active');

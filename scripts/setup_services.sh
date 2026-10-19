@@ -134,7 +134,8 @@ else:
                  + '; fi; done; exit 0')
         check = check.replace('$', '$$').replace('%', '%%')
         argument = '"' + check.replace('\\', '\\\\').replace('"', '\\"') + '"'
-        content = ('[Unit]\nWants=free-sleep-recover-switch.service\nAfter=free-sleep-recover-switch.service\n'
+        # No Wants=: timer starts would re-queue the skipped unit every minute.
+        content = ('[Unit]\nAfter=free-sleep-recover-switch.service\n'
                    '[Service]\nExecStartPre=+/bin/bash -c ' + argument + '\n')
         publish(path, content.encode(), metadata)
 PYSWITCHRECOVERY
