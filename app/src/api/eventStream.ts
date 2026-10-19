@@ -23,16 +23,11 @@ interface EventEnvelope {
 interface EventStreamState {
   state: ConnectionState;
   setState: (s: ConnectionState) => void;
-  // Last time the socket received a frame. Used by the UI as a freshness hint.
-  lastEventAt: number | null;
-  setLastEventAt: (t: number) => void;
 }
 
 export const useEventStreamStore = create<EventStreamState>((set) => ({
   state: 'idle',
   setState: (s) => set({ state: s }),
-  lastEventAt: null,
-  setLastEventAt: (t) => set({ lastEventAt: t }),
 }));
 
 function wsUrl(): string {
@@ -124,7 +119,6 @@ function connect(qc: QueryClient): ConnectionHandle {
     socket.onmessage = (msg) => {
       try {
         const env = JSON.parse(msg.data as string) as EventEnvelope;
-        useEventStreamStore.getState().setLastEventAt(Date.now());
         applyEvent(env, qc);
       } catch (err) {
         console.warn('[eventStream] bad frame:', err);

@@ -14,8 +14,8 @@ type TimeSeriesChartProps = {
   height?: number;
   startTime?: string;
   endTime?: string;
-  /** Format an x-axis tick (timestamp). Default = "HH:MM" / "Mon" / etc. */
-  xValueFormatter?: (date: Date) => string;
+  /** Format an x-axis tick in the Pod's time zone. */
+  xValueFormatter: (date: Date) => string;
   /** Format a y-axis tick. Default = integer string. */
   yValueFormatter?: (n: number) => string;
   /** Color of the line. */
@@ -32,7 +32,6 @@ export default function TimeSeriesChart({
   lineColor = palette.lamp,
 }: TimeSeriesChartProps) {
   const { width = 320, ref } = useResizeDetector();
-  const fmtX = xValueFormatter ?? ((d: Date) => d.toLocaleTimeString([], { hour: 'numeric' }).toLowerCase().replace(' ', ''));
   const fmtY = yValueFormatter ?? ((n: number) => Math.round(n).toString());
 
   // Compute Y-axis range: pad slightly above/below data.
@@ -59,7 +58,7 @@ export default function TimeSeriesChart({
           min: startTime ? new Date(startTime) : undefined,
           max: endTime ? new Date(endTime) : undefined,
           tickNumber: 3,
-          valueFormatter: (v) => fmtX(v as Date),
+          valueFormatter: (v) => xValueFormatter(v as Date),
           tickLabelStyle: { fill: palette.text.tertiary, fontSize: 12 },
           stroke: 'transparent',
           tickSize: 0,

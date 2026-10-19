@@ -61,7 +61,7 @@ beforeEach(() => {
   // vitest.config.ts pins VITE_ENV to 'demo' for the whole suite, which makes
   // useEventStream() a no-op. Undo that here so the socket path actually runs.
   vi.stubEnv('VITE_ENV', 'test');
-  useEventStreamStore.setState({ state: 'idle', lastEventAt: null });
+  useEventStreamStore.setState({ state: 'idle' });
 });
 
 afterEach(() => {
@@ -104,13 +104,16 @@ describe('eventStream reconnect lifecycle', () => {
   });
 
   it('survives a malformed frame and keeps processing later good frames', async () => {
-    renderWithProviders(<Probe />);
+    const { queryClient } = renderWithProviders(<Probe />);
+    await waitFor(() => expect(queryClient.getQueryData(['useDeviceStatus'])).toBeTruthy());
     await waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
     latest().simulateOpen();
 
     expect(() => latest().simulateMessage('not json at all')).not.toThrow();
-    latest().simulateMessage(JSON.stringify({ channel: 'hello', payload: {} }));
-    await waitFor(() => expect(useEventStreamStore.getState().lastEventAt).not.toBeNull());
+    const current = queryClient.getQueryData(['useDeviceStatus']) as DeviceStatus;
+    const next: DeviceStatus = { ...current, left: { ...current.left, targetTemperatureF: 97 } };
+    latest().simulateMessage(JSON.stringify({ channel: 'device-status', payload: next }));
+    await waitFor(() => expect((queryClient.getQueryData(['useDeviceStatus']) as DeviceStatus).left.targetTemperatureF).toBe(97));
   });
 });
 

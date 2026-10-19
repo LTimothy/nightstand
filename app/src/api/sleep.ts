@@ -25,13 +25,3 @@ export const useSleepRecords = (params?: SleepRecordQueryParams) => {
     },
   });
 };
-
-
-export const deleteSleepRecord = async (id: number): Promise<void> => {
-  await axios.delete(`/metrics/sleep/${id}`);
-};
-
-
-export const updateSleepRecord = async (id: number, updates: Partial<SleepRecord>) => {
-  return axios.put<SleepRecord>(`/metrics/sleep/${id}`, updates);
-};
