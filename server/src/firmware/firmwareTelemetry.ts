@@ -15,6 +15,8 @@ export class FirmwareTelemetry {
   private taps: TapRecord[] = [];
   private health = new HealthFeed();
   private seen = new Set<string>();
+  // Sticky for the server's life, so the readouts never drop out between sessions.
+  private reported = { target: false, health: false };
 
   ingest(batch: FirmwareBatch, features: FirmwareFeatures, now: number) {
     if (batch.session !== this.session) {
@@ -32,6 +34,8 @@ export class FirmwareTelemetry {
       const key = `${batch.session}:${source}:${record.sequence}:${record.index}:${record.kind}:${side}:${candidate}:${record.timestamp}`;
       if (this.seen.has(key)) continue;
       this.seen.add(key);
+      if (record.kind === 'thermostat') this.reported.target = true;
+      if (record.kind === 'pump') this.reported.health = true;
       if (this.seen.size > 5000) this.seen.delete(this.seen.values().next().value!);
       if (features.coolingWarning && record.kind === 'water'
           && (!this.water[record.side] || record.timestamp > this.water[record.side]!.timestamp)) this.water[record.side] = record;
@@ -105,6 +109,6 @@ export class FirmwareTelemetry {
     return { availability: biometrics ? 'Monitoring active' : 'Monitoring unavailable', targets, cooling,
       taps: features.tapDiagnostics ? this.taps.map(item => ({ ...item })) : [],
       incidents: features.firmwareHealth ? health.incidents : [], sensorFresh: biometrics && health.sensorFresh,
-      interrupted: features.firmwareHealth && biometrics && health.interrupted };
+      interrupted: features.firmwareHealth && biometrics && health.interrupted, reported: { ...this.reported } };
   }
 }

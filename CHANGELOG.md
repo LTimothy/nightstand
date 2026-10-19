@@ -207,6 +207,9 @@ is a hard fork; for the history of the projects it descends from, see
   observation, not a diagnosis of a failed component.
 - A firmware health incident that is still being reported stays listed
   past a day, with its count.
+- Firmware target and Cooling warning need a Pod 4 or newer. System status
+  shows them only once the Pod has sent the firmware target and pump
+  readings they use, and keeps them shown until the server restarts.
 
 ### Sleep data and retention
 

@@ -12,8 +12,10 @@ export default function FirmwarePanel() {
   if (!enabled) return null;
   if (query.isError) return <Alert severity="info">Firmware telemetry unavailable</Alert>;
   if (!query.data) return null;
+  // Older Pods send neither reading, so these two cards stay hidden there.
+  const { target, health } = query.data.reported;
   return <Stack spacing={ 2 }>
-    { settings?.features.coolingWarning && <Paper variant="outlined" sx={ { p: 2 } }>
+    { settings?.features.coolingWarning && target && health && <Paper variant="outlined" sx={ { p: 2 } }>
       <Typography variant="h6">Cooling warning</Typography>
       { query.data.availability === 'Monitoring unavailable' ? <Typography>Monitoring unavailable</Typography>
         : (['left', 'right'] as const).map(side => <Alert severity={ query.data!.cooling[side].active ? 'warning' : 'info' } key={ side }>
@@ -23,7 +25,7 @@ export default function FirmwarePanel() {
         </Alert>) }
     </Paper> }
     { settings?.features.tapDiagnostics && <TapDiagnostics data={ query.data } /> }
-    { settings?.features.firmwareTargetReadout && <FirmwareReadout data={ query.data } format={ settings.temperatureFormat } /> }
+    { settings?.features.firmwareTargetReadout && target && <FirmwareReadout data={ query.data } format={ settings.temperatureFormat } /> }
     { settings?.features.firmwareHealth && query.data.availability !== 'Monitoring unavailable' && <Paper variant="outlined" sx={ { p: 2 } }>
       <Typography variant="h6">Firmware health details</Typography>
       <Typography>{ query.data.sensorFresh ? 'Recent sensor readings received.' : 'No recent readings' }</Typography>
