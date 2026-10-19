@@ -154,6 +154,12 @@ is a hard fork; for the history of the projects it descends from, see
   `/home/dac`. After rolling back to an earlier release, turning Biometrics
   off in the app works again after the next update.
 
+- `ops/deploy.sh` backs up the database with a consistent snapshot and
+  stops if it cannot, and swaps the install only while no update, rollback
+  or switch holds the operation lock.
+- The update, rollback and revert logs are cut to their newest half once
+  they pass 1 MiB. The trimming refuses a linked log file.
+
 ### Installation and fork migration
 
 - The installer checks for a Wi-Fi profile and password salts reported in a
@@ -169,6 +175,8 @@ is a hard fork; for the history of the projects it descends from, see
   Failure to restore those files does not block the remaining recovery.
   Installs and updates also warn about the cron jobs without editing them.
   These migration changes have not been checked on a Pod.
+- Switching a Pod from another fork installs the newest release's tag and
+  checks it against the checksum in `releases.json`, as `install.sh` does.
 
 ### Firmware readouts
 
@@ -325,6 +333,12 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Biometrics
 
+- When the live stream reads RAW files, it reads the rest of a file before
+  moving to the next one.
+- The nightly analysis reads every record the firmware bundles into one RAW
+  entry, resumes after a damaged stretch of a file, and does not run while
+  Biometrics is off. The Status page's Analyze buttons then report
+  "Biometrics is off".
 - Installing Biometrics with `enable_biometrics.sh` no longer turns the
   firewall off. Only HTTPS and DNS go out while Python and its packages
   download, each download has a 15 minute limit, and the install waits for
