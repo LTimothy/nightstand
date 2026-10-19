@@ -28,6 +28,8 @@ esac
 # Ordinary updates may restart services while holding the same lock. With no
 # unfinished switch there is no live restoration to serialize.
 if python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" check 2>/dev/null; then
+  # Finish removing what a recovered switch left, if a removal was cut short.
+  python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" cleanup || true
   exit 0
 fi
 

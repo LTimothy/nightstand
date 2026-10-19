@@ -124,7 +124,8 @@ describe('switch recovery', () => {
       }
       assert.equal(readFileSync(box.data, 'utf8'), 'original settings');
       assert.equal(JSON.parse(readFileSync(path.join(box.live, 'server/src/serverInfo.json'), 'utf8')).version, '3.6.1');
-      assert.ok(existsSync(box.failed));
+      // The failed tree is removed once the source is back.
+      assert.ok(!existsSync(box.failed));
       assert.equal(box.journal().phase, 'recovered');
       const log = readFileSync(box.calls, 'utf8');
       assert.doesNotMatch(log, /(?:start|restart) (?!.*--no-block).*free-sleep|--now /);
@@ -284,7 +285,7 @@ store._write(journal)
       assert.equal(result.status, 0, result.stdout + result.stderr);
       assert.equal(spawnSync(path.join(venv, 'bin/python'), [], { encoding: 'utf8' }).stdout, 'original-interpreter');
       assert.ok(existsSync(prepared));
-      assert.ok(existsSync(failed));
+      assert.ok(!existsSync(failed));
     } finally { box.dispose(); }
   });
 

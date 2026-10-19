@@ -469,6 +469,93 @@ bash "$TEST_ROLLBACK"
         self.assertFalse(os.path.lexists(str(self.system.venv)))
         self.assertEqual(self.runner.fork(self.system.live), 'nightstand')
 
+    def leftovers(self, transaction):
+        roots = [self.system.live.parent, self.system.live.parent / 'free-sleep-envs',
+                 self.system.live.parent / 'free-sleep-probes']
+        return sorted(str(path) for root in roots if root.is_dir() for path in root.iterdir()
+                      if path.name.endswith(transaction))
+
+    def test_recovery_removes_the_failed_trees_and_environments_of_its_switch(self):
+        self.system.fail_readiness = True
+        with patch.object(self.runner, 'transaction_id', return_value='switch-' + 'e' * 32):
+            with self.assertRaises(ValueError):
+                self.forward()
+        self.assertTrue(self.leftovers('e' * 32))
+        offline_recover(self.system)
+        self.assertEqual(self.leftovers('e' * 32), [])
+        self.assertEqual(self.runner.fork(self.system.live), 'nightstand')
+
+    def test_recovery_cleanup_never_follows_a_replaced_parent_folder(self):
+        self.system.fail_readiness = True
+        with patch.object(self.runner, 'transaction_id', return_value='switch-' + 'e' * 32):
+            with self.assertRaises(ValueError):
+                self.forward()
+        envs = self.system.live.parent / 'free-sleep-envs'
+        elsewhere = self.system.root / 'elsewhere'
+        shutil.move(str(envs), str(elsewhere))
+        envs.symlink_to(elsewhere)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            offline_recover(self.system)
+        self.assertTrue((elsewhere / ('upstream-switch-' + 'e' * 32)).is_dir())
+        self.assertIn('Warning: could not remove', output.getvalue())
+        self.assertFalse((self.system.live.parent / ('free-sleep-failed-switch-' + 'e' * 32)).exists())
+
+    def test_recovery_cleanup_ignores_a_parent_swapped_for_a_link_after_its_check(self):
+        self.system.fail_readiness = True
+        with patch.object(self.runner, 'transaction_id', return_value='switch-' + 'e' * 32):
+            with self.assertRaises(ValueError):
+                self.forward()
+        envs = self.system.live.parent / 'free-sleep-envs'
+        victim = self.system.root / 'victim'
+        (victim / ('upstream-switch-' + 'e' * 32)).mkdir(parents=True)
+        (victim / ('upstream-switch-' + 'e' * 32) / 'keep').write_text('outside the server user tree')
+        swapped = []
+        def swap(path):
+            if path.parent == envs and not swapped:
+                shutil.move(str(envs), str(self.system.root / 'moved-envs'))
+                envs.symlink_to(victim)
+                swapped.append(path)
+        with patch.object(recover_switch, 'before_removal', side_effect=swap, create=True), \
+                redirect_stdout(io.StringIO()):
+            offline_recover(self.system)
+        self.assertTrue(swapped)
+        self.assertEqual((victim / ('upstream-switch-' + 'e' * 32) / 'keep').read_text(), 'outside the server user tree')
+        self.assertFalse((self.system.root / 'moved-envs' / ('upstream-switch-' + 'e' * 32)).exists())
+
+    def test_recovery_cleanup_is_retried_on_the_next_pass(self):
+        self.system.fail_readiness = True
+        with patch.object(self.runner, 'transaction_id', return_value='switch-' + 'e' * 32):
+            with self.assertRaises(ValueError):
+                self.forward()
+        with patch.object(recover_switch.shutil, 'rmtree', side_effect=OSError('interrupted')), \
+                redirect_stdout(io.StringIO()):
+            offline_recover(self.system)
+        trash = self.system.root / 'home/.nightstand-trash'
+        self.assertTrue(list(trash.iterdir()))
+        # The boot unit runs the helper again even when nothing is pending.
+        result = subprocess.run(['bash', str(SCRIPTS / 'recover_switch.sh')],
+                                env=dict(os.environ, NIGHTSTAND_TRANSACTION_ROOT=str(self.system.store.root),
+                                         NIGHTSTAND_OPERATION_LOCK=str(self.system.root / 'operation.lock')),
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.leftovers('e' * 32), [])
+        self.assertEqual(list(trash.iterdir()), [])
+
+    def test_recovery_keeps_what_a_later_return_still_needs(self):
+        original = self.forward()
+        kept = self.leftovers(original)
+        create_tree(self.stage, 'LTimothy/nightstand', '3.7.0')
+        self.system.fail_readiness = True
+        with patch.object(self.runner, 'transaction_id', return_value='switch-' + 'e' * 32):
+            with self.assertRaises(ValueError):
+                self.runner.install(self.system, self.stage, retained=original,
+                                    operation='free-sleep-migrate.service')
+        offline_recover(self.system)
+        self.assertEqual(self.leftovers('e' * 32), [])
+        self.assertEqual(self.leftovers(original), kept)
+        self.assertEqual(self.runner.return_companion(self.system.store, self.system.live), original)
+
     def test_failed_return_restores_absent_environment(self):
         shutil.rmtree(self.system.venv)
         original = self.forward()

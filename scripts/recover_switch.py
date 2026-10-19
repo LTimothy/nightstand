@@ -16,8 +16,11 @@ import fcntl
 import os
 from pathlib import Path
 import re
+import shutil
+import stat
 import subprocess
 import time
+import uuid
 
 from switch_transaction import TransactionStore, absolute_path, fsync_directory, digest, is_published, read_regular
 from switch_services import (Configuration, CONFIG_UNITS as FORK_CONFIG_UNITS,
@@ -252,6 +255,98 @@ def restore_target_slot(journal, record):
     fsync_directory(path.parent)
 
 
+DIRECTORY = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+def open_directory(path):
+    """Open an absolute directory without following a link in any component."""
+    descriptor = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in Path(path).parts[1:]:
+            child = os.open(part, DIRECTORY, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+    except OSError:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def open_trash(home):
+    """Open a private folder of root's beside the server user's home, on its filesystem."""
+    parent = open_directory(home.parent)
+    try:
+        try:
+            os.mkdir('.nightstand-trash', 0o700, dir_fd=parent)
+        except FileExistsError:
+            pass
+        trash = os.open('.nightstand-trash', DIRECTORY, dir_fd=parent)
+    finally:
+        os.close(parent)
+    status = os.fstat(trash)
+    if status.st_uid != os.geteuid() or stat.S_IMODE(status.st_mode) & 0o077:
+        os.close(trash)
+        raise ValueError('Unsafe trash folder: ' + str(home.parent / '.nightstand-trash'))
+    return trash
+
+
+def before_removal(path):
+    """Test hook between a path's checks and its removal."""
+
+
+def discard_failed(journal, record):
+    """Remove the trees and environments a recovered switch left behind.
+
+    Only paths named for this transaction, or its failed paths, go; a
+    companion environment from another transaction stays for a later return.
+    Each one is first moved, through folders opened without following links,
+    into root's trash folder, so a folder the server user swaps for a link
+    cannot redirect the removal. Safe to repeat: the next recovery pass
+    finishes a removal cut short.
+    """
+    kept = {Path(mapping[key]).name for mapping in record['paths'] for key in ('live', 'saved')}
+    homes = {Path(mapping['live']).parent for mapping in record['paths']}
+    folders = homes | {home / name for home in homes for name in ('free-sleep-envs', 'free-sleep-probes')}
+    names = [mapping['failed'] for mapping in record['paths']]
+    names += [path for path in journal['backups'] if path.endswith(journal['id'])]
+    for name in names:
+        path = Path(name)
+        if path.name in kept or not os.path.lexists(name):
+            continue
+        if path.parent not in folders:
+            print('Warning: not removing ' + name + ' outside its expected folder', flush=True)
+            continue
+        home = next(home for home in homes if path.parent in (home, home / path.parent.name))
+        moved = path.name + '-' + uuid.uuid4().hex
+        try:
+            trash = open_trash(home)
+            try:
+                parent = open_directory(path.parent)
+                try:
+                    before_removal(path)
+                    os.rename(path.name, moved, src_dir_fd=parent, dst_dir_fd=trash)
+                finally:
+                    os.close(parent)
+            finally:
+                os.close(trash)
+        except (OSError, ValueError) as error:
+            print('Warning: could not remove ' + name + ': ' + str(error), flush=True)
+    for home in homes:
+        # Finish anything a crash left in the trash after its move.
+        trash = home.parent / '.nightstand-trash'
+        if (trash.is_symlink() or not trash.is_dir() or trash.stat().st_uid != os.geteuid()
+                or stat.S_IMODE(trash.stat().st_mode) & 0o077):
+            continue
+        for entry in trash.iterdir():
+            try:
+                if entry.is_symlink() or not entry.is_dir():
+                    entry.unlink()
+                else:
+                    shutil.rmtree(str(entry))
+            except OSError as error:
+                print('Warning: could not remove ' + str(entry) + ': ' + str(error), flush=True)
+
+
 def finish_committed(store, journal, run_controller=None):
     """Resume idempotent cleanup without reverting a committed installation."""
     run_controller = controller if run_controller is None else run_controller
@@ -367,13 +462,16 @@ def restore(store, helper):
         # may have cancelled their initial boot jobs, so explicitly queue them.
         print('Restored the source installation offline: ' + journal['id'])
     for journal in journals(store):
+        if journal['phase'] == 'recovered':
+            discard_failed(journal, recovery_record(journal))
         finish_committed(store, journal)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('command', choices=('check', 'startup-check', 'stop-operations', 'restore', 'pending', 'operation-active'))
+    parser.add_argument('command', choices=('check', 'startup-check', 'stop-operations', 'restore', 'pending', 'operation-active',
+                                            'cleanup'))
     parser.add_argument('--helper', type=Path)
     parser.add_argument('--unit')
     parser.add_argument('--operation-lock', type=Path)
@@ -394,6 +492,10 @@ def main():
                 raise ValueError('An unfinished switch blocks writer startup')
         elif args.command == 'stop-operations':
             stop_operations(store)
+        elif args.command == 'cleanup':
+            for journal in journals(store):
+                if journal['phase'] == 'recovered':
+                    discard_failed(journal, recovery_record(journal))
         else:
             if args.helper is None:
                 raise ValueError('Missing restore helper')

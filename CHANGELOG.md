@@ -263,6 +263,11 @@ is a hard fork; for the history of the projects it descends from, see
   while holding the maintenance lock. The switch to upstream and the
   migration installer now stop after two hours and a rollback after one,
   and the usual recovery then restores the previous install.
+- Once a failed switch between Nightstand and upstream is undone, its failed
+  install, its prepared Python environment and its validation files are
+  removed. Before, each failed try left about 700 MB in `/home/dac` until
+  updates stopped for low disk. What a later return to Nightstand needs is
+  kept.
 
 ### Firmware readouts
 
