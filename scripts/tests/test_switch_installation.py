@@ -224,6 +224,18 @@ python3() {
         self.assertEqual(stopped.exception.code, 2)
         self.assertEqual(output.getvalue(), '')
 
+    def test_return_without_the_retained_tree_falls_back_to_a_fresh_install(self):
+        transaction = self.forward()
+        shutil.rmtree(self.system.live.parent / ('free-sleep-retained-' + transaction))
+        with patch.object(self.runner, 'System', return_value=self.system), \
+                patch.object(sys, 'argv', ['switch_installation.py', 'return-companion']), \
+                redirect_stdout(io.StringIO()) as output, patch('sys.stderr', new=io.StringIO()) as errors, \
+                self.assertRaises(SystemExit) as stopped:
+            self.runner.main()
+        self.assertEqual(stopped.exception.code, 2)
+        self.assertEqual(output.getvalue(), '')
+        self.assertIn('Retained source tree is missing', errors.getvalue())
+
     def test_return_companion_requires_a_confirmed_forward_switch(self):
         self.runner.install(self.system, self.stage, operation='free-sleep-revert.service')
         with patch.object(self.runner, 'System', return_value=self.system), \

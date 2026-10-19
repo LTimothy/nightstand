@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 
@@ -182,7 +183,12 @@ def return_companion(store, live):
     selected = [journal for journal in candidates if journal['metadata']['generation'] == newest]
     if len(selected) != 1:
         raise ValueError('Retained transactions have ambiguous ordering')
-    companion(store, selected[0]['id'])
+    try:
+        companion(store, selected[0]['id'])
+    except ValueError as error:
+        # Without the retained tree the ordinary migration installs the release fresh.
+        print('Warning: ' + str(error) + '; returning with a fresh install instead', file=sys.stderr, flush=True)
+        return None
     return selected[0]['id']
 
 

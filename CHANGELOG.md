@@ -248,6 +248,9 @@ is a hard fork; for the history of the projects it descends from, see
   any of its files, and installs its dependencies with `npm ci` so its
   lockfile stays as checked. Before, the server user could change the
   staged files after the first check.
+- Coming back to Nightstand from upstream after the kept Nightstand copy
+  in `/home/dac` was deleted logs a warning and installs the release fresh,
+  as a migration from another fork does. Before, the return was refused.
 
 ### Firmware readouts
 
