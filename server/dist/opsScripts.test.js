@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -232,6 +232,57 @@ describe('deploy.sh runs root-owned copies', () => {
         const healthy = src.slice(start, src.indexOf('# --- automatic rollback'));
         assert.match(healthy, /SSH "bash \$COPY\/scripts\/setup_services\.sh \$COPY"/);
         assert.doesNotMatch(src.slice(src.indexOf('# --- automatic rollback')), /setup_services|system_scripts\.py (?:publish|point)/);
+    });
+});
+describe('deploy.sh keeps the pod consistent', () => {
+    const src = readFileSync(path.join(repoRoot, 'ops/deploy.sh'), 'utf8');
+    it('backs the database up with a consistent snapshot, and stops when it cannot', () => {
+        assert.doesNotMatch(src, /cp \/persistent\/free-sleep-data\/free-sleep\.db/);
+        // One call, so a failed probe stops the deploy instead of skipping the backup.
+        const snapshot = 'SSH "[ ! -f /persistent/free-sleep-data/free-sleep.db ] || python3 -I - backup '
+            + '/persistent/free-sleep-data/free-sleep.db \'$BK/free-sleep.db\'" < scripts/sqlite-safety.py \\\n';
+        assert.doesNotMatch(src, /if SSH "\[ -f \/persistent\/free-sleep-data\/free-sleep\.db \]"/);
+        const at = src.indexOf(snapshot);
+        assert.ok(at > 0, 'the database is snapshotted with sqlite-safety.py from stdin');
+        assert.match(src.slice(at + snapshot.length), /^\s*\|\| die "database backup failed/);
+    });
+    it('swaps only while it holds the operation lock', async () => {
+        const open = src.indexOf("<<'SWAP' || SWAP_STATUS=$?\n");
+        assert.ok(open > 0, 'the swap runs as one section on the pod');
+        const swap = src.slice(src.indexOf('\n', open) + 1, src.indexOf('\nSWAP\n'));
+        assert.match(swap, /^take_operation_lock \|\| \{ \[ \$\? -eq 2 \] && exit 75; exit 1; \}$/m);
+        const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-deploy-swap-'));
+        const bin = path.join(dir, 'bin');
+        for (const tree of ['live', 'stage', 'copy/scripts', 'bin'])
+            mkdirSync(path.join(dir, tree), { recursive: true });
+        writeFileSync(path.join(dir, 'stage/new'), '');
+        copyFileSync(path.join(repoRoot, 'scripts/restore_helpers.sh'), path.join(dir, 'copy/scripts/restore_helpers.sh'));
+        writeFileSync(path.join(bin, 'systemctl'), '#!/bin/sh\nexit 0\n');
+        chmodSync(path.join(bin, 'systemctl'), 0o755);
+        const lock = path.join(dir, 'operation.lock');
+        const runSwap = () => spawnSync('bash', ['-s', '--', ...['copy', 'stage', 'live', 'prev'].map(name => path.join(dir, name))], {
+            input: swap, encoding: 'utf8',
+            env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_OPERATION_LOCK: lock, NIGHTSTAND_OPERATION_OWNER: '' },
+        });
+        const holder = spawn('python3', ['-c',
+            'import fcntl, sys, time\nf = open(sys.argv[1], "a")\nfcntl.flock(f, fcntl.LOCK_EX)\nprint("held", flush=True)\ntime.sleep(30)', lock]);
+        try {
+            await new Promise(resolve => holder.stdout.once('data', resolve));
+            assert.equal(runSwap().status, 75);
+            assert.ok(existsSync(path.join(dir, 'live')) && existsSync(path.join(dir, 'stage/new')) && !existsSync(path.join(dir, 'prev')));
+        }
+        finally {
+            holder.kill();
+            await new Promise(resolve => holder.once('exit', resolve));
+        }
+        try {
+            const done = runSwap();
+            assert.equal(done.status, 0, done.stderr);
+            assert.ok(existsSync(path.join(dir, 'prev')) && existsSync(path.join(dir, 'live/new')) && !existsSync(path.join(dir, 'stage')));
+        }
+        finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
     });
 });
 //# sourceMappingURL=opsScripts.test.js.map

@@ -104,6 +104,7 @@ export const AGENT_MANIFEST = [
     { path: 'scripts/systemd/free-sleep-recover-update.timer', mode: 'add', why: 'schedules recovery without holding boot completion' },
     { path: 'scripts/rollback_pod.sh', mode: 'add', why: 'swaps the live and previous trees offline' },
     { path: 'scripts/close_update_window.sh', mode: 'add', why: 'closes the download window after the update or revert unit stops' },
+    { path: 'scripts/trim_log.sh', mode: 'add', why: 'keeps the update, rollback and revert logs small' },
     // No snapshot exists to restore. Upstream ships no tags, so this downloads
     // the upstream commit releases.json records as checked with the switch, or
     // main until one is recorded. Neither is pinned to AGENT_BASE.sha, and
