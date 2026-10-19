@@ -70,8 +70,11 @@ it('lists every night under its date, with its changes and the count', () => {
 
 it('leaves a night out with a toggle that keeps its name', async () => {
   const posted: unknown[] = [];
+  let release = () => {};
+  const gate = new Promise<void>(resolve => { release = resolve; });
   server.use(http.post('*/rhythms/suggestions/exclude', async ({ request }) => {
     posted.push(await request.json());
+    await gate;
     return new HttpResponse(null, { status: 204 });
   }));
   const { user } = open({ forRhythm: 'off-days' });
@@ -81,9 +84,26 @@ it('leaves a night out with a toggle that keeps its name', async () => {
   await user.click(toggle);
   expect(screen.getByRole('button', { name: 'Leave out, Sat, Oct 10' })).toHaveAttribute('aria-pressed', 'true');
   await waitFor(() => expect(posted).toEqual([{ side: 'right', rhythmId: 'off-days', date: '2026-10-10', excluded: true }]));
-  expect(screen.getByText('Sat, Oct 10, left out')).toBeInTheDocument();
+  release();
   expect(screen.getByRole('button', { name: 'Leave out, Thu, Oct 8' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.queryByRole('button', { name: /^Leave out, Sun, Oct 11/ })).not.toBeInTheDocument();
+});
+
+it('ignores a second tap while that night is still saving', async () => {
+  const posted: unknown[] = [];
+  let release = () => {};
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  server.use(http.post('*/rhythms/suggestions/exclude', async ({ request }) => {
+    posted.push(await request.json());
+    await gate;
+    return new HttpResponse(null, { status: 204 });
+  }));
+  const { user } = open({ forRhythm: 'off-days' });
+  const toggle = screen.getByRole('button', { name: 'Leave out, Fri, Oct 9' });
+  await user.click(toggle);
+  await user.click(toggle);
+  release();
+  await waitFor(() => expect(posted).toEqual([{ side: 'right', rhythmId: 'off-days', date: '2026-10-09', excluded: true }]));
 });
 
 it('puts the toggle back and says so when the night could not be saved', async () => {

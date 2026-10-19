@@ -1,6 +1,6 @@
 /* eslint-disable react/no-multi-comp */
 // A night's row is private to the notes sheet.
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, ToggleButton, Typography } from '@mui/material';
 import Check from '@mui/icons-material/Check';
@@ -70,6 +70,7 @@ export default function NotesSheet({ side, rhythms, forRhythm, data, away, forma
   const rulesId = useId();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const inFlight = useRef(new Set<string>());
   const [error, setError] = useState('');
   const [rulesOpen, setRulesOpen] = useState(false);
   const shown = forRhythm ? rhythms.filter(rhythm => rhythm.id === forRhythm) : rhythms;
@@ -79,15 +80,22 @@ export default function NotesSheet({ side, rhythms, forRhythm, data, away, forma
   const smart = shown.some(rhythm => rhythm.temperatureMode === 'smart');
   const toggle = async (night: NightLog) => {
     const key = nightKey(night);
+    // A second tap while the first is in flight would race it, and the Pod could end opposite to the button.
+    if (inFlight.current.has(key)) return;
+    inFlight.current.add(key);
     const excluded = !(pending[key] ?? night.excluded);
+    const settle = () => setPending(current => Object.fromEntries(Object.entries(current).filter(([other]) => other !== key)));
     setError('');
     setPending(current => ({ ...current, [key]: excluded }));
     try {
       await postNightExclude({ side, rhythmId: night.rhythmId, date: night.date, excluded });
       await queryClient.invalidateQueries({ queryKey: ['useSuggestions'] });
+      settle();
     } catch {
-      setPending(current => Object.fromEntries(Object.entries(current).filter(([other]) => other !== key)));
+      settle();
       setError(EXCLUDE_ERROR);
+    } finally {
+      inFlight.current.delete(key);
     }
   };
   const showAgain = async (entry: Dismissed) => {
