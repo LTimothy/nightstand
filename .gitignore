@@ -12,6 +12,10 @@ yarn-error.log*
 *.tsbuildinfo
 tmp
 
+# python bytecode
+__pycache__/
+*.pyc
+
 *.log
 
 server/lowdb/*
