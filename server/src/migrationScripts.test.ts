@@ -1,7 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, existsSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, existsSync, statSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -121,13 +123,16 @@ describe('fork-switch tool scripts', () => {
   describe('pod-installer.sh ordering', () => {
     const src = readScript('scripts/migrate/pod-installer.sh');
 
-    // main only moves at a release, so its tip is the newest release; the
-    // staged-version check still refuses a tip that does not match the manifest.
-    it('installs the newest release from the tip of main', () => {
-      assert.match(src, /MAIN_ZIP_URL="https:\/\/github\.com\/LTimothy\/nightstand\/archive\/refs\/heads\/main\.zip"/);
+    it('installs the newest release from its tag, checked against its published checksum before root copies it', () => {
+      assert.match(src, /TAG_ZIP_URL_PREFIX="https:\/\/github\.com\/LTimothy\/nightstand\/archive\/refs\/tags\/v"/);
+      assert.match(src, /curl -fL --max-time 300 -o "\$WORK\/release\.zip" "\$\{TAG_ZIP_URL_PREFIX\}\$\{TARGET_VERSION\}\.zip"/);
+      assert.doesNotMatch(src, /refs\/heads\/main\.zip|MAIN_ZIP_URL|get\('artifacts'\)/);
       assert.match(src, /print\(data\['releases'\]\[0\]\['version'\]/);
       assert.doesNotMatch(src, /r\['channel'\] == 'stable'/);
+      assert.match(src, /python3 "\$FRESH\/scripts\/tree_digest\.py" "\$FRESH"/);
+      assert.match(src, /does not match its published checksum/);
       assert.match(src, /staged tree reports v\$STAGED_VERSION but v\$TARGET_VERSION was requested/);
+      assertOrder(src, ['Verifying the published checksum', 'system_scripts.py" publish "$FRESH"'], 'pod-installer.sh');
     });
 
     it('switch-to-this-fork.sh tells the user the version it is about to install', () => {
@@ -148,9 +153,9 @@ describe('fork-switch tool scripts', () => {
       assert.match(src, /systemctl is-active --quiet/);
     });
 
-    it('verifies artifact hashes and runs the data-compat dry run before the swap', () => {
+    it('verifies the published checksum and runs the data-compat dry run before the swap', () => {
       assertOrder(src, [
-        'Verifying artifact hashes',
+        'Verifying the published checksum',
         'Data-compatibility dry run',
         'Stopping their service',
       ], 'pod-installer.sh');
@@ -320,7 +325,7 @@ echo "$STREAM_WAS_ACTIVE"`], { encoding: 'utf8' });
     // A fork moving here has no update channel yet; the server would default
     // to stable and offer a Pod on a beta nothing until a stable passed it.
     it('saves the installed release\'s channel after the swap, before the server starts', () => {
-      assert.match(src, /read -r TARGET_VERSION TARGET_CHANNEL <<< "\$PICK"/);
+      assert.match(src, /read -r TARGET_VERSION TARGET_CHANNEL EXPECTED_DIGEST <<< "\$PICK"/);
       assertOrder(src, [
         'move_tree "$STAGE" "$LIVE"',
         '# A fork moving here has no update channel yet',
@@ -543,11 +548,12 @@ describe('the fork switch runs root-owned copies', () => {
     writeFileSync(path.join(release, 'system_scripts.py'),
       'import os, sys\nrecord = os.path.abspath(__file__) + " " + " ".join(sys.argv[1:])\n'
       + 'open(os.environ["FIXTURE"] + "/published", "w").write(record)\nprint("/copy")\n');
+    copyFileSync(path.join(repoRoot, 'scripts/tree_digest.py'), path.join(release, 'tree_digest.py'));
     execFileSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
       path.join(dir, 'release'), path.join(dir, 'release')]);
     const result = spawnSync('bash', ['-c', `set -uo pipefail
 SYSTEM_DIR="$FIXTURE/system"; STAGE="$FIXTURE/home/free-sleep-migrate-staging"
-TARGET_VERSION=3.7.0; MAIN_ZIP_URL=https://example.invalid/main.zip
+TARGET_VERSION=3.7.0; TAG_ZIP_URL_PREFIX=https://example.invalid/v
 mkdir -p "$FIXTURE/home" "$FIXTURE/outside" "$STAGE/old"
 say() { :; }
 fail() { echo "FAIL $*"; exit 1; }
@@ -576,6 +582,22 @@ echo "COPY=$COPY"`], { encoding: 'utf8', env: { ...process.env, FIXTURE: dir } }
       assert.equal(chowned, `chown -hR dac:dac ${path.join(dir, 'home/free-sleep-migrate-staging')}\n`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('checks the download against its published checksum before root copies it', () => {
+    const good = stage('scripts/migrate/pod-installer.sh',
+      `EXPECTED_DIGEST=$(python3 "${path.join(repoRoot, 'scripts/tree_digest.py')}" "$FIXTURE/release/nightstand-main")`);
+    const bad = stage('scripts/migrate/pod-installer.sh', 'EXPECTED_DIGEST=0000');
+    try {
+      assert.equal(good.result.status, 0, good.result.stdout + good.result.stderr);
+      assert.ok(existsSync(path.join(good.dir, 'published')));
+      assert.equal(bad.result.status, 1, bad.result.stdout + bad.result.stderr);
+      assert.match(bad.result.stdout, /FAIL the download of v3\.7\.0 does not match its published checksum/);
+      assert.equal(existsSync(path.join(bad.dir, 'published')), false);
+      assert.equal(bad.chowned, '');
+    } finally {
+      for (const { dir } of [good, bad]) rmSync(dir, { recursive: true, force: true });
     }
   });
 

@@ -50,8 +50,8 @@ NPM=/home/dac/.volta/bin/npm
 NPX=/home/dac/.volta/bin/npx
 
 RELEASES_URL="https://raw.githubusercontent.com/LTimothy/nightstand/main/releases.json"
-# main only moves at a release, so its tip is always the newest release.
-MAIN_ZIP_URL="https://github.com/LTimothy/nightstand/archive/refs/heads/main.zip"
+# Always a tag: only a tag matches the checksum releases.json publishes.
+TAG_ZIP_URL_PREFIX="https://github.com/LTimothy/nightstand/archive/refs/tags/v"
 
 # Recheck before staging. Standalone runs need the laptop's explicit cleanup consent.
 REMOVE_FOREIGN=${1:-no}
@@ -176,9 +176,9 @@ PICK=$(printf '%s' "$RELEASES_JSON" | python3 -I -c "
 import json, sys
 data = json.load(sys.stdin)
 if data['releases']:
-    print(data['releases'][0]['version'], data['releases'][0].get('channel', 'stable'))
+    print(data['releases'][0]['version'], data['releases'][0].get('channel', 'stable'), data['releases'][0].get('treeSha256') or '')
 ") || fail "could not parse releases.json"
-read -r TARGET_VERSION TARGET_CHANNEL <<< "$PICK"
+read -r TARGET_VERSION TARGET_CHANNEL EXPECTED_DIGEST <<< "$PICK"
 [ -n "$TARGET_VERSION" ] || fail "no release found in releases.json"
 say "Target: v$TARGET_VERSION (newest release)"
 write_status "resolve" "ok" "target v$TARGET_VERSION"
@@ -216,16 +216,29 @@ PERS_FREE=$(free_mb /persistent)
 [ "${PERS_FREE:-0}" -ge "$PERS_NEED" ] \
   || fail "low disk on /persistent (${PERS_FREE:-unknown}M free, ${PERS_NEED}M needed), aborting before touching anything; old snapshots in /persistent/free-sleep-database-backups/ can be removed to make room"
 
-say "Downloading v$TARGET_VERSION (the tip of main)..."
+say "Downloading v$TARGET_VERSION..."
 # Downloaded, unpacked and copied for root where only root can write. Root
 # runs this copy from here on, never the stage the server user will own.
 mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
   || fail "could not create a download folder in $SYSTEM_DIR; their server was never touched"
-curl -fL --max-time 300 -o "$WORK/release.zip" "$MAIN_ZIP_URL" \
+curl -fL --max-time 300 -o "$WORK/release.zip" "${TAG_ZIP_URL_PREFIX}${TARGET_VERSION}.zip" \
   || fail "download failed; their server was never touched"
 unzip -q "$WORK/release.zip" -d "$WORK/tree" || fail "unzip failed; their server was never touched"
 FRESH=$(find "$WORK/tree" -mindepth 1 -maxdepth 1 -type d | head -n1)
 [ -n "$FRESH" ] || fail "unexpected zip layout; their server was never touched"
+# No copy of ours is installed yet, so the downloaded digest script does the
+# check, as in install.sh: it catches a corrupt or wrong download.
+say "Verifying the published checksum..."
+if [ -z "${EXPECTED_DIGEST:-}" ]; then
+  say "No published checksum for v$TARGET_VERSION; installing without one"
+elif [ ! -f "$FRESH/scripts/tree_digest.py" ]; then
+  say "v$TARGET_VERSION was released before checksum checks; installing without one"
+else
+  ACTUAL_DIGEST=$(python3 "$FRESH/scripts/tree_digest.py" "$FRESH") || ACTUAL_DIGEST=""
+  [ "$ACTUAL_DIGEST" = "$EXPECTED_DIGEST" ] \
+    || fail "the download of v$TARGET_VERSION does not match its published checksum; their server was never touched"
+  say "v$TARGET_VERSION matches its published checksum"
+fi
 COPY=$(python3 -B "$FRESH/scripts/system_scripts.py" publish "$FRESH") \
   || fail "could not copy the scripts root runs; their server was never touched"
 rm -rf "$STAGE"
@@ -240,28 +253,6 @@ STAGED_FORK=$(python3 -I -c 'import json;print(json.load(open("'"$STAGE"'/server
 [ "$STAGED_FORK" = "LTimothy/nightstand" ] || fail "staged tree's fork field is '$STAGED_FORK', not this fork, refusing"
 STAGED_VERSION=$(python3 -I -c 'import json;print(json.load(open("'"$STAGE"'/server/src/serverInfo.json"))["version"])')
 [ "$STAGED_VERSION" = "$TARGET_VERSION" ] || fail "staged tree reports v$STAGED_VERSION but v$TARGET_VERSION was requested"
-
-say "Verifying artifact hashes against releases.json..."
-# releases.json is passed via stdin (not interpolated into the python source)
-# so nothing in it can break bash or python quoting.
-ARTIFACT_CHECK=$(printf '%s' "$RELEASES_JSON" | STAGE_DIR="$STAGE" TARGET_VER="$TARGET_VERSION" python3 -I -c "
-import json, hashlib, sys, os
-data = json.load(sys.stdin)
-head = data['releases'][0]
-artifacts = head.get('artifacts') or {}
-if head['version'] != os.environ['TARGET_VER']:
-    print('head-mismatch'); sys.exit(0)
-for relpath, expected in artifacts.items():
-    with open(os.path.join(os.environ['STAGE_DIR'], relpath), 'rb') as f:
-        actual = 'sha256:' + hashlib.sha256(f.read()).hexdigest()
-    if actual != expected:
-        print('mismatch:' + relpath); sys.exit(0)
-print('ok')
-" 2>/dev/null || echo "check-failed")
-case "$ARTIFACT_CHECK" in
-  ok|head-mismatch) : ;; # head-mismatch = target isn't manifest head (e.g. artifacts only present for head); not an error
-  *) fail "artifact hash check failed ($ARTIFACT_CHECK), download may be corrupt or the wrong tag" ;;
-esac
 
 # What / still takes now that the release is staged: the Node ensure-node.sh
 # installs if Volta lacks it, the dependency install with its caches, and the
