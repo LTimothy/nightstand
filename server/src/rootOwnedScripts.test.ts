@@ -635,6 +635,109 @@ echo "HEALTHY=$HEALTHY"`], { encoding: 'utf8' });
   }
 });
 
+describe('root writes into the server user\'s data folder', () => {
+  const between = (file: string, from: string, to: string) => {
+    const src = read(file);
+    const start = src.indexOf(from);
+    const end = src.indexOf(to, start);
+    assert.ok(start >= 0 && end > start, `${file}: ${from}`);
+    return src.slice(start, end + to.length);
+  };
+  const box = (body: (dir: string, data: string) => void) => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'data-writes-'));
+    try {
+      const data = path.join(dir, 'persistent/free-sleep-data');
+      mkdirSync(path.join(data, 'lowdb'), { recursive: true });
+      body(dir, data);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  };
+  const run = (dir: string, block: string, prelude = '') => spawnSync('bash', ['-c', `set -uo pipefail
+say() { echo "$*"; }
+systemctl() { [ "$1" != is-active ] || { echo inactive; return 3; }; }
+${prelude}
+${block.replaceAll('/persistent/', `${dir}/persistent/`).replaceAll('/home/dac', `${dir}/home`)}`], { encoding: 'utf8' });
+
+  // The server user puts the link back right after root removes it.
+  const racingRm = (links: [string, string][]) => `rm() {
+  command rm "$@"; local a
+  for a in "$@"; do
+${links.map(([at, to]) => `    [ "$a" != '${at}' ] || ln -s '${to}' '${at}'`).join('\n')}
+  done
+}
+`;
+
+  it('install.sh records the socket path and moves old settings without following links', () => {
+    box((dir, data) => {
+      mkdirSync(path.join(dir, 'home/free-sleep-database'), { recursive: true });
+      writeFileSync(path.join(dir, 'home/free-sleep-database/settingsDB.json'), 'old settings');
+      writeFileSync(path.join(dir, 'frank.sh'), 'DAC_SOCKET=/run/dac.sock\n');
+      mkdirSync(path.join(dir, 'outside'));
+      const settings = path.join(data, 'lowdb/settingsDB.json');
+      const sock = path.join(data, 'dac_sock_path.txt');
+      symlinkSync(path.join(dir, 'outside'), settings);
+      symlinkSync(path.join(dir, 'created'), sock);
+      const block = between('scripts/install.sh', '# Puts text $2', '\ndone\n')
+        .replace('/opt/eight/bin/frank.sh', path.join(dir, 'frank.sh'));
+      const race = racingRm([[settings, path.join(dir, 'outside')], [sock, path.join(dir, 'created')]]);
+      const result = run(dir, `grep() { echo /run/dac.sock; }\n${block}`, race);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.deepEqual(readdirSync(path.join(dir, 'outside')), []);
+      assert.equal(existsSync(path.join(dir, 'created')), false);
+      assert.equal(readFileSync(sock, 'utf8'), '/run/dac.sock\n');
+      assert.equal(readFileSync(settings, 'utf8'), 'old settings');
+      assert.equal(existsSync(path.join(dir, 'home/free-sleep-database/settingsDB.json')), false);
+    });
+  });
+
+  it('install.sh reads an old settings file without following a link swapped in after its check', () => {
+    box((dir, data) => {
+      const source = path.join(dir, 'home/free-sleep-database/settingsDB.json');
+      mkdirSync(path.dirname(source), { recursive: true });
+      writeFileSync(source, 'old settings');
+      writeFileSync(path.join(dir, 'secret'), 'root only');
+      const block = between('scripts/install.sh', '# Puts text $2', '\ndone\n')
+        .replace('/opt/eight/bin/frank.sh', path.join(dir, 'missing'));
+      // Whatever reads the source next finds a link to a root-only file.
+      const swap = `swap() { case "$*" in *'${source}'*) command rm -f '${source}'; ln -s '${path.join(dir, 'secret')}' '${source}';; esac; }
+cp() { swap "$@"; command cp "$@"; }
+python3() { swap "$@"; command python3 "$@"; }`;
+      run(dir, block, swap);
+      const settings = path.join(data, 'lowdb/settingsDB.json');
+      assert.ok(!existsSync(settings) || !readFileSync(settings, 'utf8').includes('root only'));
+    });
+  });
+
+  it('install.sh leaves no temporary file in /persistent when it cannot put one in place', () => {
+    box((dir, data) => {
+      writeFileSync(path.join(dir, 'frank.sh'), 'DAC_SOCKET=/run/dac.sock\n');
+      mkdirSync(path.join(data, 'dac_sock_path.txt', 'busy'), { recursive: true });
+      const block = between('scripts/install.sh', '# Puts text $2', '\ndone\n')
+        .replace('/opt/eight/bin/frank.sh', path.join(dir, 'frank.sh'));
+      run(dir, `grep() { echo /run/dac.sock; }\n${block}`);
+      assert.deepEqual(readdirSync(path.join(dir, 'persistent')).filter(name => name.startsWith('.')), []);
+    });
+  });
+
+  it('switch-to-upstream.sh puts the settings back without following links', () => {
+    box((dir, data) => {
+      const bk = path.join(dir, 'bk');
+      mkdirSync(path.join(bk, 'lowdb'), { recursive: true });
+      for (const name of ['settingsDB.json', 'schedulesDB.json']) writeFileSync(path.join(bk, 'lowdb', name), `saved ${name}`);
+      writeFileSync(path.join(dir, 'victim'), 'keep');
+      const settings = path.join(data, 'lowdb/settingsDB.json');
+      symlinkSync(path.join(dir, 'victim'), settings);
+      const fn = between('scripts/switch-to-upstream.sh', 'restore_switch_data() {', '\n}\n');
+      const race = racingRm([[settings, path.join(dir, 'victim')]]);
+      const result = run(dir, `${fn}
+DATA_CHANGED=yes RESTORE_ATTEMPTED=no ARCHIVE_WAS_ACTIVE=inactive BK='${bk}'\nrestore_switch_data`, race);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.equal(readFileSync(path.join(dir, 'victim'), 'utf8'), 'keep');
+      assert.equal(readFileSync(settings, 'utf8'), 'saved settingsDB.json');
+      assert.deepEqual(readdirSync(path.join(dir, 'persistent')).filter(name => name.startsWith('.')), []);
+    });
+  });
+});
+
 describe('pod-installer.sh database preflight', () => {
   it('copies the snapshot into a folder root made, never into the server user\'s stage', () => {
     const src = read('scripts/migrate/pod-installer.sh');

@@ -276,6 +276,33 @@ bash "$COPY/scripts/ensure-node.sh" "$USERNAME"
 mkdir -p /persistent/free-sleep-data/logs/
 mkdir -p /persistent/free-sleep-data/lowdb/
 
+# Puts text $2 (with "text") or the plain file $2 (with "copy") at $3 by
+# rename, which replaces a link at $3 instead of following it. The copy is
+# read without following links and made in /persistent, root's, on the same
+# filesystem, and removed if it cannot be put in place.
+install_file() {
+  python3 -I -c '
+import os, stat, sys, tempfile
+mode, source, destination = sys.argv[1:]
+descriptor, temporary = tempfile.mkstemp(prefix=".nightstand-install.", dir="/persistent/")
+try:
+    with os.fdopen(descriptor, "wb") as output:
+        if mode == "text":
+            output.write(source.encode() + b"\n")
+        else:
+            reading = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(reading, "rb") as handle:
+                if not stat.S_ISREG(os.fstat(reading).st_mode):
+                    raise SystemExit(source + " is not a plain file")
+                output.write(handle.read())
+        os.fchmod(output.fileno(), 0o644)
+    os.replace(temporary, destination)
+except BaseException:
+    os.unlink(temporary)
+    raise
+' "$@"
+}
+
 SRC_FILE="/opt/eight/bin/frank.sh"
 DEST_FILE="/persistent/free-sleep-data/dac_sock_path.txt"
 
@@ -286,7 +313,7 @@ else
     echo "Found $SRC_FILE, searching for dac.sock path..."
     result=$(grep -oP '(?<=DAC_SOCKET=)[^ ]*dac\.sock' "$SRC_FILE" || true)
     if [ -n "$result" ]; then
-      echo "$result" > "$DEST_FILE"
+      install_file text "$result" "$DEST_FILE"
       echo "DAC socket path saved to $DEST_FILE"
     else
       echo "No dac.sock path found in $SRC_FILE, skipping write."
@@ -306,8 +333,9 @@ FILES_TO_MOVE=(
 
 for entry in "${FILES_TO_MOVE[@]}"; do
   IFS=":" read -r SOURCE_FILE DESTINATION <<< "$entry"
-  if [ -f "$SOURCE_FILE" ]; then
-    mv "$SOURCE_FILE" "$DESTINATION"
+  if [ -f "$SOURCE_FILE" ] && [ ! -L "$SOURCE_FILE" ]; then
+    install_file copy "$SOURCE_FILE" "$DESTINATION"
+    rm -f "$SOURCE_FILE"
     echo "Moved $SOURCE_FILE to $DESTINATION"
   fi
 done

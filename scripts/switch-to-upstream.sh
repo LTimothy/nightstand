@@ -54,8 +54,15 @@ restore_switch_data() {
     esac
   done
   RESTORE_ATTEMPTED=yes
+  local copy
   for name in settingsDB.json schedulesDB.json; do
-    cp -p "$BK/lowdb/$name" "/persistent/free-sleep-data/lowdb/$name" || return 1
+    # Copied in root's /persistent, then renamed over any link at the name.
+    copy=$(mktemp /persistent/.nightstand-restore.XXXXXX) || return 1
+    if ! cp -p "$BK/lowdb/$name" "$copy" \
+      || ! python3 -I -c 'import os, sys; os.replace(sys.argv[1], sys.argv[2])' "$copy" "/persistent/free-sleep-data/lowdb/$name"; then
+      rm -f "$copy"
+      return 1
+    fi
   done
   DATA_CHANGED=no
   if [ "$ARCHIVE_WAS_ACTIVE" = active ]; then

@@ -201,6 +201,10 @@ is a hard fork; for the history of the projects it descends from, see
   timer armed.
   The database compatibility check copies the snapshot into a folder root
   creates in `/persistent`, not into the server user's staging folder.
+- The installer's socket path record and old settings move, and the
+  settings a failed switch to upstream puts back, are now written to a
+  new file in `/persistent` and renamed into place, which replaces a link
+  the server user left at the name instead of writing through it.
 
 ### Installation and fork migration
 

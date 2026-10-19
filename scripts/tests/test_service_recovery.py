@@ -63,6 +63,7 @@ STREAM_WAS_ACTIVE=active
 BK=fixture-backup
 STAGE=stage
 ZIP=zip
+mktemp() { echo "$FIXTURE/copy"; }
 cp() { echo restore-attempt >> "$FIXTURE/services"; return 1; }
 rm() { :; }
 trap cleanup EXIT
