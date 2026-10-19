@@ -369,13 +369,15 @@ class LatestRawFileHandler(FileSystemEventHandler):
         latest_file = os.path.join(self.directory, raw_files[0])
 
         if latest_file != self.latest_file:
-            # If a new file is found, stop tracking the old one
+            # Read what the old file gained since the last pass before leaving it.
+            if self.latest_file_obj:
+                try:
+                    self.follow_latest_file()
+                except Exception as error:
+                    logger.warning(f'Could not finish reading {self.latest_file}: {error}')
+                self.latest_file_obj.close()
             self.latest_file = latest_file
             logger.debug(f"Now tracking: {self.latest_file}")
-
-            # Close old file handle if open
-            if self.latest_file_obj:
-                self.latest_file_obj.close()
 
             # Open the new file for reading in binary mode
             self.latest_file_obj = open(self.latest_file, "rb")

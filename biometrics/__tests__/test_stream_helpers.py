@@ -712,6 +712,21 @@ class TestRawFileRecovery(StreamHelpersTestCase):
         self.addCleanup(lambda: handler.latest_file_obj.close())
         return handler
 
+    def test_reads_the_rest_of_a_file_before_following_the_next(self):
+        handler = self.handler(self.records[0])
+        handler.follow_latest_file()
+        with open(self.path, 'ab') as handle:
+            handle.write(self.records[1])
+        third = recent_piezo(seq=3)
+        newer = os.path.join(self.folder, 'b.RAW')
+        with open(newer, 'wb') as handle:
+            handle.write(cbor2.dumps({'seq': 2, 'data': cbor2.dumps(third)}))
+        later = time.time() + 5
+        os.utime(newer, (later, later))
+        handler.track_latest_file()
+        handler.follow_latest_file()
+        self.assertEqual(self._ingested(), self.frames + [third])
+
     def test_resyncs_corrupt_middle_header_and_logs_skipped_bytes(self):
         corrupt = b'\xa2\x63bad header'
         fixture = self.records[0] + corrupt + self.records[1]
