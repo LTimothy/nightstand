@@ -1,3 +1,4 @@
+/* eslint-disable react/no-multi-comp */
 import { useState } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -163,9 +164,24 @@ it('starts the checks over when a refetch changes its rows', async () => {
     const entry = { rhythmId: 'off-days', near: false, rows };
     return <>
       <button onClick={ () => setRows([up]) }>refetch</button>
-      <SuggestionSheet key={ keyed ? sheetKey(entry) : undefined } entry={ entry } rhythm={ offDays } side="right" counted={ 14 } log={ log }
-        sleeps={ sleeps } today="2026-10-17" timeZone="UTC" format="fahrenheit" trackingOn={ false } error="" busy={ false }
-        onAdd={ vi.fn() } onDontSuggest={ vi.fn() } onShowNights={ vi.fn() } onClose={ vi.fn() }/>
+      <SuggestionSheet
+        key={ keyed ? sheetKey(entry) : undefined }
+        entry={ entry }
+        rhythm={ offDays }
+        side="right"
+        counted={ 14 }
+        log={ log }
+        sleeps={ sleeps }
+        today="2026-10-17"
+        timeZone="UTC"
+        format="fahrenheit"
+        trackingOn={ false }
+        error=""
+        busy={ false }
+        onAdd={ vi.fn() }
+        onDontSuggest={ vi.fn() }
+        onShowNights={ vi.fn() }
+        onClose={ vi.fn() }/>
     </>;
   };
   const { user } = renderWithProviders(<Refetch keyed/>);
