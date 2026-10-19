@@ -11,6 +11,7 @@ Run locally (needs cbor2, numpy, pandas, not part of the node CI):
 """
 import tempfile
 import unittest
+import unittest.mock
 from datetime import datetime, timedelta, timezone
 
 import cbor2
@@ -146,6 +147,32 @@ class TestDecodeRecovery(unittest.TestCase):
         self.assertEqual(len(data['capSense']), 2)
         self.assertLessEqual(len(logs.records), 2, logs.output[:5])
         self.assertTrue(any('Skipped 3000 bytes' in line for line in logs.output), logs.output[:5])
+
+    def test_stops_at_a_partial_record_that_completes_during_the_resync(self):
+        records = [self._record(cbor2.dumps(_cap_sense_record(self.ts + 60 * n))) for n in range(3)]
+        path = os.path.join(self.tmp.name, 'test.RAW')
+        with open(path, 'wb') as handle:
+            handle.write(records[0] + records[1][:-3])
+        real_read = load_raw_files._read_raw_record
+
+        grown = []
+
+        def read_then_grow(handle):
+            try:
+                return real_read(handle)
+            except EOFError:
+                if grown:
+                    raise
+                grown.append(True)
+                # The Pod finishes the record and writes the next one before the resync scan.
+                with open(path, 'ab') as grow:
+                    grow.write(records[1][-3:] + records[2])
+                raise
+
+        data = {'capSense': []}
+        with unittest.mock.patch.object(load_raw_files, '_read_raw_record', side_effect=read_then_grow):
+            _decode_cbor_file(path, data, self.start, self.end, 'left', 1)
+        self.assertEqual(len(data['capSense']), 1)
 
     def test_skips_a_record_whose_length_runs_past_the_end(self):
         bad = b'\xa2\x63seq\x01\x64data\x5a\xff\xff\xff\x00'

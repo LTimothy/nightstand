@@ -811,6 +811,31 @@ class TestRawFileRecovery(StreamHelpersTestCase):
         self.assertEqual(self.ingest.call_count, 2)
         self.assertEqual(handler.last_pos, sum(map(len, self.records)))
 
+    def test_waits_for_a_partial_record_that_completes_during_the_resync(self):
+        third = recent_piezo(seq=3)
+        records = self.records + [cbor2.dumps({'seq': 2, 'data': cbor2.dumps(third)})]
+        handler = self.handler(records[0] + records[1][:-3])
+        real_read = stream._read_raw_record
+
+        grown = []
+
+        def read_then_grow(handle, **kwargs):
+            try:
+                return real_read(handle, **kwargs)
+            except EOFError:
+                if grown:
+                    raise
+                grown.append(True)
+                # The Pod finishes the record and writes the next one before the resync scan.
+                with open(self.path, 'ab') as grow:
+                    grow.write(records[1][-3:] + records[2])
+                raise
+
+        with unittest.mock.patch.object(stream, '_read_raw_record', side_effect=read_then_grow):
+            handler.follow_latest_file()
+        handler.follow_latest_file()
+        self.assertEqual(self._ingested(), self.frames + [third])
+
     def test_keeps_live_tail_even_when_it_contains_an_invalid_header_match(self):
         tail = b'bad\xa2\x63seq\x01\x64data\x41\xff'
         handler = self.handler(self.records[0] + tail)

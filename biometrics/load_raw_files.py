@@ -115,11 +115,13 @@ def _read_raw_record(f, with_sequence=False):
     return {'seq': sequence, 'data': data} if with_sequence else data
 
 
-def _find_next_raw_record(handle, after):
-    """Find a complete record after a bad offset, leaving a live partial tail intact."""
+def _find_next_raw_record(handle, after, end):
+    """Find a complete record after a bad offset, leaving a live partial tail intact.
+
+    end is the file size taken before the failed read: a record still partial
+    then has no complete successor within it, so an append is never skipped.
+    """
     header = b'\xa2\x63seq'
-    # Snapshot the end so a concurrent append is retried on the next pass.
-    end = os.fstat(handle.fileno()).st_size
     offset = after + 1
     while offset < end:
         handle.seek(offset)
@@ -430,6 +432,7 @@ def _decode_cbor_file(file_path: str, data: dict, start_time, end_time, side: Si
     with open(file_path, 'rb') as raw_data:
         while True:
             start = raw_data.tell()
+            end = os.fstat(raw_data.fileno()).st_size
             try:
                 # Manual reader instead of cbor2.load(), the C extension
                 # reads in 4096-byte chunks and skips most records (see
@@ -440,7 +443,7 @@ def _decode_cbor_file(file_path: str, data: dict, start_time, end_time, side: Si
                 records = list(plain_records(data_bytes))
             except (EOFError, ValueError, cbor2.CBORDecodeError) as error:
                 # Resync at the next whole record, as the live reader does.
-                next_pos = _find_next_raw_record(raw_data, start)
+                next_pos = _find_next_raw_record(raw_data, start, end)
                 if next_pos is None:
                     if not isinstance(error, EOFError):
                         logger.warning(f'Stopped reading {file_path} at offset {start} after a RAW decode failure: {error}')

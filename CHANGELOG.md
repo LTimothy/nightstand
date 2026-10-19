@@ -449,6 +449,10 @@ is a hard fork; for the history of the projects it descends from, see
   with the same name after its sequence restarts. The older file is kept
   beside it as `<name>.1.RAW` (then `.2`, and so on if the name comes back
   again).
+- A RAW record the firmware was still writing when a read reached it is no
+  longer skipped if the firmware finished it and wrote the next record
+  before the reader looked for where to resume. The live stream waits for
+  it and the nightly analysis stops at it, as for any partial record.
 
 ### Schedules
 

@@ -398,6 +398,7 @@ class LatestRawFileHandler(FileSystemEventHandler):
         self.latest_file_obj.seek(self.last_pos)
 
         while True:
+            end = os.fstat(self.latest_file_obj.fileno()).st_size
             try:
                 # Manual reader instead of cbor2.load(), the C extension
                 # reads in 4096-byte chunks and skips most records (see
@@ -412,7 +413,7 @@ class LatestRawFileHandler(FileSystemEventHandler):
                 decoded_records = list(_decode_raw_row(data_bytes))
 
             except (EOFError, ValueError, cbor2.CBORDecodeError) as error:
-                next_pos = _find_next_raw_record(self.latest_file_obj, self.last_pos)
+                next_pos = _find_next_raw_record(self.latest_file_obj, self.last_pos, end)
                 if next_pos is not None:
                     logger.warning(f'Skipped {next_pos - self.last_pos} bytes in {self.latest_file} '
                                    f'at offset {self.last_pos} after RAW decode failure: {error}')
