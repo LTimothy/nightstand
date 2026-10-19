@@ -217,6 +217,9 @@ is a hard fork; for the history of the projects it descends from, see
   the server user could already write. Database files root left owned by
   itself are handed to that user first. Before, root could open, write or
   copy the file a link pointed to.
+- Installing a release from before 3.7 still works, and brings back that
+  release's own services and sudo rules, which run scripts from `/home/dac`
+  as root. Updating to 3.7 or later removes them again.
 
 ### Installation and fork migration
 
