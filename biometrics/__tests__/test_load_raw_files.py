@@ -116,6 +116,83 @@ class TestDecodeWindowTrim(unittest.TestCase):
         self.assertEqual(max(loaded), '2026-09-28 13:00:00')
 
 
+
+class TestArchiveRenameDuringLoad(unittest.TestCase):
+    """The archive timer moves raw-archive/X.RAW to X.1.RAW when the firmware reuses the name."""
+
+    def setUp(self):
+        self.start = datetime(2026, 9, 28, 12, 0, 0, tzinfo=timezone.utc)
+        self.ts = int((self.start + timedelta(minutes=1)).timestamp())
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.live = os.path.join(tmp.name, 'live')
+        self.archive = os.path.join(tmp.name, 'data', 'raw-archive')
+        os.makedirs(self.live)
+        os.makedirs(self.archive)
+        self.data_folder = os.path.join(tmp.name, 'data', '')
+
+    def _write(self, path, *offsets):
+        with open(path, 'wb') as handle:
+            for offset in offsets:
+                handle.write(cbor2.dumps({'seq': offset, 'data': cbor2.dumps(_cap_sense_record(self.ts + offset))}))
+
+    def _load_while(self, during):
+        real_decode = load_raw_files._decode_cbor_file
+        calls = []
+
+        def decode(path, *args, **kwargs):
+            if not calls:
+                during()
+            calls.append(os.path.basename(path))
+            return real_decode(path, *args, **kwargs)
+
+        with unittest.mock.patch.object(load_raw_files.logger, 'folder_path', self.data_folder), \
+                unittest.mock.patch.object(load_raw_files, '_decode_cbor_file', side_effect=decode):
+            data = load_raw_files.load_raw_files(self.live, self.start, self.start + timedelta(hours=1), 'left',
+                                                 sensor_count=1, raw_data_types=['capSense'])
+        return sorted(row['ts'] for row in data['cap_senses']), calls
+
+    def test_a_file_renamed_mid_run_is_still_read_once(self):
+        self._write(os.path.join(self.archive, 'A.RAW'), 0)
+        self._write(os.path.join(self.archive, 'B.RAW'), 60)
+        old = os.path.join(self.archive, 'B.RAW')
+        for replaced in (False, True):
+            with self.subTest(replaced=replaced):
+                def rename():
+                    os.rename(old, os.path.join(self.archive, 'B.1.RAW'))
+                    if replaced:
+                        # The firmware's new night arrives under the old name.
+                        self._write(old, 120)
+                loaded, calls = self._load_while(rename)
+                self.assertEqual(len(loaded), 2, loaded)
+                self.assertEqual(calls, ['A.RAW', 'B.1.RAW'])
+                os.replace(os.path.join(self.archive, 'B.1.RAW'), old)
+
+    def test_a_smaller_file_under_the_listed_inode_is_not_taken_for_it(self):
+        self._write(os.path.join(self.archive, 'A.RAW'), 0)
+        old = os.path.join(self.archive, 'B.RAW')
+        self._write(old, 60, 120)
+
+        def reuse():
+            # Stands in for a reused inode: same identity, fewer bytes than listed.
+            moved = os.path.join(self.archive, 'B.1.RAW')
+            os.rename(old, moved)
+            with open(moved, 'r+b') as handle:
+                handle.truncate(1)
+
+        loaded, calls = self._load_while(reuse)
+        self.assertEqual(len(loaded), 1, loaded)
+        self.assertEqual(calls, ['A.RAW'])
+
+    def test_a_live_file_deleted_mid_run_is_read_from_its_archive_link(self):
+        self._write(os.path.join(self.archive, 'A.RAW'), 0)
+        live = os.path.join(self.live, 'B.RAW')
+        self._write(live, 60)
+        os.link(live, os.path.join(self.archive, 'B.RAW'))
+        loaded, calls = self._load_while(lambda: os.remove(live))
+        self.assertEqual(len(loaded), 2, loaded)
+        self.assertEqual(calls, ['A.RAW', 'B.RAW'])
+
 if __name__ == '__main__':
     unittest.main()
 

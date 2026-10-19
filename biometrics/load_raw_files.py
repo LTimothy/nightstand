@@ -173,6 +173,21 @@ def get_current_files(folder_path: str):
     return [candidates[name] for name in sorted(candidates)]
 
 
+def _file_id(path):
+    """(st_dev, st_ino) and size, or (None, 0) when the path is gone."""
+    try:
+        stat = os.stat(path)
+        return (stat.st_dev, stat.st_ino), stat.st_size
+    except OSError:
+        return None, 0
+
+
+def _same_file(path, key, size) -> bool:
+    # A RAW file only grows, so a smaller one is a reused inode, not the listed file.
+    found, found_size = _file_id(path)
+    return found == key and found_size >= size
+
+
 def _decode_piezo_data(raw_bytes: bytes) -> np.ndarray:
     return np.frombuffer(raw_bytes, dtype=np.int32)
 
@@ -511,14 +526,25 @@ def load_raw_files(folder_path: str, start_time: datetime, end_time: datetime, s
         logger.info(f'Loading RAW files from {folder_path} | {start_time.isoformat()} -> {end_time.isoformat()}')
 
         file_paths = get_current_files(folder_path)
+        listed = [_file_id(file_path) for file_path in file_paths]
         raw_diagnostics = _Diagnostics(cap_formats, presence_collector)
 
-        for file_path in file_paths:
-            if os.path.isfile(file_path):
-                _decode_cbor_file(file_path, data, start_time, end_time, side, sensor_count, presence_collector,
-                                  raw_diagnostics.formats, raw_diagnostics.unknown_caps)
-            else:
-                logger.warning(f'File path deleted before parsed! {file_path}')
+        decoded = set()
+        for listed_path, (key, size) in zip(file_paths, listed):
+            file_path = listed_path
+            if key is not None and not _same_file(file_path, key, size):
+                # The archive timer renames a file whose name the firmware reused,
+                # and the firmware deletes live files the archive still links.
+                file_path = next((path for path in get_current_files(folder_path)
+                                  if _same_file(path, key, size)), None)
+            if file_path is None or key is None:
+                logger.warning(f'File path deleted before parsed! {listed_path}')
+                continue
+            if key in decoded:
+                continue
+            decoded.add(key)
+            _decode_cbor_file(file_path, data, start_time, end_time, side, sensor_count, presence_collector,
+                              raw_diagnostics.formats, raw_diagnostics.unknown_caps)
 
         if any(data.values()):
             raw_diagnostics.apply()

@@ -462,6 +462,9 @@ is a hard fork; for the history of the projects it descends from, see
 - The nightly analysis skips a night only when Biometrics is switched off.
   A missing or unreadable `servicesDB.json` no longer reads as off; the
   analysis runs as before and the error is logged.
+- The nightly analysis still reads a RAW file the archive renames to
+  `<name>.1.RAW` while the run is going, or a live file the firmware deletes
+  once the archive holds it. Before, that file was left out of the run.
 
 ### Schedules
 
