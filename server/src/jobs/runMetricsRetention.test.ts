@@ -129,7 +129,7 @@ test('a timed-out retention batch is reported once without retrying that daily r
   assert.equal(errors.length, 0);
 });
 
-test('daily left calibration prunes even with biometrics, priming and both sides away', async () => {
+test('daily retention job prunes even with biometrics, priming and both sides away', async () => {
   await updateServices({ biometrics: { enabled: false } });
   await updateSettings(data => {
     data.primePodDaily.enabled = false;
@@ -138,7 +138,8 @@ test('daily left calibration prunes even with biometrics, priming and both sides
   });
   schedulePrimingRebootAndCalibration(settings.data);
   await schedule.scheduledJobs['daily-calibration-19:00-right'].invoke();
-  assert.equal(pruning.length, 0);
   await schedule.scheduledJobs['daily-calibration-18:30-left'].invoke();
+  assert.equal(pruning.length, 0);
+  await schedule.scheduledJobs['daily-metrics-retention'].invoke();
   assert.equal(pruning.length, 1);
 });

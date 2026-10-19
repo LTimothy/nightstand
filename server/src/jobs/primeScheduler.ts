@@ -61,7 +61,6 @@ const scheduleCalibrationJob = (onHour: number, onMinute: number, timeZone: Time
   const time = `${String(onHour).padStart(2,'0')}:${String(onMinute).padStart(2,'0')}`;
   logger.debug(`Scheduling daily calibration job at ${time} for ${side}`);
   schedule.scheduleJob(`daily-calibration-${time}-${side}`, dailyRule, async () => {
-    if (side === 'left') await runMetricsRetention();
     await servicesDB.read();
     if (!servicesDB.data.biometrics.enabled) {
       logger.debug('Not executing calibration job, biometrics is disabled');
@@ -72,6 +71,27 @@ const scheduleCalibrationJob = (onHour: number, onMinute: number, timeZone: Time
   });
 };
 
+
+// Retention can take minutes on a low-disk day, so it runs an hour before calibration.
+// It steps back an hour at a time until it is 30+ minutes from the reboot and prime times.
+const retentionClock = (primeTime?: string) => {
+  const busy = primeTime ? [primeTime, `${rebootClock(primeTime).hour}:${rebootClock(primeTime).minute}`] : [];
+  const minutes = busy.map((t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; });
+  for (let hour = 17; hour >= 0; hour--) {
+    const at = hour * 60 + 30;
+    if (minutes.every((m) => Math.min(Math.abs(m - at), 1440 - Math.abs(m - at)) >= 30)) return { hour, minute: 30 };
+  }
+  return { hour: 17, minute: 30 };
+};
+
+const scheduleRetentionJob = (timeZone: TimeZone, primeTime?: string) => {
+  const dailyRule = new schedule.RecurrenceRule();
+  const { hour, minute } = retentionClock(primeTime);
+  dailyRule.hour = hour;
+  dailyRule.minute = minute;
+  dailyRule.tz = timeZone;
+  schedule.scheduleJob('daily-metrics-retention', dailyRule, () => runMetricsRetention());
+};
 
 // Calibration runs at a fixed time of day, decoupled from the prime time.
 // 18:30 / 19:00 was empirically chosen because it's reliably bed-empty for
@@ -90,6 +110,7 @@ export const schedulePrimingRebootAndCalibration = (settingsData: Settings) => {
   // is on and that the bed is empty.
   scheduleCalibrationJob(CALIBRATE_LEFT_HOUR, CALIBRATE_LEFT_MINUTE, timeZone, 'left');
   scheduleCalibrationJob(CALIBRATE_RIGHT_HOUR, CALIBRATE_RIGHT_MINUTE, timeZone, 'right');
+  scheduleRetentionJob(timeZone, primePodDaily.enabled ? primePodDaily.time : undefined);
 
   if (!primePodDaily.enabled) return;
   const dailyRule = new schedule.RecurrenceRule();
