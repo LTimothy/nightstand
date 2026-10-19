@@ -4,6 +4,8 @@ After=free-sleep.service
 
 [Service]
 Type=oneshot
+# The leading - keeps a copy without the script working.
+ExecStartPre=-/bin/bash /usr/local/lib/nightstand/live/scripts/trim_log.sh /persistent/free-sleep-data/logs/free-sleep-revert.log
 # A tree rolled back to a release from before the rename has only the old name.
 ExecStart=/bin/bash -c 'test -f /usr/local/lib/nightstand/live/scripts/switch-to-upstream.sh && exec /bin/bash /usr/local/lib/nightstand/live/scripts/switch-to-upstream.sh; exec /bin/bash /usr/local/lib/nightstand/live/scripts/revert-to-stock.sh'
 # Closes the download window even when the updater was killed outright.

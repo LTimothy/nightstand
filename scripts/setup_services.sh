@@ -183,6 +183,7 @@ After=free-sleep.service
 
 [Service]
 Type=oneshot
+ExecStartPre=-/bin/bash /usr/local/lib/nightstand/live/scripts/trim_log.sh /persistent/free-sleep-data/logs/free-sleep-update.log
 # Run via bash so the updater still works if the script's exec bit is lost
 # (systemd fails with 203/EXEC before writing anything to the log otherwise).
 ExecStart=/bin/bash /usr/local/lib/nightstand/live/scripts/update_service.sh
