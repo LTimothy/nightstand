@@ -180,10 +180,13 @@ say "Backing up code + data to $BK"
 SSH "set -e
   mkdir -p '$BK'
   tar czf '$BK/code.tar.gz' -C /home/dac --exclude free-sleep/server/node_modules free-sleep
-  cp /persistent/free-sleep-data/free-sleep.db '$BK/' 2>/dev/null || true
   cp -r /persistent/free-sleep-data/lowdb '$BK/lowdb'
-  ls -1dt $BACKUPS/*/ | tail -n +$((KEEP_BACKUPS+1)) | xargs -r rm -rf
 " || die "backup failed - aborting, nothing changed"
+# A raw copy of a live WAL database can be torn or miss committed rows. This
+# checkout's helper, read from stdin, takes a consistent snapshot.
+SSH "[ ! -f /persistent/free-sleep-data/free-sleep.db ] || python3 -I - backup /persistent/free-sleep-data/free-sleep.db '$BK/free-sleep.db'" < scripts/sqlite-safety.py \
+  || die "database backup failed - aborting, nothing changed"
+SSH "ls -1dt $BACKUPS/*/ | tail -n +$((KEEP_BACKUPS+1)) | xargs -r rm -rf"
 
 # --- ship HEAD to staging ---------------------------------------------------
 # When the deploy host and the pod are both Wi-Fi stations on the same subnet,
@@ -366,13 +369,21 @@ fi
 # --- atomic swap ------------------------------------------------------------
 say "Swapping (service stops now)"
 MOVED_MODULES=no
-SSH "set -e
-  $MOVE_TREE
-  systemctl stop free-sleep
-  rm -rf $PREV
-  move_tree $LIVE $PREV || { systemctl start free-sleep; exit 1; }
-  move_tree $STAGE $LIVE || { move_tree $PREV $LIVE; systemctl start free-sleep; exit 1; }
-" || die "swap failed - pod may need manual attention: $POD_SSH_HINT, check $LIVE/$PREV/$STAGE"
+# Under the lock the updater, the rollback and the switch take, from root's copy.
+SWAP_STATUS=0
+SSH "bash -s -- $COPY $STAGE $LIVE $PREV" <<'SWAP' || SWAP_STATUS=$?
+set -e
+COPY=$1; STAGE=$2; LIVE=$3; PREV=$4
+say() { echo "$*"; }
+source "$COPY/scripts/restore_helpers.sh"
+take_operation_lock || { [ $? -eq 2 ] && exit 75; exit 1; }
+systemctl stop free-sleep
+rm -rf "$PREV"
+move_tree "$LIVE" "$PREV" || { systemctl start free-sleep; exit 1; }
+move_tree "$STAGE" "$LIVE" || { move_tree "$PREV" "$LIVE"; systemctl start free-sleep; exit 1; }
+SWAP
+[ "$SWAP_STATUS" -ne 75 ] || die "an update, rollback or switch is running on the pod; nothing was swapped. Try again when it has finished."
+[ "$SWAP_STATUS" -eq 0 ] || die "swap failed - pod may need manual attention: $POD_SSH_HINT, check $LIVE/$PREV/$STAGE"
 if [ "$LOCK_SAME" = "yes" ]; then
   SSH "$MOVE_TREE move_tree $PREV/server/node_modules $LIVE/server/node_modules && chown -hR dac:dac $LIVE/server/node_modules"
   MOVED_MODULES=yes
