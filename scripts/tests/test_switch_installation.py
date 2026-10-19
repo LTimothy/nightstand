@@ -861,6 +861,25 @@ bash "$TEST_ROLLBACK"
                     if mode == 'rollback':
                         self.assertEqual(self.runner.find_companion(system.store, system.live.parent / 'free-sleep-prev'), retained)
 
+    def test_unexpected_errors_still_restore_the_source_in_process(self):
+        self.forward()
+        previous = self.system.live.parent / 'free-sleep-prev'
+        def broken(*arguments):
+            raise AttributeError("'list' object has no attribute 'get'")
+        self.system.validate = broken
+        lock = str(self.system.root / 'operation.lock')
+        with patch.object(self.runner, 'System', return_value=self.system), \
+                patch.object(sys, 'argv', ['switch_installation.py', 'rollback', '--stage', str(previous)]), \
+                patch.dict(os.environ, NIGHTSTAND_OPERATION_LOCK=lock), \
+                patch.object(recover_switch.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)), \
+                patch.object(recover_switch, 'controller', side_effect=self.system.controller), \
+                patch('sys.stderr', new=io.StringIO()) as errors, redirect_stdout(io.StringIO()), \
+                self.assertRaises(SystemExit) as stopped:
+            self.runner.main()
+        self.assertEqual(stopped.exception.code, 3, errors.getvalue())
+        self.assertIn('source restored', errors.getvalue())
+        self.assertEqual(self.runner.fork(self.system.live), 'upstream')
+
     def test_cleanup_failure_after_commit_reports_the_validated_target(self):
         self.forward()
         previous = self.system.live.parent / 'free-sleep-prev'

@@ -156,6 +156,8 @@ def sample_system(probe_path, enabled):
             probe = json.loads(read_regular(probe_path))
         except FileNotFoundError:
             pass
+        if probe is not None and not isinstance(probe, dict):
+            raise ValueError('Probe is not a JSON object')
         stored = biometrics.get('jobs', {}).get('stream')
         if probe and stored:
             stamp = datetime.fromisoformat(stored['timestamp'].replace('Z', '+00:00'))

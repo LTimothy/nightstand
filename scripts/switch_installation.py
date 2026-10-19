@@ -571,7 +571,8 @@ def main():
         prior_ids = {journal['id'] for journal in recover_switch.journals(system.store)}
         try:
             print(install(system, args.stage, target=target, retained=retained, operation=unit))
-        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        except Exception as error:
+            # Any failure, not only expected ones, restores the source in process.
             pending = any(journal['phase'] not in recover_switch.TERMINAL for journal in recover_switch.journals(system.store))
             committed = [journal['id'] for journal in recover_switch.journals(system.store)
                          if journal['id'] not in prior_ids and journal['phase'] in ('committed', 'cleaned')]
@@ -582,7 +583,7 @@ def main():
             if pending:
                 parser.exit(3, 'Cross-fork installation failed; source restored: ' + str(error) + '\n')
             raise
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+    except Exception as error:
         parser.exit(1, 'Cross-fork installation stopped: ' + str(error) + '\n')
 
 

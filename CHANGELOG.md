@@ -268,6 +268,10 @@ is a hard fork; for the history of the projects it descends from, see
   removed. Before, each failed try left about 700 MB in `/home/dac` until
   updates stopped for low disk. What a later return to Nightstand needs is
   kept.
+- A switch between Nightstand and upstream that fails with an unexpected
+  error restores the previous install at once, as it does for expected
+  ones, and a validation probe file that is not a JSON object fails the
+  check. Before, such an error left the restore to the next start.
 
 ### Firmware readouts
 

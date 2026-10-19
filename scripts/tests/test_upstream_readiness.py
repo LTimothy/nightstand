@@ -50,6 +50,13 @@ class UpstreamReadinessTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'regular file'):
                 self.sample_probe(probe)
 
+    def test_a_probe_that_is_not_an_object_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            probe = Path(folder) / 'probe.json'
+            probe.write_text('[]')
+            with self.assertRaisesRegex(ValueError, 'Probe'):
+                self.sample_probe(probe)
+
     def test_enabled_requires_ninety_seconds_of_sustained_success(self):
         check = self.check()
         for now in range(0, 90, 5):
