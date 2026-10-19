@@ -95,9 +95,10 @@ or when calibration is missing or the capacitance readings go stale, a side
 stays on old tracking, so turning the switch on doesn't by itself mean New
 sleep tracking is running.
 
-Elsewhere, including a Pod 5 with the older `capSense` records, the switch is
-experimental: it changes the nightly records and which minutes get heart rate
-and breathing, not the in-bed indicator or presence auto-off.
+Elsewhere, including a Pod 5 with the older `capSense` records, the switch
+has not been checked against anyone's sleep. It changes the nightly records
+and which minutes get heart rate and breathing, not the in-bed indicator or
+presence auto-off.
 
 ### How the new sleep tracking was checked
 

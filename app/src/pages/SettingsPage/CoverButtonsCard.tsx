@@ -10,8 +10,8 @@ import { coverButtonsPath, POD5_HUB_GESTURES } from './coverButtons.ts';
 import { GESTURE_LABELS } from './tapActions.ts';
 
 const gestureName = (gesture: keyof typeof GESTURE_LABELS) => GESTURE_LABELS[gesture].toLowerCase();
-const POD5_HUB = `Your Pod 5 hub turns plus into a ${gestureName(POD5_HUB_GESTURES.plus)} and minus into a `
-  + `${gestureName(POD5_HUB_GESTURES.minus)}; the logo is probably a ${gestureName(POD5_HUB_GESTURES.logo)}, not yet checked. `
+const POD5_HUB = `Your Pod 5 hub turns plus into a ${gestureName(POD5_HUB_GESTURES.plus)}, minus into a `
+  + `${gestureName(POD5_HUB_GESTURES.minus)} and the logo into a ${gestureName(POD5_HUB_GESTURES.logo)}. `
   + 'Set what each click does here.';
 const POD4_HUB = 'Your Pod 4 hub ignores short clicks on the Pod 5 cover. Nightstand reads them from the Pod\'s log, 15 to 25 s late.';
 

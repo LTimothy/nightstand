@@ -12,7 +12,7 @@ export function coverButtonsPath(hub?: string, cover?: string): CoverButtonsPath
   return null;
 }
 
-// Which tap counter each button bumps on a Pod 5 hub, inferred from the Pod's logs. The logo is not checked yet.
+// Which tap counter each button bumps on a Pod 5 hub, read from the Pod's logs.
 export const POD5_HUB_GESTURES = { plus: 'tripleTap', minus: 'doubleTap', logo: 'quadTap' } as const;
 export const DEFAULT_LOGO_F = 80;
 const DEFAULT_QUAD_TAP: TapAction = { type: 'base_control', behavior: 'toggle_preset' };

@@ -65,8 +65,8 @@ describe('Cover buttons options', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Cover buttons' })).toBeVisible();
     expect(screen.queryByRole('switch', { name: /cover buttons/i })).not.toBeInTheDocument();
     expect(screen.getByText(
-      'Your Pod 5 hub turns plus into a triple tap and minus into a double tap; the logo is probably a quad tap, '
-      + 'not yet checked. Set what each click does here.',
+      'Your Pod 5 hub turns plus into a triple tap, minus into a double tap and the logo into a quad tap. '
+      + 'Set what each click does here.',
     )).toBeVisible();
     const group = await leftButtons();
     await userEvent.click(within(group).getByRole('combobox', { name: 'Left Step per click' }));

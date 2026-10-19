@@ -325,8 +325,8 @@ still in use, where they were 27 minutes apart
 One of those nights, old tracking against new. The labels come from New
 sleep tracking, not from the notes.
 
-Elsewhere, including on a Pod 5 with the older records, the setting is
-experimental and hasn't been checked against anyone's sleep
+Elsewhere, including on a Pod 5 with the older records, the setting
+hasn't been checked against anyone's sleep
 ([details](biometrics/BIOMETRICS.md)).
 
 ## Updating

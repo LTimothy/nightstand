@@ -12,25 +12,20 @@ import DeleteNotesDialog from './DeleteNotesDialog.tsx';
 import { DELETE_NOTES, FEATURE_TITLE, featureDescription } from '../../SchedulePage/rhythms/suggestionsCopy';
 import { Services, useServices, postServices } from '@api/services.ts';
 import { useSettings, postSettings } from '@api/settings.ts';
-import { useDeviceStatus } from '@api/deviceStatus.ts';
-import { useCalibration } from '@api/calibration.ts';
-import { EXPERIMENTAL_ON_THIS_POD, sleepTrackingExperimental } from '@api/sleepTrackingValidation.ts';
 import { Settings } from '@api/settingsSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { DeepPartial } from 'ts-essentials';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
-const BIOMETRICS_UNCHECKED_MODEL = 'Not checked on this Pod model.';
-const NEW_SLEEP_TRACKING_CHECKED = 'Tells the two sides apart with the capacitance sensors. Checked on one Pod 5.';
+const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. '
+  + 'It changes the nightly sleep records and the heart rate and breathing estimates.';
 const child = { pl: 2, borderLeft: 1, borderColor: 'divider' };
 
 export default function FeaturesSection() {
   const [error, setError] = useState<string | null>(null);
   const { data: services, refetch: refetchServices, isLoading: servicesLoading, isError: servicesError } = useServices();
   const { data: settings, refetch: refetchSettings, isLoading: settingsLoading, isError: settingsError } = useSettings();
-  const { data: deviceStatus } = useDeviceStatus();
-  const { data: calibrationState } = useCalibration();
   const setIsUpdating = useAppStore((state) => state.setIsUpdating);
   const isUpdating = useAppStore((state) => state.isUpdating);
   const [rhythmsDialog, setRhythmsDialog] = useState<'enable' | 'disable'>();
@@ -95,16 +90,6 @@ export default function FeaturesSection() {
   const features = settings.features;
   const biometricsEnabled = services.biometrics?.enabled ?? false;
   const biometricsInstalled = services.biometrics?.jobs?.installation?.status === 'healthy';
-  // Unknown counts as unchecked: the labels show until the Pod proves it is a
-  // validated Pod 5.
-  const experimental = deviceStatus === undefined || sleepTrackingExperimental(
-    deviceStatus.coverVersion, deviceStatus.hubVersion,
-    [calibrationState?.left?.capFormat, calibrationState?.right?.capFormat],
-  );
-  // Biometrics only needs the model: the capacitance format is a New sleep tracking matter.
-  const modelUnchecked = deviceStatus === undefined
-    || sleepTrackingExperimental(deviceStatus.coverVersion, deviceStatus.hubVersion, []);
-
   const needsBiometrics = !biometricsEnabled && <TurnOnFirst
     parent="Biometrics"
     href="#biometrics"/>;
@@ -169,11 +154,7 @@ export default function FeaturesSection() {
           checked={ biometricsEnabled }
           onChange={ (next) => updateServices({ biometrics: { enabled: next } }) }
           description={
-            biometricsInstalled ? <>
-              { BIOMETRICS_ESTIMATES }
-              { modelUnchecked && <Box component="span" sx={ { display: 'block', mt: 0.5 } }>{ BIOMETRICS_UNCHECKED_MODEL }</Box> }
-            </>
-              : 'Not installed. Optional sleep and vital estimates.'
+            biometricsInstalled ? BIOMETRICS_ESTIMATES : 'Not installed. Optional sleep and vital estimates.'
           }
         />
         { !biometricsInstalled && <Accordion disableGutters>
@@ -208,7 +189,7 @@ export default function FeaturesSection() {
             disabled={ isUpdating || features?.biometricsV2 === undefined || !biometricsEnabled }
             checked={ features?.biometricsV2 ?? false }
             onChange={ (next) => updateFeature({ biometricsV2: next }) }
-            description={ needsBiometrics || (experimental ? EXPERIMENTAL_ON_THIS_POD : NEW_SLEEP_TRACKING_CHECKED) }
+            description={ needsBiometrics || NEW_SLEEP_TRACKING }
           />
           <FeatureToggleRow
             label="Cooling warning"

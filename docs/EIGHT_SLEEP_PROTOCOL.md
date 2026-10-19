@@ -328,9 +328,8 @@ lines from that bed.
   ([sleepypod sensor profiles](https://github.com/sleepypod/core/blob/main/docs/hardware/sensor-profiles.md),
   [NATS frame notes](https://github.com/sleepypod/core/blob/main/docs/nats-frame-readers.md)).
   We have not found a published Pod 4 cover capture of either. Nightstand
-  therefore reads the format from the records and treats anything but
-  `capSense2` on a Pod 5 as experimental. On `capSense` its new sleep tracking
-  starts from sleepypod's `capSense` entry level of 300 counts
+  therefore reads the format from the records. On `capSense` its new sleep
+  tracking starts from sleepypod's `capSense` entry level of 300 counts
   ([sleepypod sleep detector](https://github.com/sleepypod/core/blob/main/docs/sleep-detector.md))
   and then learns each side's own level.
 - 📖 **A Pod 4 hub with a Pod 5 cover.** The two fit together and run

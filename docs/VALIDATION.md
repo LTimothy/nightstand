@@ -132,7 +132,7 @@ sleep tracking, not from the notes.
 
 Heart rate, breathing, stages and the score weren't part of this check.
 Other Pod models, other households, and a Pod 5 with the older capacitance
-records haven't been checked; there the switch is experimental.
+records haven't been checked.
 
 ## Two people in one bed
 
