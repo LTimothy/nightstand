@@ -35,8 +35,16 @@ const { updateDeviceStatus } = await import('./updateDeviceStatus.js');
 const { default: settingsDB } = await import('../../db/settings.js');
 const { FrankenSupersededError } = await import('../../8sleep/frankenErrors.js');
 const { keptSleeps, rememberKeptAlarms } = await import('../../jobs/rhythms/keptAlarms.js');
+const { wasSentSince } = await import('../../8sleep/sentTargets.js');
 
 describe('updateDeviceStatus', () => {
+  it('notes the target it sends, so the monitor does not read it as a change on the bed', async () => {
+    const before = Date.now();
+    await updateDeviceStatus({ left: { targetTemperatureF: 73 } });
+    assert.equal(wasSentSince('left', 73, before), true);
+    assert.equal(wasSentSince('right', 73, before), false);
+  });
+
   it('preserves all canonical and off-grid temperature writes with firmware readout on and off', async () => {
     const targets = [55, 58, 61, 63, 66, 69, 72, 74, 77, 80, 83, 85, 88, 91, 94, 96, 99, 102, 105, 107, 110, 82.5, 79.3];
     const expected = [-100, -89, -78, -71, -60, -49, -38, -31, -20, -9, 2, 9, 20, 31, 42, 49, 60, 71, 82, 89, 100, 0, -12];

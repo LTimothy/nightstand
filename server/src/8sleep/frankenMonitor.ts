@@ -11,6 +11,7 @@ import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js
 import { markManualTempChange } from '../jobs/scheduleOverride.js';
 import { drivingSide } from '../jobs/scheduleQueries.js';
 import { noteDeviceStatus } from './lastDeviceStatus.js';
+import { wasSentSince } from './sentTargets.js';
 import { DeepPartial } from 'ts-essentials';
 import serverStatus from '../serverStatus.js';
 import { trimixBase } from './trimixBaseControl.js';
@@ -36,6 +37,9 @@ const POLL_MS = 2_000;
 // when the Pod has not reported it yet. Past this the latest read wins, so a
 // write the Pod refused cannot keep steering gestures.
 const WRITTEN_TARGET_MS = 10_000;
+// A write sent this long before the previous read may still have reached the
+// Pod after it, so it counts as ours when a later read shows it.
+const SENT_SLACK_MS = 10_000;
 
 type WrittenTarget = {
   // The target the last gesture wrote.
@@ -51,6 +55,8 @@ type WrittenTarget = {
 export class FrankenMonitor {
   private isRunning: boolean;
   private deviceStatus?: DeviceStatus;
+  // When deviceStatus was read.
+  private readAt = 0;
   private currentBasePreset: keyof typeof BASE_PRESETS = 'flat';
   // The last tap counters read as numbers. A read missing a counter keeps the
   // one before it, so a tap made across that read is still seen.
@@ -88,6 +94,7 @@ export class FrankenMonitor {
 
   private setDeviceStatus(next: DeviceStatus) {
     this.deviceStatus = next;
+    this.readAt = Date.now();
     noteDeviceStatus(next);
   }
 
@@ -273,6 +280,23 @@ export class FrankenMonitor {
     }
   }
 
+  // A target that moved while the side stayed on, and that Nightstand did not
+  // send, was changed on the bed itself: a Pod 5 hub acts on cover clicks.
+  private noteHubChanges(nextDeviceStatus: DeviceStatus) {
+    for (const side of ['left', 'right'] as const) {
+      const before = this.deviceStatus?.[side];
+      const after = nextDeviceStatus[side];
+      if (!before?.isOn || !after.isOn || before.targetTemperatureF === after.targetTemperatureF) continue;
+      // Anything sent since the previous read is ours, however long the reads were failing.
+      if (wasSentSince(side, after.targetTemperatureF, this.readAt - SENT_SLACK_MS)
+        || this.writtenTargets[side]?.written.has(after.targetTemperatureF)) continue;
+      logger.info(`[frankenMonitor] ${side} target changed on the bed: ${before.targetTemperatureF} -> ${after.targetTemperatureF} F`);
+      markManualTempChange(side, {
+        targetF: after.targetTemperatureF, fromF: before.targetTemperatureF, on: true, setsOn: false, source: 'tap',
+      }).catch(error => logger.error(`Failed to note the ${side} side's change: ${error instanceof Error ? error.message : String(error)}`));
+    }
+  }
+
   // Not async: it awaits nothing, and an async function called without await
   // is the same floating-promise trap the gesture calls above just closed.
   private processGestures(nextDeviceStatus: DeviceStatus) {
@@ -281,6 +305,7 @@ export class FrankenMonitor {
       return;
     }
 
+    this.noteHubChanges(nextDeviceStatus);
     this.settleWrittenTargets(nextDeviceStatus);
     this.processGesturesForSide(nextDeviceStatus, 'left');
     this.processGesturesForSide(nextDeviceStatus, 'right');
