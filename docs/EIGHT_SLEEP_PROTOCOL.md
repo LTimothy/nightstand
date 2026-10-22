@@ -177,6 +177,11 @@ by `[TTC] right top button clicked 1 times` and `[buttons] enc {id:0,clicks:1}`,
 then `[thermostat] temp_up right -24->-14`. Two quick clicks report
 `clicks:2` and "clicked 2 times". The firmware changes the target itself by
 10 levels per click, so the buttons already work without Nightstand.
+Plus and minus also reach `DEVICE_STATUS` as a triple and a double tap,
+so Nightstand's tap action runs as well; Nightstand steps from the target
+before the firmware's change and replaces it. A logo click is logged as
+`[TTC] left middle button clicked 1 times` and changes no target and no
+tap counter; the firmware uses it only to stop an alarm.
 The Pod 4 hub with a Pod 5 cover instead logs `[TTC] ignoring N short clicks`
 for plus and minus. My Pod 5 also logs a stray `gpi press 105` with
 `invalid gpi->row 105->255` every five minutes.

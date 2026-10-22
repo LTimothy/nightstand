@@ -58,7 +58,8 @@ function SideButtons({ title, side, path, format, disabled, save }: {
         onChange={ on => change({ logoF: on ? DEFAULT_LOGO_F : null }) }/> }
       { values.logoOther && <Typography
         variant="body2"
-        color="text.secondary">The logo is set to another action under Bed and sides &gt; Tap gestures.</Typography> }
+        color="text.secondary">The quad tap is set to another action under Bed and sides &gt; Tap gestures,
+        so the logo only stops alarms.</Typography> }
       { values.logoF !== null && <Box>
         <Typography variant="body2">Logo temperature</Typography>
         <TemperatureStepper

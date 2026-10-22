@@ -65,8 +65,8 @@ describe('Cover buttons options', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Cover buttons' })).toBeVisible();
     expect(screen.queryByRole('switch', { name: /cover buttons/i })).not.toBeInTheDocument();
     expect(screen.getByText(
-      'Your Pod 5 hub turns plus into a triple tap, minus into a double tap and the logo into a quad tap. '
-      + 'Set what each click does here.',
+      'Your Pod 5 hub turns plus into a triple tap and minus into a double tap. '
+      + 'Nightstand reads logo clicks from the Pod\'s log, 15 to 25 s late. Set what each click does here.',
     )).toBeVisible();
     const group = await leftButtons();
     await userEvent.click(within(group).getByRole('combobox', { name: 'Left Step per click' }));
@@ -120,7 +120,9 @@ describe('Cover buttons options', () => {
     }));
     renderWithProviders(ui);
     const group = await leftButtons();
-    expect(within(group).getByText('The logo is set to another action under Bed and sides > Tap gestures.')).toBeVisible();
+    expect(within(group).getByText(
+      'The quad tap is set to another action under Bed and sides > Tap gestures, so the logo only stops alarms.',
+    )).toBeVisible();
     await userEvent.click(within(group).getByRole('switch', { name: 'Left logo sets a temperature' }));
     expect(posted).toEqual([{ left: { taps: { quadTap: { type: 'set_temperature', temperatureF: 80 } } } }]);
   });
