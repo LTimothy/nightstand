@@ -251,7 +251,8 @@ export class FrankenMonitor {
     }
   }
 
-  private processGesturesForSide(nextDeviceStatus: DeviceStatus, side: Side) {
+  // `hubFromF` is the target before a change the hub made by itself in this read, if any.
+  private processGesturesForSide(nextDeviceStatus: DeviceStatus, side: Side, hubFromF: number | null = null) {
     try {
       const gestures: Gesture[] = [];
       for (const gesture of GestureSchema.options) {
@@ -267,14 +268,21 @@ export class FrankenMonitor {
         this.lastTaps[side][gesture] = current;
         if (previous !== undefined && current > previous) gestures.push(gesture);
       }
-      if (gestures.length === 0) return;
+      if (gestures.length === 0) {
+        if (hubFromF !== null) this.noteHubChange(side, hubFromF, nextDeviceStatus[side].targetTemperatureF);
+        return;
+      }
+      // A Pod 5 hub steps a plus click itself and also reports it as a tap, so
+      // the tap steps from the target before the hub's step and replaces it.
+      // Assumes both land in one read, as seen on a Pod 5; a step and tap split across reads still stack.
+      const readTarget = hubFromF ?? nextDeviceStatus[side].targetTemperatureF;
       // Deliberately detached: a base move takes seconds over BLE and this
       // loop doubles as the tap-detection cadence, so awaiting here would
       // delay the next read. Detached means the surrounding try cannot see a
       // rejection, and an unhandled one takes the whole server down (the
       // process-level handler shuts it down), so each gesture is caught in
       // processGesturesInOrder.
-      void this.processGesturesInOrder(side, gestures, nextDeviceStatus[side].targetTemperatureF);
+      void this.processGesturesInOrder(side, gestures, readTarget);
     } catch (error) {
       logger.error(error);
     }
@@ -282,19 +290,21 @@ export class FrankenMonitor {
 
   // A target that moved while the side stayed on, and that Nightstand did not
   // send, was changed on the bed itself: a Pod 5 hub acts on cover clicks.
-  private noteHubChanges(nextDeviceStatus: DeviceStatus) {
-    for (const side of ['left', 'right'] as const) {
-      const before = this.deviceStatus?.[side];
-      const after = nextDeviceStatus[side];
-      if (!before?.isOn || !after.isOn || before.targetTemperatureF === after.targetTemperatureF) continue;
-      // Anything sent since the previous read is ours, however long the reads were failing.
-      if (wasSentSince(side, after.targetTemperatureF, this.readAt - SENT_SLACK_MS)
-        || this.writtenTargets[side]?.written.has(after.targetTemperatureF)) continue;
-      logger.info(`[frankenMonitor] ${side} target changed on the bed: ${before.targetTemperatureF} -> ${after.targetTemperatureF} F`);
-      markManualTempChange(side, {
-        targetF: after.targetTemperatureF, fromF: before.targetTemperatureF, on: true, setsOn: false, source: 'tap',
-      }).catch(error => logger.error(`Failed to note the ${side} side's change: ${error instanceof Error ? error.message : String(error)}`));
-    }
+  // Returns the target before that change.
+  private hubStepFrom(nextDeviceStatus: DeviceStatus, side: Side): number | null {
+    const before = this.deviceStatus?.[side];
+    const after = nextDeviceStatus[side];
+    if (!before?.isOn || !after.isOn || before.targetTemperatureF === after.targetTemperatureF) return null;
+    // Anything sent since the previous read is ours, however long the reads were failing.
+    if (wasSentSince(side, after.targetTemperatureF, this.readAt - SENT_SLACK_MS)
+      || this.writtenTargets[side]?.written.has(after.targetTemperatureF)) return null;
+    return before.targetTemperatureF;
+  }
+
+  private noteHubChange(side: Side, fromF: number, targetF: number) {
+    logger.info(`[frankenMonitor] ${side} target changed on the bed: ${fromF} -> ${targetF} F`);
+    markManualTempChange(side, { targetF, fromF, on: true, setsOn: false, source: 'tap' })
+      .catch(error => logger.error(`Failed to note the ${side} side's change: ${error instanceof Error ? error.message : String(error)}`));
   }
 
   // Not async: it awaits nothing, and an async function called without await
@@ -305,10 +315,11 @@ export class FrankenMonitor {
       return;
     }
 
-    this.noteHubChanges(nextDeviceStatus);
+    // Read before settling, which forgets targets the gestures wrote.
+    const hubFrom = { left: this.hubStepFrom(nextDeviceStatus, 'left'), right: this.hubStepFrom(nextDeviceStatus, 'right') };
     this.settleWrittenTargets(nextDeviceStatus);
-    this.processGesturesForSide(nextDeviceStatus, 'left');
-    this.processGesturesForSide(nextDeviceStatus, 'right');
+    this.processGesturesForSide(nextDeviceStatus, 'left', hubFrom.left);
+    this.processGesturesForSide(nextDeviceStatus, 'right', hubFrom.right);
   }
 
   // Cheap deep-equality for the status payload. The shape is stable so a

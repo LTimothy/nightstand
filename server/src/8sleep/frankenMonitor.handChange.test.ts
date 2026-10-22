@@ -151,4 +151,20 @@ describe('cover taps as hand changes', () => {
     await new Promise(resolve => setTimeout(resolve, 5));
     assert.deepEqual(changes, [['left', { targetF: 76, fromF: 77, on: true, setsOn: false, source: 'tap' }]]);
   });
+
+  it('steps a tap from before the hub\'s own step when both land in one read, and notes it once', async () => {
+    changes.length = 0;
+    await settingsDB.read();
+    settingsDB.data.left.taps.tripleTap = { type: 'temperature', change: 'increment', amount: 2 };
+    await settingsDB.write();
+    const monitor = new FrankenMonitor() as unknown as Internals;
+    const before = status(83, 0);
+    monitor.deviceStatus = before;
+    const after = status(86, 0);
+    after.left.taps = { doubleTap: 0, tripleTap: 1, quadTap: 0 };
+    before.left.taps = { doubleTap: 0, tripleTap: 0, quadTap: 0 };
+    monitor.processGestures(after);
+    for (let i = 0; i < 20 && changes.length === 0; i++) await new Promise(resolve => setTimeout(resolve, 5));
+    assert.deepEqual(changes, [['left', { targetF: 85, fromF: 83, on: true, setsOn: false, source: 'tap' }]]);
+  });
 });
