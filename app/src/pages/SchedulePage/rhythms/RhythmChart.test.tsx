@@ -42,6 +42,12 @@ describe('the chart on a rhythm card', () => {
     expect(document.getElementById('caption')).toBeEmptyDOMElement();
   });
 
+  it('says only how many nights until five can be drawn, never that they match', () => {
+    const held = { ...night(dates[4]), sets: [{ at: at(dates[4], 8), temperatureF: null }] };
+    draw([...dates.slice(0, 4).map(date => night(date)), held]);
+    expect(document.getElementById('caption')).toHaveTextContent(/^5 nights so far\.$/);
+  });
+
   it('draws where a typical night differs as a tinted block with a dashed edge, its value inside, and says so', () => {
     const log = dates.map((date, index) => night(date, index < 4 ? [change(date, 0.75, 79), change(date, 6.5, 84, 79)] : []));
     const { container } = draw(log);

@@ -29,7 +29,7 @@ const stroke = { fill: 'none', strokeLinejoin: 'round', vectorEffect: 'non-scali
 const axisText = { variant: 'caption', color: 'text.secondary', sx: { lineHeight: '12px', fontSize: 12 } } as const;
 
 export default function RhythmChart({ rhythm, log, today, timeZone, format, trackingOn, captionId }: Props) {
-  const { endMin, loF, hiF, plan, nights, blocks } = useMemo(() => rhythmOverlay({ rhythm, log, today, timeZone, trackingOn }),
+  const { endMin, loF, hiF, plan, nights, drawn, blocks } = useMemo(() => rhythmOverlay({ rhythm, log, today, timeZone, trackingOn }),
     [rhythm, log, today, timeZone, trackingOn]);
   const { on } = rhythm.night.power;
   const smart = rhythm.temperatureMode === 'smart';
@@ -103,7 +103,8 @@ export default function RhythmChart({ rhythm, log, today, timeZone, format, trac
     </Box>
     { /* Always rendered, so the card's aria-describedby never points at nothing. */ }
     <Typography id={ captionId } variant="caption" color="text.secondary" sx={ { display: 'block', mt: nights > 0 ? 1 : 0 } }>
-      { nights > 0 && (nights < MIN_NIGHTS ? nightsSoFar(nights) : typicalNightText(blocks, on, format, smart)) }
+      { /* Compared only once five nights can be drawn, so a match is never claimed unchecked. */ }
+      { nights > 0 && (drawn < MIN_NIGHTS ? nightsSoFar(nights) : typicalNightText(blocks, on, format, smart)) }
     </Typography>
   </Box>;
 }

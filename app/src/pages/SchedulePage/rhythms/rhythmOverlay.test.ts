@@ -22,7 +22,7 @@ const overlay = (log: NightLog[]) => rhythmOverlay({ ...args, log });
 
 describe('the chart on a rhythm card', () => {
   it('draws the schedule in steps over the rhythm\'s own length', () => {
-    expect(overlay([])).toEqual({ endMin: 480, plan: [{ x: 0, f: 82 }, { x: 240, f: 79 }], nights: 0, blocks: [], loF: 75, hiF: 86 });
+    expect(overlay([])).toEqual({ endMin: 480, plan: [{ x: 0, f: 82 }, { x: 240, f: 79 }], nights: 0, drawn: 0, blocks: [], loF: 75, hiF: 86 });
   });
 
   it('draws a change half or more of the nights made, and never a one-off', () => {
@@ -69,6 +69,11 @@ describe('the chart on a rhythm card', () => {
     const log = [...dates.slice(0, 3).map(short), night(dates[3], [change(dates[3], 5.5, 70, 79)]),
       night(dates[4], [change(dates[4], 5.5, 70, 79)]), night(dates[5])];
     expect(overlay(log).blocks).toEqual([]);
+  });
+
+  it('counts a night with nothing written to draw, as the notes do', () => {
+    const held = night(dates[1], [], { sets: [{ at: at(dates[1], 8), temperatureF: null }] });
+    expect(overlay([night(dates[0]), held])).toMatchObject({ nights: 2, drawn: 1 });
   });
 
   it('counts the last 14 nights and widens the range to the typical night', () => {

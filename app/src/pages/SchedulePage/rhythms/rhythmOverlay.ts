@@ -15,7 +15,7 @@ export const BLOCK_OPACITY = 0.22;
 // `farF` is the schedule's value farthest from `f` inside it. `turned` is how the typical night moved at `from`,
 // null when it held still and the schedule moved instead.
 export type Block = { from: number; to: number; f: number; farF: number; schedule: Step[]; turned: 'down' | 'up' | null };
-export type Overlay = { endMin: number; loF: number; hiF: number; plan: Step[]; nights: number; blocks: Block[] };
+export type Overlay = { endMin: number; loF: number; hiF: number; plan: Step[]; nights: number; drawn: number; blocks: Block[] };
 type Args = { rhythm: Rhythm; log: NightLog[]; today: string; timeZone: string; trackingOn: boolean };
 type Night = { points: Step[]; end: number };
 
@@ -104,19 +104,20 @@ export function rhythmOverlay(args: Args): Overlay {
   const endMin = nightMinutes(rhythm.night.power);
   const plan = schedule(args, endMin);
   // The notes' own rule: a night left out or under another plan does not count.
-  const nights = log.filter(night => night.rhythmId === rhythm.id && !night.tonight && !night.excluded && night.samePlan !== false)
+  const counted = log.filter(night => night.rhythmId === rhythm.id && !night.tonight && !night.excluded && night.samePlan !== false)
     .sort((a, b) => b.date.localeCompare(a.date))
-    .flatMap(night => {
-      const drawn = nightLine(night, wallClock(night.date, rhythm.night.power.on, timeZone).getTime(), endMin);
-      return drawn ? [drawn] : [];
-    })
     .slice(0, WINDOW_NIGHTS);
+  // A night with nothing written to draw (a held temperature at power-on) still counts, as in the notes.
+  const nights = counted.flatMap(night => {
+    const drawn = nightLine(night, wallClock(night.date, rhythm.night.power.on, timeZone).getTime(), endMin);
+    return drawn ? [drawn] : [];
+  });
   const blocks = nights.length >= MIN_NIGHTS && plan.length ? differences(typicalNight(nights, plan, endMin), plan, endMin) : [];
   const planned = plan.map(step => step.f);
   const typical = blocks.map(block => block.f);
   // The schedule's values and RANGE_F either way, widened to the typical night where it is drawn.
   return {
-    endMin, plan, nights: nights.length, blocks,
+    endMin, plan, nights: counted.length, drawn: nights.length, blocks,
     loF: Math.min(Math.min(...planned) - RANGE_F, ...typical),
     hiF: Math.max(Math.max(...planned) + RANGE_F, ...typical),
   };
