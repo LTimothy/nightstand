@@ -49,7 +49,8 @@ export default function TimeSeriesChart({
       <LineChart
         width={ width }
         height={ height }
-        margin={ { top: 12, bottom: 32, left: 38, right: 24 } }
+        // Room for half of the last time label, which the axis centres on its tick.
+        margin={ { top: 12, bottom: 32, left: 38, right: 30 } }
         colors={ [lineColor] }
         dataset={ data.map((p) => ({ ...p })) }
         xAxis={ [{

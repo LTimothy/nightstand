@@ -25,7 +25,7 @@ it('reserves label space, marks a lone reading, and fixes the time axis to the r
   expect(lineChart.props.xAxis?.[0].tickNumber).toBe(3);
   const showMark = lineChart.props.series?.[0].showMark;
   expect(typeof showMark === 'function' ? showMark({ index: 0 }) : showMark).toBe(true);
-  expect(lineChart.props.margin?.right).toBe(24);
+  expect(lineChart.props.margin?.right).toBe(30);
 });
 
 it('passes a missing reading through as a break in the line, with nothing drawn behind it', () => {

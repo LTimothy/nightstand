@@ -32,6 +32,8 @@ test('week strip days are at least 44px wide at 320px', async ({ page }) => {
 });
 
 test('expanded measurements fit a 320px screen without widening the page', async ({ page }) => {
+  // The demo night follows the clock, so its last axis label moves; this time put it at the edge.
+  await page.clock.install({ time: new Date('2026-10-22T18:08:00Z') });
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto('/sleep?metric=heart_rate');
   const chart = page.getByRole('region').getByRole('img');
