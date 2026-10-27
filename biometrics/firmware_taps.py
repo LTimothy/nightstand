@@ -1,4 +1,4 @@
-"""Tap and button candidates for diagnostics only, without action dispatch."""
+"""Tap and button candidates parsed from firmware records, without action dispatch."""
 import re
 
 

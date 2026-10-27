@@ -80,6 +80,18 @@ class DeliveryBoundsTest(unittest.TestCase):
         self.assertEqual(delivery.pending.get_nowait()['timestamp'], 244)
         self.assertTrue(delivery.wake.is_set())
 
+    def test_button_taps_queue_without_tap_diagnostics_and_wake_delivery(self):
+        delivery = self.delivery({})
+        delivery.ingest({'type': 'buttonEvent', 'ts': 100, 'right': {'top': 2}}, 'RAW', 100)
+        self.assertEqual(delivery.pending.qsize(), 1)
+        self.assertEqual(delivery.pending.get_nowait()['count'], 2)
+        self.assertTrue(delivery.wake.is_set())
+
+    def test_other_taps_still_need_tap_diagnostics(self):
+        delivery = self.delivery({})
+        delivery.ingest({'type': 'tap-gesture', 'ts': 100, 'side': 'left', 'taps': 3}, 'RAW', 100)
+        self.assertTrue(delivery.pending.empty())
+
     def test_each_kind_requires_its_own_flag(self):
         delivery = self.delivery({'tapDiagnostics': True})
         delivery.ingest({'type': 'log', 'ts': 100, 'msg': 'FS_WRITE_FAIL: 1'}, 'RAW', 100)

@@ -95,7 +95,7 @@ class FirmwareDelivery:
     def ingest(self, record, source, received_at=None):
         now = time.time() if received_at is None else received_at
         self.refresh(now)
-        if not any(self.flags.get(key) is True for key in FEATURES):
+        if not any(self.flags.get(key) is True for key in FEATURES) and not (isinstance(record, dict) and record.get('type') == 'buttonEvent'):
             return
         records = normalize_record(record, source, now)
         for sample in records:
@@ -103,7 +103,8 @@ class FirmwareDelivery:
                 continue
             if sample['kind'] in ('water', 'pump') and self.flags.get('coolingWarning') is not True:
                 continue
-            if sample['kind'] == 'tap' and self.flags.get('tapDiagnostics') is not True:
+            button = sample['kind'] == 'tap' and sample.get('origin') == 'buttonEvent'
+            if sample['kind'] == 'tap' and not button and self.flags.get('tapDiagnostics') is not True:
                 continue
             if sample['kind'] == 'health' and self.flags.get('firmwareHealth') is not True:
                 continue
@@ -122,7 +123,7 @@ class FirmwareDelivery:
                     self.pending.put_nowait(sample)
                 except queue.Full:
                     pass
-            if sample.get('code') in ('write-failures', 'samples-dropped'):
+            if button or sample.get('code') in ('write-failures', 'samples-dropped'):
                 self.wake.set()
         if records and not self.started:
             self.started = True
