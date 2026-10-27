@@ -49,3 +49,13 @@ it('strictly validates nested values and the batch byte bound', async () => {
   assert.equal((await post({ session: 'a'.repeat(32), records: [record] })).status, 204);
   assert.equal((await post({ session: 'a'.repeat(32), records: [{ ...record, arbitrary: 'text' }] })).status, 400);
 });
+
+it('feeds button click counts to the registry even with tapDiagnostics off', async () => {
+  const { claimClicks, resetClickCounts } = await import('../../8sleep/clickCounts.js');
+  resetClickCounts();
+  const now = Math.floor(Date.now() / 1000);
+  const record = { kind: 'tap', origin: 'buttonEvent', side: 'right', control: 'top', count: 3,
+    timestamp: now, receivedAt: now, source: 'RAW', sequence: null, index: 0 };
+  assert.equal((await post({ session: 'a'.repeat(32), records: [record] })).status, 204);
+  assert.equal(claimClicks('right', 'tripleTap', now, now), 3);
+});
