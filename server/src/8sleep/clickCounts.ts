@@ -73,4 +73,5 @@ export function resetClickCounts() {
   records = [];
   pending = [];
   done = new Map();
+  listeners.clear();
 }
