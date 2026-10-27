@@ -10,6 +10,9 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Fixes
 
+- Quick cover clicks on a Pod 5 now step the temperature once per click,
+  using the click count from the Pod's own button log. This needs Biometrics
+  on; with it off, a quick burst still steps once.
 - The last time label on the sleep charts no longer runs 2px past the edge
   of a 320px screen.
 
