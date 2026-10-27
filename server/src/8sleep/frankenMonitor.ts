@@ -36,6 +36,7 @@ const POLL_MS = 2_000;
 // How long a target written by a gesture stays the base for the next one
 // when the Pod has not reported it yet. Past this the latest read wins, so a
 // write the Pod refused cannot keep steering gestures.
+const MAX_TAPS_PER_READ = 5;
 const WRITTEN_TARGET_MS = 10_000;
 // A write sent this long before the previous read may still have reached the
 // Pod after it, so it counts as ours when a later read shows it.
@@ -266,7 +267,11 @@ export class FrankenMonitor {
         // would act on the bed with nobody touching it.
         if (typeof current !== 'number') continue;
         this.lastTaps[side][gesture] = current;
-        if (previous !== undefined && current > previous) gestures.push(gesture);
+        // Clicks less than a read apart arrive as one jump; each gets its own step.
+        // Capped so a misread counter cannot run the bed to the end of its range.
+        if (previous !== undefined && current > previous) {
+          for (let n = Math.min(current - previous, MAX_TAPS_PER_READ); n > 0; n--) gestures.push(gesture);
+        }
       }
       if (gestures.length === 0) {
         if (hubFromF !== null) this.noteHubChange(side, hubFromF, nextDeviceStatus[side].targetTemperatureF);

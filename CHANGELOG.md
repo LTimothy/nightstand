@@ -8,6 +8,13 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+### Fixes
+
+- Cover clicks less than a second apart now each step the temperature.
+  Before, two quick clicks on a Pod 5 often moved it only one step.
+- The last time label on the sleep charts no longer runs 2px past the edge
+  of a 320px screen.
+
 ## [3.7.0] - 2026-10-19
 
 Adds suggestions from your hand changes, editors for tap gestures and cover buttons, firmware readouts and fewer flash writes, and keeps the scripts and files root uses where only root can write.
