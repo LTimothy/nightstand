@@ -361,6 +361,7 @@ describe('FrankenMonitor gestures in one read', () => {
 
   it('steps the second gesture from the target the first one wrote', async () => {
     await runGestureTick(deviceStatus(taps(1, 1)), deviceStatus(taps(2, 2)));
+    await writesFinished(2);
 
     assert.deepEqual(writtenLeftTargets, [80, 90]);
   });
@@ -369,6 +370,7 @@ describe('FrankenMonitor gestures in one read', () => {
     settingsDB.data.left.taps.doubleTap = { type: 'set_temperature', temperatureF: 75 };
     await settingsDB.write();
     await runGestureTick(deviceStatus(taps(1, 1)), deviceStatus(taps(2, 2)));
+    await writesFinished(2);
 
     assert.deepEqual(writtenLeftTargets, [75, 85]);
   });
