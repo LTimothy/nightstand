@@ -54,3 +54,17 @@ it('a record with no tap never fires', () => {
   noteButtonTap(tap(T, 3, 'bottom'), T);
   assert.deepEqual(calls, []);
 });
+
+it('keeps adjacent press groups apart', () => {
+  noteButtonTap(tap(T, 3), T);
+  noteButtonTap(tap(T + 1, 2), T + 1);
+  assert.equal(claimClicks('right', 'tripleTap', T + 1, T + 1), 2);
+  assert.equal(claimClicks('right', 'tripleTap', T, T + 1), 3);
+});
+
+it('ignores a record posted again after it was claimed', () => {
+  noteButtonTap(tap(T, 3), T);
+  assert.equal(claimClicks('right', 'tripleTap', T, T), 3);
+  noteButtonTap(tap(T, 3), T);
+  assert.equal(claimClicks('right', 'tripleTap', T + 1, T + 1), undefined);
+});
