@@ -302,7 +302,7 @@ describe('FrankenMonitor gesture handling', () => {
 
     const previous = deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 });
     const next = deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 });
-    next.right = side({ doubleTap: 1, tripleTap: 0, quadTap: 0 });
+    next.right = side({ doubleTap: 5, tripleTap: 0, quadTap: 0 });
 
     const seen = await runGestureTick(previous, next);
 

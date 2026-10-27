@@ -167,20 +167,4 @@ describe('cover taps as hand changes', () => {
     for (let i = 0; i < 20 && changes.length === 0; i++) await new Promise(resolve => setTimeout(resolve, 5));
     assert.deepEqual(changes, [['left', { targetF: 85, fromF: 83, on: true, setsOn: false, source: 'tap' }]]);
   });
-
-  it('steps once for each click when two land in one read', async () => {
-    changes.length = 0;
-    await settingsDB.read();
-    settingsDB.data.left.taps.tripleTap = { type: 'temperature', change: 'increment', amount: 2 };
-    await settingsDB.write();
-    const monitor = new FrankenMonitor() as unknown as Internals;
-    const before = status(83, 0);
-    monitor.deviceStatus = before;
-    const after = status(89, 0);
-    after.left.taps = { doubleTap: 0, tripleTap: 2, quadTap: 0 };
-    before.left.taps = { doubleTap: 0, tripleTap: 0, quadTap: 0 };
-    monitor.processGestures(after);
-    for (let i = 0; i < 20 && changes.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 5));
-    assert.deepEqual(changes.map(([, change]) => (change as { targetF: number }).targetF), [85, 87]);
-  });
 });

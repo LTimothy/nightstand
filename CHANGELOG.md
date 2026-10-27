@@ -10,8 +10,6 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Fixes
 
-- Cover clicks less than a second apart now each step the temperature.
-  Before, two quick clicks on a Pod 5 often moved it only one step.
 - The last time label on the sleep charts no longer runs 2px past the edge
   of a 320px screen.
 
