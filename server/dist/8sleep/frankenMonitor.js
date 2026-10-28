@@ -17,6 +17,7 @@ import { BASE_PRESETS } from './basePresets.js';
 import eventBus from '../events/eventBus.js';
 import { waterLevelTracker } from './waterLevel.js';
 import { handleAlarmTap } from './tapAlarm.js';
+import { claimClicks, markPending, onLateClicks } from './clickCounts.js';
 export { lastDeviceStatus } from './lastDeviceStatus.js';
 // Pod 4+ only: gestures and the 2s cadence are the only path. The Pod 3
 // 60s slow-poll branch was removed alongside the WebSocket initiative.
@@ -52,6 +53,9 @@ export class FrankenMonitor {
     // the firmware reports a held cover button as a tap, -24 then -16 were
     // written back to back from a read of -24 instead of stacking.
     writtenTargets = {};
+    // One chain per side, so steps from a late click count never overlap a read's steps.
+    sideChains = { left: Promise.resolve(), right: Promise.resolve() };
+    stopLateClicks;
     constructor() {
         this.isRunning = false;
         this.deviceStatus = undefined;
@@ -62,6 +66,16 @@ export class FrankenMonitor {
             return;
         }
         this.isRunning = true;
+        this.stopLateClicks = onLateClicks((side, gesture, extra) => {
+            try {
+                if (!this.deviceStatus)
+                    return;
+                this.queueGestures(side, Array(extra).fill(gesture), this.deviceStatus[side].targetTemperatureF);
+            }
+            catch (error) {
+                logger.error(`Failed to queue late ${gesture} clicks on the ${side} side: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        });
         this.frankenLoop().catch(error => {
             logger.error(error);
             this.markStatus('failed', String(error));
@@ -72,6 +86,8 @@ export class FrankenMonitor {
             return;
         logger.debug('Stopping FrankenMonitor loop');
         this.isRunning = false;
+        this.stopLateClicks?.();
+        this.stopLateClicks = undefined;
     }
     setDeviceStatus(next) {
         this.deviceStatus = next;
@@ -220,6 +236,11 @@ export class FrankenMonitor {
             }
         }
     }
+    queueGestures(side, gestures, readTarget) {
+        this.sideChains[side] = this.sideChains[side]
+            .then(() => this.processGesturesInOrder(side, gestures, readTarget))
+            .catch(error => { logger.error(error); });
+    }
     // `hubFromF` is the target before a change the hub made by itself in this read, if any.
     processGesturesForSide(nextDeviceStatus, side, hubFromF = null) {
         try {
@@ -236,7 +257,19 @@ export class FrankenMonitor {
                 if (typeof current !== 'number')
                     continue;
                 this.lastTaps[side][gesture] = current;
-                if (previous !== undefined && current > previous)
+                if (previous === undefined || current <= previous)
+                    continue;
+                // Counters are the time of the last tap, not a count, so a jump is one press group.
+                let clicks = 1;
+                if (settingsDB.data[side]?.taps?.[gesture]?.type === 'temperature') {
+                    const now = Date.now() / 1000;
+                    const count = claimClicks(side, gesture, current, now);
+                    if (count === undefined)
+                        markPending(side, gesture, current, now);
+                    else
+                        clicks = Math.max(1, count);
+                }
+                for (let i = 0; i < clicks; i++)
                     gestures.push(gesture);
             }
             if (gestures.length === 0) {
@@ -254,7 +287,7 @@ export class FrankenMonitor {
             // rejection, and an unhandled one takes the whole server down (the
             // process-level handler shuts it down), so each gesture is caught in
             // processGesturesInOrder.
-            void this.processGesturesInOrder(side, gestures, readTarget);
+            this.queueGestures(side, gestures, readTarget);
         }
         catch (error) {
             logger.error(error);

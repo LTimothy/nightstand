@@ -4,6 +4,7 @@ import { FirmwareBatchSchema } from '../../firmware/firmwareSchema.js';
 import { firmwareTelemetry, firmwareHealthSummary } from '../../firmware/firmwareRuntime.js';
 import settingsDB from '../../db/settings.js';
 import servicesDB from '../../db/services.js';
+import { noteButtonTap } from '../../8sleep/clickCounts.js';
 export const isLoopback = (address) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address ?? '');
 export function createFirmwareRouter(store, readConfig) {
     const router = express.Router();
@@ -21,6 +22,11 @@ export function createFirmwareRouter(store, readConfig) {
         if (!parsed.success) {
             res.status(400).json({ error: 'Invalid firmware telemetry' });
             return;
+        }
+        const nowSeconds = Date.now() / 1000;
+        for (const record of parsed.data.records) {
+            if (record.kind === 'tap' && record.origin === 'buttonEvent')
+                noteButtonTap(record, nowSeconds);
         }
         const config = await readConfig();
         if (config.enabled)

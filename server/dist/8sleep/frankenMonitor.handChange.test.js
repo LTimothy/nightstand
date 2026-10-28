@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { before, describe, it, mock } from 'node:test';
+import { before, beforeEach, describe, it, mock } from 'node:test';
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -38,10 +38,12 @@ let FrankenMonitor;
 let lastDeviceStatus;
 let settingsDB;
 let noteSentTarget;
+let clickCounts;
 before(async () => {
     ({ FrankenMonitor, lastDeviceStatus } = await import('./frankenMonitor.js'));
     ({ default: settingsDB } = await import('../db/settings.js'));
     ({ noteSentTarget } = await import('./sentTargets.js'));
+    clickCounts = await import('./clickCounts.js');
 });
 const sideStatus = (targetTemperatureF, doubleTap) => ({
     currentTemperatureLevel: 0, currentTemperatureF: 80, targetTemperatureF, secondsRemaining: 0, isOn: true,
@@ -154,6 +156,103 @@ describe('cover taps as hand changes', () => {
         for (let i = 0; i < 20 && changes.length === 0; i++)
             await new Promise(resolve => setTimeout(resolve, 5));
         assert.deepEqual(changes, [['left', { targetF: 85, fromF: 83, on: true, setsOn: false, source: 'tap' }]]);
+    });
+});
+describe('cover clicks with the firmware\'s click count', () => {
+    const PREVIOUS = 1793101537;
+    const TAP = 1793122973;
+    const read = (leftTripleTap, rightTripleTap = PREVIOUS) => {
+        const next = status(80, 0);
+        next.left.taps = { doubleTap: 0, tripleTap: leftTripleTap, quadTap: 0 };
+        next.right = sideStatus(80, 0);
+        next.right.taps = { doubleTap: 0, tripleTap: rightTripleTap, quadTap: 0 };
+        return next;
+    };
+    const record = (side, count) => clickCounts.noteButtonTap({ side, control: 'top', count, timestamp: TAP }, Date.now() / 1000);
+    const writes = (side) => changes.filter(([changed]) => changed === side).map(([, change]) => change.targetF);
+    // Waits for at least `count` writes, then a little longer so extra ones would show.
+    const writesFinished = async (count) => {
+        for (let i = 0; i < 200 && changes.length < count; i++)
+            await new Promise(resolve => setTimeout(resolve, 5));
+        await new Promise(resolve => setTimeout(resolve, 50));
+    };
+    const started = async () => {
+        const first = read(PREVIOUS);
+        reads = [first];
+        onRead = () => { };
+        const monitor = new FrankenMonitor();
+        await monitor.start();
+        for (let i = 0; i < 200 && lastDeviceStatus() !== first; i++)
+            await new Promise(resolve => setTimeout(resolve, 5));
+        assert.equal(lastDeviceStatus(), first);
+        return monitor;
+    };
+    beforeEach(async () => {
+        changes.length = 0;
+        clickCounts.resetClickCounts();
+        await settingsDB.read();
+        settingsDB.data.left.taps.tripleTap = { type: 'temperature', change: 'increment', amount: 1 };
+        settingsDB.data.right.taps.tripleTap = { type: 'temperature', change: 'increment', amount: 1 };
+        await settingsDB.write();
+    });
+    it('steps once for a timestamp jump of minutes with no record', async () => {
+        const monitor = new FrankenMonitor();
+        monitor.deviceStatus = read(PREVIOUS);
+        monitor.processGestures(read(TAP));
+        await writesFinished(1);
+        assert.deepEqual(writes('left'), [81]);
+    });
+    it('steps by the count of a record that arrived first', async () => {
+        const monitor = new FrankenMonitor();
+        monitor.deviceStatus = read(PREVIOUS);
+        record('left', 3);
+        monitor.processGestures(read(TAP));
+        await writesFinished(3);
+        assert.deepEqual(writes('left'), [81, 82, 83]);
+    });
+    it('adds the rest when the record arrives after the step', async () => {
+        const monitor = await started();
+        try {
+            monitor.processGestures(read(TAP));
+            await writesFinished(1);
+            assert.deepEqual(writes('left'), [81]);
+            record('left', 3);
+            await writesFinished(3);
+            assert.deepEqual(writes('left'), [81, 82, 83]);
+        }
+        finally {
+            monitor.stop();
+        }
+    });
+    it('runs a set temperature tap once whatever the count', async () => {
+        settingsDB.data.left.taps.tripleTap = { type: 'set_temperature', temperatureF: 75 };
+        await settingsDB.write();
+        const monitor = new FrankenMonitor();
+        monitor.deviceStatus = read(PREVIOUS);
+        record('left', 3);
+        monitor.processGestures(read(TAP));
+        await writesFinished(1);
+        assert.deepEqual(writes('left'), [75]);
+    });
+    it('a record alone steps nothing', async () => {
+        const monitor = await started();
+        try {
+            record('left', 3);
+            await writesFinished(1);
+            assert.deepEqual(changes, []);
+        }
+        finally {
+            monitor.stop();
+        }
+    });
+    it('steps only the side the record names', async () => {
+        const monitor = new FrankenMonitor();
+        monitor.deviceStatus = read(PREVIOUS);
+        record('right', 2);
+        monitor.processGestures(read(TAP, TAP));
+        await writesFinished(3);
+        assert.deepEqual(writes('left'), [81]);
+        assert.deepEqual(writes('right'), [81, 82]);
     });
 });
 //# sourceMappingURL=frankenMonitor.handChange.test.js.map
