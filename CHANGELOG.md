@@ -8,6 +8,10 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+## [3.7.1] - 2026-10-28
+
+Steps the temperature once for each quick cover click and keeps a chart label inside small screens.
+
 ### Fixes
 
 - Quick cover clicks on a Pod 5 now step the temperature once per click,
@@ -15,6 +19,8 @@ is a hard fork; for the history of the projects it descends from, see
   on; with it off, a quick burst still steps once.
 - The last time label on the sleep charts no longer runs 2px past the edge
   of a 320px screen.
+
+Checked on: Pod 5, quick-click bursts of 1, 2, 3 and 5 presses each stepped exactly once per press; rolled-back 3.7.0 soaked nights 10-21 to 10-27.
 
 ## [3.7.0] - 2026-10-19
 
