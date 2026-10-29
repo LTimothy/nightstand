@@ -135,10 +135,13 @@ personal and network details.
 
 | Pod | What to expect |
 | --- | --- |
-| Pod 5 | I have used it nightly since July 2026. Some units on newer firmware have a locked bootloader; see [issue #6](https://github.com/LTimothy/nightstand/issues/6). |
+| Pod 5 | I have used it nightly since July 2026. |
 | Pod 3, Pod 4 | Supported by free-sleep, not tested with Nightstand. |
 | Pod 1, Pod 2 | Not supported. |
 | Pod 6 | Unknown. |
+
+> [!CAUTION]
+> Some Pod 5 units on newer firmware have a locked bootloader. See [issue #6](https://github.com/LTimothy/nightstand/issues/6).
 
 One Pod 3 owner's reports led to three fixes; only the first is confirmed
 on that Pod. The adjustable base controls are untested, because I have no
