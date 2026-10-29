@@ -135,7 +135,7 @@ personal and network details.
 
 | Pod | What to expect |
 | --- | --- |
-| Pod 5 | I have used it nightly since July 2026. |
+| Pod 5 | I have used it nightly since July 2026. Some units on newer firmware have a locked bootloader; see [issue #6](https://github.com/LTimothy/nightstand/issues/6). |
 | Pod 3, Pod 4 | Supported by free-sleep, not tested with Nightstand. |
 | Pod 1, Pod 2 | Not supported. |
 | Pod 6 | Unknown. |
