@@ -63,6 +63,13 @@ for your model. On a Pod 5 there is no tested way back.
   Pod where the water tubes plug in) and Pod 4: supported by upstream
   free-sleep.
 - Pod 5: the model I use and test on.
+
+> [!CAUTION]
+> Some Pod 5 units on newer firmware have a locked bootloader that blocks
+> installation at step 4. Units kept offline before the update are not affected.
+> See [issue #6](https://github.com/LTimothy/nightstand/issues/6) for the
+> current state.
+
 - Pod 6: unknown.
 
 ## Tools required
@@ -136,6 +143,12 @@ open the device, check the name again.
 ![minicom](docs/installation/0_minicom.png)
 
 ### 4. Plug the power into the Pod
+
+> [!CAUTION]
+> Some Pod 5 units on newer firmware do not show `Hit any key to stop autoboot`
+> and boot straight through. If yours does, **stop here**. There is no software
+> workaround yet. See [issue #6](https://github.com/LTimothy/nightstand/issues/6)
+> for the current state.
 
 Plug in the Pod's power and watch minicom. When `Hit any key to stop autoboot`
 appears, press a key (Ctrl+C works). If you miss it and the Pod keeps booting,
