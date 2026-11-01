@@ -351,9 +351,15 @@ function candidatesOf(night: DailySchedule, clusters: Cluster[]): Candidate[] {
   return candidates.sort((a, b) => a.at - b.at || a.offset - b.offset);
 }
 
-function evidenceOf(direction: Direction, key: string, supporting: Vote[]) {
-  const dates = supporting.map(vote => vote.date).sort();
-  return { key, direction, supporting: dates.length, firstNight: dates[0], lastNight: dates[dates.length - 1], supportingDates: dates };
+// A base row's votes are levels, not temperatures, so it carries no votes.
+function evidenceOf(direction: Direction, key: string, supporting: Vote[], withVotes = true) {
+  const ordered = [...supporting].sort((a, b) => a.date.localeCompare(b.date));
+  const dates = ordered.map(vote => vote.date);
+  const votes = ordered.map(vote => ({ date: vote.date, offsetMin: vote.offset, temperatureF: vote.value }));
+  return {
+    key, direction, supporting: dates.length, firstNight: dates[0], lastNight: dates[dates.length - 1],
+    supportingDates: dates, ...(withVotes ? { votes } : {}),
+  };
 }
 
 // The editor's own limits: strictly inside the night, and no new step past the cap.
@@ -452,7 +458,7 @@ export function placeSmart(rhythm: Rhythm, evidence: Evidence, gate: Gate): Plac
   const current = rhythm.smart.baseLevel;
   const baseLevel = Math.max(-10, Math.min(10, current + (top.direction === 'down' ? -BASE_STEP : BASE_STEP)));
   if (baseLevel === current) return { rows: [], stages: ['too-small'], changed: votes.length };
-  const row: SuggestionRow = { kind: 'base', ...evidenceOf(top.direction, key, top.supporting), baseLevel, currentBaseLevel: current };
+  const row: SuggestionRow = { kind: 'base', ...evidenceOf(top.direction, key, top.supporting, false), baseLevel, currentBaseLevel: current };
   return { rows: [{ row, at: 0 }], stages: [], changed: votes.length };
 }
 
