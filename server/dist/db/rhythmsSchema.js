@@ -92,6 +92,7 @@ export const RhythmsLiveSchema = z.object({
 }).strict();
 export const RhythmsLiveResponseSchema = RhythmsLiveSchema.nullable();
 export const RhythmsLiveQuerySchema = z.object({ side: SideSchema }).strict();
+export const VoteSchema = z.object({ date: IsoDateSchema, offsetMin: z.number().int().min(0), temperatureF: TemperatureSchema }).strict();
 // GET /rhythms/suggestions, and the bodies that hide, restore and exclude.
 const Evidence = {
     key: z.string().max(24),
@@ -101,6 +102,8 @@ const Evidence = {
     lastNight: IsoDateSchema,
     // The review chart draws these nights from the log.
     supportingDates: z.array(IsoDateSchema).max(WINDOW_NIGHTS),
+    // One per supporting night, in date order; absent from an older server.
+    votes: z.array(VoteSchema).max(WINDOW_NIGHTS).optional(),
 };
 export const ThenBackSchema = z.object({
     time: TimeSchema, temperatureF: TemperatureSchema, supporting: z.number().int().min(1), replaces: TimeSchema.optional(),

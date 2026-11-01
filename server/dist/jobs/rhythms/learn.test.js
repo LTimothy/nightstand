@@ -192,6 +192,11 @@ describe('clusters', () => {
         const [cluster] = clusterEpisodes(episodesOf([change(0, 60, 82, 78), change(0, 80, 78, 80)]));
         assert.deepEqual(cluster.votes, [{ date: dateOf(0), direction: 'down', value: 80, offset: 60, from: 82 }]);
     });
+    it('times a cooler vote at its first cooler change, not an earlier warmer tap', () => {
+        const lines = [change(0, 81, 79, 82), change(0, 177, 82, 78), change(0, 180, 78, 76)];
+        const [cluster] = clusterEpisodes(episodesOf(lines));
+        assert.deepEqual(cluster.votes, [{ date: dateOf(0), direction: 'down', value: 76, offset: 177, from: 79 }]);
+    });
     it('gives no vote to a press and undo more than 10 minutes apart', () => {
         const [cluster] = clusterEpisodes(episodesOf([change(0, 60, 82, 80), change(0, 75, 80, 82)]));
         assert.deepEqual(cluster.votes, []);
@@ -222,7 +227,9 @@ describe('placing hand-set rows', () => {
         const lines = [...down(9, 150), ...range(0, 8).map(night => change(night, 360, 79, 82))];
         assert.deepEqual(place(HAND, lines, 14).rows.map(placed => placed.row), [{
                 kind: 'step', key: 'step:down', direction: 'down', supporting: 9, firstNight: dateOf(0), lastNight: dateOf(8),
-                supportingDates: range(0, 9).map(dateOf), time: '00:30', temperatureF: 79, plannedF: 82,
+                supportingDates: range(0, 9).map(dateOf),
+                votes: range(0, 9).map(night => ({ date: dateOf(night), offsetMin: 150, temperatureF: 79 })),
+                time: '00:30', temperatureF: 79, plannedF: 82,
                 thenBack: { time: '04:00', temperatureF: 82, supporting: 8 },
             }]);
     });
@@ -248,7 +255,9 @@ describe('placing hand-set rows', () => {
         const lines = [...range(0, 8).map(night => change(night, 5, 82, 80)), ...range(0, 7).map(night => change(night, 300, 80, 82))];
         assert.deepEqual(place(HAND, lines, 12).rows.map(placed => placed.row), [{
                 kind: 'on', key: 'on:down', direction: 'down', supporting: 8, firstNight: dateOf(0), lastNight: dateOf(7),
-                supportingDates: range(0, 8).map(dateOf), temperatureF: 80, plannedF: 82,
+                supportingDates: range(0, 8).map(dateOf),
+                votes: range(0, 8).map(night => ({ date: dateOf(night), offsetMin: 5, temperatureF: 80 })),
+                temperatureF: 80, plannedF: 82,
                 thenBack: { time: '03:00', temperatureF: 82, supporting: 7 },
             }]);
     });
@@ -256,7 +265,9 @@ describe('placing hand-set rows', () => {
         const lines = range(0, 9).map(night => change(night, 165, 79, 77, { plannedF: 79 }));
         assert.deepEqual(place(STEPPED, lines, 14).rows.map(placed => placed.row), [{
                 kind: 'step', key: 'step:down', direction: 'down', supporting: 9, firstNight: dateOf(0), lastNight: dateOf(8),
-                supportingDates: range(0, 9).map(dateOf), time: '00:30', replaces: '00:30', temperatureF: 77, plannedF: 79,
+                supportingDates: range(0, 9).map(dateOf),
+                votes: range(0, 9).map(night => ({ date: dateOf(night), offsetMin: 165, temperatureF: 77 })),
+                time: '00:30', replaces: '00:30', temperatureF: 77, plannedF: 79,
             }]);
     });
     it('drops a change that only sets a saved step a little early', () => {
@@ -329,6 +340,7 @@ describe('Smart Schedule votes', () => {
                 kind: 'base', key: 'base:down', direction: 'down', supporting: 7, firstNight: dateOf(0), lastNight: dateOf(6),
                 supportingDates: range(0, 7).map(dateOf), baseLevel: -1, currentBaseLevel: 0,
             }]);
+        assert.equal('votes' in result.rows[0].row, false);
     });
     it('counts a cooler cool-down change, and a warmer night-level one', () => {
         assert.equal(smartPlace([...nights(5, SMART), ...range(0, 3).map(night => smartChange(night, 'cooldown', 74))], 5).rows.length, 1);
@@ -437,6 +449,13 @@ describe('learning over nights', () => {
         const [row] = entryOf(result)?.rows ?? [];
         assert.deepEqual(row.supportingDates, range(0, 7).map(dateOf));
         assert.equal(result.nights[HAND.id].changed, 9);
+    });
+    it('sends each supporting night with its time and value', () => {
+        const offsets = [60, 70, 80, 90, 100];
+        const lines = [...nights(5), ...offsets.map((offset, night) => change(night, offset, 82, 79 - (night % 2)))];
+        const [row] = entryOf(learn(lines, afterNight(4)))?.rows ?? [];
+        assert.deepEqual(row.votes, offsets.map((offsetMin, night) => ({ date: dateOf(night), offsetMin, temperatureF: 79 - (night % 2) })));
+        assert.deepEqual(row.votes?.map(vote => vote.date), row.supportingDates);
     });
     it('gives the furthest reason a rhythm reached', () => {
         const reasonOf = (lines, count, rhythm = HAND) => learn(lines, afterNight(count - 1), [planned(rhythm)]).nights[rhythm.id].reason;

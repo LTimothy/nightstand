@@ -185,7 +185,7 @@ export function median(values) {
     const middle = Math.floor(sorted.length / 2);
     return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
-// A night's vote in a cluster is its net change there, timed at its first change in it.
+// A night's vote in a cluster is its net change there, from its first change and timed at its first change in that direction.
 function nightVotes(episodes) {
     const byNight = new Map();
     for (const episode of episodes)
@@ -195,7 +195,8 @@ function nightVotes(episodes) {
         const first = ordered[0];
         const last = ordered[ordered.length - 1];
         const net = last.targetF - first.from;
-        return net === 0 ? [] : [{ date, direction: directionOf(net), value: last.targetF, offset: first.offsetMin, from: first.from }];
+        const timed = ordered.find(episode => directionOf(episode.targetF - episode.from) === directionOf(net)) ?? first;
+        return net === 0 ? [] : [{ date, direction: directionOf(net), value: last.targetF, offset: timed.offsetMin, from: first.from }];
     });
 }
 // Takes the CLUSTER_MIN window holding the most nights (the earliest on a tie) as one cluster, until none are left.
@@ -289,9 +290,15 @@ function candidatesOf(night, clusters) {
     }
     return candidates.sort((a, b) => a.at - b.at || a.offset - b.offset);
 }
-function evidenceOf(direction, key, supporting) {
-    const dates = supporting.map(vote => vote.date).sort();
-    return { key, direction, supporting: dates.length, firstNight: dates[0], lastNight: dates[dates.length - 1], supportingDates: dates };
+// A base row's votes are levels, not temperatures, so it carries no votes.
+function evidenceOf(direction, key, supporting, withVotes = true) {
+    const ordered = [...supporting].sort((a, b) => a.date.localeCompare(b.date));
+    const dates = ordered.map(vote => vote.date);
+    const votes = ordered.map(vote => ({ date: vote.date, offsetMin: vote.offset, temperatureF: vote.value }));
+    return {
+        key, direction, supporting: dates.length, firstNight: dates[0], lastNight: dates[dates.length - 1],
+        supportingDates: dates, ...(withVotes ? { votes } : {}),
+    };
 }
 // The editor's own limits: strictly inside the night, and no new step past the cap.
 const refused = (night, steps, time) => !temperatureInPowerWindow(time, night.power) || (!Object.hasOwn(steps, time) && Object.keys(steps).length >= MAX_TEMPERATURES_PER_DAY);
@@ -394,7 +401,7 @@ export function placeSmart(rhythm, evidence, gate) {
     const baseLevel = Math.max(-10, Math.min(10, current + (top.direction === 'down' ? -BASE_STEP : BASE_STEP)));
     if (baseLevel === current)
         return { rows: [], stages: ['too-small'], changed: votes.length };
-    const row = { kind: 'base', ...evidenceOf(top.direction, key, top.supporting), baseLevel, currentBaseLevel: current };
+    const row = { kind: 'base', ...evidenceOf(top.direction, key, top.supporting, false), baseLevel, currentBaseLevel: current };
     return { rows: [{ row, at: 0 }], stages: [], changed: votes.length };
 }
 function analyse(scope, planned, at, gate) {
