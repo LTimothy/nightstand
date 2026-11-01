@@ -60,8 +60,8 @@ export default function SuggestionSheet(props: Props) {
   const voted = step?.votes?.length ? step : null;
   const exclude = useNightExclude(side);
   // Supporting nights only, the far-off ones first so they are the first to check.
-  const unusual = entry.rows.flatMap(row => (row.kind === 'base' ? [] : unusualDates(row.votes ?? [])));
-  const thoseNights = smart ? [] : [...new Set(entry.rows.flatMap(row => row.supportingDates))]
+  const unusual = rows.flatMap(row => (row.kind === 'base' ? [] : unusualDates(row.votes ?? [])));
+  const thoseNights = smart ? [] : [...new Set(rows.flatMap(row => row.supportingDates))]
     .flatMap(date => log.filter(night => night.date === date && night.rhythmId === entry.rhythmId))
     .sort((a, b) => Number(unusual.includes(b.date)) - Number(unusual.includes(a.date)) || a.date.localeCompare(b.date));
   const listId = useId();

@@ -255,4 +255,18 @@ describe('one step with its nights', () => {
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
     expect(within(list).getByRole('button', { name: 'Leave out, Thu, Oct 15' })).toBeInTheDocument();
   });
+
+  it('lists only the checked rows\' nights', async () => {
+    const night = (date: string): NightLog => ({ ...log[0], date });
+    const rows = [{ ...down, supportingDates: ['2026-10-15'] }, { ...up, supportingDates: ['2026-10-14'] }];
+    const { user } = open({
+      entry: { rhythmId: 'off-days', near: false, rows },
+      log: [night('2026-10-14'), night('2026-10-15')],
+    });
+    expect(within(screen.getByRole('list', { name: 'Those nights' })).getAllByRole('listitem')).toHaveLength(2);
+    await user.click(screen.getByRole('checkbox', { name: /^7 of 14 nights/ }));
+    const list = screen.getByRole('list', { name: 'Those nights' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(list).getByRole('button', { name: 'Leave out, Thu, Oct 15' })).toBeInTheDocument();
+  });
 });
