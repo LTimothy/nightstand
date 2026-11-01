@@ -114,6 +114,8 @@ export default function SuggestionSheet(props: Props) {
         format={ format }
         trackingOn={ trackingOn }/> : <Box
         role="figure"
+        // The top y label sits half a line above the plot.
+        sx={ { mt: 1 } }
         aria-label={ voted ? votesSentence(voted, counted, rhythm.night.power.on, format)
           : rows.map(row => evidenceSentence(row, counted, format)).join(' ') }>
         <Box aria-hidden>
