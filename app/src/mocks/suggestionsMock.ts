@@ -43,10 +43,10 @@ export function resetMockSuggestions() {
 const OFF = (enabled: boolean): SuggestionsResponse => ({ enabled, nights: {}, suggestions: [], dismissed: [], log: [] });
 const counting = (counted: number, reason: RhythmNights['reason'] = 'few-nights', changed = 0): RhythmNights =>
   ({ counted, needed: 5, changed, earlier: false, reason });
-const evidence = (dates: string[], offsetMin = 60, temperatureF = 79) =>
+const evidence = (dates: string[], nights: number[] = [], votes?: { at: Record<number, number>; temperatureF: number }) =>
   ({
     supporting: dates.length, firstNight: dates[0], lastNight: dates[dates.length - 1], supportingDates: dates,
-    votes: dates.map((date, index) => ({ date, offsetMin: offsetMin + ((index * 7) % 15), temperatureF })),
+    ...(votes ? { votes: dates.map((date, index) => ({ date, offsetMin: votes.at[nights[index]], temperatureF: votes.temperatureF })) } : {}),
   });
 
 // What the demo Pod set: the plan's steps until a hand change held the bed, then the power-off at the night's end.
@@ -111,10 +111,14 @@ function rightSample(now: Date): SuggestionsResponse {
   const pick = (indexes: number[]) => indexes.map(index => dates[index]);
   const rows: SuggestionRow[] = [
     {
-      kind: 'step', key: 'step:down', direction: 'down', ...evidence(pick(DOWN_NIGHTS), 195, 79), time: '23:15', temperatureF: 79, plannedF: 82,
+      kind: 'step', key: 'step:down', direction: 'down', ...evidence(pick(DOWN_NIGHTS), DOWN_NIGHTS, { at: DOWN_AT, temperatureF: 79 }),
+      time: '23:15', temperatureF: 79, plannedF: 82,
       thenBack: { time: '02:00', temperatureF: 82, supporting: BACK_NIGHTS.length },
     },
-    { kind: 'step', key: 'step:up', direction: 'up', ...evidence(pick(UP_NIGHTS), 525, 84), time: '05:45', temperatureF: 84, plannedF: 79 },
+    {
+      kind: 'step', key: 'step:up', direction: 'up', ...evidence(pick(UP_NIGHTS), UP_NIGHTS, { at: UP_AT, temperatureF: 84 }),
+      time: '05:45', temperatureF: 84, plannedF: 79,
+    },
   ];
   const counted = offDays.filter(night => !night.excluded).length;
   return {

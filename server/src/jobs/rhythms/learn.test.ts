@@ -405,6 +405,7 @@ describe('Smart Schedule votes', () => {
       kind: 'base', key: 'base:down', direction: 'down', supporting: 7, firstNight: dateOf(0), lastNight: dateOf(6),
       supportingDates: range(0, 7).map(dateOf), baseLevel: -1, currentBaseLevel: 0,
     }]);
+    assert.equal('votes' in result.rows[0].row, false);
   });
 
   it('counts a cooler cool-down change, and a warmer night-level one', () => {
