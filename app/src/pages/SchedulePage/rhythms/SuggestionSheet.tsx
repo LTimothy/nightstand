@@ -39,7 +39,7 @@ type Props = {
 export const sheetKey = ({ rhythmId, rows }: RhythmSuggestion) =>
   `${rhythmId}|${rows.map(row => `${row.key}@${row.kind === 'step' ? row.time : ''}`).join(',')}`;
 
-const subheading = { fontSize: 16, fontWeight: weight.heading, mt: 3 } as const;
+const subheading = { fontSize: 16, fontWeight: weight.heading, mt: 3, '&:first-child': { mt: 0 } } as const;
 
 // One sheet per rhythm, for a card or a near miss. Add writes only the checked rows, in one save.
 export default function SuggestionSheet(props: Props) {

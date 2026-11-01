@@ -222,7 +222,8 @@ describe('one step with its nights', () => {
     const rows = within(list).getAllByRole('listitem');
     expect(rows).toHaveLength(4);
     expect(rows[0]).toHaveTextContent('Mon, Oct 26');
-    expect(within(rows[0]).getByText('Unusual')).toBeInTheDocument();
+    // Under the date, before the night's changes, so a busy night cannot push it out of view.
+    expect(rows[0].textContent).toMatch(/^Mon, Oct 26Leave outUnusual/);
     expect(within(rows[1]).queryByText('Unusual')).not.toBeInTheDocument();
     rows.forEach(row => expect(within(row).getByRole('button', { name: /^Leave out, / })).toBeInTheDocument());
   });

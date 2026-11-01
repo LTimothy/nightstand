@@ -58,10 +58,10 @@ export function NightRow({ night, excluded, format, timeZone, onToggle, note }: 
         { LEAVE_OUT }
       </ToggleButton>
     </Box>
+    { note && <Typography variant="body2" sx={ { pl: 1.5, color: palette.status.warn } }>{ note }</Typography> }
     { lines.map((line, index) => <Typography key={ index } variant="body2" sx={ { pl: 1.5, color: 'inherit', overflowWrap: 'anywhere' } }>
       { line }
     </Typography>) }
-    { note && <Typography variant="body2" sx={ { pl: 1.5, color: palette.status.warn } }>{ note }</Typography> }
   </Box>;
 }
 
