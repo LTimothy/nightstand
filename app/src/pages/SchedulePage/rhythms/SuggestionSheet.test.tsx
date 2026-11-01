@@ -214,6 +214,8 @@ describe('one step with its nights', () => {
     expect(within(dialog).getByText('On 4 of the last 8 nights you turned it down to about 77°F between 10:09 PM and 11:57 PM.'))
       .toBeInTheDocument();
     expect(within(dialog).getByText('77°F and 10:15 PM are typical of those nights.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('figure'))
+      .toHaveAccessibleName('On 4 of the last 8 nights you turned it down to about 77°F between 10:09 PM and 11:57 PM.');
     expect(dialog.querySelectorAll('[data-dot][data-edge="bottom"]')).toHaveLength(1);
     expect(dialog.querySelectorAll('[data-dot]')).toHaveLength(4);
     const list = within(dialog).getByRole('list', { name: 'Those nights' });

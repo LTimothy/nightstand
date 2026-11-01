@@ -112,10 +112,14 @@ export default function SuggestionSheet(props: Props) {
         date={ start.kind === 'date' ? start.date : today }
         timeZone={ timeZone }
         format={ format }
-        trackingOn={ trackingOn }/> : <OverlayChart
-        { ...suggestionOverlay(rhythm, rows, format) }
-        on={ rhythm.night.power.on }
-        format={ format }/> }
+        trackingOn={ trackingOn }/> : <Box
+        role="figure"
+        aria-label={ voted ? votesSentence(voted, counted, timeZone, rhythm.night.power.on, format)
+          : rows.map(row => evidenceSentence(row, counted, format)).join(' ') }>
+        <Box aria-hidden>
+          <OverlayChart { ...suggestionOverlay(rhythm, rows, format) } on={ rhythm.night.power.on } format={ format }/>
+        </Box>
+      </Box> }
       { voted && <Typography variant="body2" sx={ { mt: 1 } }>
         { votesSentence(voted, counted, timeZone, rhythm.night.power.on, format) }
       </Typography> }
