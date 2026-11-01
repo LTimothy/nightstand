@@ -232,6 +232,12 @@ describe('clusters', () => {
     assert.deepEqual(cluster.votes, [{ date: dateOf(0), direction: 'down', value: 80, offset: 60, from: 82 }]);
   });
 
+  it('times a cooler vote at its first cooler change, not an earlier warmer tap', () => {
+    const lines = [change(0, 81, 79, 82), change(0, 177, 79, 78), change(0, 180, 78, 76)];
+    const [cluster] = clusterEpisodes(episodesOf(lines));
+    assert.deepEqual(cluster.votes, [{ date: dateOf(0), direction: 'down', value: 76, offset: 177, from: 79 }]);
+  });
+
   it('gives no vote to a press and undo more than 10 minutes apart', () => {
     const [cluster] = clusterEpisodes(episodesOf([change(0, 60, 82, 80), change(0, 75, 80, 82)]));
     assert.deepEqual(cluster.votes, []);
