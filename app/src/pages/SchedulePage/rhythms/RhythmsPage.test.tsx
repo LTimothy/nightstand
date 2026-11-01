@@ -430,6 +430,25 @@ it('puts a suggestion card above the week', async () => {
   }
 });
 
+it('says so and closes the sheet when leaving a night out ends the suggestion', async () => {
+  withCard();
+  server.use(http.post('*/rhythms/suggestions/exclude', () => {
+    withSuggestions({ enabled: true, nights: {}, suggestions: [], dismissed: [], log: [] });
+    return new HttpResponse(null, { status: 204 });
+  }));
+  try {
+    const { user } = renderWithProviders(<ScheduleTab/>);
+    await user.click(await screen.findByRole('button', { name: 'Review suggestion for Weekend' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Leave out, / }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const note = screen.getByText('No suggestion for Weekend without that night.').closest('[role="status"]') as HTMLElement;
+    await user.click(within(note).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByText('No suggestion for Weekend without that night.')).not.toBeInTheDocument();
+  } finally {
+    noSuggestions();
+  }
+});
+
 it('adds the checked rows, the return included, in one save, and undoes it', async () => {
   withCard();
   try {

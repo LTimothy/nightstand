@@ -285,6 +285,8 @@ export function undoAddMessage(name: string, rows: SuggestionRow[], format: Temp
   return `${name} now ${joinAnd([...starts, ...(sets.length ? [`sets ${joinAnd(sets)}`] : [])])}`;
 }
 
+export const noLongerSuggested = (name: string) => `No suggestion for ${name} without that night.`;
+
 export const undoHideMessage = (name: string) => `${name}: suggestion hidden`;
 
 export const hiddenIntro = (name: string) => `Not suggested again until you change ${name}, or press Show again.`;

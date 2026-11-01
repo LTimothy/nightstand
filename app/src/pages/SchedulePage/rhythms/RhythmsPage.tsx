@@ -31,7 +31,7 @@ import SuggestionsSection from './SuggestionsSection';
 import UndoBar from './UndoBar';
 import UseRhythmSheet from './UseRhythmSheet';
 import WeekList from './WeekList';
-import { HIDE_ERROR, undoAddMessage, undoHideMessage } from './suggestionsCopy';
+import { HIDE_ERROR, noLongerSuggested, undoAddMessage, undoHideMessage } from './suggestionsCopy';
 import {
   applySuggestion, comingUpDates, datePickMessage, datesPickMessage, deleteMessage, deleteRhythm, firstComingUpDate, hasOwn,
   MAX_RHYTHMS_PER_SIDE, restoreDate, restoreDeleted, restoreRhythm, restoreWeekDays, restoreDates, setDateChange, setDateChanges,
@@ -60,6 +60,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
   const [using, setUsing] = useState<string>();
   const [notes, setNotes] = useState<{ rhythmId?: string }>();
   const [review, setReview] = useState<string>();
+  const [ended, setEnded] = useState('');
   const [headingFocus, setHeadingFocus] = useState(0);
   const closedEditor = useRef<{ id: string | null; created: boolean } | undefined>(undefined);
   const location = useLocation();
@@ -114,6 +115,14 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
     ? suggestions.data.suggestions.filter(entry => !entry.near && hasOwn(sideData.rhythms, entry.rhythmId)) : [];
   const reviewEntry = review ? suggestions.data?.suggestions.find(entry => entry.rhythmId === review) : undefined;
   const reviewRhythm = reviewEntry && hasOwn(sideData.rhythms, reviewEntry.rhythmId) ? sideData.rhythms[reviewEntry.rhythmId] : undefined;
+
+  // Leaving a night out can drop a rhythm below the gate; close its sheet and say so.
+  const gone = !!review && suggestions.isSuccess && !suggestions.isFetching && !reviewEntry;
+  useEffect(() => {
+    if (!gone || !review) return;
+    setReview(undefined);
+    if (hasOwn(sideData.rhythms, review)) setEnded(noLongerSuggested(sideData.rhythms[review].name));
+  }, [gone, review, sideData.rhythms]);
 
   const save = async (next: SideRhythms) => {
     setError('');
@@ -209,6 +218,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
   const openReview = (rhythmId: string) => {
     setUndo(undefined);
     setError('');
+    setEnded('');
     setReview(rhythmId);
   };
   // One save for every checked row; a refusal stays in the sheet, which stays open.
@@ -305,6 +315,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
         note="Changes you save apply after the pause."
         onResumed={ () => requestAnimationFrame(() => document.getElementById('week-heading')?.focus({ preventScroll: true })) }/>
       { error && !reviewEntry && <Alert severity="error" sx={ { width: '100%' } } onClose={ () => setError('') }>{ error }</Alert> }
+      { ended && <Alert severity="info" role="status" sx={ { width: '100%' } } onClose={ () => setEnded('') }>{ ended }</Alert> }
       { cards.map(entry => <SuggestionCard
         key={ entry.rhythmId }
         name={ sideData.rhythms[entry.rhythmId].name }
