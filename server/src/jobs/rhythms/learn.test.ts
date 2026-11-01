@@ -233,7 +233,7 @@ describe('clusters', () => {
   });
 
   it('times a cooler vote at its first cooler change, not an earlier warmer tap', () => {
-    const lines = [change(0, 81, 79, 82), change(0, 177, 79, 78), change(0, 180, 78, 76)];
+    const lines = [change(0, 81, 79, 82), change(0, 177, 82, 78), change(0, 180, 78, 76)];
     const [cluster] = clusterEpisodes(episodesOf(lines));
     assert.deepEqual(cluster.votes, [{ date: dateOf(0), direction: 'down', value: 76, offset: 177, from: 79 }]);
   });

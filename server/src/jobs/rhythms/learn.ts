@@ -233,7 +233,7 @@ export function median(values: number[]): number {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-// A night's vote in a cluster is its net change there, timed at its first change in that direction.
+// A night's vote in a cluster is its net change there, from its first change and timed at its first change in that direction.
 function nightVotes(episodes: Episode[]): Vote[] {
   const byNight = new Map<string, Episode[]>();
   for (const episode of episodes) byNight.set(episode.date, [...(byNight.get(episode.date) ?? []), episode]);
@@ -243,7 +243,7 @@ function nightVotes(episodes: Episode[]): Vote[] {
     const last = ordered[ordered.length - 1];
     const net = last.targetF - first.from;
     const timed = ordered.find(episode => directionOf(episode.targetF - episode.from) === directionOf(net)) ?? first;
-    return net === 0 ? [] : [{ date, direction: directionOf(net), value: last.targetF, offset: timed.offsetMin, from: timed.from }];
+    return net === 0 ? [] : [{ date, direction: directionOf(net), value: last.targetF, offset: timed.offsetMin, from: first.from }];
   });
 }
 
