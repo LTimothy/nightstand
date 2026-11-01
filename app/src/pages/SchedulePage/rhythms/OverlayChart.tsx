@@ -7,7 +7,7 @@ import { clockAfterOn, yTickLabel, type Step } from './nightsChartModel';
 import { BLOCK_OPACITY, type Block } from './rhythmOverlay';
 import { pairTemperatures } from './suggestionsCopy';
 
-// An edge dot's value lies off the chart: a ring at that edge, its value printed beside it.
+// An edge dot's value lies off the chart: a ring at that edge, its value printed beside it and inward, so it stays inside the chart.
 export type ChartDot = { x: number; f: number; key: string; edge?: 'top' | 'bottom'; label?: string };
 
 type Props = {
@@ -109,9 +109,11 @@ export default function OverlayChart({ endMin, loF, hiF, plan, blocks, on, forma
         } }>
         { dot.edge && dot.label && <Typography
           component="span"
+          data-label-side={ x(dot.x) > 75 ? 'left' : 'right' }
+          data-label-place={ dot.edge === 'top' ? 'below' : 'above' }
           sx={ {
-            position: 'absolute', left: DOT, top: '50%', transform: 'translateY(-50%)', ml: 0.5,
-            fontSize: 12, lineHeight: 1, color: palette.status.warn, whiteSpace: 'nowrap',
+            position: 'absolute', [x(dot.x) > 75 ? 'right' : 'left']: DOT, [dot.edge === 'top' ? 'top' : 'bottom']: '50%',
+            mx: 0.5, fontSize: 12, lineHeight: 1, color: palette.status.warn, whiteSpace: 'nowrap',
           } }>
           { dot.label }
         </Typography> }
