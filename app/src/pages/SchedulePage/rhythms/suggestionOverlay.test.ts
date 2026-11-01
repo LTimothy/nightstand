@@ -26,7 +26,7 @@ describe('unusualDates', () => {
 describe('suggestionOverlay', () => {
   it('models the live case', () => {
     const model = suggestionOverlay(rhythm, [row()], 'fahrenheit');
-    expect(model).toMatchObject({ endMin: 660, loF: 75, hiF: 85, ticks: [0, 135, 660] });
+    expect(model).toMatchObject({ endMin: 660, loF: 75, hiF: 85, ticks: [135, 660] });
     expect(model.blocks).toEqual([{ from: 135, to: 360, f: 77, farF: 79, schedule: [{ x: 135, f: 79 }], turned: 'down' }]);
     expect(model.dots).toEqual([
       { x: 237, f: 78, key: '2026-10-24' },
@@ -37,6 +37,16 @@ describe('suggestionOverlay', () => {
   });
   it('labels an edge dot in the user\'s unit', () => {
     expect(suggestionOverlay(rhythm, [row()], 'level').dots[1].label).toBe('\u22126');
+  });
+  it('draws the start once for an on row', () => {
+    const on: SuggestionRow = {
+      kind: 'on', key: 'on:down', direction: 'down', supporting: 4, firstNight: '2026-10-24', lastNight: '2026-10-31',
+      supportingDates: [], temperatureF: 77, plannedF: 79,
+    };
+    expect(suggestionOverlay(rhythm, [on], 'fahrenheit').ticks).toEqual([0, 660]);
+  });
+  it('drops the power-off label beside a late step', () => {
+    expect(suggestionOverlay(rhythm, [row({ time: '06:00', temperatureF: 77, plannedF: 81 })], 'fahrenheit').ticks).toEqual([0, 600]);
   });
   it('draws no dots for a row without votes', () => {
     expect(suggestionOverlay(rhythm, [row({ votes: undefined })], 'fahrenheit').dots).toEqual([]);

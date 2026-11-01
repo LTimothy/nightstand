@@ -69,6 +69,8 @@ export function suggestionOverlay(rhythm: Rhythm, rows: SuggestionRow[], format:
     const edge = vote.temperatureF < loF ? 'bottom' : vote.temperatureF > hiF ? 'top' : undefined;
     return { x: vote.offsetMin, f, key: vote.date, ...(edge && { edge, label: displayTemperature(vote.temperatureF, format) }) };
   });
-  const ticks = [0, blocks[0] ? blocks[0].from : endMin / 2, endMin];
+  // The edge labels give way to the change's time when it sits within a quarter night of them.
+  const mid = blocks[0]?.from ?? endMin / 2;
+  const ticks = [mid, ...[0, endMin].filter(x => Math.abs(x - mid) >= endMin / 4)].sort((a, b) => a - b);
   return { endMin, loF, hiF, plan, blocks, dots, ticks };
 }
