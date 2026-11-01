@@ -329,7 +329,7 @@ describe('the review sheet for one step', () => {
   it('asks the question the live row answers', () => {
     expect(questionHeading(live, 'fahrenheit')).toBe('Cool to 77°F at 10:15 PM?');
     expect(holdsLine(live, 'fahrenheit')).toBe('Your schedule holds 79°F then.');
-    expect(votesSentence(live, 8, 'UTC', '20:00', 'fahrenheit'))
+    expect(votesSentence(live, 8, '20:00', 'fahrenheit'))
       .toBe('On 4 of the last 8 nights you turned it down to about 77°F between 10:09 PM and 11:57 PM.');
     expect(typicalLine(live, 'fahrenheit')).toBe('77°F and 10:15 PM are typical of those nights.');
   });
@@ -337,7 +337,7 @@ describe('the review sheet for one step', () => {
   it('gives levels in level format', () => {
     expect(questionHeading(live, 'level')).toBe('Cool to \u22122 at 10:15 PM?');
     expect(holdsLine(live, 'level')).toBe('Your schedule holds \u22121 then.');
-    expect(votesSentence(live, 8, 'UTC', '20:00', 'level'))
+    expect(votesSentence(live, 8, '20:00', 'level'))
       .toBe('On 4 of the last 8 nights you turned it down to about \u22122 between 10:09 PM and 11:57 PM.');
     expect(typicalLine(live, 'level')).toBe('\u22122 and 10:15 PM are typical of those nights.');
   });
@@ -345,6 +345,6 @@ describe('the review sheet for one step', () => {
   it('warms, and gives one time for one night', () => {
     const up = { ...live, direction: 'up' as const, temperatureF: 84, votes: [votes[0]] };
     expect(questionHeading(up, 'fahrenheit')).toBe('Warm to 84°F at 10:15 PM?');
-    expect(votesSentence(up, 8, 'UTC', '20:00', 'fahrenheit')).toBe('On 4 of the last 8 nights you turned it up to about 84°F at 11:57 PM.');
+    expect(votesSentence(up, 8, '20:00', 'fahrenheit')).toBe('On 4 of the last 8 nights you turned it up to about 84°F at 11:57 PM.');
   });
 });

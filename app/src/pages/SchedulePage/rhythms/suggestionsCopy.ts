@@ -255,8 +255,7 @@ export const holdsLine = (row: StepRow, format: TemperatureFormat) =>
 export const typicalLine = (row: StepRow, format: TemperatureFormat) =>
   `${newValue(row, format)} and ${clockOf(row.time)} are typical of those nights.`;
 
-// Clock times are minutes after power-on, so the time zone is not needed to read them.
-export function votesSentence(row: StepRow, counted: number, _timeZone: string, on: string, format: TemperatureFormat): string {
+export function votesSentence(row: StepRow, counted: number, on: string, format: TemperatureFormat): string {
   const offsets = (row.votes ?? []).map(vote => vote.offsetMin);
   const [first, last] = [Math.min(...offsets), Math.max(...offsets)].map(minutes => clockAfterOn(on, minutes));
   const when = first === last ? `at ${first}` : `between ${first} and ${last}`;
