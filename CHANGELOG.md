@@ -8,6 +8,12 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+### Changes
+
+- The suggestion review sheet draws the change the way the rhythm card does,
+  with a dot for each night it is based on. A night far from the others is
+  marked Unusual, and Leave out works from the sheet.
+
 ## [3.7.1] - 2026-10-28
 
 Steps the temperature once for each quick cover click and keeps a chart label inside small screens.
