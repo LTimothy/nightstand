@@ -25,7 +25,7 @@ describe('unusualDates', () => {
 
 describe('suggestionOverlay', () => {
   it('models the live case', () => {
-    const model = suggestionOverlay(rhythm, [row()]);
+    const model = suggestionOverlay(rhythm, [row()], 'fahrenheit');
     expect(model).toMatchObject({ endMin: 660, loF: 75, hiF: 85, ticks: [0, 135, 660] });
     expect(model.blocks).toEqual([{ from: 135, to: 360, f: 77, farF: 79, schedule: [{ x: 135, f: 79 }], turned: 'down' }]);
     expect(model.dots).toEqual([
@@ -35,7 +35,10 @@ describe('suggestionOverlay', () => {
       { x: 185, f: 77, key: '2026-10-31' },
     ]);
   });
+  it('labels an edge dot in the user\'s unit', () => {
+    expect(suggestionOverlay(rhythm, [row()], 'level').dots[1].label).toBe('\u22126');
+  });
   it('draws no dots for a row without votes', () => {
-    expect(suggestionOverlay(rhythm, [row({ votes: undefined })]).dots).toEqual([]);
+    expect(suggestionOverlay(rhythm, [row({ votes: undefined })], 'fahrenheit').dots).toEqual([]);
   });
 });

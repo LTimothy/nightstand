@@ -33,12 +33,14 @@ export const DONT_SUGGEST = "Don't suggest this";
 export const DONT_SUGGEST_CHECKED = "Don't suggest the checked";
 export const HIDE_ERROR = 'Could not hide this suggestion. Try again.';
 export const SHOW_AGAIN_ERROR = 'Could not show it again. Try again.';
-export const CHART_LEGEND = { change: 'With this change', night: 'A night', now: 'Now' } as const;
+export const UNUSUAL = 'Unusual';
+export const THOSE_NIGHTS = 'Those nights';
 
 export const MATCH_SCHEDULE = 'Your nights match the schedule.';
 export const MATCH_CURVE = 'Your nights match the curve.';
 
 type ValueRow = Extract<SuggestionRow, { kind: 'step' | 'on' }>;
+type StepRow = Extract<SuggestionRow, { kind: 'step' }>;
 
 const inTen = (share: number) => `${Math.round(share * 10)} in 10`;
 const atLeast = (share: number) => (share === 0.5 ? 'half or more' : `${inTen(share)} or more`);
@@ -245,6 +247,22 @@ export function withChangeRows(before: Rhythm, after: Rhythm, format: Temperatur
   return [`${clockOf(power.on)} | On, ${onText}`, ...steps, `${clockOf(power.off)} | Off`];
 }
 
+// A single step reads as a question, checked against what the schedule holds and what those nights did.
+export const questionHeading = (row: StepRow, format: TemperatureFormat) =>
+  `${row.direction === 'down' ? 'Cool' : 'Warm'} to ${newValue(row, format)} at ${clockOf(row.time)}?`;
+export const holdsLine = (row: StepRow, format: TemperatureFormat) =>
+  `Your schedule holds ${pairTemperatures(row.plannedF, row.temperatureF, format)[0]} then.`;
+export const typicalLine = (row: StepRow, format: TemperatureFormat) =>
+  `${newValue(row, format)} and ${clockOf(row.time)} are typical of those nights.`;
+
+// Clock times are minutes after power-on, so the time zone is not needed to read them.
+export function votesSentence(row: StepRow, counted: number, _timeZone: string, on: string, format: TemperatureFormat): string {
+  const offsets = (row.votes ?? []).map(vote => vote.offsetMin);
+  const [first, last] = [Math.min(...offsets), Math.max(...offsets)].map(minutes => clockAfterOn(on, minutes));
+  const when = first === last ? `at ${first}` : `between ${first} and ${last}`;
+  return `On ${row.supporting} of the last ${counted} nights you turned it ${row.direction} to about ${newValue(row, format)} ${when}.`;
+}
+
 export const provenance = (name: string) => `Middle values of those nights, rounded. Counted since you last changed ${name}.`;
 
 export function startsLine(start: SuggestionStart, name: string): string {
@@ -281,13 +299,3 @@ function hiddenWhat(entry: Dismissed): string {
 
 export const hiddenRow = (entry: Dismissed) => (entry.scope === 'later' ? capitalized(hiddenWhat(entry)) : `Hidden: ${hiddenWhat(entry)}`);
 export const showAgainName = (entry: Dismissed) => `Show again, ${entry.scope === 'later' ? 'all suggestions' : hiddenWhat(entry)}`;
-
-export function chartCaption(nights: NightLog[], supportingDates: string[]): string {
-  const quiet = nights.filter(logged => logged.changes.length === 0).length;
-  const other = nights.filter(logged => logged.changes.length > 0 && !supportingDates.includes(logged.date)).length;
-  return [
-    'One line per night.',
-    ...(quiet ? [quiet === 1 ? '1 had no change and sits on the dashed line.' : `${quiet} had no change and sit on the dashed line.`] : []),
-    ...(other ? [`${other} had other changes.`] : []),
-  ].join(' ');
-}

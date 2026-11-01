@@ -2,7 +2,7 @@
 // x is minutes after the rhythm's power-on, f is °F.
 import type { Rhythm, SuggestionRow, SuggestionVote } from '@api/rhythmsSchema';
 import { nightMinutes } from '@api/rhythmWake';
-import { displayTemperature } from '@lib/temperatureConversions';
+import { displayTemperature, type TemperatureFormat } from '@lib/temperatureConversions';
 import { planSteps, RANGE_F, type Step } from './nightsChartModel';
 import type { ChartDot } from './OverlayChart';
 import type { Block } from './rhythmOverlay';
@@ -55,7 +55,7 @@ function blocksBetween(plan: Step[], after: Step[], endMin: number): Block[] {
   return blocks;
 }
 
-export function suggestionOverlay(rhythm: Rhythm, rows: SuggestionRow[]) {
+export function suggestionOverlay(rhythm: Rhythm, rows: SuggestionRow[], format: TemperatureFormat) {
   const endMin = nightMinutes(rhythm.night.power);
   const plan = planSteps(rhythm, endMin);
   const after = planSteps(withRows(rhythm, rows), endMin);
@@ -67,7 +67,7 @@ export function suggestionOverlay(rhythm: Rhythm, rows: SuggestionRow[]) {
   const dots = rows.flatMap(row => (row.kind === 'base' ? [] : row.votes ?? [])).map((vote): ChartDot => {
     const f = Math.min(hiF, Math.max(loF, vote.temperatureF));
     const edge = vote.temperatureF < loF ? 'bottom' : vote.temperatureF > hiF ? 'top' : undefined;
-    return { x: vote.offsetMin, f, key: vote.date, ...(edge && { edge, label: displayTemperature(vote.temperatureF, 'fahrenheit') }) };
+    return { x: vote.offsetMin, f, key: vote.date, ...(edge && { edge, label: displayTemperature(vote.temperatureF, format) }) };
   });
   const ticks = [0, blocks[0] ? blocks[0].from : endMin / 2, endMin];
   return { endMin, loF, hiF, plan, blocks, dots, ticks };

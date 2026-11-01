@@ -33,7 +33,7 @@ const axisText = { variant: 'caption', color: 'text.secondary', sx: { lineHeight
 
 export default function OverlayChart({ endMin, loF, hiF, plan, blocks, on, format, dots = [], ticks, height = 110 }: Props) {
   const x = (minutes: number) => round((minutes / endMin) * 100);
-  // Display units, as NightsChart plots them, so a level or Celsius label sits where its value is drawn.
+  // Display units, so a level or Celsius label sits where its value is drawn.
   const lo = fahrenheitToDisplay(loF, format);
   const hi = fahrenheitToDisplay(hiF, format);
   const y = (f: number) => round(((hi - fahrenheitToDisplay(f, format)) / (hi - lo)) * 100);

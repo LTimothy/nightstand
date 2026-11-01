@@ -1,5 +1,5 @@
 /* eslint-disable react/no-multi-comp */
-// A night's row is private to the notes sheet.
+// A night's row and its Leave out toggle, shared with the suggestion sheet.
 import { useCallback, useId, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, ToggleButton, Typography } from '@mui/material';
@@ -26,13 +26,13 @@ type Props = {
   onClose: () => void;
 };
 
-type RowProps = { night: NightLog; excluded: boolean; format: TemperatureFormat; timeZone: string; onToggle: () => void };
+type RowProps = { night: NightLog; excluded: boolean; format: TemperatureFormat; timeZone: string; onToggle: () => void; note?: string };
 
 const nightKey = (night: NightLog) => `${night.rhythmId}|${night.date}`;
 const subheading = { fontSize: 16, fontWeight: weight.heading } as const;
 
 // The date and the toggle share one 44 px line, so the changes below get the full width at 320 px.
-function NightRow({ night, excluded, format, timeZone, onToggle }: RowProps) {
+export function NightRow({ night, excluded, format, timeZone, onToggle, note }: RowProps) {
   const lines = noteLines(night, format, timeZone);
   if (night.tonight) {
     return <Box component="li" sx={ { py: 0.5 } }>
@@ -61,23 +61,15 @@ function NightRow({ night, excluded, format, timeZone, onToggle }: RowProps) {
     { lines.map((line, index) => <Typography key={ index } variant="body2" sx={ { pl: 1.5, color: 'inherit', overflowWrap: 'anywhere' } }>
       { line }
     </Typography>) }
+    { note && <Typography variant="body2" sx={ { pl: 1.5, color: palette.status.warn } }>{ note }</Typography> }
   </Box>;
 }
 
-export default function NotesSheet({ side, rhythms, forRhythm, data, away, format, timeZone, onClose }: Props) {
-  const focusHeading = useCallback((node: HTMLHeadingElement | null) => node?.focus(), []);
-  const titleId = useId();
-  const rulesId = useId();
+export function useNightExclude(side: 'left' | 'right') {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const inFlight = useRef(new Set<string>());
   const [error, setError] = useState('');
-  const [rulesOpen, setRulesOpen] = useState(false);
-  const shown = forRhythm ? rhythms.filter(rhythm => rhythm.id === forRhythm) : rhythms;
-  // Said once per sheet, under the first list that has a Leave out toggle.
-  const hintFor = shown.find(rhythm => data.log.some(night => night.rhythmId === rhythm.id && !night.tonight))?.id;
-  const hidden = (rhythmId: string) => data.dismissed.filter(entry => entry.rhythmId === rhythmId);
-  const smart = shown.some(rhythm => rhythm.temperatureMode === 'smart');
   const toggle = async (night: NightLog) => {
     const key = nightKey(night);
     // A second tap while the first is in flight would race it, and the Pod could end opposite to the button.
@@ -98,6 +90,22 @@ export default function NotesSheet({ side, rhythms, forRhythm, data, away, forma
       inFlight.current.delete(key);
     }
   };
+  // setError lets a sheet share the one message line with its other actions.
+  return { toggle, pending, error, setError, excludedOf: (night: NightLog) => pending[nightKey(night)] ?? night.excluded };
+}
+
+export default function NotesSheet({ side, rhythms, forRhythm, data, away, format, timeZone, onClose }: Props) {
+  const focusHeading = useCallback((node: HTMLHeadingElement | null) => node?.focus(), []);
+  const titleId = useId();
+  const rulesId = useId();
+  const queryClient = useQueryClient();
+  const { toggle, error, setError, excludedOf } = useNightExclude(side);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const shown = forRhythm ? rhythms.filter(rhythm => rhythm.id === forRhythm) : rhythms;
+  // Said once per sheet, under the first list that has a Leave out toggle.
+  const hintFor = shown.find(rhythm => data.log.some(night => night.rhythmId === rhythm.id && !night.tonight))?.id;
+  const hidden = (rhythmId: string) => data.dismissed.filter(entry => entry.rhythmId === rhythmId);
+  const smart = shown.some(rhythm => rhythm.temperatureMode === 'smart');
   const showAgain = async (entry: Dismissed) => {
     setError('');
     try {
@@ -130,7 +138,7 @@ export default function NotesSheet({ side, rhythms, forRhythm, data, away, forma
           { data.log.filter(night => night.rhythmId === rhythm.id).map(night => <NightRow
             key={ night.date }
             night={ night }
-            excluded={ pending[nightKey(night)] ?? night.excluded }
+            excluded={ excludedOf(night) }
             format={ format }
             timeZone={ timeZone }
             onToggle={ () => void toggle(night) }/>) }

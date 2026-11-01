@@ -1,10 +1,12 @@
 /* eslint-disable react/no-multi-comp */
 import { useState } from 'react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
+import { server } from '@test/setup';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
-import { DEFAULT_SMART, type NightLog, type SuggestionRow } from '@api/rhythmsSchema';
+import { DEFAULT_SMART, type NightLog, type SuggestionRow, type SuggestionVote } from '@api/rhythmsSchema';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
 import SuggestionSheet, { sheetKey } from './SuggestionSheet';
 
@@ -145,12 +147,6 @@ it('says a change waits for the pause', () => {
   expect(screen.getByText('Starts after the pause.')).toBeInTheDocument();
 });
 
-it('leaves nights of an earlier plan out of the chart caption', () => {
-  const earlier = { ...log[0], date: '2026-10-14', samePlan: false };
-  open({ log: [...log, earlier] });
-  expect(screen.getByText('One line per night. 1 had no change and sits on the dashed line.')).toBeInTheDocument();
-});
-
 it('explains the unchecked rows and holds Add when nothing is checked', async () => {
   const { user } = open();
   await user.click(screen.getByRole('checkbox', { name: /^9 of 14 nights/ }));
@@ -188,4 +184,73 @@ it('starts the checks over when a refetch changes its rows', async () => {
   await user.click(screen.getByRole('checkbox', { name: /^9 of 14 nights/ }));
   await user.click(screen.getByRole('button', { name: 'refetch', hidden: true }));
   expect(screen.getByRole('button', { name: 'Add to Off days' })).not.toHaveAttribute('aria-disabled', 'true');
+});
+
+describe('one step with its nights', () => {
+  const vote = (date: string, offsetMin: number, temperatureF: number): SuggestionVote => ({ date, offsetMin, temperatureF });
+  const votes = [vote('2026-10-24', 237, 78), vote('2026-10-26', 129, 65), vote('2026-10-27', 135, 76), vote('2026-10-31', 185, 77)];
+  const rhythm = structuredClone(offDays);
+  rhythm.night.power = { ...rhythm.night.power, on: '20:00', off: '07:00', onTemperature: 79 };
+  rhythm.night.temperatures = { '02:00': 79, '03:00': 80, '04:00': 81 };
+  const live: SuggestionRow = {
+    kind: 'step', key: 'step:down', direction: 'down', supporting: 4, firstNight: '2026-10-24', lastNight: '2026-10-31',
+    supportingDates: votes.map(v => v.date), votes, time: '22:15', temperatureF: 77, plannedF: 79,
+  };
+  const at = (date: string, offsetMin: number) => new Date(Date.parse(`${date}T20:00:00Z`) + offsetMin * 60_000).toISOString();
+  const nights: NightLog[] = [
+    ...votes.map(({ date, offsetMin, temperatureF }) => ({
+      date, rhythmId: 'off-days', tonight: false, excluded: false, plan: [{ offsetMin: 0, temperatureF: 79 }], endMin: 660,
+      changes: [{ at: at(date, offsetMin), fromF: 79, targetF: temperatureF, plannedF: 79, held: false, source: 'api' as const }],
+    })),
+    { date: '2026-10-25', rhythmId: 'off-days', tonight: false, excluded: false, plan: [{ offsetMin: 0, temperatureF: 79 }], endMin: 660,
+      changes: [] },
+  ];
+  const single = () => open({ entry: { rhythmId: 'off-days', near: false, rows: [live] }, rhythm, counted: 8, log: nights });
+
+  it('shows a single step as a question with the chart and its nights', () => {
+    single();
+    const dialog = screen.getByRole('dialog', { name: 'Cool to 77°F at 10:15 PM?' });
+    expect(within(dialog).getByText('Your schedule holds 79°F then.')).toBeInTheDocument();
+    expect(within(dialog).getByText('On 4 of the last 8 nights you turned it down to about 77°F between 10:09 PM and 11:57 PM.'))
+      .toBeInTheDocument();
+    expect(within(dialog).getByText('77°F and 10:15 PM are typical of those nights.')).toBeInTheDocument();
+    expect(dialog.querySelectorAll('[data-dot][data-edge="bottom"]')).toHaveLength(1);
+    expect(dialog.querySelectorAll('[data-dot]')).toHaveLength(4);
+    const list = within(dialog).getByRole('list', { name: 'Those nights' });
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toHaveTextContent('Mon, Oct 26');
+    expect(within(rows[0]).getByText('Unusual')).toBeInTheDocument();
+    expect(within(rows[1]).queryByText('Unusual')).not.toBeInTheDocument();
+    rows.forEach(row => expect(within(row).getByRole('button', { name: /^Leave out, / })).toBeInTheDocument());
+  });
+
+  it('leaves a night out from the sheet', async () => {
+    const posted: unknown[] = [];
+    server.use(http.post('*/rhythms/suggestions/exclude', async ({ request }) => {
+      posted.push(await request.json());
+      return new HttpResponse(null, { status: 204 });
+    }));
+    const { user, queryClient } = single();
+    const refetch = vi.spyOn(queryClient, 'invalidateQueries');
+    await user.click(screen.getByRole('button', { name: 'Leave out, Mon, Oct 26' }));
+    await waitFor(() => expect(posted).toEqual([{ side: 'right', rhythmId: 'off-days', date: '2026-10-26', excluded: true }]));
+    await waitFor(() => expect(refetch).toHaveBeenCalledWith({ queryKey: ['useSuggestions'] }));
+  });
+
+  it('keeps the smart sheet as it was', () => {
+    open({ entry: { rhythmId: 'workday', near: true, rows: [base] }, rhythm: workday, side: 'left', counted: 12, sleeps: [] });
+    expect(screen.getByRole('dialog', { name: 'Base one step cooler' })).toBeInTheDocument();
+    expect(screen.getByRole('figure').getAttribute('aria-label')).toMatch(/^Smart Schedule preview\./);
+    expect(screen.queryByRole('list', { name: 'Those nights' })).not.toBeInTheDocument();
+  });
+
+  it('draws two rows on the card chart and lists their nights', () => {
+    open();
+    expect(screen.getByRole('dialog', { name: 'Cooler around 11:45 PM, warmer around 5:00 AM' })).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-block]').length).toBeGreaterThan(0);
+    const list = screen.getByRole('list', { name: 'Those nights' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(list).getByRole('button', { name: 'Leave out, Thu, Oct 15' })).toBeInTheDocument();
+  });
 });

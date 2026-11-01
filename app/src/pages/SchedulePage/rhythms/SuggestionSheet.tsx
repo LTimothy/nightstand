@@ -4,13 +4,15 @@ import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
 import type { NightLog, Rhythm, RhythmSuggestion, SuggestionRow } from '@api/rhythmsSchema';
 import type { TemperatureFormat } from '@lib/temperatureConversions';
 import { weight } from '@design/tokens';
-import NightsChart from './NightsChart';
+import { NightRow, useNightExclude } from './NotesSheet';
+import OverlayChart from './OverlayChart';
 import SmartCurveChart from './SmartCurveChart';
 import { suggestionStart, withRows } from './rhythmsModel';
 import { INACTIVE, SCROLL_SHEET } from './sheetStyles';
+import { suggestionOverlay, unusualDates } from './suggestionOverlay';
 import {
-  addLabel, dontSuggestLabel, evidenceSentence, NIGHTS_HEADING, provenance, sheetHeading, sheetOverline, showNightsLabel, startsLine,
-  uncheckedNote, WITH_CHANGE_HEADING, withChangeRows,
+  addLabel, dontSuggestLabel, evidenceSentence, holdsLine, NIGHTS_HEADING, provenance, questionHeading, sheetHeading, sheetOverline,
+  showNightsLabel, startsLine, THOSE_NIGHTS, typicalLine, uncheckedNote, UNUSUAL, votesSentence, WITH_CHANGE_HEADING, withChangeRows,
 } from './suggestionsCopy';
 
 type Props = {
@@ -50,10 +52,19 @@ export default function SuggestionSheet(props: Props) {
   const rows = entry.rows.filter((_, index) => checked[index]);
   const none = rows.length === 0;
   const after = withRows(rhythm, rows);
-  const sameLog = log.filter(night => night.samePlan !== false);
   const start = suggestionStart(sleeps, rhythm, rows, new Date(), today, timeZone, pausedUntil);
   const unchecked = entry.rows.length - rows.length;
   const smart = entry.rows.some(row => row.kind === 'base');
+  const step = entry.rows.length === 1 && entry.rows[0].kind === 'step' ? entry.rows[0] : null;
+  // The votes sentence under the chart replaces the evidence sentence above it.
+  const voted = step?.votes?.length ? step : null;
+  const exclude = useNightExclude(side);
+  // Supporting nights only, the far-off ones first so they are the first to check.
+  const unusual = entry.rows.flatMap(row => (row.kind === 'base' ? [] : unusualDates(row.votes ?? [])));
+  const thoseNights = smart ? [] : [...new Set(entry.rows.flatMap(row => row.supportingDates))]
+    .flatMap(date => log.filter(night => night.date === date && night.rhythmId === entry.rhythmId))
+    .sort((a, b) => Number(unusual.includes(b.date)) - Number(unusual.includes(a.date)) || a.date.localeCompare(b.date));
+  const listId = useId();
   const guard = (run: () => void, blocked = false) => () => {
     if (!busy && !blocked) run();
   };
@@ -75,11 +86,12 @@ export default function SuggestionSheet(props: Props) {
         component="h2"
         tabIndex={ -1 }
         sx={ { fontSize: 18, fontWeight: weight.heading, outline: 'none' } }>
-        { sheetHeading(entry.rows) }
+        { step ? questionHeading(step, format) : sheetHeading(entry.rows) }
       </Typography>
+      { step && <Typography variant="body2" color="text.secondary">{ holdsLine(step, format) }</Typography> }
     </DialogTitle>
     <DialogContent dividers>
-      { entry.rows.length === 1 ? <Typography variant="body2">{ evidenceSentence(entry.rows[0], counted, format) }</Typography> : <>
+      { entry.rows.length === 1 ? !voted && <Typography variant="body2">{ evidenceSentence(entry.rows[0], counted, format) }</Typography> : <>
         { entry.rows.map((row, index) => <FormControlLabel
           key={ `${row.key}-${index}` }
           sx={ { display: 'flex', alignItems: 'flex-start', minHeight: 44, mr: 0 } }
@@ -100,14 +112,26 @@ export default function SuggestionSheet(props: Props) {
         date={ start.kind === 'date' ? start.date : today }
         timeZone={ timeZone }
         format={ format }
-        trackingOn={ trackingOn }/> : <NightsChart
-        rhythm={ rhythm }
-        after={ after }
-        nights={ sameLog }
-        rows={ rows }
-        timeZone={ timeZone }
-        format={ format }
-        evidence={ rows.map(row => evidenceSentence(row, counted, format)).join(' ') }/> }
+        trackingOn={ trackingOn }/> : <OverlayChart
+        { ...suggestionOverlay(rhythm, rows, format) }
+        on={ rhythm.night.power.on }
+        format={ format }/> }
+      { voted && <Typography variant="body2" sx={ { mt: 1 } }>
+        { votesSentence(voted, counted, timeZone, rhythm.night.power.on, format) }
+      </Typography> }
+      { thoseNights.length > 0 && <>
+        <Typography component="h3" id={ listId } sx={ subheading }>{ THOSE_NIGHTS }</Typography>
+        <Box component="ul" aria-labelledby={ listId } sx={ { listStyle: 'none', p: 0, m: 0, mt: 0.5 } }>
+          { thoseNights.map(night => <NightRow
+            key={ night.date }
+            night={ night }
+            excluded={ exclude.excludedOf(night) }
+            format={ format }
+            timeZone={ timeZone }
+            note={ unusual.includes(night.date) ? UNUSUAL : undefined }
+            onToggle={ () => void exclude.toggle(night) }/>) }
+        </Box>
+      </> }
       <Button onClick={ props.onShowNights } sx={ { minHeight: 44, px: 0 } }>{ showNightsLabel(counted) }</Button>
       <Typography component="h3" sx={ subheading }>{ WITH_CHANGE_HEADING }</Typography>
       <Box component="ul" sx={ { listStyle: 'none', p: 0, m: 0, mt: 0.5 } }>
@@ -115,10 +139,12 @@ export default function SuggestionSheet(props: Props) {
           { line }
         </Typography>) }
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={ { mt: 2 } }>{ provenance(rhythm.name) }</Typography>
+      <Typography variant="body2" color="text.secondary" sx={ { mt: 2 } }>
+        { step ? typicalLine(step, format) : provenance(rhythm.name) }
+      </Typography>
       <Typography variant="body2" sx={ { mt: 1 } }>{ startsLine(start, rhythm.name) }</Typography>
     </DialogContent>
-    { error && <Alert severity="error" sx={ { mx: 2, mt: 1 } }>{ error }</Alert> }
+    { (error || exclude.error) && <Alert severity="error" sx={ { mx: 2, mt: 1 } }>{ error || exclude.error }</Alert> }
     <DialogActions sx={ { flexWrap: 'wrap', gap: 1, px: 2, '& > :not(style) ~ :not(style)': { ml: 0 } } }>
       <Button
         variant="contained"

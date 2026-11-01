@@ -5,12 +5,13 @@ import { createDemoRhythms } from '../../../mocks/rhythmsMock';
 import type { Block } from './rhythmOverlay';
 import { withRows } from './rhythmsModel';
 import {
-  addLabel, cardEvidence, cardLine, cardRowLine, chartCaption, DONT_SUGGEST, dontSuggestLabel, evidenceSentence, hiddenForLine,
+  addLabel, cardEvidence, cardLine, cardRowLine, DONT_SUGGEST, dontSuggestLabel, evidenceSentence, hiddenForLine,
   hiddenIntro, hiddenRow, MATCH_CURVE, MATCH_SCHEDULE, nearLine, nightsSoFar,
   provenance, reviewName, sheetHeading, sheetOverline, showAgainName, showNightsLabel, startsLine,
   typicalNightText, uncheckedNote, undoAddMessage, undoHideMessage, withChangeRows,
   clockOf, featureDescription, howSuggestionsWork, LEAVE_OUT_HINT, leaveOutName, nightLabel, noteLines, notesCountLine, notesTitle,
   pairTemperatures, reasonLine, sectionCaption, whatCounts,
+  holdsLine, questionHeading, typicalLine, votesSentence,
 } from './suggestionsCopy';
 
 const nights = (over: Partial<RhythmNights>): RhythmNights => ({
@@ -247,14 +248,6 @@ describe('undo and the hidden list', () => {
     expect(showAgainName(entry({ scope: 'later', key: null, time: null, nightsLeft: 9 }))).toBe('Show again, all suggestions');
   });
 
-  it('captions the chart from the log', () => {
-    const logged = (date: string, changes: number): NightLog => night({
-      date, changes: Array.from({ length: changes }, () => change()),
-    });
-    const all = [logged('2026-10-01', 1), logged('2026-10-02', 0), logged('2026-10-03', 0), logged('2026-10-04', 1)];
-    expect(chartCaption(all, ['2026-10-01'])).toBe('One line per night. 2 had no change and sit on the dashed line. 1 had other changes.');
-    expect(chartCaption(all.slice(0, 2), ['2026-10-01'])).toBe('One line per night. 1 had no change and sits on the dashed line.');
-  });
 });
 
 describe('the sentence under a rhythm card\'s chart', () => {
@@ -320,5 +313,38 @@ describe('the sentence under a rhythm card\'s chart', () => {
     expect(MATCH_CURVE).toBe('Your nights match the curve.');
     expect(nightsSoFar(2)).toBe('2 nights so far.');
     expect(nightsSoFar(1)).toBe('1 night so far.');
+  });
+});
+
+describe('the review sheet for one step', () => {
+  const votes = [
+    { date: '2026-10-24', offsetMin: 237, temperatureF: 78 }, { date: '2026-10-26', offsetMin: 129, temperatureF: 65 },
+    { date: '2026-10-27', offsetMin: 135, temperatureF: 76 }, { date: '2026-10-31', offsetMin: 185, temperatureF: 77 },
+  ];
+  const live: Extract<SuggestionRow, { kind: 'step' }> = {
+    kind: 'step', key: 'step:down', direction: 'down', supporting: 4, firstNight: '2026-10-24', lastNight: '2026-10-31',
+    supportingDates: votes.map(vote => vote.date), votes, time: '22:15', temperatureF: 77, plannedF: 79,
+  };
+
+  it('asks the question the live row answers', () => {
+    expect(questionHeading(live, 'fahrenheit')).toBe('Cool to 77°F at 10:15 PM?');
+    expect(holdsLine(live, 'fahrenheit')).toBe('Your schedule holds 79°F then.');
+    expect(votesSentence(live, 8, 'UTC', '20:00', 'fahrenheit'))
+      .toBe('On 4 of the last 8 nights you turned it down to about 77°F between 10:09 PM and 11:57 PM.');
+    expect(typicalLine(live, 'fahrenheit')).toBe('77°F and 10:15 PM are typical of those nights.');
+  });
+
+  it('gives levels in level format', () => {
+    expect(questionHeading(live, 'level')).toBe('Cool to \u22122 at 10:15 PM?');
+    expect(holdsLine(live, 'level')).toBe('Your schedule holds \u22121 then.');
+    expect(votesSentence(live, 8, 'UTC', '20:00', 'level'))
+      .toBe('On 4 of the last 8 nights you turned it down to about \u22122 between 10:09 PM and 11:57 PM.');
+    expect(typicalLine(live, 'level')).toBe('\u22122 and 10:15 PM are typical of those nights.');
+  });
+
+  it('warms, and gives one time for one night', () => {
+    const up = { ...live, direction: 'up' as const, temperatureF: 84, votes: [votes[0]] };
+    expect(questionHeading(up, 'fahrenheit')).toBe('Warm to 84°F at 10:15 PM?');
+    expect(votesSentence(up, 8, 'UTC', '20:00', 'fahrenheit')).toBe('On 4 of the last 8 nights you turned it up to about 84°F at 11:57 PM.');
   });
 });
