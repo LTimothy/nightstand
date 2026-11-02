@@ -8,11 +8,23 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+## [3.7.2] - 2026-11-01
+
+Redraws the suggestion review sheet so the change and the nights behind it are easy to read.
+
 ### Changes
 
 - The suggestion review sheet draws the change the way the rhythm card does,
   with a dot for each night it is based on. A night far from the others is
   marked Unusual, and Leave out works from the sheet.
+
+### Fixes
+
+- A suggestion's time now comes from each night's first change in the
+  direction it went, so a warmer tap before turning the bed down no longer
+  sets the time of a cooler suggestion.
+
+Checked on: Pod 5, the review sheet on a live suggestion (chart, Unusual mark, night list); Leave out from the sheet not yet tried on the Pod; the 3.7.1 code ran on the Pod nights 10-28 to 10-31.
 
 ## [3.7.1] - 2026-10-28
 
