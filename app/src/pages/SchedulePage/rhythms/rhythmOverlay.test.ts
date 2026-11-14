@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { NightLog } from '@api/rhythmsSchema';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
 import { rhythmOverlay } from './rhythmOverlay';
+import { MATCH_CURVE, typicalNightText } from './suggestionsCopy';
 
 const demo = createDemoRhythms(new Date('2026-10-12T19:00:00Z'));
 // Off days: on at 23:00 with 82 °F, 79 °F at 3:00 AM, off at 7:00 AM. The chart works in UTC here.
@@ -92,25 +93,48 @@ describe('the chart on a rhythm card', () => {
     ]);
   });
 
-  it('draws tonight\'s curve for a Smart rhythm and the nights that held one value against it', () => {
-    const workday = demo.left.rhythms.workday;
-    const flat = (date: string): NightLog => {
-      const on = Date.parse(`${date}T22:30:00.000Z`);
-      return {
-        ...night(date, [], { rhythmId: 'workday', endMin: 495, plan: [{ offsetMin: 0, temperatureF: 80 }] }),
-        start: new Date(on).toISOString(),
-        sets: [{ at: new Date(on).toISOString(), temperatureF: 80 }, { at: new Date(on + 495 * 60_000).toISOString(), temperatureF: null }],
-      };
-    };
-    const drawn = rhythmOverlay({ ...args, rhythm: workday, log: dates.slice(0, 5).map(flat) });
-    expect(drawn.endMin).toBe(495);
+  // Workday: on at 22:30, the curve cools from 22:40 and holds from 23:40, wake 6:30, off 6:45.
+  const workday = demo.left.rhythms.workday;
+  const onAt = (date: string, minutes: number) => new Date(Date.parse(`${date}T22:30:00.000Z`) + minutes * 60_000).toISOString();
+  // A null target is a power-off.
+  const smartNight = (date: string, changes: Array<[number, number | null]> = [], over: Partial<NightLog> = {}): NightLog => ({
+    ...night(date, changes.map(([minutes, targetF]) => ({ ...change(date, 0, 80), at: onAt(date, minutes), targetF: targetF as number })), {
+      rhythmId: 'workday', endMin: 495, start: onAt(date, 0), plan: [{ offsetMin: 0, temperatureF: 80 }],
+      // The controller's own writes: a cool-down that waited for sleep, then the power-off.
+      sets: [{ at: onAt(date, 0), temperatureF: 83 }, { at: onAt(date, 120), temperatureF: 75 }, { at: onAt(date, 495), temperatureF: null }],
+    }),
+    ...over,
+  });
+  const smart = (log: NightLog[], rhythm = workday) => rhythmOverlay({ ...args, rhythm, log });
+  const noWarmUp = { ...workday, smart: { ...workday.smart, warmUp: false } };
+
+  it('draws tonight\'s curve for a Smart rhythm and leaves out the curve\'s own writes', () => {
+    const drawn = smart(dates.slice(0, 5).map(date => smartNight(date)));
+    expect(drawn).toMatchObject({ endMin: 495, nights: 5, drawn: 5, blocks: [] });
     expect(drawn.plan[0].x).toBe(0);
     expect(drawn.plan.length).toBeGreaterThan(2);
-    expect(drawn.nights).toBe(5);
-    expect(drawn.blocks.length).toBeGreaterThan(0);
-    // The first block opens the night against the schedule's start; the rest hold the one value.
-    const turned = (block: { from: number }) => (block.from === 0 ? 'down' : null);
-    expect(drawn.blocks.every(block => block.f === 80 && block.turned === turned(block) && block.schedule.length > 1)).toBe(true);
-    expect(rhythmOverlay({ ...args, rhythm: workday, log: [] })).toMatchObject({ nights: 0, blocks: [] });
+    expect(typicalNightText(drawn.blocks, '22:30', 'fahrenheit', true)).toBe(MATCH_CURVE);
+    expect(smart([])).toMatchObject({ nights: 0, blocks: [] });
+  });
+
+  it('holds a cool-down change on a Smart night until the hold phase starts', () => {
+    const log = [...dates.slice(0, 3).map(date => smartNight(date, [[15, 90]])), smartNight(dates[3]), smartNight(dates[4])];
+    expect(smart(log).blocks.map(({ from, to, f, turned }) => ({ from, to, f, turned }))).toEqual([{ from: 15, to: 70, f: 90, turned: 'up' }]);
+    expect(smart(log.slice(1)).blocks).toEqual([]);
+  });
+
+  it('holds a change during the hold phase three hours with warm-up off, and never past the power-off', () => {
+    const held = smart(dates.slice(0, 5).map(date => smartNight(date, [[120, 90]])), noWarmUp);
+    expect(held.blocks.map(({ from, to, f }) => ({ from, to, f }))).toEqual([{ from: 120, to: 300, f: 90 }]);
+    const late = { ...noWarmUp, night: { ...noWarmUp.night, power: { ...noWarmUp.night.power, off: '06:30' } } };
+    const cut = smart(dates.slice(0, 5).map(date => smartNight(date, [[420, 90]], { endMin: 480 })), late);
+    expect(cut.blocks.map(({ from, to, f }) => ({ from, to, f }))).toEqual([{ from: 420, to: 480, f: 90 }]);
+  });
+
+  it('lets a later change on a Smart night replace the earlier hold, and ends the line at a power-off', () => {
+    const log = dates.slice(0, 5).map(date => smartNight(date, [[120, 90], [180, 70], [200, null]]));
+    // A night counts through its last minute, as on a hand-set rhythm.
+    expect(smart(log, noWarmUp).blocks.map(({ from, to, f }) => ({ from, to, f })))
+      .toEqual([{ from: 120, to: 180, f: 90 }, { from: 180, to: 201, f: 70 }]);
   });
 });

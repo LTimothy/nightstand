@@ -134,7 +134,7 @@ const joinAnd = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${par
 export const nightsSoFar = (nights: number) => `${count(nights, 'night')} so far.`;
 
 // The sentence under a rhythm card's chart: what the typical night did where it left the schedule, in time order.
-// A Smart rhythm's nights can differ from tonight's curve with no hand change, so the bed is the subject there.
+// A Smart rhythm's nights are tonight's curve with your hand changes, so you are the subject there too.
 export function typicalNightText(blocks: Block[], on: string, format: TemperatureFormat, smart: boolean): string {
   if (!blocks.length) return smart ? MATCH_CURVE : MATCH_SCHEDULE;
   const what = smart ? 'the curve' : 'the schedule';
@@ -145,13 +145,13 @@ export function typicalNightText(blocks: Block[], on: string, format: Temperatur
       // Both printed values share a unit, so a level pair never mixes a level with °F.
       const [held, far] = pairTemperatures(block.f, block.farF, format);
       const [now, then] = held === value ? [held, far] : [block.f, block.farF].map(f => displayTemperature(f, 'fahrenheit'));
-      return `${smart ? 'stayed' : 'kept it'} at ${now} while ${what} went ${block.farF < block.f ? 'down' : 'up'} to ${then}`;
+      return `kept it at ${now} while ${what} went ${block.farF < block.f ? 'down' : 'up'} to ${then}`;
     }
     const previous = blocks[index - 1];
-    const verb = previous?.turned ? '' : smart ? (previous ? 'the bed went ' : 'went ') : 'turned it ';
+    const verb = previous?.turned ? '' : 'turned it ';
     return `${verb}${block.turned} to ${value} around ${clockAfterOn(on, Math.round(block.from / round) * round)}`;
   });
-  return `On half or more nights ${smart ? 'the bed' : 'you'} ${joinAnd(clauses)}.`;
+  return `On half or more nights you ${joinAnd(clauses)}.`;
 }
 
 // The value a row writes, read against the one it replaces.

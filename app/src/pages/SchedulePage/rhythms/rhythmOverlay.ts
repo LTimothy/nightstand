@@ -4,6 +4,7 @@ import type { NightLog, Rhythm } from '@api/rhythmsSchema';
 import { wallClock } from '@api/rhythmTimes';
 import { nightMinutes } from '@api/rhythmWake';
 import { MIN_NIGHTS, TIME_ROUND_MIN, WINDOW_NIGHTS } from '@api/suggestionRules';
+import { holdEnd, type CurvePoint } from '@api/smartCurve';
 import { levelToFahrenheit } from '@lib/temperatureConversions';
 import { planSteps, RANGE_F, type Step } from './nightsChartModel';
 import { previewCurves } from './smartPreview';
@@ -29,23 +30,46 @@ function within(points: Step[], end: number): Step[] {
   return [...first, ...sorted.filter(point => point.x > 0 && point.x < end)];
 }
 
-// Tonight's curve for a Smart rhythm, the saved steps for a hand-set one.
-function schedule({ rhythm, today, timeZone, trackingOn }: Args, endMin: number): Step[] {
-  if (rhythm.temperatureMode !== 'smart') return planSteps(rhythm, endMin);
+// Tonight's curve, as steps and as the points with phases the hold rule reads.
+type Curve = { steps: Step[]; points: CurvePoint[]; powerOff: Date; origin: number };
+
+function tonightsCurve({ rhythm, today, timeZone, trackingOn }: Args, endMin: number): Curve {
   const origin = wallClock(today, rhythm.night.power.on, timeZone).getTime();
-  const { series } = previewCurves({ night: rhythm.night, wake: rhythm.wake, smart: rhythm.smart, date: today, timeZone, trackingOn });
-  return within(series.map(point => ({ x: Math.round((point.at.getTime() - origin) / MINUTE), f: levelToFahrenheit(point.level) })), endMin);
+  const { night, wake, smart } = rhythm;
+  const { series, points, anchors } = previewCurves({ night, wake, smart, date: today, timeZone, trackingOn });
+  const x = (at: Date) => Math.round((at.getTime() - origin) / MINUTE);
+  const steps = within(series.map(point => ({ x: x(point.at), f: levelToFahrenheit(point.level) })), endMin);
+  return { steps, points, powerOff: anchors.powerOff, origin };
 }
 
-// One ended night as the bed was set: the scheduler's writes and the hand changes in time order, ending at the
-// first power-off, the night's own end or the axis. A night noted before the writes were kept holds from its first change.
-function nightLine(night: NightLog, origin: number, endMin: number): Night | null {
+// A Smart night replayed on tonight's curve with that night's hand changes, so the curve's own steps never read as a
+// difference. Each change holds as the controller holds it, until a later change replaces it.
+function smartEvents(changes: Array<{ x: number; f: number | null }>, curve: Curve) {
+  const holds = changes.flatMap((change, index) => {
+    if (change.f === null) return [];
+    const ends = holdEnd(curve.points, new Date(curve.origin + change.x * MINUTE), curve.powerOff).getTime();
+    const next = changes[index + 1]?.x ?? Infinity;
+    return [{ x: change.x, f: change.f, until: Math.min(Math.round((ends - curve.origin) / MINUTE), next), next }];
+  });
+  return [
+    ...curve.steps.filter(step => !holds.some(hold => step.x >= hold.x && step.x < hold.until)),
+    // A hold that ends before the next change hands back to the curve.
+    ...holds.flatMap(hold => [{ x: hold.x, f: hold.f },
+      ...(hold.until < hold.next ? [{ x: hold.until, f: valueAt(curve.steps, hold.until) }] : [])]),
+  ];
+}
+
+// One ended night as the bed was set, ending at the first power-off, the night's own end or the axis. A hand-set
+// rhythm's night is the scheduler's writes and the hand changes in time order; a night noted before the writes were
+// kept holds from its first change.
+function nightLine(night: NightLog, origin: number, endMin: number, curve: Curve | null): Night | null {
   const minutes = (at: string) => Math.round((Date.parse(at) - origin) / MINUTE);
-  const events = [
+  const changes = night.changes.map(change => ({ x: minutes(change.at), f: change.targetF as number | null })).sort((a, b) => a.x - b.x);
+  const events = curve ? smartEvents(changes, curve) : [
     ...(night.sets ?? []).map(set => ({ x: minutes(set.at), f: set.temperatureF, hand: 0 })),
-    ...night.changes.map(change => ({ x: minutes(change.at), f: change.targetF as number | null, hand: 1 })),
+    ...changes.map(change => ({ ...change, hand: 1 })),
   ].sort((a, b) => a.x - b.x || a.hand - b.hand);
-  const off = events.find(event => event.f === null);
+  const off = (curve ? changes : events).find(event => event.f === null);
   // Some power-offs write no off line, so the night's end always counts.
   const ended = (night.start ? minutes(night.start) : 0) + night.endMin;
   const end = Math.min(endMin, ended, off?.x ?? endMin);
@@ -102,14 +126,15 @@ function differences(typical: Array<number | null>, plan: Step[], endMin: number
 export function rhythmOverlay(args: Args): Overlay {
   const { rhythm, log, timeZone } = args;
   const endMin = nightMinutes(rhythm.night.power);
-  const plan = schedule(args, endMin);
+  const curve = rhythm.temperatureMode === 'smart' ? tonightsCurve(args, endMin) : null;
+  const plan = curve ? curve.steps : planSteps(rhythm, endMin);
   // The notes' own rule: a night left out or under another plan does not count.
   const counted = log.filter(night => night.rhythmId === rhythm.id && !night.tonight && !night.excluded && night.samePlan !== false)
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, WINDOW_NIGHTS);
   // A night with nothing written to draw (a held temperature at power-on) still counts, as in the notes.
   const nights = counted.flatMap(night => {
-    const drawn = nightLine(night, wallClock(night.date, rhythm.night.power.on, timeZone).getTime(), endMin);
+    const drawn = nightLine(night, wallClock(night.date, rhythm.night.power.on, timeZone).getTime(), endMin, curve);
     return drawn ? [drawn] : [];
   });
   const blocks = nights.length >= MIN_NIGHTS && plan.length ? differences(typicalNight(nights, plan, endMin), plan, endMin) : [];
