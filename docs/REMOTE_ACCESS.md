@@ -199,9 +199,9 @@ server, Eight Sleep's included. Masking the update services in
 stops firmware updates, and the script's `/etc/hosts` block for Eight
 Sleep's update hosts
 ([details](../INSTALLATION.md#keeping-eight-sleep-updates-out)) is what
-refuses its updater here. I have not tested that with Tailscale on. The exceptions stay until the firewall is applied
-again, even if Tailscale stops. To remove them, stop Tailscale and rerun the
-script.
+refuses its updater here. I have not tested that with Tailscale on. The
+exceptions stay until the firewall is applied again, even if Tailscale
+stops. To remove them, stop Tailscale and rerun the script.
 
 ## 6. Use the Pod from your phone
 
