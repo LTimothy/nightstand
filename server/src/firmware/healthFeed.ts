@@ -15,7 +15,7 @@ export interface HealthIncident {
   historical?: boolean;
 }
 const severity = (code: HealthRecord['code']): HealthIncident['severity'] =>
-  ['write-failures', 'samples-dropped'].includes(code) ? 'warning'
+  code === 'write-failures' ? 'warning'
     : ['bus-timeout', 'device-missing', 'pump-running', 'pump-stopped', 'throttling-disabled'].includes(code) ? 'diagnostic' : 'info';
 
 export class HealthFeed {
@@ -36,8 +36,9 @@ export class HealthFeed {
 
   observe(record: HealthRecord, session: string, now: number) {
     this.beginSession(session, now);
+    if (record.code === 'samples-dropped') return;
     let count = 1;
-    if (record.code === 'write-failures' || record.code === 'samples-dropped') {
+    if (record.code === 'write-failures') {
       if (record.value === undefined) return;
       if (record.timestamp < (this.counterTimes.get(record.code) ?? 0)) return;
       this.counterTimes.set(record.code, record.timestamp);

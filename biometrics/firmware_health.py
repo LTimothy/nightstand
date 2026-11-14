@@ -55,10 +55,9 @@ def classify_log(message):
         return {**result, 'code': 'water-calibrated' if calibrated else 'water-calibration', 'details': details}
     if re.search(r'\bCapwater not calibrated\b', message):
         return {**result, 'code': 'water-calibration'}
-    for label, code in (('FS_WRITE_FAIL', 'write-failures'), ('SENSOR_SAMPLES_DROPPED', 'samples-dropped')):
-        match = re.search(r'\b' + label + r':\s*(\d{1,15})(?:\s|$)', message)
-        if match:
-            return {**result, 'code': code, 'value': int(match.group(1))}
+    match = re.search(r'\bFS_WRITE_FAIL:\s*(\d{1,15})(?:\s|$)', message)
+    if match:
+        return {**result, 'code': 'write-failures', 'value': int(match.group(1))}
     if re.search(r'\bstarted throttling .*\[disabled\]', message):
         return {**result, 'code': 'throttling-disabled'}
     return None

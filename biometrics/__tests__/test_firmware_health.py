@@ -18,7 +18,6 @@ class HealthClassifierTest(unittest.TestCase):
                  ('failed to find USB device on port: 1-1.2', 'device-missing'),
                  ('Capwater not calibrated', 'water-calibration'),
                  ('FS_WRITE_FAIL: 0', 'write-failures'),
-                 ('SENSOR_SAMPLES_DROPPED: 123', 'samples-dropped'),
                  ('started throttling cooling [disabled]', 'throttling-disabled')]
         for message, code in cases:
             with self.subTest(message=message):
@@ -32,7 +31,8 @@ class HealthClassifierTest(unittest.TestCase):
     def test_side_and_bounded_numeric_details(self):
         self.assertEqual(classify_log('[cap_samplingR] status ok->too low')['side'], 'right')
         self.assertEqual(classify_log('[i2c12] timed out req 2')['details'], {'bus': 12})
-        self.assertEqual(classify_log('SENSOR_SAMPLES_DROPPED: 12')['value'], 12)
+        self.assertEqual(classify_log('FS_WRITE_FAIL: 0')['value'], 0)
+        self.assertIsNone(classify_log('SENSOR_SAMPLES_DROPPED: 123'))
 
     def test_every_pump_speed_counts_as_running(self):
         for speed in ('slow', 'fast', 'default'):

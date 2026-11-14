@@ -49,18 +49,24 @@ const ingestLog = (store: FirmwareTelemetry, record: ReturnType<typeof log>, ses
 };
 it('baselines counters after either restart, counts increases and handles resets', () => {
   const store = new FirmwareTelemetry();
-  ingestLog(store, log('samples-dropped', 100, 1, 500));
+  ingestLog(store, log('write-failures', 100, 1, 500));
   assert.equal(store.snapshot(healthFeatures, true, 100).incidents.length, 0);
-  ingestLog(store, log('samples-dropped', 101, 2, 502));
+  ingestLog(store, log('write-failures', 101, 2, 502));
   assert.equal(store.snapshot(healthFeatures, true, 101).incidents[0].count, 2);
-  ingestLog(store, log('samples-dropped', 102, 3, 0));
-  ingestLog(store, log('samples-dropped', 103, 4, 1));
+  ingestLog(store, log('write-failures', 102, 3, 0));
+  ingestLog(store, log('write-failures', 103, 4, 1));
   assert.equal(store.snapshot(healthFeatures, true, 103).incidents[0].count, 3);
-  ingestLog(store, log('samples-dropped', 104, 5, 900), 'b'.repeat(32));
+  ingestLog(store, log('write-failures', 104, 5, 900), 'b'.repeat(32));
   assert.equal(store.snapshot(healthFeatures, true, 104).incidents[0].count, 3);
   const restarted = new FirmwareTelemetry();
   ingestLog(restarted, log('write-failures', 105, 1, 42));
   assert.equal(restarted.snapshot(healthFeatures, true, 105).incidents.length, 0);
+});
+it('accepts a samples-dropped record from an older stream without raising an incident', () => {
+  const store = new FirmwareTelemetry();
+  ingestLog(store, log('samples-dropped', 100, 1, 500));
+  ingestLog(store, log('samples-dropped', 101, 2, 4294967295));
+  assert.equal(store.snapshot(healthFeatures, true, 101).incidents.length, 0);
 });
 it('collapses repeats, deduplicates across sources and never calls silence recovery', () => {
   const store = new FirmwareTelemetry();
@@ -162,9 +168,9 @@ it('preserves cooling history across thirty-second delivery batches and out-of-o
 
 it('treats incidents retained across a stream restart as historical', () => {
   const store = new FirmwareTelemetry();
-  ingestLog(store, log('samples-dropped', 100, 1, 500));
-  ingestLog(store, log('samples-dropped', 101, 2, 502));
-  ingestLog(store, log('samples-dropped', 102, 3, 900), 'b'.repeat(32));
+  ingestLog(store, log('write-failures', 100, 1, 500));
+  ingestLog(store, log('write-failures', 101, 2, 502));
+  ingestLog(store, log('write-failures', 102, 3, 900), 'b'.repeat(32));
   assert.equal(store.snapshot(healthFeatures, true, 102).incidents[0].freshness, 'Historical');
   assert.equal(store.summary(healthFeatures, true, 102)?.status, 'waiting_for_data');
 });

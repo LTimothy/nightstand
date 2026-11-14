@@ -123,7 +123,7 @@ class FirmwareDelivery:
                     self.pending.put_nowait(sample)
                 except queue.Full:
                     pass
-            if button or sample.get('code') in ('write-failures', 'samples-dropped'):
+            if button or sample.get('code') == 'write-failures':
                 self.wake.set()
         if records and not self.started:
             self.started = True
