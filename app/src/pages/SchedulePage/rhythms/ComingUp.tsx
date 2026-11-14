@@ -10,7 +10,7 @@ import { BOTTOM_SHEET, INACTIVE } from './sheetStyles';
 import MultiDateSheet from './MultiDateSheet';
 import RhythmPicker from './RhythmPicker';
 import {
-  changeFor, dayLabel, effectiveRhythmId, formatDate, MAX_CHANGE_DAYS_AHEAD, NO_SLEEP, rhythmDetail, rhythmOptions,
+  changeFor, dayLabel, effectiveRhythmId, formatDate, MAX_CHANGE_DAYS_AHEAD, NO_SLEEP, rhythmOptions, rhythmTimes,
   sleepDetail, weekLabel, type DateChoice, type PickerOption,
 } from './rhythmsModel';
 
@@ -57,7 +57,7 @@ export default function ComingUp({
     const rhythm = id ? sideData.rhythms[id] : undefined;
     if (!rhythm) return NO_SLEEP;
     const sleep = sleeps.find(item => item.date === date);
-    return `${rhythm.name} · ${sleep ? sleepDetail(sleep, timeZone) : rhythmDetail(rhythm)}`;
+    return `${rhythm.name} · ${sleep ? sleepDetail(sleep, timeZone) : rhythmTimes(rhythm.night)}`;
   };
   const options = (date: string): PickerOption[] => [
     ...rhythmOptions(sideData),

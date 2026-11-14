@@ -58,7 +58,7 @@ export default function OverlayChart({ endMin, loF, hiF, plan, blocks, on, forma
   const top = Math.round(fahrenheitToDisplay(hiF, format));
   const tick = (f: number) => yTickLabel(Math.round(fahrenheitToDisplay(f, format)), top, format);
   const align = (index: number, count: number) => (index === 0 ? '0' : index === count - 1 ? '-100%' : '-50%');
-  return <Box sx={ { display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 0.75, rowGap: 0.5 } }>
+  return <Box sx={ { display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 0.75, rowGap: 1.25 } }>
     <Box sx={ { display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', my: '-6px' } }>
       { [hiF, (hiF + loF) / 2, loF].map((f, index) => <Typography key={ index } { ...axisText }>{ tick(f) }</Typography>) }
     </Box>

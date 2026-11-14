@@ -78,7 +78,7 @@ export class HealthFeed {
     this.prune(now);
     const sensorFresh = this.lastSensor !== undefined && now - this.lastSensor <= FIRMWARE_FRESH_SECONDS;
     const incidents = this.incidents.map(item => ({ ...item,
-      freshness: item.historical ? 'Historical' : now - item.lastSeen <= FIRMWARE_FRESH_SECONDS ? 'Recent' : 'No recent readings' }));
+      freshness: item.historical ? 'Historical' : now - item.lastSeen <= FIRMWARE_FRESH_SECONDS ? 'Recent' : 'Earlier' }));
     const missingSince = this.lastSensor ?? this.firstObservation;
     const interrupted = !sensorFresh && missingSince !== undefined && now - missingSince >= 120
       && incidents.some(item => item.code === 'bus-timeout' && item.freshness === 'Recent');

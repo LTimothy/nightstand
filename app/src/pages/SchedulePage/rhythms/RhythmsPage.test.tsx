@@ -112,7 +112,7 @@ it('ignores the other side\'s sleeps, as the server sends for a side that is awa
     return HttpResponse.json(listMockSleeps('right', new Date(url.searchParams.get('from')!), new Date(url.searchParams.get('to')!)));
   }));
   renderWithProviders(<ScheduleTab/>);
-  expect(await screen.findByRole('button', { name: 'Tomorrow, Sep 29: Workday · 10:30 PM to 6:45 AM · Smart Schedule' }))
+  expect(await screen.findByRole('button', { name: 'Tomorrow, Sep 29: Workday · 10:30 PM to 6:45 AM' }))
     .toBeInTheDocument();
   expect(screen.queryByText('Now')).not.toBeInTheDocument();
 });

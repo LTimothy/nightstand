@@ -102,7 +102,7 @@ export function rhythmDetail(rhythm: Rhythm): string {
 export function sleepDetail(sleep: ResolvedSleepResponse, timeZone: string): string {
   const time = (value: string) => moment.tz(value, timeZone).format('h:mm A');
   const start = sleep.mode === 'smart' ? clock(sleep.night.power.on) : time(sleep.start);
-  return `${start} to ${time(sleep.end)}${sleep.mode === 'smart' ? ' · Smart Schedule' : ''}`;
+  return `${start} to ${time(sleep.end)}`;
 }
 
 export function rhythmOptions(side: SideRhythms): PickerOption[] {
@@ -127,7 +127,7 @@ export function isRhythmInUse(side: SideRhythms, id: string, today: string): boo
 }
 
 export function describeUsage(usage: RhythmUsage): string {
-  if (!usage.days.length && !usage.dates.length) return 'Not used yet';
+  if (!usage.days.length && !usage.dates.length) return 'Not scheduled';
   // Dates listed together drop their inner comma so the list stays readable.
   const dates = usage.dates.map(date => usage.dates.length > 1 ? moment(date, DATE).format('ddd MMM D') : formatDate(date));
   const datesText = dates.length > 1 ? `${dates.slice(0, -1).join(', ')} and ${dates[dates.length - 1]}` : dates[0];

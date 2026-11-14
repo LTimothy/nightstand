@@ -29,7 +29,7 @@ it('describes times, days and dates in plain words', () => {
   expect(describeDays([...LOWERCASE_DAYS])).toBe('Every day');
   expect(describeUsage(rhythmUsage(left, 'weekend', '2026-09-28'))).toBe('Used on Fri and Sat');
   expect(describeUsage({ days: ['friday', 'saturday'], dates: ['2026-10-03'] })).toBe('Used on Fri and Sat, plus Sat, Oct 3');
-  expect(describeUsage({ days: [], dates: [] })).toBe('Not used yet');
+  expect(describeUsage({ days: [], dates: [] })).toBe('Not scheduled');
   expect(describeUsage({ days: [], dates: ['2026-10-03'] })).toBe('Used on Sat, Oct 3');
   const threeDates = ['2026-10-03', '2026-10-04', '2026-10-05'];
   expect(describeUsage({ days: [], dates: threeDates })).toBe('Used on Sat Oct 3, Sun Oct 4 and Mon Oct 5');

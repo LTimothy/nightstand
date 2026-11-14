@@ -77,7 +77,7 @@ it('collapses repeats, deduplicates across sources and never calls silence recov
   const incidents = store.snapshot(healthFeatures, true, 171).incidents;
   assert.equal(incidents.length, 1);
   assert.equal(incidents[0].count, 2);
-  assert.equal(incidents[0].freshness, 'No recent readings');
+  assert.equal(incidents[0].freshness, 'Earlier');
   assert.equal(incidents[0].recoveredAt, undefined);
   assert.equal(store.snapshot(healthFeatures, true, 171).sensorFresh, false);
 });

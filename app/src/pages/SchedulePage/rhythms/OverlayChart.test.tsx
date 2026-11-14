@@ -42,4 +42,10 @@ describe('the overlay chart', () => {
     draw({ on: '20:00', endMin: 660, ticks: [0, 135, 660] });
     for (const text of ['8:00 PM', '10:15 PM', '7:00 AM']) expect(screen.getByText(text)).toBeInTheDocument();
   });
+
+  it('leaves room under the y labels for the time row', () => {
+    const { container } = draw({});
+    // jsdom has no layout, so assert the grid gap that keeps the bottom label clear
+    expect(getComputedStyle(container.firstElementChild as Element).rowGap).toBe('10px');
+  });
 });

@@ -30,7 +30,7 @@ const sleepAround = (start: number, end: number, date = '2026-09-28') => ({
 
 it('lists dates with their rhythm and marks changed ones', () => {
   renderComingUp(['2026-09-28', '2026-09-29', '2026-09-30']);
-  expect(screen.getByRole('button', { name: 'Today, Sep 28: Workday · 10:30 PM to 6:45 AM · Smart Schedule' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Today, Sep 28: Workday · 10:30 PM to 6:45 AM' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Wed, Sep 30: No sleep scheduled, changed' })).toBeInTheDocument();
   expect(screen.getAllByText('Changed')).toHaveLength(1);
 });
