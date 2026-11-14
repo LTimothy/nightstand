@@ -45,6 +45,8 @@ function tonightsCurve({ rhythm, today, timeZone, trackingOn }: Args, endMin: nu
 // A Smart night replayed on tonight's curve with that night's hand changes, so the curve's own steps never read as a
 // difference. Each change holds as the controller holds it, until a later change replaces it.
 function smartEvents(changes: Array<{ x: number; f: number | null }>, curve: Curve) {
+  // No curve to replay on, so nothing to compare.
+  if (!curve.steps.length) return [];
   const holds = changes.flatMap((change, index) => {
     if (change.f === null) return [];
     const ends = holdEnd(curve.points, new Date(curve.origin + change.x * MINUTE), curve.powerOff).getTime();
