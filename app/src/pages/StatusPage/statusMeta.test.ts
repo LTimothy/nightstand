@@ -30,3 +30,7 @@ it('describes the biometrics add-on without naming HRV', () => {
     'Whether the biometrics add-on (heart rate and sleep estimates) is installed on the Pod.',
   );
 });
+
+it('uses the short boot rescue subtitle', () => {
+  expect(STATUS_META.bootRescue.blurb).toBe('Whether serial rescue still works');
+});

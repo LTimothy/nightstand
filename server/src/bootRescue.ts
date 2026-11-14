@@ -17,10 +17,12 @@ export function readBootSettings(file = BOOT_SETTINGS): BootSettings | undefined
 
 export function bootRescueStatus(settings: BootSettings | undefined): Pick<StatusInfo, 'status' | 'message'> {
   const { bootdelay, currentSlot, nextSlot } = settings ?? {};
-  if (typeof bootdelay === 'string' && /^-\d+$/.test(bootdelay)) {
+  const delay = typeof bootdelay === 'string' && /^-?\d+$/.test(bootdelay) ? bootdelay : undefined;
+  // -1 waits at the prompt for good; only -2 and below skip it.
+  if (delay !== undefined && Number(delay) <= -2) {
     return {
       status: 'failed',
-      message: `Startup no longer pauses for serial access (bootdelay ${bootdelay}), so serial rescue will not work. `
+      message: `Startup no longer pauses for serial access (bootdelay ${delay}), so serial rescue will not work. `
         + 'Set it back with fw_setenv bootdelay 2 over SSH.',
     };
   }
@@ -30,8 +32,8 @@ export function bootRescueStatus(settings: BootSettings | undefined): Pick<Statu
       message: 'The next restart will start from the other system slot. A stock update may be waiting; check before restarting.',
     };
   }
-  if (typeof bootdelay === 'string' && /^\d+$/.test(bootdelay)) {
-    return { status: 'healthy', message: `Startup pauses for serial access (bootdelay ${bootdelay}).` };
+  if (delay !== undefined) {
+    return { status: 'healthy', message: `Startup pauses for serial access (bootdelay ${delay}).` };
   }
   return { status: 'not_started', message: 'Boot settings not read yet.' };
 }

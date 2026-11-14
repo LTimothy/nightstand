@@ -160,7 +160,7 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
   },
   bootRescue: {
     group: 'core',
-    blurb: 'Whether startup still pauses for serial access, so a Pod that cannot start can be recovered over a serial cable.',
+    blurb: 'Whether serial rescue still works',
     meaning: { healthy: 'Serial rescue still works.', not_started: 'Boot settings not read yet.' },
   },
   database: {

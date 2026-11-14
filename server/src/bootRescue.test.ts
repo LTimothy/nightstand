@@ -10,6 +10,11 @@ it('bootdelay 2 with matching slots is healthy', () => {
     { status: 'healthy', message: 'Startup pauses for serial access (bootdelay 2).' });
 });
 
+it('bootdelay -1 is healthy', () => {
+  assert.deepEqual(bootRescueStatus({ bootdelay: '-1', currentSlot: 'a', nextSlot: 'a' }),
+    { status: 'healthy', message: 'Startup pauses for serial access (bootdelay -1).' });
+});
+
 it('bootdelay -2 is failed', () => {
   assert.deepEqual(bootRescueStatus({ bootdelay: '-2', currentSlot: 'a', nextSlot: 'a' }), {
     status: 'failed',
