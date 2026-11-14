@@ -1441,6 +1441,12 @@ the biometrics service; `/api/deviceStatus` converts them.
   file in `/persistent` was written in the last 15 seconds and `failed`
   with the reason otherwise: no RAW file, a file that stopped growing, or a
   click that could not be applied.
+- `bootRescue` reads `/run/nightstand-boot-settings.json`, which the health
+  check writes once per boot from `fw_printenv`. It is `healthy` while
+  `bootdelay` is -1 or above and the boot slots match, `failed` when
+  `bootdelay` is -2 or below or the next restart switches slots (both
+  messages when both hold), and `not_started` when the file is missing or
+  the settings could not be read.
 
 #### Response
 
@@ -1453,6 +1459,7 @@ the biometrics service; `/api/deviceStatus` converts them.
   "frankenMonitor": { "name": "Franken monitor", "status": "healthy", "description": "Handles gestures and monitoring the status", "message": "" },
   "buttonMonitor": { "name": "Cover buttons", "status": "healthy", "description": "Reads ignored cover clicks from the RAW files", "message": "Off in Settings > Bed and sides > Cover buttons", "timestamp": "2026-09-20T18:04:11-07:00" },
   "jobs": { "name": "Job scheduler", "status": "healthy", "description": "Scheduling service for temperature changes, alarms, and maintenance", "message": "" },
+  "bootRescue": { "name": "Boot rescue", "status": "healthy", "description": "Whether serial rescue still works", "message": "Startup pauses for serial access (bootdelay 2)." },
   "logger": { "name": "Logger", "status": "healthy", "description": "Logging service", "message": "" },
   "powerSchedule": { "name": "Power schedule", "status": "healthy", "description": "Power on/off schedule", "message": "" },
   "primeSchedule": { "name": "Prime schedule", "status": "healthy", "description": "Daily prime job", "message": "" },

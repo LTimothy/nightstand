@@ -256,7 +256,7 @@ systemctl mask swupdate-progress swupdate defibrillator eight-kernel telegraf ve
 ### Keeping Eight Sleep updates out
 
 Step 11 masks the update services, and step 19 adds a second layer. The
-firewall script (`block_internet_access.sh`) does three things for this. You
+firewall script (`block_internet_access.sh`) does two things for this. You
 run it in step 19, and it runs again with every update, rollback, restore and
 fork switch. The hosts file is kept across restarts, so once written the
 block stays. An existing install gets it with its next update.
@@ -265,7 +265,6 @@ block stays. An existing install gets it with its next update.
   in `/etc/hosts` that points `update-api.8slp.net`,
   `raw-api-upload.8slp.net` and `device-api-ws.8slp.net` at `0.0.0.0` and `::`.
 - Masks `swupdate-usb@.service`, so a USB drive cannot start an update.
-- Does not accept inbound UDP from source port 123.
 
 Eight Sleep's cloud agent (capybara) keeps running. On a Pod 5, Eight
 Sleep's own `/opt/eight/bin/frank.sh` waits for capybara before it starts the
