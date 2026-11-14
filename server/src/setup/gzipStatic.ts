@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import type { ServerResponse } from 'node:http';
 import type { RequestHandler } from 'express';
 
 type Entry = { mtimeMs: number; size: number; gz: Promise<Buffer> };
@@ -9,6 +10,14 @@ const TYPES: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
 };
+
+// Appends to Vary instead of replacing it, so cors's Vary: Origin survives.
+export function addVary(res: ServerResponse, value: string): void {
+  const cur = String(res.getHeader('Vary') ?? '');
+  if (!cur.split(',').some((v) => v.trim().toLowerCase() === value.toLowerCase())) {
+    res.setHeader('Vary', cur ? `${cur}, ${value}` : value);
+  }
+}
 
 export function gzipStatic(publicDir: string): RequestHandler {
   let names: string[] = [];
@@ -33,12 +42,12 @@ export function gzipStatic(publicDir: string): RequestHandler {
         }));
         entry = { mtimeMs: st.mtimeMs, size: st.size, gz };
         cache.set(name, entry);
-        gz.catch(() => cache.delete(name));
+        gz.catch(() => { if (cache.get(name) === entry) cache.delete(name); });
       }
       const body = await entry.gz;
       res.setHeader('Content-Type', TYPES[path.extname(name)]);
       res.setHeader('Content-Encoding', 'gzip');
-      res.setHeader('Vary', 'Accept-Encoding');
+      addVary(res, 'Accept-Encoding');
       res.setHeader('Cache-Control', 'public, max-age=0');
       res.setHeader('Last-Modified', st.mtime.toUTCString());
       res.setHeader('ETag', `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}-gz"`);

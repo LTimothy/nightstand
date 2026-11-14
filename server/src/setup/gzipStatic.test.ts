@@ -7,7 +7,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
-import { gzipStatic } from './gzipStatic.js';
+import { addVary, gzipStatic } from './gzipStatic.js';
 
 const BODY = 'console.log("nightstand");\n'.repeat(500);
 let dir: string;
@@ -34,10 +34,14 @@ describe('gzipStatic', () => {
     fs.writeFileSync(path.join(dir, 'app.css'), 'a{color:red}\n'.repeat(200));
     fs.writeFileSync(path.join(dir, 'later.js'), BODY);
     const app = express();
+    app.use((req, res, next) => {
+      if (req.headers['x-vary-origin']) res.setHeader('Vary', 'Origin');
+      next();
+    });
     app.use(gzipStatic(dir));
     app.use(express.static(dir, {
       setHeaders: (res, file) => {
-        if (/\.(js|css)$/.test(file)) res.setHeader('Vary', 'Accept-Encoding');
+        if (/\.(js|css)$/.test(file)) addVary(res, 'Accept-Encoding');
       },
     }));
     server = app.listen(0);
@@ -58,6 +62,13 @@ describe('gzipStatic', () => {
     assert.strictEqual(r.headers['cache-control'], 'public, max-age=0');
     assert.match(String(r.headers.etag), /-gz"$/);
     assert.strictEqual(zlib.gunzipSync(r.body).toString(), BODY);
+  });
+
+  it('keeps an existing Vary: Origin on gzip and identity responses', async () => {
+    const gz = await get('/app.js', { 'accept-encoding': 'gzip', 'x-vary-origin': '1' });
+    assert.strictEqual(gz.headers.vary, 'Origin, Accept-Encoding');
+    const id = await get('/app.js', { 'x-vary-origin': '1' });
+    assert.strictEqual(id.headers.vary, 'Origin, Accept-Encoding');
   });
 
   it('serves css as text/css', async () => {

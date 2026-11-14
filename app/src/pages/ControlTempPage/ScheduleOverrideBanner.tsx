@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Button, Typography, Box } from '@mui/material';
 import moment from 'moment-timezone';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,15 @@ export default function ScheduleOverrideBanner() {
   const override = settings?.[side]?.scheduleOverrides?.temperatureSchedules;
   const isOverridden =
     !!override?.disabled && !!override.expiresAt && moment(override.expiresAt).isAfter(moment());
+
+  const expiresAt = override?.expiresAt;
+  const [, setExpired] = useState(0);
+  // Re-render when the hold ends so the banner drops away without waiting on a refetch.
+  useEffect(() => {
+    if (!isOverridden || !expiresAt) return;
+    const id = setTimeout(() => setExpired((n) => n + 1), Math.min(moment(expiresAt).diff(moment()) + 50, 2 ** 31 - 1));
+    return () => clearTimeout(id);
+  }, [isOverridden, expiresAt]);
 
   // The pause notice on the Tonight card covers a paused side.
   if (!isOverridden || !settings || isSchedulePaused(settings, side, moment().toDate())) return null;

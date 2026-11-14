@@ -253,7 +253,7 @@ test('a day sleep is this sleep on Bed and in the pause sheet', async ({ page })
 test('a Smart Schedule sleep without a warm start says turns on', async ({ page }) => {
   await open(page, '/', new Date('2026-09-29T05:00:00Z'));
   await page.getByRole('radiogroup', { name: 'Bed side' }).getByRole('radio', { name: /^Sam/ }).click();
-  await expect(page.getByText(/^Turns on tomorrow at 7:40 AM, set to/)).toBeVisible();
+  await expect(page.getByText(/^Turns on tomorrow at 7:40 AM for an 8:00 AM bedtime, set to/)).toBeVisible();
 });
 
 test('turning Rhythms off previews the handoff and brings back the weekly schedule', async ({ page }) => {

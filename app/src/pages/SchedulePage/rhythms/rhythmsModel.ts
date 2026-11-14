@@ -98,7 +98,7 @@ export function rhythmDetail(rhythm: Rhythm): string {
   return `${rhythmTimes(rhythm.night)}${rhythm.temperatureMode === 'smart' ? ' · Smart Schedule' : ''}`;
 }
 
-// A Smart Schedule sleep starts warming before its bedtime; list the bedtime, as the rhythm card does.
+// A Smart Schedule sleep turns on before its bedtime; list the bedtime, as the rhythm card does.
 export function sleepDetail(sleep: ResolvedSleepResponse, timeZone: string): string {
   const time = (value: string) => moment.tz(value, timeZone).format('h:mm A');
   const start = sleep.mode === 'smart' ? clock(sleep.night.power.on) : time(sleep.start);

@@ -38,6 +38,6 @@ export const markManualTempChange = async (side: Side, change?: HandChange): Pro
     if (next.diff(now, 'minutes') / 60 > OVERRIDE_WINDOW_HOURS) return false;
     const expiresAt = now.clone().add(OVERRIDE_DURATION_HOURS, 'hours').format();
     draft[side].scheduleOverrides.temperatureSchedules = { disabled: true, expiresAt };
-    logger.info(`[manual temp] ${side}: schedule paused until ${expiresAt} (next change was at ${next.format()}).`);
+    logger.info(`[manual temp] ${side}: temperature held until ${expiresAt} (next change was at ${next.format()}).`);
   });
 };

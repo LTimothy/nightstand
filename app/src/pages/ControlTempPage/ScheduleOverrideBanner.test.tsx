@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import moment from 'moment-timezone';
 import ScheduleOverrideBanner from './ScheduleOverrideBanner';
@@ -45,4 +45,17 @@ it('steps aside while the whole schedule is paused', () => {
   fixture.pause = { active: true, expiresAt: '' };
   renderBanner();
   expect(screen.queryByText('Holding your temperature')).not.toBeInTheDocument();
+});
+
+it('drops away when the hold ends', () => {
+  vi.restoreAllMocks();
+  vi.useFakeTimers({ now: Date.parse('2026-09-28T22:59:00Z') });
+  try {
+    renderBanner();
+    expect(screen.getByText('Holding your temperature')).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(61_000); });
+    expect(screen.queryByText('Holding your temperature')).not.toBeInTheDocument();
+  } finally {
+    vi.useRealTimers();
+  }
 });
