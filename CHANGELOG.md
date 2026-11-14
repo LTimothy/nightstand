@@ -27,6 +27,18 @@ is a hard fork; for the history of the projects it descends from, see
 - The first load after an update is faster: the Pod compresses the app's
   scripts and styles, and a loading screen shows until the app starts.
 
+### Updates and recovery
+
+- The firewall script now also blocks Eight Sleep's update hosts in
+  `/etc/hosts` and masks the USB update unit, at install, on every update and
+  when the saved rules are restored at boot. With Tailscale on, the firewall
+  opens HTTPS to any host, so the hosts block is the guard there; not yet
+  tested on a Pod with Tailscale on.
+- The firewall no longer accepts inbound UDP from source port 123.
+- System status has a Boot rescue row. It shows whether startup still pauses
+  for serial access and warns when the next restart would use the other
+  system slot. See [installation](INSTALLATION.md#keeping-eight-sleep-updates-out).
+
 ## [3.7.2] - 2026-11-01
 
 Redraws the suggestion review sheet so the change and the nights behind it are easy to read.

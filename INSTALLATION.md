@@ -253,6 +253,46 @@ systemctl disable --now swupdate-progress swupdate defibrillator eight-kernel te
 systemctl mask swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket swupdate-usb@
 ```
 
+### Keeping Eight Sleep updates out
+
+Step 11 masks the update services, and step 19 adds a second layer. The
+firewall script (`block_internet_access.sh`, which also runs at install, on
+every update and when the saved rules are restored at boot) does three things
+for this:
+
+- Adds a block between `# nightstand-block-start` and `# nightstand-block-end`
+  in `/etc/hosts` that points `update-api.8slp.net`,
+  `raw-api-upload.8slp.net` and `device-api-ws.8slp.net` at `0.0.0.0` and `::`.
+- Masks `swupdate-usb@.service`, so a USB drive cannot start an update.
+- Does not accept inbound UDP from source port 123.
+
+Eight Sleep's cloud agent (capybara) keeps running. The firmware launcher
+waits for it, so it is left alone. Its connections are what the firewall and
+the hosts block refuse.
+
+With Tailscale running, the firewall opens HTTPS to any host (see
+[remote access](docs/REMOTE_ACCESS.md#5-turn-the-firewall-back-on)), so the
+hosts block is what stops Eight Sleep's updater there. I have not tested that
+on a Pod with Tailscale on.
+
+The boot setting that lets you rescue a Pod over the serial cable can also be
+changed by a stock update. Check it over SSH as root:
+
+```bash
+fw_printenv bootdelay
+```
+
+A value of -2 or below skips the startup pause, and serial rescue will not
+work. Restore it with:
+
+```bash
+fw_setenv bootdelay 2
+```
+
+System status shows this as a Boot rescue row, and also warns when the next
+restart would start from the other system slot. None of this helps a Pod that
+was already locked before Nightstand was installed.
+
 ### 12. Set up internet access
 
 This connects the Pod to your Wi-Fi. Pod 3 with an SD card: skip this step.

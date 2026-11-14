@@ -196,7 +196,10 @@ WireGuard connections and STUN) and TCP 443 (for Tailscale's servers and
 relays) to any host. These exceptions are broad: the Pod can reach any HTTPS
 server, Eight Sleep's included. Masking the update services in
 [installation step 11](../INSTALLATION.md#11-disable-software-updates) still
-stops firmware updates. The exceptions stay until the firewall is applied
+stops firmware updates, and the script's `/etc/hosts` block for Eight Sleep's
+update hosts
+([details](../INSTALLATION.md#keeping-eight-sleep-updates-out)) is what
+refuses its updater here. I have not tested that with Tailscale on. The exceptions stay until the firewall is applied
 again, even if Tailscale stops. To remove them, stop Tailscale and rerun the
 script.
 
