@@ -1,5 +1,6 @@
 import express, { Express, Request, Response } from 'express';
 import path from 'path';
+import { gzipStatic } from './gzipStatic.js';
 import { fileURLToPath } from 'url';
 import deviceStatus from '../routes/deviceStatus/deviceStatus.js';
 import alarm from '../routes/alarm/alarm.js';
@@ -76,7 +77,13 @@ export default function (app: Express) {
   registerErrorHandlers(app);
 
   // --- Static files for the SPA
-  app.use(express.static(path.join(__dirname, '../../public')));
+  const publicDir = path.join(__dirname, '../../public');
+  app.use(gzipStatic(publicDir));
+  app.use(express.static(publicDir, {
+    setHeaders: (res, file) => {
+      if (/\.(js|css)$/.test(file)) res.setHeader('Vary', 'Accept-Encoding');
+    },
+  }));
 
   // --- SPA catch-all (MUST be last)
   app.get('/{*splat}', (_req, res) => {
