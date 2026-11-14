@@ -276,6 +276,15 @@ describe('health_check.sh', () => {
     t.cleanup();
   });
 
+  it('records nulls when libubootenv falls back to defaults', () => {
+    const t = setup({
+      fwPrintenv: 'echo "Cannot read environment, using default" >&2\nprintf "bootdelay=2\\ncurrent_slot=a\\nnext_slot=a\\n"',
+    });
+    t.run();
+    assert.deepEqual({ ...settings(t.bootSettings), checkedAt: undefined }, { checkedAt: undefined, ...nulls });
+    t.cleanup();
+  });
+
   it('the restart decision is unchanged when fw_printenv fails', () => {
     const failing = setup({ fwPrintenv: 'echo boom >&2; exit 1' });
     failing.run(); failing.run();

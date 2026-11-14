@@ -84,7 +84,7 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
       >
         { statusInfo.status === 'failed' && statusInfo.message
           ? `Error: ${statusInfo.message}`
-          : statusInfo.status === 'healthy' && statusInfo.message ? statusInfo.message : meaning }
+          : (statusInfo.status === 'healthy' || job === 'bootRescue') && statusInfo.message ? statusInfo.message : meaning }
       </Typography>
 
       { (job === 'franken' || job === 'express') && <Typography variant="caption" color="text.secondary">{ statusInfo.name }</Typography> }

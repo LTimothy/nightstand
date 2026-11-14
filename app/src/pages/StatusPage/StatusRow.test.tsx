@@ -63,4 +63,10 @@ describe('status text', () => {
     renderWithProviders(<StatusRow job="analyzeSleepLeft" statusInfo={ status } divider={ false }/>);
     expect(screen.getByText('Finished analyzing the most recent sleep session.')).toBeVisible();
   });
+  it('shows why boot settings are missing instead of the canned meaning', () => {
+    const statusInfo = { ...status, name: 'Boot rescue', status: 'not_started', message: 'Boot settings could not be read.' } as const;
+    renderWithProviders(<StatusRow job="bootRescue" statusInfo={ statusInfo } divider={ false }/>);
+    expect(screen.getByText('Boot settings could not be read.')).toBeVisible();
+    expect(screen.queryByText('Boot settings not read yet.')).not.toBeInTheDocument();
+  });
 });

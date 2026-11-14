@@ -17,14 +17,15 @@ LIMIT=3
 STARTUP_GRACE=120
 
 # Records the U-Boot boot settings for the Status page, once per boot since
-# /run is tmpfs. Read only. With a bad CRC fw_printenv prints its built-in
-# defaults rather than the Pod's, so that counts as unknown too.
+# /run is tmpfs. Read only. On a bad environment fw_printenv warns on stderr
+# and prints defaults rather than the Pod's, so any stderr output counts as
+# unknown too.
 record_boot_settings() {
   local tmp out ok=1
   [ -e "$BOOT_SETTINGS" ] && return 0
   tmp=$(mktemp "$(dirname "$BOOT_SETTINGS")/.nightstand-boot-settings.XXXXXX") || return 0
   out=$(timeout 10 "$FW_PRINTENV" bootdelay current_slot next_slot 2>"$tmp") || ok=0
-  grep -q 'Bad CRC' "$tmp" && ok=0
+  [ -s "$tmp" ] && ok=0
   value() {
     local v=''
     [ "$ok" = 1 ] && v=$(printf '%s\n' "$out" | sed -n "s/^$1=//p" | head -n 1)
