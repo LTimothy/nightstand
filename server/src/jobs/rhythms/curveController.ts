@@ -3,7 +3,7 @@
 // engine re-resolves sleeps through smartCoolStartFor when a start moves.
 import type { Side } from '../../db/schedulesSchema.js';
 import {
-  effectiveCoolStart, levelAt, phaseAt, type CurvePhase, type CurvePoint, type SmartCurveInfo,
+  effectiveCoolStart, holdEnd, levelAt, MANUAL_HOLD_MAX_MS, phaseAt, type CurvePhase, type CurvePoint, type SmartCurveInfo,
 } from '../../db/smartCurve.js';
 import type { RhythmsLive, SmartSchedule } from '../../db/rhythmsSchema.js';
 import { PRESENCE_STALE_MS } from '../../8sleep/presenceStale.js';
@@ -19,7 +19,6 @@ import {
 } from './offWhenUp.js';
 
 const MINUTE = 60_000;
-export const MANUAL_HOLD_MAX_MS = 3 * 60 * MINUTE;
 export const AFTER_WAKE_MS = 30 * MINUTE;
 export const EXIT_COUNT_WINDOW_MS = 60 * MINUTE;
 const LOOKBACK_MS = 24 * 60 * MINUTE;
@@ -29,19 +28,6 @@ const SIDES: readonly Side[] = ['left', 'right'];
 const LATEST_REACH_MS = (SMART_OFF.extendMinutes + SMART_OFF.clearMinutes) * MINUTE;
 
 const otherSide = (side: Side): Side => (side === 'left' ? 'right' : 'left');
-// The pre-warm and bedtime are one stretch at the bedtime level, up to the cool-down.
-const stretchOf = (phase: CurvePhase): CurvePhase => (phase === 'bedtime' ? 'prewarm' : phase);
-
-// A manual change holds until the curve's next phase starts, at most 3 hours,
-// and never past the power off.
-export function holdEnd(points: CurvePoint[], from: Date, powerOff: Date): Date {
-  const time = from.getTime();
-  const current = phaseAt(points, from);
-  const next = current === null
-    ? undefined
-    : points.find(point => point.at.getTime() > time && stretchOf(point.phase) !== stretchOf(current));
-  return new Date(Math.min(next?.at.getTime() ?? Infinity, time + MANUAL_HOLD_MAX_MS, powerOff.getTime()));
-}
 const keyOf = (side: Side, date: string) => `${side}-${date}`;
 
 // What the controller knows about a finished sleep; history adds the onset estimate.
