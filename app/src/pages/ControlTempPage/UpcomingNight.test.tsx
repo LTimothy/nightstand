@@ -4,13 +4,16 @@ import { MemoryRouter } from 'react-router-dom';
 import moment from 'moment-timezone';
 import { ThemeProvider } from '@mui/material/styles';
 import { theme } from '../../theme';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import UpcomingNight from './UpcomingNight';
+import ScheduleOverrideBanner from './ScheduleOverrideBanner';
 
 const fixture = vi.hoisted(() => ({ expiresAt: '2026-09-28T20:00:00Z', on: '19:00' }));
 vi.mock('@state/appStore.tsx', () => ({ useAppStore: () => ({ side: 'left' }) }));
 vi.mock('@api/settings.ts', () => ({ useSettings: () => ({ data: {
   timeZone: 'UTC', temperatureFormat: 'fahrenheit', left: { awayMode: false,
-    scheduleOverrides: { temperatureSchedules: { disabled: true, expiresAt: fixture.expiresAt } },
+    scheduleOverrides: { temperatureSchedules: { disabled: true, expiresAt: fixture.expiresAt },
+      pause: { active: false, expiresAt: '' } },
   },
 } }) }));
 vi.mock('@api/schedules.ts', () => ({ useSchedules: () => ({ data: { left: { monday: {
@@ -26,6 +29,29 @@ it('does not label future events as paused after an override expires', () => {
   fixture.expiresAt = '2026-09-28T20:00:00Z';
   render(<MemoryRouter><UpcomingNight/></MemoryRouter>);
   expect(screen.getByText(/Changes to/)).not.toHaveTextContent('paused');
+});
+
+it('marks a change the hand hold covers as on hold, not paused', () => {
+  vi.spyOn(moment, 'now').mockReturnValue(Date.parse('2026-09-28T20:00:00Z'));
+  fixture.on = '19:00';
+  fixture.expiresAt = '2026-09-29T08:00:00Z';
+  render(<MemoryRouter><UpcomingNight/></MemoryRouter>);
+  const line = screen.getByText(/Changes to/);
+  expect(line.textContent).toMatch(/\(on hold\)$/);
+  expect(line).not.toHaveTextContent('paused');
+});
+
+it('shows the hold banner next to the Pause schedule button', () => {
+  vi.spyOn(moment, 'now').mockReturnValue(Date.parse('2026-09-28T20:00:00Z'));
+  fixture.on = '19:00';
+  fixture.expiresAt = '2026-09-29T08:00:00Z';
+  render(
+    <QueryClientProvider client={ new QueryClient() }>
+      <MemoryRouter><ScheduleOverrideBanner/><UpcomingNight/></MemoryRouter>
+    </QueryClientProvider>,
+  );
+  expect(screen.getByText('Holding your temperature')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Pause schedule' })).toBeInTheDocument();
 });
 
 it('explains that an active manual override keeps the manual target at power-on', () => {
