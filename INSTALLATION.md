@@ -248,7 +248,7 @@ doesn't exist are expected.
 
 ```bash
 # First save which of these are enabled, so they can be restored later
-[ -e /persistent/nightstand-stock/unit-states.txt ] || { mkdir -p /persistent/nightstand-stock && for unit in swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket; do echo "$unit $(systemctl is-enabled $unit 2>/dev/null || echo unknown)"; done > /persistent/nightstand-stock/unit-states.txt; }
+[ -e /persistent/nightstand-stock/unit-states.txt ] || { mkdir -p /persistent/nightstand-stock && for unit in swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket swupdate-usb@; do echo "$unit $(systemctl is-enabled $unit 2>/dev/null || echo unknown)"; done > /persistent/nightstand-stock/unit-states.txt; }
 systemctl disable --now swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket swupdate-usb@
 systemctl mask swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket swupdate-usb@
 ```
@@ -542,7 +542,7 @@ copy it back if there is a copy, remove the replacement if there is an
 | SSH server config, client config, keys and service replaced | step 18 (`setup_ssh.sh`) | `sshd_config`, `ssh_config`, `authorized_keys`, `sshd.service` | Restore the first three under /etc/ssh/ and `sshd.service` under /etc/systemd/system/ as described above, run `systemctl daemon-reload` and restart sshd. Step 18 removed /etc/ssh/authorized_keys and put your key in /home/root/ssh/authorized_keys. Keep a working SSH session open while you do. |
 | Firewall rules replaced | step 19 (`block_internet_access.sh`) | `iptables.rules` and `ip6tables.rules` are live snapshots from `iptables-save` and `ip6tables-save`; `*.rules.file` saves the rules files from /etc/iptables/ | Use `iptables-restore` and `ip6tables-restore` with the live snapshots. Restore the rules files under /etc/iptables/ from `*.rules.file` or their markers as described above. |
 | Eight Sleep's update hosts blocked in /etc/hosts | step 19 (`block_internet_access.sh`) | none | Delete the lines between `# nightstand-block-start` and `# nightstand-block-end` in /etc/hosts, markers included. |
-| USB update unit masked | step 19 | none | `systemctl unmask swupdate-usb@.service`. Doing this lets the Pod install updates from a USB drive. |
+| USB update unit masked | step 11 and step 19 | none | `systemctl unmask swupdate-usb@.service`. Doing this lets the Pod install updates from a USB drive. |
 | Time sync servers changed | step 19 | `timesyncd.conf` | Restore it under /etc/systemd/ as described above and restart systemd-timesyncd. |
 | Wi-Fi profile UUIDs rewritten | step 12 | `/persistent/system-connections.stock/` (only if you made the copy in step 12) | Copy the files back to /persistent/system-connections/ and restart NetworkManager. |
 | Hardware watchdog enabled where the script's Pod 5 checks pass | step 13 (`setup_watchdog.sh`) | not needed | Before removing /home/dac/free-sleep, run `bash /usr/local/lib/nightstand/live/scripts/setup_watchdog.sh --remove` as root. It removes /etc/systemd/system.conf.d/10-nightstand-watchdog.conf and the trial copy under /run/systemd/system.conf.d/, and leaves a note so later installs and updates keep it off. If the kernel cannot stop the running watchdog, or systemd cannot reload the setting, it turns off only after a restart. |

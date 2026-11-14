@@ -54,7 +54,7 @@ echo "${tool} $*" >> "$RULE_LOG"
       .replaceAll('/run/systemd/resolve/resolv.conf', path.join(folder, 'resolved.conf'))
       .replaceAll('/etc/systemd/timesyncd.conf', path.join(folder, 'timesyncd.conf'))
       .replaceAll('/etc/iptables/', `${folder}/`);
-    const result = spawnSync('bash', ['-c', script], {
+    const result = spawnSync('sh', ['-c', script], {
       encoding: 'utf8',
       env: { ...process.env, PATH: `${folder}:${process.env.PATH}`, RULE_LOG: path.join(folder, 'rules'),
         ATTEMPT_LOG: path.join(folder, 'attempts'), FAIL_REJECT_KIND: 'all', ...faults },
@@ -92,6 +92,15 @@ describe('block_internet_access.sh', () => {
     assert.equal(hostsText, first);
   });
 
+  it('keeps lines after a start marker that has no end marker', () => {
+    const content = '127.0.0.1 localhost\n# nightstand-block-start\n10.0.0.5 nas\n10.0.0.6 printer\n';
+    const { hostsText } = runBlock('', false, undefined, {}, { content });
+    const lines = hostsText.split('\n');
+    assert.ok(lines.includes('10.0.0.5 nas') && lines.includes('10.0.0.6 printer'));
+    assert.equal(lines.filter(line => line === '# nightstand-block-start').length, 1);
+    assert.equal(blockLines(hostsText).length, 6);
+  });
+
   it('keeps unrelated hosts lines and their order', () => {
     const content = '127.0.0.1 localhost\n# nightstand-block-start\n0.0.0.0 stale.example\n# nightstand-block-end\n10.0.0.5 nas\n';
     const { hostsText } = runBlock('', false, undefined, {}, { content });
@@ -127,6 +136,14 @@ describe('block_internet_access.sh', () => {
 
   it('parses', () => {
     assert.doesNotThrow(() => execFileSync('bash', ['-n', SCRIPT]));
+  });
+
+  it('parses under sh', () => {
+    assert.doesNotThrow(() => execFileSync('sh', ['-n', SCRIPT]));
+  });
+
+  it('parses under dash', { skip: spawnSync('dash', ['-c', ':']).error !== undefined }, () => {
+    assert.doesNotThrow(() => execFileSync('dash', ['-n', SCRIPT]));
   });
 
   it('flushes each chain before adding rules, so re-runs do not stack them', () => {

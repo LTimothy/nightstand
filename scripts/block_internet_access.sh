@@ -97,7 +97,7 @@ verify_output_tail() {
 
 FIREWALL_FAILED=no
 
-EIGHT_SLEEP_HOSTS=(update-api.8slp.net raw-api-upload.8slp.net device-api-ws.8slp.net)
+EIGHT_SLEEP_HOSTS="update-api.8slp.net raw-api-upload.8slp.net device-api-ws.8slp.net"
 HOSTS_FILE=/etc/hosts
 
 # Rewrites only the marked block. cat > keeps /etc/hosts a symlink if it is one.
@@ -105,9 +105,16 @@ block_stock_update_hosts() {
   local host merged
   merged=$(mktemp) || return 1
   {
-    awk '/^# nightstand-block-start$/ {skip = 1} !skip {print} /^# nightstand-block-end$/ {skip = 0}' "$HOSTS_FILE"
+    # A start marker with no end marker keeps its following lines.
+    awk '
+      /^# nightstand-block-start$/ {skip = 1; held = ""; next}
+      /^# nightstand-block-end$/ && skip {skip = 0; held = ""; next}
+      skip {held = held $0 "\n"; next}
+      {print}
+      END {printf "%s", held}
+    ' "$HOSTS_FILE"
     echo "# nightstand-block-start"
-    for host in "${EIGHT_SLEEP_HOSTS[@]}"; do
+    for host in $EIGHT_SLEEP_HOSTS; do
       echo "0.0.0.0 $host"
       echo ":: $host"
     done
