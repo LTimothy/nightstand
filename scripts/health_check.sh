@@ -11,8 +11,31 @@ LOCK="${NIGHTSTAND_OPERATION_LOCK:-/run/lock/free-sleep-operation.lock}"
 [ -n "${NIGHTSTAND_OPERATION_LOCK:-}" ] || [ -d /run/lock ] || LOCK=/tmp/free-sleep-operation.lock
 PROC_LOCKS="${NIGHTSTAND_PROC_LOCKS:-/proc/locks}"
 UPTIME="${NIGHTSTAND_UPTIME:-/proc/uptime}"
+BOOT_SETTINGS="${NIGHTSTAND_BOOT_SETTINGS:-/run/nightstand-boot-settings.json}"
+FW_PRINTENV="${NIGHTSTAND_FW_PRINTENV:-fw_printenv}"
 LIMIT=3
 STARTUP_GRACE=120
+
+# Records the U-Boot boot settings for the Status page, once per boot since
+# /run is tmpfs. Read only. With a bad CRC fw_printenv prints its built-in
+# defaults rather than the Pod's, so that counts as unknown too.
+record_boot_settings() {
+  local tmp out ok=1
+  [ -e "$BOOT_SETTINGS" ] && return 0
+  tmp=$(mktemp "$(dirname "$BOOT_SETTINGS")/.nightstand-boot-settings.XXXXXX") || return 0
+  out=$(timeout 10 "$FW_PRINTENV" bootdelay current_slot next_slot 2>"$tmp") || ok=0
+  grep -q 'Bad CRC' "$tmp" && ok=0
+  value() {
+    local v=''
+    [ "$ok" = 1 ] && v=$(printf '%s\n' "$out" | sed -n "s/^$1=//p" | head -n 1)
+    case "$v" in '' | *[!A-Za-z0-9_.-]*) printf null ;; *) printf '"%s"' "$v" ;; esac
+  }
+  printf '{"checkedAt": "%s", "bootdelay": %s, "currentSlot": %s, "nextSlot": %s}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(value bootdelay)" "$(value current_slot)" "$(value next_slot)" > "$tmp" \
+    && chmod 644 "$tmp" && mv -f "$tmp" "$BOOT_SETTINGS"
+  rm -f "$tmp"
+}
+record_boot_settings 2>/dev/null || true
 
 # Reads /proc/locks rather than taking the lock, which for that moment would
 # make an update starting at the same time refuse to run. Locks are listed as

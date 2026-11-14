@@ -158,6 +158,11 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
     blurb: 'Writes the activity logs you can view under Logs.',
     meaning: { healthy: 'Logging normally.' },
   },
+  bootRescue: {
+    group: 'core',
+    blurb: 'Whether startup still pauses for serial access, so a Pod that cannot start can be recovered over a serial cable.',
+    meaning: { healthy: 'Serial rescue still works.', not_started: 'Boot settings not read yet.' },
+  },
   database: {
     group: 'core',
     blurb: 'Local storage for your settings, schedules, and sleep history.',
@@ -194,8 +199,9 @@ export function usableStatusKeys(data?: ServerStatus): ServerStatusKey[] {
     .filter(key => !!STATUS_META[key] && StatusInfoSchema.safeParse(data[key]).success) : [];
 }
 
+// Boot rescue is read about five minutes after boot and is not a running service, so it never holds up readiness.
 export const CORE_KEYS: ServerStatusKey[] = (Object.keys(STATUS_META) as ServerStatusKey[])
-  .filter(key => STATUS_META[key].group === 'core');
+  .filter(key => STATUS_META[key].group === 'core' && key !== 'bootRescue');
 
 export function coreServicesReady(data?: ServerStatus): boolean {
   return CORE_KEYS.every(key => StatusInfoSchema.safeParse(data?.[key]).success && data?.[key]?.status === 'healthy');
@@ -228,6 +234,7 @@ export function statusImpact(key: ServerStatusKey): string {
   if (key === 'biometricsStream') return 'Sleep tracking stopped. New sleep data may not be recorded.';
   if (key === 'franken') return 'Heating and cooling controls cannot reach the hardware.';
   if (key === 'database') return 'Settings and sleep history may be unavailable.';
+  if (key === 'bootRescue') return 'Check the boot settings below before restarting the Pod.';
   if (key === 'systemDate') return 'Scheduled changes may run at the wrong time.';
   return STATUS_META[key].meaning?.failed ?? STATUS_META[key].blurb;
 }

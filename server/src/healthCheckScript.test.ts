@@ -26,6 +26,8 @@ type Options = {
   procLocks?: boolean;
   activeSince?: number;
   uptime?: number;
+  // fw_printenv's script body; null leaves the command missing.
+  fwPrintenv?: string | null;
 };
 
 // The key /proc/locks prints for a file: hex major:minor, then the inode.
@@ -37,7 +39,7 @@ function lockKey(file: string) {
 
 function setup({
   active = 'active', answers = false, status, silentCurl = false, lockHeld = false, otherDeviceLock = false, procLocks = true, activeSince,
-  uptime = 100000,
+  uptime = 100000, fwPrintenv = 'printf "bootdelay=2\\ncurrent_slot=a\\nnext_slot=a\\n"',
 }: Options = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-health-'));
   const bin = path.join(dir, 'bin');
@@ -71,6 +73,10 @@ function setup({
   const uptimeFile = path.join(dir, 'uptime');
   writeFileSync(uptimeFile, `${uptime}.42 1234.00\n`);
   const state = path.join(dir, 'failures');
+  // The Pod has timeout; a Mac running these may not.
+  stub('timeout', 'shift; exec "$@"');
+  if (fwPrintenv !== null) stub('fw_printenv', fwPrintenv);
+  const bootSettings = path.join(dir, 'boot-settings.json');
   const run = () => spawnSync('bash', [SCRIPT], {
     env: {
       ...process.env,
@@ -79,11 +85,13 @@ function setup({
       NIGHTSTAND_OPERATION_LOCK: lock,
       NIGHTSTAND_PROC_LOCKS: locks,
       NIGHTSTAND_UPTIME: uptimeFile,
+      NIGHTSTAND_BOOT_SETTINGS: bootSettings,
+      NIGHTSTAND_FW_PRINTENV: path.join(bin, 'fw_printenv'),
     },
     encoding: 'utf8',
   });
   const log = () => (existsSync(calls) ? readFileSync(calls, 'utf8') : '');
-  return { run, log, state, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  return { run, log, state, bootSettings, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 describe('health_check.sh', () => {
@@ -223,6 +231,64 @@ describe('health_check.sh', () => {
     settled.run(); settled.run(); settled.run();
     assert.match(settled.log(), /systemctl restart free-sleep/);
     settled.cleanup();
+  });
+
+  const settings = (file: string): Record<string, string | null> => JSON.parse(readFileSync(file, 'utf8'));
+  const nulls = { bootdelay: null, currentSlot: null, nextSlot: null };
+
+  it('writes boot settings from fw_printenv once per boot', () => {
+    // Most runs exit early, so the write has to come before those exits.
+    const t = setup({ active: 'inactive' });
+    t.run(); t.run();
+    const written = settings(t.bootSettings);
+    assert.deepEqual({ ...written, checkedAt: undefined },
+      { checkedAt: undefined, bootdelay: '2', currentSlot: 'a', nextSlot: 'a' });
+    assert.ok(!Number.isNaN(Date.parse(written.checkedAt ?? '')));
+    assert.equal(statSync(t.bootSettings).mode & 0o777, 0o644);
+    assert.equal(t.log().match(/^fw_printenv bootdelay current_slot next_slot$/gm)?.length, 1);
+    assert.match(t.log(), /^timeout 10 /m);
+    t.cleanup();
+  });
+
+  it('does not rewrite an existing file', () => {
+    const t = setup();
+    writeFileSync(t.bootSettings, 'kept');
+    t.run();
+    assert.equal(readFileSync(t.bootSettings, 'utf8'), 'kept');
+    assert.doesNotMatch(t.log(), /fw_printenv/);
+    t.cleanup();
+  });
+
+  it('records nulls when fw_printenv is missing', () => {
+    const t = setup({ fwPrintenv: null });
+    t.run();
+    assert.deepEqual({ ...settings(t.bootSettings), checkedAt: undefined }, { checkedAt: undefined, ...nulls });
+    t.cleanup();
+  });
+
+  it('records nulls on a bad CRC warning', () => {
+    // With a bad CRC fw_printenv prints its built-in defaults, not the Pod's.
+    const t = setup({
+      fwPrintenv: 'echo "Warning: Bad CRC, using default environment" >&2\nprintf "bootdelay=2\\ncurrent_slot=a\\nnext_slot=a\\n"',
+    });
+    t.run();
+    assert.deepEqual({ ...settings(t.bootSettings), checkedAt: undefined }, { checkedAt: undefined, ...nulls });
+    t.cleanup();
+  });
+
+  it('the restart decision is unchanged when fw_printenv fails', () => {
+    const failing = setup({ fwPrintenv: 'echo boom >&2; exit 1' });
+    failing.run(); failing.run();
+    assert.doesNotMatch(failing.log(), /restart/);
+    failing.run();
+    assert.match(failing.log(), /systemctl restart free-sleep --no-block/);
+    assert.deepEqual({ ...settings(failing.bootSettings), checkedAt: undefined }, { checkedAt: undefined, ...nulls });
+    failing.cleanup();
+
+    const answering = setup({ answers: true, fwPrintenv: 'exit 1' });
+    for (let i = 0; i < 3; i++) answering.run();
+    assert.doesNotMatch(answering.log(), /restart/);
+    answering.cleanup();
   });
 });
 

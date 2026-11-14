@@ -439,6 +439,12 @@ const createServerStatus = (): ServerStatus => ({
     description: 'Alarm scheduling service',
     message: '',
   },
+  bootRescue: {
+    name: 'Boot rescue',
+    status: 'healthy',
+    description: 'Whether serial rescue still works',
+    message: 'Startup pauses for serial access (bootdelay 2).',
+  },
   database: {
     name: 'Database',
     status: 'healthy',

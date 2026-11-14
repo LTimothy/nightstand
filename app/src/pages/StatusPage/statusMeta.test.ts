@@ -17,9 +17,11 @@ it('uses the server start time and waits two minutes before warning', () => {
 
 
 it('requires every core service in the metadata to be ready', () => {
-  expect(CORE_KEYS).toEqual(Object.keys(STATUS_META).filter(key => STATUS_META[key as keyof typeof STATUS_META].group === 'core'));
+  expect(CORE_KEYS).toEqual(Object.keys(STATUS_META)
+    .filter(key => STATUS_META[key as keyof typeof STATUS_META].group === 'core' && key !== 'bootRescue'));
   const data = getServerStatus();
   expect(coreServicesReady(data)).toBe(true);
+  expect(coreServicesReady({ ...data, bootRescue: { ...data.bootRescue, status: 'not_started' } })).toBe(true);
   expect(coreServicesReady({ ...data, pumpHealthLeft: { ...data.pumpHealthLeft!, status: 'not_started' } })).toBe(false);
 });
 
