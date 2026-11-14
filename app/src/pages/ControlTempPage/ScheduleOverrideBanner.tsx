@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Button, Typography, Box } from '@mui/material';
 import moment from 'moment-timezone';
 import { useQueryClient } from '@tanstack/react-query';
@@ -7,27 +7,13 @@ import { useSettings, postSettings } from '@api/settings.ts';
 import { isSchedulePaused } from '@api/schedulePause.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { weight } from '@design/tokens';
-
-function formatRemaining(expiresAt: string): string {
-  const diffMs = moment(expiresAt).diff(moment());
-  if (diffMs <= 0) return 'expired';
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
+import { formatPauseEnd } from './pauseTimes';
 
 export default function ScheduleOverrideBanner() {
   const { side } = useAppStore();
   const { data: settings } = useSettings();
   const queryClient = useQueryClient();
   const [isResuming, setIsResuming] = useState(false);
-  // Re-render every 30s so the countdown stays roughly current.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 30_000);
-    return () => clearInterval(id);
-  }, []);
 
   const override = settings?.[side]?.scheduleOverrides?.temperatureSchedules;
   const isOverridden =
@@ -72,10 +58,10 @@ export default function ScheduleOverrideBanner() {
       <Box display="flex" alignItems="center" justifyContent="space-between" gap={ 2 }>
         <Box>
           <Typography variant="body2" fontWeight={ weight.heading }>
-            Schedule paused
+            Holding your temperature
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Resumes in { formatRemaining(override!.expiresAt!) }
+            Scheduled temperature changes resume at { formatPauseEnd(moment(override!.expiresAt), settings.timeZone) }
           </Typography>
         </Box>
         <Button
@@ -84,7 +70,7 @@ export default function ScheduleOverrideBanner() {
           onClick={ handleResume }
           disabled={ isResuming }
         >
-          Resume
+          Resume now
         </Button>
       </Box>
     </Alert>

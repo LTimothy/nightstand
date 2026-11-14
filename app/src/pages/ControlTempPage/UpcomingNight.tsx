@@ -114,7 +114,7 @@ export default function UpcomingNight() {
   const eventText = event && `${action} ${eventDay} at ${event.at.format('h:mm A')}`
     + (bedtime ? ` for ${withArticle(bedtime.format('h:mm A'))} bedtime` : '')
     + (event.kind === 'on' ? eventPaused ? ' and keeps your manual temperature' : `, set to ${temperature}` : '')
-    + (event.kind === 'temperature' && eventPaused ? ' (currently paused)' : '')
+    + (event.kind === 'temperature' && eventPaused ? ' (on hold)' : '')
     + (rhythmLabel ? ` (${rhythmLabel})` : '');
   return (
     <Box ref={ cardRef } data-tonight sx={ cardSx }>
