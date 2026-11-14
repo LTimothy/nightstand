@@ -328,7 +328,16 @@ else
       echo "No dac.sock path found in $SRC_FILE, skipping write."
     fi
   else
-    echo "File $SRC_FILE not found or not readable, skipping."
+    # Newer firmware (seen on a Pod 5) has no frank.sh; the socket path is set in the frank unit.
+    # Without it the server would fall back to the Pod 3 path and never reach the firmware.
+    echo "File $SRC_FILE not found, checking the frank service for the dac.sock path..."
+    result=$(systemctl cat frank 2>/dev/null | grep -oP '(?<=DAC_SOCKET=)[^ "]*dac\.sock' | head -n 1 || true)
+    if [ -n "$result" ]; then
+      echo "$result" > "$DEST_FILE"
+      echo "DAC socket path saved to $DEST_FILE"
+    else
+      echo "No dac.sock path found in the frank service, skipping write."
+    fi
   fi
 fi
 
