@@ -8,6 +8,25 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+### Fixes
+
+- After a hand change near a scheduled one, Bed says "Holding your
+  temperature" with the clock time scheduled changes resume, instead of
+  calling it a paused schedule.
+- A Smart Schedule night that turns on before bedtime names that bedtime on
+  Bed, and only says "Starts warming" when it actually warms.
+- A Smart Schedule rhythm card compares your nights by the changes you made
+  by hand, so the curve's own steps, or an earlier warm-up setting, no longer
+  show as differences.
+- System status no longer shows a dropped sensor readings count. The Pod's
+  firmware does not report it as a usable number.
+- Small display fixes: the rhythm chart's lowest temperature clears the time
+  labels, Coming up rows drop the repeated "Smart Schedule", an unused
+  rhythm says "Not scheduled", and firmware messages not seen in the last
+  minute say "Earlier".
+- The first load after an update is faster: the Pod compresses the app's
+  scripts and styles, and a loading screen shows until the app starts.
+
 ## [3.7.2] - 2026-11-01
 
 Redraws the suggestion review sheet so the change and the nights behind it are easy to read.
