@@ -146,7 +146,7 @@ it('says the bed starts warming only when the pre-warm is above neutral', async 
   // A cool sleeper's pre-warm stays below neutral, so the bed only turns on early.
   bed.value = { state: 'rhythms', sleeps: [smartTonight({ base: -7, prewarm: -5 })] };
   renderWithProviders(<UpcomingNight/>);
-  expect(await screen.findByText('Turns on tonight at 10:00 PM, set to \u22125')).toBeInTheDocument();
+  expect(await screen.findByText('Turns on tonight at 10:00 PM for a 10:30 PM bedtime, set to \u22125')).toBeInTheDocument();
   expect(screen.queryByText(/Starts warming/)).not.toBeInTheDocument();
 });
 

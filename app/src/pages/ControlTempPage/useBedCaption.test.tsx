@@ -344,3 +344,18 @@ it('keeps "at" and the time together on one line', () => {
   const line = screen.getByText('Turns on tonight at 9:00 PM');
   expect(line.textContent).toBe('Turns on tonight at\u00a09:00\u00a0PM');
 });
+
+it.each([[0, 'Turns on'], [1, 'Starts warming']])('words a level %i pre-warm caption as "%s"', (level, verb) => {
+  fixture.pause = { active: false, expiresAt: '' };
+  fixture.bed = { state: 'rhythms', sleeps: [{
+    ...sleep('2026-09-28', '2026-09-29'), mode: 'smart',
+    smart: { baseLevel: 0, intensity: 'standard', warmStart: true, warmUp: true, upEarly: false },
+    smartCurve: {
+      bedtime: '2026-09-28T22:30:00.000Z', coolStart: '2026-09-28T22:30:00.000Z', wake: '2026-09-29T06:30:00.000Z',
+      daySleep: false,
+      points: [{ at: '2026-09-28T22:30:00.000Z', level, phase: 'prewarm' }],
+    },
+  }] };
+  label(false);
+  expect(screen.getByText(`${verb} tonight at 10:30 PM`)).toBeInTheDocument();
+});

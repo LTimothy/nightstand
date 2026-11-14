@@ -4,7 +4,7 @@ import type { ResolvedSleepResponse, SleepEvent } from '@api/rhythmsResponse';
 import { buildCurve } from '@api/smartCurve';
 import {
   alarmNightFromSleeps, currentSleep, isEveningSleep, nextSleepEvent, pauseOptionLabel, scheduledTemperatureFromSleeps, skipLine,
-  skippedFromSleeps, sleepAt, warmStartBedtime, withArticle,
+  preWarms, skippedFromSleeps, sleepAt, warmStartBedtime, withArticle,
 } from './sleepEvents';
 
 const TZ = 'UTC';
@@ -85,10 +85,14 @@ const smartSleep = (baseLevel: number, warmStart: boolean, points?: unknown[]): 
   } as ResolvedSleepResponse;
 };
 
-it('says the bed warms before bedtime only when the pre-warm is above neutral', () => {
+it('names the bedtime for any pre-warm and flags warming only above neutral', () => {
   expect(warmStartBedtime(smartSleep(0, true), TZ)?.toISOString()).toBe('2026-09-28T22:30:00.000Z');
-  expect(warmStartBedtime(smartSleep(0, false), TZ)).toBeUndefined();
-  expect(warmStartBedtime(smartSleep(-7, true), TZ)).toBeUndefined();
+  expect(warmStartBedtime(smartSleep(-7, true), TZ)?.toISOString()).toBe('2026-09-28T22:30:00.000Z');
+  expect(preWarms(smartSleep(0, true))).toBe(true);
+  expect(preWarms(smartSleep(-7, true))).toBe(false);
+  expect(preWarms(undefined)).toBe(false);
+  expect(warmStartBedtime(smartSleep(0, false), TZ)?.toISOString()).toBe('2026-09-28T22:30:00.000Z');
+  expect(preWarms(smartSleep(0, false))).toBe(false);
   expect(warmStartBedtime(sleeps[0], TZ)).toBeUndefined();
   expect(warmStartBedtime(undefined, TZ)).toBeUndefined();
 });

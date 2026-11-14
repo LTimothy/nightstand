@@ -16,7 +16,7 @@ import PauseScheduleSheet from './PauseScheduleSheet';
 import { MAX_PAUSE_DAYS, pauseResumeAt } from './pauseTimes';
 import SchedulePauseNotice from './SchedulePauseNotice';
 import SmartPhaseLine from './SmartPhaseLine';
-import { currentSleep, isEveningSleep, nextSleepEvent, sleepAt, warmStartBedtime, withArticle } from './sleepEvents';
+import { currentSleep, isEveningSleep, nextSleepEvent, preWarms, sleepAt, warmStartBedtime, withArticle } from './sleepEvents';
 import { useBedSleeps } from './useBedSleeps';
 import { cardSx, headingSx, tonightLineSx } from './tonightStyles';
 
@@ -88,7 +88,7 @@ export default function UpcomingNight() {
     (event.kind === 'off'
       ? 'Turns off'
       : event.kind === 'on'
-        ? bedtime ? 'Starts warming' : 'Turns on'
+        ? preWarms(eventSleep) ? 'Starts warming' : 'Turns on'
         : `Changes to ${temperature}`);
   const now = moment.tz(settings.timeZone);
   // An older server leaves pause out of its settings and would drop the write.

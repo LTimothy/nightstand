@@ -10,7 +10,7 @@ import { useSettings } from '@api/settings';
 import { nextBedEvent } from './bedEvents';
 import { NBSP } from './bedText';
 import { pauseResumeAt } from './pauseTimes';
-import { currentSleep, nextSleepEvent, sleepAt, warmStartBedtime } from './sleepEvents';
+import { currentSleep, nextSleepEvent, preWarms, sleepAt } from './sleepEvents';
 import { useBedSleeps } from './useBedSleeps';
 
 const clock = (at: moment.Moment) => at.format(`h:mm${NBSP}A`);
@@ -52,8 +52,8 @@ export function useBedCaption(isOn: boolean): string[] {
   const betweenNights = bed.state === 'rhythms' ? !currentSleep(bed.sleeps, now.toDate())
     : !event || (!!nextStart && nextStart.at.isBefore(event.at));
   const turnsOff = timerEnd && betweenNights && (!nextStart || timerEnd.isBefore(nextStart.at)) ? timerEnd : event?.at;
-  const warming = !resumeAt && !isOn && !!event && bed.state === 'rhythms' && !!settings
-    && !!warmStartBedtime(sleepAt(bed.sleeps, event.at.toDate()), settings.timeZone);
+  const warming = !resumeAt && !isOn && !!event && bed.state === 'rhythms'
+    && preWarms(sleepAt(bed.sleeps, event.at.toDate()));
   // A "When I get up" sleep turns off when the person gets up, by its latest off.
   const upBy = isOn && !paused && !!settings && !settings[side].awayMode && live?.offWhenUp
     ? moment.tz(live.offWhenUp.by, settings.timeZone) : undefined;
