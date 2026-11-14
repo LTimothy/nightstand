@@ -97,6 +97,30 @@ verify_output_tail() {
 
 FIREWALL_FAILED=no
 
+EIGHT_SLEEP_HOSTS=(update-api.8slp.net raw-api-upload.8slp.net device-api-ws.8slp.net)
+HOSTS_FILE=/etc/hosts
+
+# Rewrites only the marked block. cat > keeps /etc/hosts a symlink if it is one.
+block_stock_update_hosts() {
+  local host merged
+  merged=$(mktemp) || return 1
+  {
+    awk '/^# nightstand-block-start$/ {skip = 1} !skip {print} /^# nightstand-block-end$/ {skip = 0}' "$HOSTS_FILE"
+    echo "# nightstand-block-start"
+    for host in "${EIGHT_SLEEP_HOSTS[@]}"; do
+      echo "0.0.0.0 $host"
+      echo ":: $host"
+    done
+    echo "# nightstand-block-end"
+  } > "$merged" && cat "$merged" > "$HOSTS_FILE"
+  local status=$?
+  rm -f "$merged"
+  return $status
+}
+
+block_stock_update_hosts || echo "Warning: could not update $HOSTS_FILE" >&2
+systemctl mask swupdate-usb@.service 2>/dev/null || true
+
 # IPv4 Rules
 echo "Configuring IPv4 rules..."
 
@@ -138,7 +162,6 @@ allow_dns_to_configured_resolvers 4
 
 # Allow NTP traffic - this allows us to synchronize the system time
 iptables -I OUTPUT -p udp --dport 123 -j ACCEPT
-iptables -I INPUT -p udp --sport 123 -j ACCEPT
 
 echo "Updating the timesyncd config"
 # New configuration content
@@ -232,7 +255,6 @@ allow_dns_to_configured_resolvers 6
 
 # Allow NTP traffic (IPv6)
 ip6tables -I OUTPUT -p udp --dport 123 -j ACCEPT
-ip6tables -I INPUT -p udp --sport 123 -j ACCEPT
 
 ip6tables -A OUTPUT -d ff02::fb -p udp --dport 5353 -j ACCEPT
 
