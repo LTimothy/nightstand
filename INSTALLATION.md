@@ -256,9 +256,10 @@ systemctl mask swupdate-progress swupdate defibrillator eight-kernel telegraf ve
 ### Keeping Eight Sleep updates out
 
 Step 11 masks the update services, and step 19 adds a second layer. The
-firewall script (`block_internet_access.sh`, which also runs at install, on
-every update and when the saved rules are restored at boot) does three things
-for this:
+firewall script (`block_internet_access.sh`) does three things for this. You
+run it in step 19, and it runs again with every update, rollback, restore and
+fork switch. The hosts file is kept across restarts, so once written the
+block stays. An existing install gets it with its next update.
 
 - Adds a block between `# nightstand-block-start` and `# nightstand-block-end`
   in `/etc/hosts` that points `update-api.8slp.net`,
@@ -266,9 +267,10 @@ for this:
 - Masks `swupdate-usb@.service`, so a USB drive cannot start an update.
 - Does not accept inbound UDP from source port 123.
 
-Eight Sleep's cloud agent (capybara) keeps running. The firmware launcher
-waits for it, so it is left alone. Its connections are what the firewall and
-the hosts block refuse.
+Eight Sleep's cloud agent (capybara) keeps running. On a Pod 5, Eight
+Sleep's own `/opt/eight/bin/frank.sh` waits for capybara before it starts the
+firmware, so Nightstand leaves capybara running. Its connections are what the
+firewall and the hosts block refuse.
 
 With Tailscale running, the firewall opens HTTPS to any host (see
 [remote access](docs/REMOTE_ACCESS.md#5-turn-the-firewall-back-on)), so the
@@ -468,6 +470,9 @@ its raw sensor recordings. With them, most internet access is blocked. Time
 sync still works, and name lookups go only to the resolvers your network had
 set when the script ran (it prints them; rerun it after moving the Pod to
 another network). HTTPS and UDP to any server stay open while Tailscale runs.
+
+The script also blocks Eight Sleep's update hosts; see
+[Keeping Eight Sleep updates out](#keeping-eight-sleep-updates-out).
 
 Local access keeps working on a private network, which most home networks
 are: the Pod's address from step 14 should start with `10.`, `192.168.`, or

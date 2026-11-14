@@ -30,8 +30,9 @@ is a hard fork; for the history of the projects it descends from, see
 ### Updates and recovery
 
 - The firewall script now also blocks Eight Sleep's update hosts in
-  `/etc/hosts` and masks the USB update unit, at install, on every update and
-  when the saved rules are restored at boot. With Tailscale on, the firewall
+  `/etc/hosts` and masks the USB update unit. It is applied at step 19 and
+  again with every update, so an existing install gets it with its next
+  update. With Tailscale on, the firewall
   opens HTTPS to any host, so the hosts block is the guard there; not yet
   tested on a Pod with Tailscale on.
 - The firewall no longer accepts inbound UDP from source port 123.
