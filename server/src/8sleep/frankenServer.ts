@@ -53,6 +53,12 @@ export class FrankenCommandTimeoutError extends Error {
   }
 }
 
+function assertBefore(notAfter: number | undefined) {
+  if (notAfter !== undefined && Date.now() > notAfter) {
+    throw new FrankenUnavailableError('Pod hardware became available too late for this command');
+  }
+}
+
 // The singleton types refer to the classes defined below.
 // eslint-disable-next-line no-use-before-define
 let frankenServer: FrankenServer | undefined;
@@ -354,12 +360,6 @@ export type CommandOptions = {
 
 // Newest waiting command per setting; older ones drop out when superseded.
 const latestWaiting = new Map<string, symbol>();
-
-function assertBefore(notAfter: number | undefined) {
-  if (notAfter !== undefined && Date.now() > notAfter) {
-    throw new FrankenUnavailableError('Pod hardware became available too late for this command');
-  }
-}
 
 async function connectFrankenLatest(key: string, notAfter: number | undefined): Promise<Franken> {
   const ticket = Symbol(key);
