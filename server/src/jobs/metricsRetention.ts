@@ -28,15 +28,25 @@ export async function reusableBytes(client: PrismaClient): Promise<number> {
 }
 
 // Movement of a night is only dropped once its saved summary holds the stages computed from it.
-async function deleteSummarizedMovement(client: Pick<PrismaClient, '$executeRaw'>, floors: Record<string, number>) {
-  return client.$executeRaw(Prisma.sql`
-    DELETE FROM movement WHERE id IN (
-      SELECT m.id FROM movement m
-      WHERE ((m.side = 'left' AND m.timestamp < ${floors.left}) OR (m.side = 'right' AND m.timestamp < ${floors.right}))
-        AND EXISTS (SELECT 1 FROM vitals_summaries s WHERE s.side = m.side
-          AND s.entered_bed_at <= m.timestamp AND m.timestamp <= s.left_bed_at
-          AND json_extract(s.payload, '$.stages') IS NOT NULL)
-      ORDER BY m.timestamp ASC, m.id ASC LIMIT ${BATCH_ROWS})`);
+// Driven from the summaries so each delete is a bounded range on the (side, timestamp) index.
+async function deleteSummarizedMovement(client: Pick<PrismaClient, '$executeRaw' | '$queryRaw'>, floors: Record<string, number>) {
+  let deleted = 0;
+  for (const side of ['left', 'right']) {
+    const nights = await client.$queryRaw<{ entered_bed_at: number; left_bed_at: number }[]>(Prisma.sql`
+      SELECT entered_bed_at, left_bed_at FROM vitals_summaries
+      WHERE side = ${side} AND entered_bed_at < ${floors[side]} AND json_extract(payload, '$.stages') IS NOT NULL
+      ORDER BY entered_bed_at ASC`);
+    for (const night of nights) {
+      if (deleted >= BATCH_ROWS) return deleted;
+      deleted += await client.$executeRaw(Prisma.sql`
+        DELETE FROM movement WHERE id IN (
+          SELECT id FROM movement
+          WHERE side = ${side} AND timestamp >= ${night.entered_bed_at}
+            AND timestamp <= ${Math.min(night.left_bed_at, floors[side] - 1)}
+          ORDER BY timestamp ASC LIMIT ${BATCH_ROWS - deleted})`);
+    }
+  }
+  return deleted;
 }
 
 // Summarize and delete in the same transaction. Small batches let the live writer run between them.

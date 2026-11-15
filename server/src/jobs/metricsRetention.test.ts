@@ -353,13 +353,13 @@ test('low disk deletes movement inside saved nights once no detailed vitals are 
   const outside = [start - 3600, end + 3600];
   const protectedRows = [second - day + 60, second];
   await addMovement('left', [...inside, ...outside, ...protectedRows]);
+  const stagesBefore = await readStageSummary(client, 'left', start, end);
   const result = await pruneMetrics(client, retentionCutoffs(now, 1));
   assert.equal(result.vitals, 3);
   assert.equal(result.movement, inside.length);
   assert.deepEqual((await client.movement.findMany({ orderBy: { timestamp: 'asc' } })).map(row => row.timestamp),
-    [...outside.slice(0, 1), ...outside.slice(1), ...protectedRows].sort((a, b) => a - b));
-  const stages = await readStageSummary(client, 'left', start, end);
-  assert.ok(stages);
+    [...outside, ...protectedRows].sort((a, b) => a - b));
+  assert.deepEqual(await readStageSummary(client, 'left', start, end), stagesBefore);
   assert.equal(await client.vitals_summaries.count(), 1);
 });
 
@@ -369,11 +369,11 @@ test('low disk keeps movement of protected nights and of saved nights without st
   const long = start + 49 * 3600;
   await night('left', start, long);
   await client.vitals.create({ data: { side: 'left', timestamp: start, heart_rate: 60 } });
-  await addMovement('left', [start + 3600, second - day + 60]);
+  await addMovement('left', [start + 3600, start + 7200, second - day + 60, second - day + 120, second]);
   const result = await pruneMetrics(client, retentionCutoffs(now, 1));
   assert.equal(result.vitals, 1);
   assert.equal(result.movement, 0);
-  assert.equal(await client.movement.count(), 2);
+  assert.equal(await client.movement.count(), 5);
 });
 
 test('low disk prefers detailed vitals and rechecks storage before deleting movement', async () => {
@@ -390,4 +390,24 @@ test('low disk prefers detailed vitals and rechecks storage before deleting move
   const second2 = await pruneMetrics(client, retentionCutoffs(now, 1));
   assert.equal(second2.vitals, 1);
   assert.equal(second2.movement, 1);
+});
+
+test('a movement batch stays fast with 432000 old movement rows and 300 saved nights', { timeout: 30_000 }, async () => {
+  await recentNights();
+  const start = second - 300 * day;
+  await client.$executeRaw`WITH RECURSIVE samples(offset) AS (
+    SELECT 0 UNION ALL SELECT offset + 1 FROM samples WHERE offset < 431999
+  ) INSERT INTO movement (side, timestamp, total_movement) SELECT 'left', ${start} + offset * 60, 1 FROM samples`;
+  await client.$executeRaw`WITH RECURSIVE nights(n) AS (
+    SELECT 0 UNION ALL SELECT n + 1 FROM nights WHERE n < 299
+  ) INSERT INTO vitals_summaries (side, entered_bed_at, left_bed_at, payload)
+    SELECT 'left', ${start} + n * ${day}, ${start} + n * ${day} + 8 * 3600,
+      '{"version":1,"stats":null,"stages":{"pad":"' || printf('%.2000c', 'x') || '"},"score":null}' FROM nights`;
+  let checks = 0;
+  const began = performance.now();
+  const result = await pruneMetrics(client, retentionCutoffs(now, 1), async () => ++checks === 1 ? 1 : 200 * 1024 * 1024);
+  const elapsed = performance.now() - began;
+  assert.equal(result.movement, 1000);
+  assert.equal(result.batches, 1);
+  assert.ok(elapsed < 1000, `${elapsed} ms`);
 });
