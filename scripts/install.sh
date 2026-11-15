@@ -114,6 +114,8 @@ echo ""
 echo "Unzipping the repository..."
 rm -rf "$UNZIP_DIR"
 unzip -o -q "$ZIP_FILE" -d "$UNZIP_DIR"
+# BusyBox unzip makes the folders GitHub lists 777; only root can reach this one.
+find "$UNZIP_DIR" -type d -exec chmod go-w {} \; || { echo "Could not secure the download. Nothing was installed."; exit 1; }
 echo "Removing the zip file..."
 rm -f "$ZIP_FILE"
 
