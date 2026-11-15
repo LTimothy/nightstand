@@ -1,5 +1,6 @@
 import settingsDB from './db/settings.js';
 import { firmwareHealthSummary } from './firmware/firmwareRuntime.js';
+import { bootRescueStatus, readBootSettings } from './bootRescue.js';
 import { isSystemDateValid } from './jobs/isSystemDateValid.js';
 import servicesDB, { updateServices } from './db/services.js';
 import { prisma } from './db/prisma.js';
@@ -22,6 +23,12 @@ class ServerStatus {
                 status: 'not_started',
                 description: '',
                 message: '',
+            },
+            bootRescue: {
+                name: 'Boot rescue',
+                status: 'not_started',
+                description: 'Whether serial rescue still works',
+                message: 'Boot settings not read yet.',
             },
             database: {
                 name: 'Database',
@@ -206,6 +213,7 @@ class ServerStatus {
         await this.updateDB();
         await this.updateServices();
         this.updateSystemDate();
+        Object.assign(this.status.bootRescue, bootRescueStatus(readBootSettings()));
         await settingsDB.read();
         const firmwareHealth = firmwareHealthSummary(settingsDB.data.features, servicesDB.data.biometrics.enabled);
         if (firmwareHealth)

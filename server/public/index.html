@@ -38,6 +38,17 @@
 
     <title>Nightstand</title>
 
+    <style>
+      html, body { background: #000; color-scheme: dark; }
+      #boot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+        min-height: 60vh; color: rgba(255, 255, 255, 0.7); font: 14px system-ui, sans-serif; }
+      @media (prefers-reduced-motion: no-preference) {
+        #boot::before { content: ""; width: 40px; height: 40px; box-sizing: border-box; border-radius: 50%;
+          border: 3px solid #88878C; border-top-color: #fff; animation: boot-spin 1s linear infinite; }
+        @keyframes boot-spin { to { transform: rotate(360deg); } }
+      }
+    </style>
+
     <script type="module" crossorigin src="/index.js"></script>
     <script>(function () {
 var key = "nightstand-theme", backgrounds = {"lamp":"#000000","classic":"#010101","glass":"#000000"};
@@ -56,6 +67,6 @@ document.querySelectorAll('meta[name="theme-color"], meta[name="msapplication-Ti
 })();</script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div id="boot" role="status">Loading Nightstand</div></div>
   </body>
 </html>

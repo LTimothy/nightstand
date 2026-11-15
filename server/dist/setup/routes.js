@@ -1,5 +1,5 @@
-import express from 'express';
 import path from 'path';
+import { serveApp } from './gzipStatic.js';
 import { fileURLToPath } from 'url';
 import deviceStatus from '../routes/deviceStatus/deviceStatus.js';
 import alarm from '../routes/alarm/alarm.js';
@@ -72,7 +72,7 @@ export default function (app) {
     });
     registerErrorHandlers(app);
     // --- Static files for the SPA
-    app.use(express.static(path.join(__dirname, '../../public')));
+    serveApp(app, path.join(__dirname, '../../public'));
     // --- SPA catch-all (MUST be last)
     app.get('/{*splat}', (_req, res) => {
         res.sendFile(path.resolve(__dirname, '../../public', 'index.html'));

@@ -1,5 +1,5 @@
 import { HEALTH_MESSAGES, FIRMWARE_FRESH_SECONDS } from './firmwareSchema.js';
-const severity = (code) => ['write-failures', 'samples-dropped'].includes(code) ? 'warning'
+const severity = (code) => code === 'write-failures' ? 'warning'
     : ['bus-timeout', 'device-missing', 'pump-running', 'pump-stopped', 'throttling-disabled'].includes(code) ? 'diagnostic' : 'info';
 export class HealthFeed {
     incidents = [];
@@ -22,8 +22,10 @@ export class HealthFeed {
     sensor(timestamp) { this.lastSensor = Math.max(this.lastSensor ?? 0, timestamp); }
     observe(record, session, now) {
         this.beginSession(session, now);
+        if (record.code === 'samples-dropped')
+            return;
         let count = 1;
-        if (record.code === 'write-failures' || record.code === 'samples-dropped') {
+        if (record.code === 'write-failures') {
             if (record.value === undefined)
                 return;
             if (record.timestamp < (this.counterTimes.get(record.code) ?? 0))
@@ -68,7 +70,7 @@ export class HealthFeed {
         this.prune(now);
         const sensorFresh = this.lastSensor !== undefined && now - this.lastSensor <= FIRMWARE_FRESH_SECONDS;
         const incidents = this.incidents.map(item => ({ ...item,
-            freshness: item.historical ? 'Historical' : now - item.lastSeen <= FIRMWARE_FRESH_SECONDS ? 'Recent' : 'No recent readings' }));
+            freshness: item.historical ? 'Historical' : now - item.lastSeen <= FIRMWARE_FRESH_SECONDS ? 'Recent' : 'Earlier' }));
         const missingSince = this.lastSensor ?? this.firstObservation;
         const interrupted = !sensorFresh && missingSince !== undefined && now - missingSince >= 120
             && incidents.some(item => item.code === 'bus-timeout' && item.freshness === 'Recent');

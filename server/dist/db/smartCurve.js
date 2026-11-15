@@ -1,4 +1,5 @@
 const MINUTE = 60_000;
+export const MANUAL_HOLD_MAX_MS = 3 * 60 * MINUTE;
 export const CURVE = {
     prewarmMinutes: { standard: 30, gentle: 20 },
     coolDelayMinutes: { night: 10, day: 5 },
@@ -158,6 +159,18 @@ export function phaseAt(points, at) {
         current = point;
     }
     return current.phase;
+}
+// The pre-warm and bedtime are one stretch at the bedtime level, up to the cool-down.
+export const stretchOf = (phase) => (phase === 'bedtime' ? 'prewarm' : phase);
+// A manual change holds until the curve's next phase starts, at most 3 hours,
+// and never past the power off.
+export function holdEnd(points, from, powerOff) {
+    const time = from.getTime();
+    const current = phaseAt(points, from);
+    const next = current === null
+        ? undefined
+        : points.find(point => point.at.getTime() > time && stretchOf(point.phase) !== stretchOf(current));
+    return new Date(Math.min(next?.at.getTime() ?? Infinity, time + MANUAL_HOLD_MAX_MS, powerOff.getTime()));
 }
 // The bed warms before bedtime only when the pre-warm is above neutral; a cool or neutral pre-warm just turns it on early.
 export function warmsBeforeBedtime(points) {

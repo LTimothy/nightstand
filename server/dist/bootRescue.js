@@ -1,0 +1,33 @@
+import { readFileSync } from 'node:fs';
+// Written by root's health check from fw_printenv, at most an hour old.
+const BOOT_SETTINGS = process.env.NIGHTSTAND_BOOT_SETTINGS || '/run/nightstand-boot-settings.json';
+export function readBootSettings(file = BOOT_SETTINGS) {
+    try {
+        const data = JSON.parse(readFileSync(file, 'utf8'));
+        return data && typeof data === 'object' ? data : undefined;
+    }
+    catch {
+        return undefined;
+    }
+}
+export function bootRescueStatus(settings) {
+    const { bootdelay, currentSlot, nextSlot } = settings ?? {};
+    const delay = typeof bootdelay === 'string' && /^-?\d+$/.test(bootdelay) ? bootdelay : undefined;
+    const messages = [];
+    // -1 waits at the prompt for good; only -2 and below skip it.
+    if (delay !== undefined && Number(delay) <= -2) {
+        messages.push(`Startup no longer pauses for serial access (bootdelay ${delay}), so serial rescue will not work. `
+            + 'See Keeping Eight Sleep updates out in the installation guide.');
+    }
+    if (typeof currentSlot === 'string' && typeof nextSlot === 'string' && currentSlot !== nextSlot) {
+        messages.push(`Boot settings list slot ${currentSlot} now and slot ${nextSlot} next. A stock update may be waiting. `
+            + 'Do not restart or unplug the Pod; open an issue on GitHub.');
+    }
+    if (messages.length)
+        return { status: 'failed', message: messages.join(' ') };
+    if (delay !== undefined) {
+        return { status: 'healthy', message: `Serial rescue is available (bootdelay ${delay}).` };
+    }
+    return { status: 'not_started', message: settings ? 'Boot settings could not be read.' : 'Boot settings not read yet.' };
+}
+//# sourceMappingURL=bootRescue.js.map

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { BlockList } from 'node:net';
@@ -13,7 +13,7 @@ const SCRIPT = path.join(repoRoot, 'scripts/block_internet_access.sh');
 const src = readFileSync(SCRIPT, 'utf8');
 // Runs the script against stub firewall commands and redirected resolver
 // files, and returns the logged rules and the script's output.
-function runBlock(resolvConf, tailscale, resolved, faults = {}) {
+function runBlock(resolvConf, tailscale, resolved, faults = {}, hosts = {}) {
     const folder = mkdtempSync(path.join(tmpdir(), 'nightstand-dns-firewall-'));
     try {
         writeFileSync(path.join(folder, 'resolv.conf'), resolvConf);
@@ -21,7 +21,7 @@ function runBlock(resolvConf, tailscale, resolved, faults = {}) {
             writeFileSync(path.join(folder, 'resolved.conf'), resolved);
         for (const tool of ['iptables', 'ip6tables', 'iptables-save', 'ip6tables-save', 'systemctl']) {
             const body = tool === 'systemctl'
-                ? `#!/bin/sh\ncase "$*" in *is-active*tailscaled*) exit ${tailscale ? 0 : 1} ;; esac\n`
+                ? `#!/bin/sh\necho "systemctl $*" >> "$ATTEMPT_LOG"\ncase "$*" in *is-active*tailscaled*) exit ${tailscale ? 0 : 1} ;; esac\n`
                 : `#!/bin/bash
 echo "${tool} $*" >> "$ATTEMPT_LOG"
 if [ "$1" = -C ]; then
@@ -40,7 +40,19 @@ echo "${tool} $*" >> "$RULE_LOG"
             writeFileSync(file, body);
             chmodSync(file, 0o755);
         }
-        const script = src.replaceAll('/etc/resolv.conf', path.join(folder, 'resolv.conf'))
+        const hostsFile = path.join(folder, 'hosts');
+        const hostsTarget = hosts.symlink ? path.join(folder, 'hosts.real') : hostsFile;
+        if (hosts.unwritable)
+            mkdirSync(hostsFile);
+        else if (!hosts.missing) {
+            writeFileSync(hostsTarget, hosts.content ?? '127.0.0.1 localhost\n');
+            if (hosts.old)
+                utimesSync(hostsTarget, 1000, 1000);
+            if (hosts.symlink)
+                symlinkSync(hostsTarget, hostsFile);
+        }
+        const script = src.replaceAll('/etc/hosts', hostsFile)
+            .replaceAll('/etc/resolv.conf', path.join(folder, 'resolv.conf'))
             .replaceAll('/run/systemd/resolve/resolv.conf', path.join(folder, 'resolved.conf'))
             .replaceAll('/etc/systemd/timesyncd.conf', path.join(folder, 'timesyncd.conf'))
             .replaceAll('/etc/iptables/', `${folder}/`);
@@ -50,15 +62,98 @@ echo "${tool} $*" >> "$RULE_LOG"
                 ATTEMPT_LOG: path.join(folder, 'attempts'), FAIL_REJECT_KIND: 'all', ...faults },
         });
         return { lines: readFileSync(path.join(folder, 'rules'), 'utf8').trim().split('\n'),
-            attempts: readFileSync(path.join(folder, 'attempts'), 'utf8'), status: result.status, output: result.stdout, error: result.stderr };
+            attempts: readFileSync(path.join(folder, 'attempts'), 'utf8'),
+            hostsText: existsSync(hostsTarget) && !hosts.unwritable ? readFileSync(hostsTarget, 'utf8') : '',
+            hostsExists: existsSync(hostsFile),
+            hostsMtime: existsSync(hostsTarget) ? statSync(hostsTarget).mtimeMs : 0,
+            hostsIsLink: existsSync(hostsFile) && lstatSync(hostsFile).isSymbolicLink(),
+            status: result.status, output: result.stdout, error: result.stderr };
     }
     finally {
         rmSync(folder, { recursive: true, force: true });
     }
 }
 describe('block_internet_access.sh', () => {
+    const blockLines = (text) => {
+        const all = text.split('\n');
+        return all.slice(all.indexOf('# nightstand-block-start') + 1, all.indexOf('# nightstand-block-end'));
+    };
+    it('blocks Eight Sleep\'s update hosts in the hosts file', () => {
+        const { hostsText, status } = runBlock('', false);
+        assert.equal(status, 0);
+        const lines = blockLines(hostsText);
+        assert.equal(lines.length, 6);
+        for (const host of ['update-api.8slp.net', 'raw-api-upload.8slp.net', 'device-api-ws.8slp.net']) {
+            assert.ok(lines.includes(`0.0.0.0 ${host}`), host);
+            assert.ok(lines.includes(`:: ${host}`), host);
+        }
+    });
+    it('running the script twice leaves a single hosts block', () => {
+        const first = runBlock('', false).hostsText;
+        const { hostsText } = runBlock('', false, undefined, {}, { content: first });
+        assert.equal(hostsText.split('# nightstand-block-start').length, 2);
+        assert.equal(hostsText, first);
+    });
+    it('leaves an already blocked hosts file untouched', () => {
+        const first = runBlock('', false).hostsText;
+        const { hostsMtime } = runBlock('', false, undefined, {}, { content: first, old: true });
+        assert.equal(hostsMtime, 1000 * 1000);
+    });
+    it('leaves a missing hosts file missing', () => {
+        const { hostsExists, status, error, lines } = runBlock('', false, undefined, {}, { missing: true });
+        assert.equal(hostsExists, false);
+        assert.equal(status, 0);
+        assert.match(error, /hosts/i);
+        assert.ok(lines.includes('iptables -A OUTPUT -j REJECT'));
+    });
+    it('keeps lines after a repeated start marker', () => {
+        const content = '127.0.0.1 localhost\n# nightstand-block-start\n10.0.0.5 nas\n# nightstand-block-start\n0.0.0.0 x\n# nightstand-block-end\n';
+        const { hostsText } = runBlock('', false, undefined, {}, { content });
+        assert.ok(hostsText.split('\n').includes('10.0.0.5 nas'));
+    });
+    it('keeps lines after a start marker that has no end marker', () => {
+        const content = '127.0.0.1 localhost\n# nightstand-block-start\n10.0.0.5 nas\n10.0.0.6 printer\n';
+        const { hostsText } = runBlock('', false, undefined, {}, { content });
+        const lines = hostsText.split('\n');
+        assert.ok(lines.includes('10.0.0.5 nas') && lines.includes('10.0.0.6 printer'));
+        assert.equal(lines.filter(line => line === '# nightstand-block-start').length, 1);
+        assert.equal(blockLines(hostsText).length, 6);
+    });
+    it('keeps unrelated hosts lines and their order', () => {
+        const content = '127.0.0.1 localhost\n# nightstand-block-start\n0.0.0.0 stale.example\n# nightstand-block-end\n10.0.0.5 nas\n';
+        const { hostsText } = runBlock('', false, undefined, {}, { content });
+        assert.ok(!hostsText.includes('stale.example'));
+        assert.deepEqual(hostsText.split('\n').filter(line => !line.includes('8slp.net') && !line.startsWith('# nightstand-block')), ['127.0.0.1 localhost', '10.0.0.5 nas', '']);
+    });
+    it('writes through a symlinked hosts file', () => {
+        const { hostsText, hostsIsLink } = runBlock('', false, undefined, {}, { symlink: true });
+        assert.ok(hostsIsLink);
+        assert.equal(blockLines(hostsText).length, 6);
+    });
+    it('still installs the firewall when the hosts file is not writable', () => {
+        const { lines, status, error } = runBlock('', false, undefined, {}, { unwritable: true });
+        assert.equal(status, 0);
+        assert.match(error, /hosts/i);
+        assert.ok(lines.includes('iptables -A OUTPUT -j REJECT'));
+    });
+    it('masks the USB update unit', () => {
+        const { attempts } = runBlock('', false);
+        assert.match(attempts, /^systemctl mask swupdate-usb@\.service$/m);
+    });
+    it('does not accept inbound UDP from source port 123', () => {
+        const { lines } = runBlock('', false);
+        for (const tool of ['iptables', 'ip6tables']) {
+            assert.equal(lines.filter(line => line.startsWith(`${tool} -`) && line.includes('--sport 123')).length, 0);
+        }
+    });
     it('parses', () => {
         assert.doesNotThrow(() => execFileSync('bash', ['-n', SCRIPT]));
+    });
+    it('parses under sh', () => {
+        assert.doesNotThrow(() => execFileSync('sh', ['-n', SCRIPT]));
+    });
+    it('parses under dash', { skip: spawnSync('dash', ['-c', ':']).error !== undefined }, () => {
+        assert.doesNotThrow(() => execFileSync('dash', ['-n', SCRIPT]));
     });
     it('flushes each chain before adding rules, so re-runs do not stack them', () => {
         for (const tool of ['iptables', 'ip6tables']) {

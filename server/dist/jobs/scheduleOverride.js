@@ -40,7 +40,7 @@ export const markManualTempChange = async (side, change) => {
             return false;
         const expiresAt = now.clone().add(OVERRIDE_DURATION_HOURS, 'hours').format();
         draft[side].scheduleOverrides.temperatureSchedules = { disabled: true, expiresAt };
-        logger.info(`[manual temp] ${side}: schedule paused until ${expiresAt} (next change was at ${next.format()}).`);
+        logger.info(`[manual temp] ${side}: temperature held until ${expiresAt} (next change was at ${next.format()}).`);
     });
 };
 //# sourceMappingURL=scheduleOverride.js.map
