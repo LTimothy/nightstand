@@ -294,7 +294,7 @@ test('a WAL retention batch with 864000 rows and 600 nights finishes below a sec
       const result = await pruneMetrics(measuredClient as unknown as PrismaClient, retentionCutoffs(now, 1),
         async () => ++checks === 1 ? 1 : 200 * 1024 * 1024);
       assert.equal(overlapping, true);
-      assert.deepEqual(result, { vitals: 1000, batches: 1, stopped: 'complete' });
+      assert.deepEqual(result, { vitals: 1000, movement: 0, batches: 1, stopped: 'complete' });
       assert.equal(milliseconds.length, 1);
       context.diagnostic(`1000-row WAL batch transaction: ${milliseconds[0].toFixed(1)} ms`);
       assert.ok(milliseconds[0] < 1000, `${milliseconds[0]} ms`);
@@ -323,7 +323,7 @@ test('a retention transaction exceeding three seconds rolls back its summary and
     const started = performance.now();
     const result = await pruneMetrics(client as unknown as PrismaClient, retentionCutoffs(now, null,
       { metricsRetention: true, metricsLowDiskProtection: false }));
-    assert.deepEqual(result, { vitals: 0, batches: 0, stopped: 'transaction timeout' });
+    assert.deepEqual(result, { vitals: 0, movement: 0, batches: 0, stopped: 'transaction timeout' });
     assert.ok(performance.now() - started < 5000);
     assert.deepEqual(await client.vitals.findMany(), before);
     assert.equal(await client.vitals_summaries.count(), 0);

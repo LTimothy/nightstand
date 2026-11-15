@@ -4,7 +4,7 @@ import { copyFileSync, mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PrismaClient } from '@prisma/client';
-import { collectVitalsStats, readVitalsSummary } from '../db/vitalsSummary.js';
+import { collectVitalsStats, readStageSummary, readVitalsSummary } from '../db/vitalsSummary.js';
 import { pruneMetrics, retentionCutoffs, reusableBytes, REUSABLE_TARGET_BYTES } from './metricsRetention.js';
 import { applyMigration } from '../testing/migrations.js';
 
@@ -59,7 +59,9 @@ test('upgrade without retention keys on healthy storage deletes nothing', async 
   await client.movement.create({ data: { side: 'left', timestamp: second - 300 * day, total_movement: 1 } });
   const oldVitals = await client.vitals.findMany();
   const oldSleep = await client.sleep_records.findMany();
-  assert.equal((await pruneMetrics(client, retentionCutoffs(now, 200 * 1024 * 1024, settings.data.features))).vitals, 0);
+  const healthy = await pruneMetrics(client, retentionCutoffs(now, 200 * 1024 * 1024, settings.data.features));
+  assert.equal(healthy.vitals, 0);
+  assert.equal(healthy.movement, 0);
   assert.deepEqual(await client.vitals.findMany(), oldVitals);
   assert.deepEqual(await client.sleep_records.findMany(), oldSleep);
   assert.equal(await client.movement.count(), 1);
@@ -76,7 +78,9 @@ test('age pruning keeps the 30-day boundary and never removes movement or sleep 
     }
   }
   const sleep = await client.sleep_records.findMany();
-  assert.equal((await pruneMetrics(client, retentionCutoffs(now, null, age))).vitals, 2);
+  const aged = await pruneMetrics(client, retentionCutoffs(now, null, age));
+  assert.equal(aged.vitals, 2);
+  assert.equal(aged.movement, 0);
   assert.deepEqual(await timestamps(), [second - 30 * day, second - 30 * day, second, second]);
   assert.equal(await client.movement.count(), 6);
   assert.deepEqual(await client.sleep_records.findMany(), sleep);
@@ -333,4 +337,57 @@ test('age pruning keeps a night crossing 30 days with its minute of boundary sla
   await client.vitals.createMany({ data: [start - 61, ...kept].map(timestamp => ({ side: 'left', timestamp })) });
   assert.equal((await pruneMetrics(client, retentionCutoffs(now, null, age))).vitals, 1);
   assert.deepEqual(await timestamps(), kept);
+});
+
+const addMovement = (side: string, stamps: number[]) => client.movement.createMany({
+  data: stamps.map(timestamp => ({ side, timestamp, total_movement: 1 })),
+});
+
+test('low disk deletes movement inside saved nights once no detailed vitals are left', async () => {
+  await recentNights();
+  const start = second - 40 * day;
+  const end = start + 8 * 3600;
+  await night('left', start, end);
+  await client.vitals.createMany({ data: [0, 600, 1200].map(offset => ({ side: 'left', timestamp: start + offset, heart_rate: 60 })) });
+  const inside = [start, start + 3600, end];
+  const outside = [start - 3600, end + 3600];
+  const protectedRows = [second - day + 60, second];
+  await addMovement('left', [...inside, ...outside, ...protectedRows]);
+  const result = await pruneMetrics(client, retentionCutoffs(now, 1));
+  assert.equal(result.vitals, 3);
+  assert.equal(result.movement, inside.length);
+  assert.deepEqual((await client.movement.findMany({ orderBy: { timestamp: 'asc' } })).map(row => row.timestamp),
+    [...outside.slice(0, 1), ...outside.slice(1), ...protectedRows].sort((a, b) => a - b));
+  const stages = await readStageSummary(client, 'left', start, end);
+  assert.ok(stages);
+  assert.equal(await client.vitals_summaries.count(), 1);
+});
+
+test('low disk keeps movement of protected nights and of saved nights without stages', async () => {
+  await recentNights();
+  const start = second - 40 * day;
+  const long = start + 49 * 3600;
+  await night('left', start, long);
+  await client.vitals.create({ data: { side: 'left', timestamp: start, heart_rate: 60 } });
+  await addMovement('left', [start + 3600, second - day + 60]);
+  const result = await pruneMetrics(client, retentionCutoffs(now, 1));
+  assert.equal(result.vitals, 1);
+  assert.equal(result.movement, 0);
+  assert.equal(await client.movement.count(), 2);
+});
+
+test('low disk prefers detailed vitals and rechecks storage before deleting movement', async () => {
+  await recentNights();
+  const start = second - 40 * day;
+  await night('left', start, start + 8 * 3600);
+  await client.vitals.createMany({ data: Array.from({ length: 1001 }, (_, index) => ({ side: 'left', timestamp: start + index * 5 })) });
+  await addMovement('left', [start + 3600]);
+  let checks = 0;
+  const first = await pruneMetrics(client, retentionCutoffs(now, 1), async () => ++checks === 1 ? 1 : 200 * 1024 * 1024);
+  assert.equal(first.vitals, 1000);
+  assert.equal(first.movement, 0);
+  assert.equal(await client.movement.count(), 1);
+  const second2 = await pruneMetrics(client, retentionCutoffs(now, 1));
+  assert.equal(second2.vitals, 1);
+  assert.equal(second2.movement, 1);
 });

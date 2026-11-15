@@ -28,8 +28,8 @@ async function run(now: Date): Promise<void> {
     };
     const cutoffs = retentionCutoffs(now, await readAvailableBytes(), features, settingsDB.data.timeZone);
     const counts = await pruneMetrics(prisma, cutoffs, readAvailableBytes);
-    logger.info(`Metrics retention: removed ${counts.vitals} detailed vitals rows in ${counts.batches} batches `
-      + `(${counts.stopped}). Freed SQLite pages are reusable; the database file is not smaller.`);
+    logger.info(`Metrics retention: removed ${counts.vitals} detailed vitals rows and ${counts.movement} movement rows `
+      + `in ${counts.batches} batches (${counts.stopped}). Freed SQLite pages are reusable; the database file is not smaller.`);
   } catch (error: unknown) {
     logger.error(`Metrics retention failed: ${error instanceof Error ? error.message : String(error)}`);
   }

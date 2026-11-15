@@ -88,9 +88,9 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   {
     id: 'metrics-low-disk-protection',
     title: 'Low-disk protection',
-    description: 'On by default. Below 150 MiB free, deletes the oldest detailed vitals in bounded batches '
-      + 'until 16 MiB of SQLite pages are reusable. Keeps at least the last two nights of detail. '
-      + 'Never deletes nightly summaries, sleep records, scores or movement. '
+    description: 'On by default. Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized, '
+      + 'in bounded batches until 16 MiB of SQLite pages are reusable. Keeps at least the last two nights of detail. '
+      + 'Never deletes nightly summaries, sleep records or scores. '
       + 'Stops growth by reusing space; does not shrink the database file or run VACUUM.',
     category: 'biometrics',
     version: '3.7.0',

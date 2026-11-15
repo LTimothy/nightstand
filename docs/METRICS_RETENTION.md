@@ -15,11 +15,14 @@ even when Biometrics is off:
   check can continue. It retains at least 48 hours of detail and each side's
   two latest recorded nights, including nights before a long absence. It
   does not prune a prefix of a night that overlaps that protected window.
+  Once no detailed vitals are left to delete, it deletes movement older than
+  that protected window for nights whose saved summary has sleep stages, in
+  the same bounded batches. Those nights keep their stages.
 - Prune detail after 30 days is off by default and requires opt-in. It
   deletes only detailed vitals older than 30 days, with the same protected
-  recent nights and bounded transactions.
+  recent nights and bounded transactions. It never deletes movement.
 
-Neither switch deletes nightly summaries, sleep records, scores or movement.
+Neither switch deletes nightly summaries, sleep records or scores.
 Before a night's first detail deletion, the transaction writes its complete
 vitals summary to the additive `vitals_summaries` table. If that write fails,
 its detail is not deleted. The snapshot keeps sums, counts and extrema for

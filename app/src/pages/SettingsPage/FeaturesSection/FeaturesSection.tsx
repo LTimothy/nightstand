@@ -206,7 +206,8 @@ export default function FeaturesSection() {
           disabled={ isUpdating || features?.metricsLowDiskProtection === undefined }
           checked={ features?.metricsLowDiskProtection ?? true }
           onChange={ (next) => updateFeature({ metricsLowDiskProtection: next }) }
-          description="Below 150 MiB free, deletes the oldest detailed vitals. Keeps 2 nights of detail and every nightly summary."
+          description={ 'Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized. '
+            + 'Keeps 2 nights of detail and every nightly summary.' }
         />
         <FeatureToggleRow
           label="Prune detail after 30 days"

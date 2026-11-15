@@ -66,7 +66,7 @@ describe('FeaturesSection', () => {
     const age = screen.getByRole('switch', { name: 'Prune detail after 30 days' });
     expect(lowDisk).toBeChecked();
     expect(age).not.toBeChecked();
-    expect(screen.getByText('Below 150 MiB free, deletes the oldest detailed vitals. '
+    expect(screen.getByText('Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized. '
       + 'Keeps 2 nights of detail and every nightly summary.')).toBeVisible();
     expect(screen.getByText('Deletes detailed vitals older than 30 days. Summaries, scores and movement stay. '
       + 'Cannot be undone.')).toBeVisible();

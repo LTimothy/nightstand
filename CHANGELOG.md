@@ -12,6 +12,9 @@ is a hard fork; for the history of the projects it descends from, see
 
 - "When I get up" works for rhythms set by hand too. The side keeps its last
   scheduled temperature until you get up.
+- Low-disk protection also deletes movement for nights that already have a
+  saved summary with sleep stages, once no detailed vitals are left to delete.
+  The two latest nights and their stages are kept.
 
 ### Fixes
 
