@@ -10,11 +10,6 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Fixes
 
-- Updating from the app, a fresh install and a fork switch no longer stop
-  with "is not owned and writable by this user alone". The Pod's unzip leaves
-  the downloaded folders writable by everyone, and they are now locked down
-  before the check. A Pod already on 3.7.0, 3.7.1 or 3.7.2 runs the older
-  updater, so it needs one update over SSH to pick this up.
 - After a hand change near a scheduled one, Bed says "Holding your
   temperature" with the clock time scheduled changes resume, instead of
   calling it a paused schedule.
@@ -43,6 +38,20 @@ is a hard fork; for the history of the projects it descends from, see
 - System status has a Boot rescue row. It shows whether startup still pauses
   for serial access and warns when the boot settings list a different slot
   for the next restart. See [installation](INSTALLATION.md#keeping-eight-sleep-updates-out).
+
+## [3.7.3] - 2026-11-14
+
+Lets the app update, a fresh install and a fork switch finish on a Pod.
+
+### Fixes
+
+- Updating from the app, a fresh install and a fork switch no longer stop
+  with "is not owned and writable by this user alone". The Pod's unzip leaves
+  the downloaded folders writable by everyone, and they are now locked down
+  before the check. A Pod already on 3.7.0, 3.7.1 or 3.7.2 runs the older
+  updater, so it needs one update over SSH to pick this up.
+
+Checked on: Pod 5, 3.7.3 deployed over SSH and serving; the 3.7.2 code it builds on ran on the Pod nights 11-01 to 11-14.
 
 ## [3.7.2] - 2026-11-01
 
