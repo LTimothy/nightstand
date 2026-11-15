@@ -47,7 +47,7 @@ function sandbox(opts: {
     copyFileSync(path.join(repoRoot, 'scripts/restore_helpers.sh'), path.join(repo, 'scripts/restore_helpers.sh'));
     copyFileSync(path.join(repoRoot, 'scripts/recover_update.sh'), path.join(repo, 'scripts/recover_update.sh'));
     copyFileSync(path.join(repoRoot, 'scripts/write_result.py'), path.join(repo, 'scripts/write_result.py'));
-    for (const name of ['system_scripts.py', 'block_internet_access.sh']) {
+    for (const name of ['system_scripts.py', 'block_internet_access.sh', 'record_stock.sh']) {
       copyFileSync(path.join(repoRoot, 'scripts', name), path.join(repo, 'scripts', name));
     }
   }
@@ -88,7 +88,8 @@ function sandbox(opts: {
     },
   });
   const read = (file: string) => readFileSync(file, 'utf8');
-  return { run, publish, read, systemd, sudoers, calls, tmpfiles, lock, tmpfilesCalls, system, repo, opsLogs };
+  const recovery = path.join(root, 'recovery');
+  return { recovery, run, publish, read, systemd, sudoers, calls, tmpfiles, lock, tmpfilesCalls, system, repo, opsLogs };
 }
 
 // Every command the server runs through sudo, read from its source.
@@ -257,6 +258,16 @@ describe('setup_services.sh', () => {
     assert.match(unit, /^ConditionPathExists=\/persistent\/free-sleep-data\/update-swap\.json$/m);
     assert.match(box.read(box.calls), /^enable free-sleep-recover-update\.timer$/m);
     assert.doesNotMatch(box.read(box.calls), /(?:start|--now) free-sleep-recover-update/);
+  });
+
+  it('puts record_stock.sh beside the firewall script in boot recovery', () => {
+    const box = sandbox({ withRecovery: true });
+    const result = box.run();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const file = path.join(box.recovery, 'record_stock.sh');
+    assert.equal(box.read(file), readFileSync(path.join(repoRoot, 'scripts/record_stock.sh'), 'utf8'));
+    assert.equal(statSync(file).mode & 0o777, 0o755);
+    assert.ok(existsSync(path.join(box.recovery, 'block_internet_access.sh')));
   });
 
   it('grants a sudoers rule for every command the server runs through sudo', () => {

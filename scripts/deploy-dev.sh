@@ -5,6 +5,10 @@
 # package-lock.json as the source of truth and tar+ship missing packages from
 # the dev machine's server/node_modules.
 #
+# Root runs scripts only from root-owned copies, so a change under scripts/
+# copied here does not run as root until ops/deploy.sh (or an install)
+# publishes it.
+#
 # State kept locally:
 #   .deploy-state/manifest.txt, sha256 of each file shipped last time
 #   .deploy-state/pod-package-lock.json, last known Pod lockfile

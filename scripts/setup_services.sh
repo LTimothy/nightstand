@@ -53,6 +53,7 @@ os.makedirs(recovery, exist_ok=True)
 files = [("recover_update.sh", recovery, 0o755), ("restore_helpers.sh", recovery, 0o644),
          ("write_result.py", recovery, 0o644),
          ("system_scripts.py", recovery, 0o644), ("block_internet_access.sh", recovery, 0o755),
+         ("record_stock.sh", recovery, 0o755),
          ("systemd/free-sleep-recover-update.service", systemd, 0o644),
          ("systemd/free-sleep-recover-update.timer", systemd, 0o644)]
 for source, directory, mode in files:

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import {
-  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, utimesSync,
-  writeFileSync,
+  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync,
+  utimesSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -455,6 +455,7 @@ describe('update.sh', () => {
     const dir = scratch();
     const release = tree(path.join(dir, 'release', 'nightstand-3.7.0'), '3.7.0');
     writeFileSync(path.join(release, 'scripts/archive-raw.sh'), 'RETENTION_HOURS=100\nMIN_FREE_KB=1\n');
+    chmodSync(path.join(release, 'scripts/archive-raw.sh'), 0o755);
     mkdirSync(path.join(dir, 'persistent/free-sleep-data'), { recursive: true });
     writeFileSync(path.join(dir, 'persistent/free-sleep-data/raw-archive.conf'), 'RETENTION_HOURS=200\n');
     spawnSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
@@ -512,6 +513,7 @@ echo "NEW_COPY=$NEW_COPY"`], { env: { ...env(path.join(dir, 'system')), FIXTURE:
       const copy = /NEW_COPY=(.*)/.exec(box.result.stdout)?.[1] ?? '';
       for (const file of [path.join(copy, 'scripts/archive-raw.sh'), path.join(box.stage, 'scripts/archive-raw.sh')]) {
         assert.match(readFileSync(file, 'utf8'), /^RETENTION_HOURS=200$/m, file);
+        assert.ok(statSync(file).mode & 0o100, `${file} is not executable`);
       }
     } finally { rmSync(box.dir, { recursive: true, force: true }); }
   });

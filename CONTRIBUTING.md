@@ -137,7 +137,9 @@ on a Pod:
 - `scripts/deploy-dev.sh` is the faster loop for iteration: it builds locally
   and copies only the files whose content changed since the last deploy. It
   has no backup or rollback step. Set `POD_HOST` to your Pod's address; the
-  script header lists the other options.
+  script header lists the other options. Root runs scripts only from
+  root-owned copies, so a change under `scripts/` that it copies does not run
+  as root until `ops/deploy.sh` (or an install) publishes it.
 
 Both scripts push code rather than running a full install, so they do not
 install systemd units, sudoers rules or the hardware watchdog.
