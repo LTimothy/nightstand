@@ -40,13 +40,10 @@ function resolveNight(side, date, source, timeZone) {
     const sleep = { side, date, rhythmId: source.rhythmId, start, end, wake, night, mode: source.mode, events };
     if (source.mode === 'smart' && source.smart)
         sleep.smart = { ...source.smart };
-    if (source.offWhenUp)
+    if (source.offWhenUp) {
         sleep.offWhenUp = true;
-    if (sleep.smart) {
-        if (source.offWhenUp)
+        if (sleep.smart)
             sleep.smart.offWhenUp = true;
-        else
-            delete sleep.smart.offWhenUp;
     }
     return sleep;
 }

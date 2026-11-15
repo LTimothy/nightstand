@@ -29,7 +29,10 @@ async function deleteSummarizedMovement(client, floors) {
     for (const side of ['left', 'right']) {
         const nights = await client.$queryRaw(Prisma.sql `
       SELECT entered_bed_at, left_bed_at FROM vitals_summaries
-      WHERE side = ${side} AND entered_bed_at < ${floors[side]} AND json_extract(payload, '$.stages') IS NOT NULL
+      WHERE side = ${side} AND entered_bed_at < ${floors[side]}
+        AND EXISTS (SELECT 1 FROM movement m WHERE m.side = vitals_summaries.side
+          AND m.timestamp >= entered_bed_at AND m.timestamp <= MIN(left_bed_at, ${floors[side] - 1}))
+        AND json_extract(payload, '$.stages') IS NOT NULL
       ORDER BY entered_bed_at ASC`);
         for (const night of nights) {
             if (deleted >= BATCH_ROWS)

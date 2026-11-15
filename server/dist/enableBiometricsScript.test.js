@@ -13,7 +13,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const SUDO = (calls) => `echo "sudo $*" >> "${calls}"\n[ "$1" != -H ] || shift\n[ "$1" != -u ] || shift 2\nexec "$@"`;
 // The server user runs every file in its own tree.
 const asDac = (log, pattern) => log.some((line, at) => /^sudo (?:-H )?-u dac /.test(line) && pattern.test(line) && log[at + 1]?.startsWith('python '));
-function run({ installed = false, calibrationFails = false, refuseOn = false, natsImports = true, pipFails = false, lock = '', shell = '', logTimeout = false, stubs = {}, timeoutStub = '', async = false } = {}) {
+function run({ installed = false, calibrationFails = false, refuseOn = false, natsImports = true, pipFails = false, lock = '', shell = '', logTimeout = false, stubs = {}, timeoutStub = '', async = false, limit = 900 } = {}) {
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-enable-biometrics-'));
     const home = path.join(dir, 'home');
     const scripts = path.join(home, 'free-sleep', 'scripts');
@@ -49,7 +49,7 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
     executable(path.join(bin, 'systemctl'), `echo "systemctl $*" >> "${calls}"`);
     executable(path.join(bin, 'sudo'), SUDO(calls));
     const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8')
-        .replaceAll('/usr/local/lib/nightstand/live/scripts', scripts).replaceAll('/home/dac', home);
+        .replaceAll('/usr/local/lib/nightstand/live/scripts', scripts).replaceAll('/home/dac', home).replaceAll(' 900 bash', ` ${limit} bash`);
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_OPERATION_LOCK: lock || path.join(dir, 'operation.lock'),
         NIGHTSTAND_OPERATION_OWNER: '' };
     if (async) {
@@ -162,14 +162,17 @@ describe('enable_biometrics.sh', () => {
         assert.notEqual(result.status, 0);
         assert.match(result.stdout, /Python packages timed out after 900 seconds or was stopped/);
     });
-    for (const [signal, code] of [['SIGTERM', 143], ['SIGHUP', 129], ['SIGINT', 130]]) {
-        it(`posts failed, closes the window and stops the download on ${signal}`, async () => {
+    for (const [signal, code, piped] of [['SIGTERM', 143, false], ['SIGHUP', 129, false], ['SIGINT', 130, false],
+        ['SIGTERM', 143, true]]) {
+        it(`posts failed, closes the window and stops the download on ${signal}${piped ? ' after its log reader died' : ''}`, async () => {
             const started = launch('echo $$ > "$0.pid"\nexec sleep 60');
             try {
                 const pidFile = path.join(started.dir, 'home', 'free-sleep', 'scripts', 'setup_python.sh.pid');
                 for (let i = 0; i < 100 && !existsSync(pidFile); i++)
                     await new Promise(r => setTimeout(r, 50));
                 const pid = Number(readFileSync(pidFile, 'utf8'));
+                if (piped)
+                    started.child.stdout?.destroy();
                 const begun = Date.now();
                 started.child.kill(signal);
                 const status = await Promise.race([started.exited, new Promise(r => setTimeout(() => r('hung'), 15_000))]);
@@ -185,6 +188,35 @@ describe('enable_biometrics.sh', () => {
             finally {
                 started.child.kill('SIGKILL');
                 rmSync(started.dir, { recursive: true, force: true });
+            }
+        });
+    }
+    // The timeout stubs end without stopping the step, as a BusyBox timeout or
+    // the run_limited watchdog can.
+    for (const [name, gnu, limit] of [['a timeout that only stops itself', true, 900], ['the run_limited watchdog', false, 1]]) {
+        it(`stops a download child and frees the lock after ${name}`, async () => {
+            const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-enable-step-'));
+            const lock = path.join(dir, 'operation.lock');
+            const pids = path.join(dir, 'sleep.pid');
+            const timeoutStub = gnu
+                ? `case "$*" in "1 true") exit 0 ;; esac\nshift\n"$@" &\nwhile [ ! -s "${pids}" ]; do sleep 0.05; done\nexit 124`
+                : 'exit 1';
+            try {
+                const result = run({ lock, limit, timeoutStub, stubs: { 'setup_python.sh': `sleep 60 &\necho $! > "${pids}"\nwait` } });
+                assert.notEqual(result.status, 0, result.stdout + result.stderr);
+                assert.ok(result.log.some(line => line.startsWith('curl') && line.includes('"status":"failed"')), result.log.join('\n'));
+                const pid = Number(readFileSync(pids, 'utf8'));
+                // An orphan the container's init never reaps stays a zombie, which holds nothing.
+                const state = () => spawnSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).stdout;
+                const running = () => alive(pid) && !state().startsWith('Z');
+                for (let i = 0; i < 40 && running(); i++)
+                    await new Promise(r => setTimeout(r, 50));
+                assert.equal(running(), false, `download child still running (${state().trim()})`);
+                const free = spawnSync('python3', ['-c', 'import fcntl, sys; fcntl.flock(open(sys.argv[1]), fcntl.LOCK_EX | fcntl.LOCK_NB)', lock]);
+                assert.equal(free.status, 0, 'lock still held');
+            }
+            finally {
+                rmSync(dir, { recursive: true, force: true });
             }
         });
     }

@@ -386,4 +386,26 @@ test('a movement batch stays fast with 432000 old movement rows and 300 saved ni
     assert.equal(result.batches, 1);
     assert.ok(elapsed < 1000, `${elapsed} ms`);
 });
+test('a movement batch reads only saved nights that still hold movement', async (context) => {
+    await recentNights();
+    const start = second - 50 * day;
+    await client.$executeRaw `WITH RECURSIVE nights(n) AS (
+    SELECT 0 UNION ALL SELECT n + 1 FROM nights WHERE n < 9
+  ) INSERT INTO vitals_summaries (side, entered_bed_at, left_bed_at, payload)
+    SELECT 'left', ${start} + n * ${day}, ${start} + n * ${day} + 8 * 3600, '{"version":1,"stats":null,"stages":{},"score":null}' FROM nights`;
+    await addMovement('left', [start + 9 * day + 60]);
+    const queries = [];
+    client.$on('query', event => { if (/FROM vitals_summaries|DELETE FROM movement/.test(event.query))
+        queries.push(event); });
+    let checks = 0;
+    const result = await pruneMetrics(client, retentionCutoffs(now, 1), async () => ++checks === 1 ? 1 : 200 * 1024 * 1024);
+    assert.equal(result.movement, 1);
+    assert.equal(queries.filter(event => /DELETE FROM movement/.test(event.query)).length, 1);
+    const select = queries.find(event => /FROM vitals_summaries/.test(event.query));
+    assert.ok(select);
+    const plan = await client.$queryRawUnsafe(`EXPLAIN QUERY PLAN ${select.query}`, ...JSON.parse(select.params));
+    const details = plan.map(row => row.detail).join('; ');
+    context.diagnostic(details);
+    assert.match(details, /SEARCH m USING COVERING INDEX movement_side_timestamp_key \(side=\? AND timestamp>\? AND timestamp<\?\)/);
+});
 //# sourceMappingURL=metricsRetention.test.js.map
