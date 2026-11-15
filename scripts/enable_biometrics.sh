@@ -3,6 +3,14 @@
 [ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 SCRIPTS=/usr/local/lib/nightstand/live/scripts
 
+WAN_OPEN=no
+say() { echo "$*"; }
+source "$SCRIPTS/restore_helpers.sh"
+if ! take_operation_lock; then
+  echo "An update, rollback, switch or install is running. Run this again when it has finished."
+  exit 1
+fi
+
 python3 "$SCRIPTS/is_biometrics_installed.py"
 result=$?
 
@@ -61,19 +69,37 @@ set -u  # Treat unset variables as errors
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-WAN_OPEN=no
-say() { echo "$*"; }
-source "$SCRIPTS/restore_helpers.sh"
-if ! take_operation_lock; then
-  echo "An update, rollback, switch or install is running. Run this again when it has finished."
-  exit 1
-fi
 init_update_firewall
+
+# Runs a download in its own process group so a signal can stop all of it.
+run_step() {
+  local label=$1 seconds=$2 rc=0
+  shift 2
+  set -m
+  # set -e would end run_limited early on its watchdog cleanup.
+  { set +e; run_limited "$seconds" "$@"; } &
+  STEP_PID=$!
+  set +m
+  wait "$STEP_PID" || rc=$?
+  STEP_PID=
+  [ "$rc" -ne 0 ] || return 0
+  if [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ]; then
+    echo "$label timed out after $seconds seconds or was stopped"
+  else
+    echo "$label failed (exit $rc)"
+  fi
+  exit 1
+}
+
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Catch any errors
 trap '
   rc=$?;
   set +e
+  [ -z "${STEP_PID:-}" ] || kill -s TERM "--" "-$STEP_PID" 2>/dev/null
   if [ "$rc" -ne 0 ]; then
     echo ""
     echo -e "${RED}Error enabling biometrics!${NC}"
@@ -97,8 +123,8 @@ trap '
 
 # Only HTTPS and DNS go out, and only while Python and its packages download.
 open_wan || true
-run_limited 900 bash "$SCRIPTS/setup_python.sh" || exit 1
-run_limited 900 bash "$SCRIPTS/install_python_packages.sh" || exit 1
+run_step "Python setup" 900 bash "$SCRIPTS/setup_python.sh"
+run_step "Python packages" 900 bash "$SCRIPTS/install_python_packages.sh"
 close_wan || true
 bash "$SCRIPTS/setup_streamer_service.sh"
 

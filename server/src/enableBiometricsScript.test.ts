@@ -18,7 +18,7 @@ const asDac = (log: string[], pattern: RegExp) => log.some((line, at) =>
   /^sudo (?:-H )?-u dac /.test(line) && pattern.test(line) && log[at + 1]?.startsWith('python '));
 
 function run({ installed = false, calibrationFails = false, refuseOn = false, natsImports = true, pipFails = false,
-  lock = '', shell = '', logTimeout = false } = {}) {
+  lock = '', shell = '', logTimeout = false, stubs = {} as Record<string, string>, timeoutStub = '', async = false } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-enable-biometrics-'));
   const home = path.join(dir, 'home');
   const scripts = path.join(home, 'free-sleep', 'scripts');
@@ -33,7 +33,7 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
   for (const name of ['unblock_internet_access.sh', 'block_internet_access.sh', 'setup_python.sh',
     'install_python_packages.sh', 'setup_streamer_service.sh']) {
     const fails = pipFails && name === 'install_python_packages.sh';
-    writeFileSync(path.join(scripts, name), `echo "${name}" >> "${calls}"\n${fails ? 'exit 1\n' : ''}`);
+    writeFileSync(path.join(scripts, name), stubs[name] ?? `echo "${name}" >> "${calls}"\n${fails ? 'exit 1\n' : ''}`);
   }
   const executable = (file: string, body: string) => { writeFileSync(file, `#!/bin/sh\n${body}\n`); chmodSync(file, 0o755); };
   for (const tool of ['iptables', 'ip6tables']) executable(path.join(bin, tool), `echo "\${0##*/} $*" >> "${calls}"`);
@@ -46,13 +46,17 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
     `body=$(echo "$last" | tr -d ' \\n'); echo "curl $body" >> "${calls}"`,
     refuseOn ? 'case "$body" in *\'"enabled":true\'*) exit 22 ;; esac' : ':',
   ].join('\n'));
-  if (logTimeout) executable(path.join(bin, 'timeout'), `echo "timeout $*" >> "${calls}"\nshift\nexec "$@"`);
+  if (timeoutStub) executable(path.join(bin, 'timeout'), timeoutStub);
+  else if (logTimeout) executable(path.join(bin, 'timeout'), `echo "timeout $*" >> "${calls}"\nshift\nexec "$@"`);
   executable(path.join(bin, 'systemctl'), `echo "systemctl $*" >> "${calls}"`);
   executable(path.join(bin, 'sudo'), SUDO(calls));
   const script = readFileSync(path.join(repoRoot, 'scripts/enable_biometrics.sh'), 'utf8')
     .replaceAll('/usr/local/lib/nightstand/live/scripts', scripts).replaceAll('/home/dac', home);
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, NIGHTSTAND_OPERATION_LOCK: lock || path.join(dir, 'operation.lock'),
     NIGHTSTAND_OPERATION_OWNER: '' };
+  if (async) {
+    return { child: spawn('bash', ['-c', script], { env }), dir, calls } as never;
+  }
   let result;
   if (shell) {
     const file = path.join(dir, 'enable_biometrics.sh');
@@ -65,6 +69,19 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
   rmSync(dir, { recursive: true, force: true });
   return { ...result, log };
 }
+
+// Starts the script and hands back the child and a way to read its log.
+function launch(stub: string) {
+  const started = run({ stubs: { 'setup_python.sh': stub }, async: true }) as unknown as
+    { child: ReturnType<typeof spawn>; dir: string; calls: string };
+  const out: string[] = [];
+  started.child.stdout?.on('data', d => out.push(String(d)));
+  const exited = new Promise<number | null>(resolve => started.child.once('exit', (code, signal) => resolve(signal ? null : code)));
+  const log = () => (existsSync(started.calls) ? readFileSync(started.calls, 'utf8').trim().split('\n') : []);
+  return { ...started, out, exited, log };
+}
+
+const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
 const turnsOn = (line: string) => line.startsWith('curl') && line.includes('"enabled":true');
 
@@ -141,6 +158,61 @@ describe('enable_biometrics.sh', () => {
     assert.ok(result.log.indexOf('block_internet_access.sh') > result.log.indexOf('install_python_packages.sh'), result.log.join('\n'));
     assert.ok(result.log.some(line => line.startsWith('curl') && line.includes('"status":"failed"')), result.log.join('\n'));
     assert.ok(!result.log.some(turnsOn), result.log.join('\n'));
+  });
+
+  it('names the step that failed', () => {
+    const result = run({ stubs: { 'setup_python.sh': 'exit 3' } });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /Python setup failed \(exit 3\)/);
+    assert.ok(result.log.some(line => line.startsWith('curl') && line.includes('"status":"failed"')), result.log.join('\n'));
+    assert.ok(result.log.includes('block_internet_access.sh'), result.log.join('\n'));
+  });
+
+  it('says which download timed out', () => {
+    const result = run({ timeoutStub: 'case "$*" in *install_python_packages*) exit 124 ;; esac\nshift\nexec "$@"' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /Python packages timed out after 900 seconds or was stopped/);
+  });
+
+  for (const [signal, code] of [['SIGTERM', 143], ['SIGHUP', 129], ['SIGINT', 130]] as const) {
+    it(`posts failed, closes the window and stops the download on ${signal}`, async () => {
+      const started = launch('echo $$ > "$0.pid"\nexec sleep 60');
+      try {
+        const pidFile = path.join(started.dir, 'home', 'free-sleep', 'scripts', 'setup_python.sh.pid');
+        for (let i = 0; i < 100 && !existsSync(pidFile); i++) await new Promise(r => setTimeout(r, 50));
+        const pid = Number(readFileSync(pidFile, 'utf8'));
+        const begun = Date.now();
+        started.child.kill(signal);
+        const status = await Promise.race([started.exited, new Promise<string>(r => setTimeout(() => r('hung'), 15_000))]);
+        assert.equal(status, code, started.out.join(''));
+        assert.ok(Date.now() - begun < 15_000);
+        const log = started.log();
+        assert.ok(log.some(line => line.startsWith('curl') && line.includes('"status":"failed"')), log.join('\n'));
+        assert.ok(log.includes('block_internet_access.sh'), log.join('\n'));
+        for (let i = 0; i < 40 && alive(pid); i++) await new Promise(r => setTimeout(r, 50));
+        assert.equal(alive(pid), false, 'download still running');
+      } finally {
+        started.child.kill('SIGKILL');
+        rmSync(started.dir, { recursive: true, force: true });
+      }
+    });
+  }
+
+  it('takes the lock before restarting an installed stream', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-enable-lock-'));
+    const lock = path.join(dir, 'operation.lock');
+    const holder = spawn('python3', ['-c',
+      'import fcntl, sys, time\nf = open(sys.argv[1], "a")\nfcntl.flock(f, fcntl.LOCK_EX)\nprint("held", flush=True)\ntime.sleep(30)', lock]);
+    try {
+      await new Promise(resolve => holder.stdout.once('data', resolve));
+      const result = run({ installed: true, lock });
+      assert.equal(result.status, 1);
+      assert.ok(!result.log.some(line => line.startsWith('systemctl restart')), result.log.join('\n'));
+      assert.match(result.stdout, /is running/);
+    } finally {
+      holder.kill();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('changes nothing while an update, rollback or switch holds the lock', async () => {
