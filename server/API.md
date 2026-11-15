@@ -488,10 +488,13 @@ instead of the weekly schedule.
 }
 ```
 
-- `smart.offWhenUp`, when `true`, turns the side off when the person gets up
+- `offWhenUp`, when `true`, turns the side off when the person gets up
   ("When I get up"): after 10 minutes out of bed, and no later than 3 hours
-  past the set off time. It is stored only when on. Version 3.5.0 drops it
-  when it reads the file and turns the side off at the set time.
+  past the set off time. It works for manual and Smart Schedule rhythms. It
+  is stored only when on, and `smart.offWhenUp` is set to match so releases
+  that read it only there still turn a Smart Schedule rhythm off when up.
+  Versions 3.5.0 and 3.7 drop the rhythm key when they read the file, and
+  3.5.0 turns the side off at the set time.
 
 ### POST `/api/rhythms`
 

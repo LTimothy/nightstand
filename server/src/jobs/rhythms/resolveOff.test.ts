@@ -71,8 +71,17 @@ describe('resolveSleeps with an actual off', () => {
   });
 
   it('tells a "When I get up" sleep apart', () => {
-    assert.equal(turnsOffWhenUp(tonight(smart)), true);
-    assert.equal(turnsOffWhenUp(tonight(manual)), false);
-    assert.equal(turnsOffWhenUp({ mode: 'manual', smart: { ...DEFAULT_SMART, offWhenUp: true } }), false);
+    const up = { ...DEFAULT_SMART, offWhenUp: true };
+    const manualUp = dbOf(sideOf([rhythmOf('m', NIGHT, { temperatureMode: 'manual', offWhenUp: true, smart: up })], { monday: 'm' }));
+    assert.equal(turnsOffWhenUp(tonight(manualUp)), true);
+    const oldManual = dbOf(sideOf([rhythmOf('m', NIGHT, { temperatureMode: 'manual', smart: up })], { monday: 'm' }));
+    assert.equal(turnsOffWhenUp(tonight(oldManual)), false);
+    const oldSmart = dbOf(sideOf([rhythmOf('s', NIGHT, { temperatureMode: 'smart', smart: up })], { monday: 's' }));
+    assert.equal(turnsOffWhenUp(tonight(oldSmart)), true);
+    const rhythmOnly = rhythmOf('s', NIGHT, { temperatureMode: 'smart', offWhenUp: true, smart: { ...DEFAULT_SMART } });
+    const onlyRhythm = tonight(dbOf(sideOf([rhythmOnly], { monday: 's' })));
+    assert.equal(turnsOffWhenUp(onlyRhythm), true);
+    assert.equal(onlyRhythm.smart?.offWhenUp, true);
+    assert.equal('offWhenUp' in tonight(manual), false);
   });
 });

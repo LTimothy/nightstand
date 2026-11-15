@@ -32,6 +32,8 @@ export const RhythmSchema = z.object({
   wake: TimeSchema,
   temperatureMode: z.enum(['manual', 'smart']),
   smart: SmartScheduleSchema,
+  // Stored only when on, with smart.offWhenUp set too for releases that read it only there.
+  offWhenUp: z.boolean().optional(),
 }).strict();
 
 export const WeekPlanSchema = z.object({
@@ -96,6 +98,10 @@ export type RhythmsDB = z.infer<typeof RhythmsDBSchema>;
 export type RhythmsUpdate = z.infer<typeof RhythmsUpdateSchema>;
 export type RhythmsStatus = z.infer<typeof RhythmsStatusSchema>;
 export type RhythmsResponse = z.infer<typeof RhythmsResponseSchema>;
+
+// Older data holds it on smart.offWhenUp alone, and only Smart Schedule read it there.
+export const rhythmOffWhenUp = (rhythm: Pick<Rhythm, 'offWhenUp' | 'smart' | 'temperatureMode'>): boolean =>
+  rhythm.offWhenUp === true || (rhythm.temperatureMode === 'smart' && rhythm.smart.offWhenUp === true);
 
 export const DEFAULT_SMART: SmartSchedule = { baseLevel: 0, intensity: 'standard', warmStart: true, warmUp: true, upEarly: false };
 

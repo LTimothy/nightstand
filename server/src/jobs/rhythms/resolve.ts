@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
 import { AlarmSchedule, DailySchedule, DayOfWeek, Schedules, Side } from '../../db/schedulesSchema.js';
-import { RhythmsDB, SmartSchedule } from '../../db/rhythmsSchema.js';
+import { RhythmsDB, rhythmOffWhenUp, SmartSchedule } from '../../db/rhythmsSchema.js';
 import { wakeFromNight } from '../../db/rhythmWake.js';
 import { SCHEDULE_DAYS } from '../../db/scheduleKeys.js';
 import { addDays, rhythmSleepBounds, wallClock } from '../../db/rhythmTimes.js';
@@ -27,6 +27,7 @@ export type ResolvedSleep = {
   night: DailySchedule;
   mode: 'manual' | 'smart';
   smart?: SmartSchedule;
+  offWhenUp?: true;
   events: RhythmEvent[];
   smartCurve?: SmartCurveInfo; // Smart Schedule sleeps only
 };
@@ -36,7 +37,9 @@ export type PowerOffFor = (side: Side, date: string) => Date | undefined;
 type Window = { side: Side; timeZone: string; from: Date; to: Date; coolStartFor?: CoolStartFor; powerOffFor?: PowerOffFor };
 type Overlap = { first: string; second: string };
 // wake is left out for the weekly schedule, which takes it from the night.
-type NightSource = { rhythmId: string | null; night: DailySchedule; wake?: string; mode: 'manual' | 'smart'; smart?: SmartSchedule };
+type NightSource = {
+  rhythmId: string | null; night: DailySchedule; wake?: string; mode: 'manual' | 'smart'; smart?: SmartSchedule; offWhenUp?: boolean;
+};
 
 // Longer than any caller needs, so a mistaken window cannot resolve years of sleeps.
 export const MAX_RESOLVE_WINDOW_MS = 70 * 24 * 60 * 60 * 1000;
@@ -71,6 +74,11 @@ function resolveNight(side: Side, date: string, source: NightSource, timeZone: s
   events.sort((a, b) => a.at.getTime() - b.at.getTime() || KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
   const sleep: ResolvedSleep = { side, date, rhythmId: source.rhythmId, start, end, wake, night, mode: source.mode, events };
   if (source.mode === 'smart' && source.smart) sleep.smart = { ...source.smart };
+  if (source.offWhenUp) sleep.offWhenUp = true;
+  if (sleep.smart) {
+    if (source.offWhenUp) sleep.smart.offWhenUp = true;
+    else delete sleep.smart.offWhenUp;
+  }
   return sleep;
 }
 
@@ -83,8 +91,7 @@ export function withPowerOff(sleep: ResolvedSleep, at: Date | undefined): Resolv
   return { ...sleep, end: at, setOff: sleep.end, wake: new Date(Math.min(sleep.wake.getTime(), at.getTime())), events };
 }
 
-export const turnsOffWhenUp = (sleep: Pick<ResolvedSleep, 'mode' | 'smart'>): boolean =>
-  sleep.mode === 'smart' && sleep.smart?.offWhenUp === true;
+export const turnsOffWhenUp = (sleep: Pick<ResolvedSleep, 'offWhenUp'>): boolean => sleep.offWhenUp === true;
 
 // A sleep starting the day before `from` can still be running at `from`.
 function resolveWindow(window: Window, sourceFor: (date: string) => NightSource | null): ResolvedSleep[] {
@@ -114,7 +121,10 @@ export function resolveSleeps(args: {
     const rhythmId = change ? change.rhythmId : plan.week[weekdayOf(date)];
     const rhythm = rhythmId && Object.hasOwn(plan.rhythms, rhythmId) ? plan.rhythms[rhythmId] : undefined;
     if (!rhythm) return null;
-    return { rhythmId: rhythm.id, night: rhythm.night, wake: rhythm.wake, mode: rhythm.temperatureMode, smart: rhythm.smart };
+    return {
+      rhythmId: rhythm.id, night: rhythm.night, wake: rhythm.wake, mode: rhythm.temperatureMode, smart: rhythm.smart,
+      offWhenUp: rhythmOffWhenUp(rhythm),
+    };
   });
 }
 

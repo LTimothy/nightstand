@@ -8,6 +8,11 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+### Changes
+
+- "When I get up" works for rhythms set by hand too. The side keeps its last
+  scheduled temperature until you get up.
+
 ### Fixes
 
 - After a hand change near a scheduled one, Bed says "Holding your

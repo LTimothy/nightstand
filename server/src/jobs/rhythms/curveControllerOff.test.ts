@@ -29,7 +29,7 @@ function nightSleep(side: Side, smart: SmartSchedule, alarmAt: string | null): R
   return {
     side, date: DATE, rhythmId: 'workday', start, end, wake: t('06:30'),
     night: { temperatures: {}, alarm: ALARM, alarms: [], power: { on: '22:45', off: '07:30', onTemperature: 80, enabled: true } },
-    mode: 'smart', smart,
+    mode: 'smart', smart, ...(smart.offWhenUp ? { offWhenUp: true as const } : {}),
     events: [{ kind: 'power-on', at: start, temperatureF: 80 }, ...alarms, { kind: 'power-off', at: end }],
   };
 }

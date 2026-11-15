@@ -63,6 +63,7 @@ const smartNight = (bedtime: Date, minutes: number, offWhenUp = false) => {
     wake: new Date(end.getTime() - 60 * MINUTE),
     night: { temperatures: {}, alarm, alarms: [], power: { on: '22:45', off: '07:45', onTemperature: 80, enabled: true } },
     mode: 'smart',
+    ...(offWhenUp ? { offWhenUp: true as const } : {}),
     smart: { baseLevel: 0, intensity: 'standard', warmStart: true, warmUp: true, upEarly: false, ...(offWhenUp ? { offWhenUp } : {}) },
     events: [
       { kind: 'power-on', at: bedtime, temperatureF: 80 },
