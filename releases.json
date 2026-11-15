@@ -12,7 +12,7 @@
     {
       "kind": "bundle",
       "version": "3.7.3",
-      "channel": "beta",
+      "channel": "stable",
       "date": "2026-11-14",
       "upstreamBase": "2.1.5",
       "features": [
