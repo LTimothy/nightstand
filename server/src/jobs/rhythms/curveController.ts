@@ -104,6 +104,8 @@ type SleepState = {
   side: Side;
   // A manual sleep followed only for "When I get up": no curve, holds or history.
   manual: boolean;
+  // Edited between manual and Smart Schedule: the night adds no history line.
+  modeChanged: boolean;
   date: string;
   rhythmId: string | null;
   smart: SmartSchedule;
@@ -325,7 +327,7 @@ export class CurveController {
     const key = keyOf(sleep.side, sleep.date);
     const existing = this.states.get(key);
     if (existing) {
-      existing.manual = !curve;
+      if (existing.manual !== !curve) this.changeMode(existing, sleep, curve);
       existing.rhythmId = sleep.rhythmId;
       existing.smart = smart ?? DEFAULT_SMART;
       existing.daySleep = curve?.daySleep ?? false;
@@ -345,6 +347,7 @@ export class CurveController {
     const state: SleepState = {
       side: sleep.side,
       manual: !curve,
+      modeChanged: false,
       date: sleep.date,
       rhythmId: sleep.rhythmId,
       smart: smart ?? DEFAULT_SMART,
@@ -370,6 +373,21 @@ export class CurveController {
     };
     this.states.set(key, state);
     return state;
+  }
+
+  // A sleep kept on is handed to the side's own timer, as when the choice is
+  // turned off. The new mode starts from its own bedtime, with no smart state.
+  private changeMode(state: SleepState, sleep: ResolvedSleep, curve: SmartCurveInfo | null): void {
+    const key = keyOf(state.side, state.date);
+    const record = this.offs.get(key);
+    if (record?.status === 'extended') this.endOff(key, record, this.deps.now(), 'stopped', { retime: true });
+    state.manual = !curve;
+    state.modeChanged = true;
+    state.bedtime = curve?.bedtime ?? sleep.start;
+    state.start = { status: 'watching' };
+    state.hold = null;
+    state.upEarlyAt = null;
+    state.outOfBedAt = null;
   }
 
   // An edited bedtime keeps a decided start only when the new bedtime gives
@@ -613,7 +631,7 @@ export class CurveController {
     }
     const wake = state.wake.getTime();
     // A sleep that turns off when up holds the wake level until it does.
-    const outOfBed = !state.smart.offWhenUp && !state.upEarlyAt && !state.outOfBedAt && run.known && run.presentSince === null
+    const outOfBed = !state.offWhenUp && !state.upEarlyAt && !state.outOfBedAt && run.known && run.presentSince === null
       && time >= wake && time < wake + AFTER_WAKE_MS && wake < state.powerOff.getTime();
     if (outOfBed) {
       state.outOfBedAt = now;
@@ -648,7 +666,7 @@ export class CurveController {
   }
 
   private async finish(state: SleepState): Promise<void> {
-    if (state.manual) return;
+    if (state.manual || state.modeChanged) return;
     const start = state.start.status === 'decided'
       ? state.start
       : { coolStart: state.bedtime, confirmedAt: null, reason: 'not-observed' as const };

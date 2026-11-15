@@ -84,6 +84,7 @@ function harness(options: Options = {}) {
   let smartBySide: Partial<Record<Side, Partial<SmartSchedule>>> = options.smart ?? { left: { offWhenUp: true } };
   let laterStart = options.laterStart;
   let away = options.away ?? { left: false, right: false };
+  let manualSides = options.manual ?? [];
   let clock = local(options.start ?? `${NEXT} 06:00`);
   // A retime starts a rebuild, which empties the job list until it is done (by the next minute here).
   let rebuilding = false;
@@ -105,7 +106,7 @@ function harness(options: Options = {}) {
     const over = smartBySide[side];
     if (!over) return [];
     const planned = nightSleep(side, { ...DEFAULT_SMART, ...over }, alarmFor(side));
-    const night = withPowerOff(options.manual?.includes(side) ? asManual(planned) : planned, owner.powerOffFor(side, DATE));
+    const night = withPowerOff(manualSides.includes(side) ? asManual(planned) : planned, owner.powerOffFor(side, DATE));
     const sleeps = [applySmartCurve(night, TZ, owner.coolStartFor(side, DATE))];
     if (laterStart) sleeps.push(laterSleep(side, laterStart));
     return sleeps;
@@ -198,6 +199,7 @@ function harness(options: Options = {}) {
     setSmart: (next: Partial<Record<Side, Partial<SmartSchedule>>>) => { smartBySide = next; },
     setLaterStart: (next: string) => { laterStart = next; },
     setAway: (next: Record<Side, boolean>) => { away = next; },
+    setManual: (next: Side[]) => { manualSides = next; },
     failSleeps: (fail: boolean) => { sleepsFail = fail; },
     last: (side: Side = 'left') => history.filter(item => item.side === side).at(-1),
   };
@@ -853,5 +855,55 @@ describe('"When I get up" on a rhythm set by hand', () => {
     assert.equal(h.retimes() > retimes, true);
     assert.equal(h.controller.isExtended('left', DATE), false);
     assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('08:01'));
+  });
+
+  for (const offWhenUp of [true, false]) {
+    it(`hands a manual sleep switched to Smart Schedule mid-extension to its timer, ${offWhenUp ? 'with' : 'without'} the choice`, async () => {
+      const h = manual();
+      await h.runUntil('07:30', always);
+      assert.equal(h.decide(), 'keep');
+      await h.runUntil('08:00', always);
+      const retimes = h.retimes();
+      h.setManual([]);
+      h.setSmart({ left: offWhenUp ? { offWhenUp: true } : {} });
+      await h.runUntil('08:05', always);
+      assert.deepEqual(h.offs, []);
+      assert.equal(h.retimes() > retimes, true);
+      assert.equal(h.controller.isExtended('left', DATE), false);
+      assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('08:01'));
+      assert.deepEqual(h.history, []);
+    });
+  }
+
+  it('hands a Smart Schedule sleep switched to manual mid-extension to its timer', async () => {
+    const h = harness();
+    await h.runUntil('07:30', always);
+    assert.equal(h.decide(), 'keep');
+    await h.runUntil('08:00', always);
+    h.setManual(['left']);
+    await h.runUntil('08:05', always);
+    assert.deepEqual(h.offs, []);
+    assert.equal(h.controller.isExtended('left', DATE), false);
+    assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('08:01'));
+    assert.deepEqual(h.history, []);
+  });
+
+  it('drops the Smart Schedule hold when the sleep is switched to manual', async () => {
+    const h = harness({ alarms: { left: null } });
+    await h.runUntil('06:10', always);
+    assert.equal(h.controller.noteManualChange('left', h.now()), 'held');
+    assert.notEqual(h.controller.status('left', h.now())?.holdUntil, null);
+    h.setManual(['left']);
+    await h.runUntil('06:15', always);
+    const status = h.controller.status('left', h.now());
+    assert.equal(status?.holdUntil, null);
+    assert.equal(status?.baseSince, null);
+    assert.equal(status?.phase, null);
+    assert.equal(status?.coolStart.toISOString(), local(`${DATE} 22:45`).toISOString());
+    assert.equal(h.controller.gate('left', DATE, h.now()), 'run');
+    await h.runUntil('06:55', inBed('06:40'));
+    assert.deepEqual(h.offs, [['left', '06:50']]);
+    assert.deepEqual(h.applied, []);
+    assert.deepEqual(h.history, []);
   });
 });
