@@ -4,7 +4,7 @@ import moment from 'moment-timezone';
 import { DEFAULT_SMART } from '../../db/rhythmsSchema.js';
 import { withPowerOff } from './resolve.js';
 import { applySmartCurve } from './smartSleep.js';
-import { CurveController } from './curveController.js';
+import { CurveController, liveCurveState, startCurveController, stopCurveController, } from './curveController.js';
 const TZ = 'America/Los_Angeles';
 const MINUTE = 60_000;
 const DATE = '2026-09-29';
@@ -24,7 +24,7 @@ function nightSleep(side, smart, alarmAt) {
     return {
         side, date: DATE, rhythmId: 'workday', start, end, wake: t('06:30'),
         night: { temperatures: {}, alarm: ALARM, alarms: [], power: { on: '22:45', off: '07:30', onTemperature: 80, enabled: true } },
-        mode: 'smart', smart,
+        mode: 'smart', smart, ...(smart.offWhenUp ? { offWhenUp: true } : {}),
         events: [{ kind: 'power-on', at: start, temperatureF: 80 }, ...alarms, { kind: 'power-off', at: end }],
     };
 }
@@ -39,9 +39,17 @@ function laterSleep(side, start) {
         events: [{ kind: 'power-on', at, temperatureF: 80 }, { kind: 'power-off', at: end }],
     };
 }
+// The same night set by hand: no Smart Schedule, "When I get up" kept on the sleep.
+function asManual(sleep) {
+    const manual = { ...sleep, mode: 'manual' };
+    delete manual.smart;
+    return manual;
+}
 function harness(options = {}) {
     let smartBySide = options.smart ?? { left: { offWhenUp: true } };
     let laterStart = options.laterStart;
+    let away = options.away ?? { left: false, right: false };
+    let manualSides = options.manual ?? [];
     let clock = local(options.start ?? `${NEXT} 06:00`);
     // A retime starts a rebuild, which empties the job list until it is done (by the next minute here).
     let rebuilding = false;
@@ -62,16 +70,18 @@ function harness(options = {}) {
         const over = smartBySide[side];
         if (!over)
             return [];
-        const night = withPowerOff(nightSleep(side, { ...DEFAULT_SMART, ...over }, alarmFor(side)), owner.powerOffFor(side, DATE));
+        const planned = nightSleep(side, { ...DEFAULT_SMART, ...over }, alarmFor(side));
+        const night = withPowerOff(manualSides.includes(side) ? asManual(planned) : planned, owner.powerOffFor(side, DATE));
         const sleeps = [applySmartCurve(night, TZ, owner.coolStartFor(side, DATE))];
         if (laterStart)
             sleeps.push(laterSleep(side, laterStart));
         return sleeps;
     };
-    const controller = new CurveController({
+    const create = options.active ? startCurveController : (deps) => new CurveController(deps);
+    const controller = create({
         now: () => clock,
         presence: () => presence,
-        awayMode: () => options.away ?? { left: false, right: false },
+        awayMode: () => away,
         isPaused: (_side, now) => options.paused?.(now) ?? false,
         sleeps: (side, from, to) => {
             if (sleepsFail)
@@ -152,6 +162,8 @@ function harness(options = {}) {
         curve: () => resolveWith(controller, 'left')[0]?.smartCurve,
         setSmart: (next) => { smartBySide = next; },
         setLaterStart: (next) => { laterStart = next; },
+        setAway: (next) => { away = next; },
+        setManual: (next) => { manualSides = next; },
         failSleeps: (fail) => { sleepsFail = fail; },
         last: (side = 'left') => history.filter(item => item.side === side).at(-1),
     };
@@ -648,6 +660,152 @@ describe('"When I get up" with pause, holds, away mode and both sides', () => {
         await h.runUntil('07:00');
         assert.notEqual(h.controller.status('left', h.now()), null);
         assert.equal(h.controller.status('left', h.now())?.offBy, null);
+    });
+});
+describe('"When I get up" on a rhythm set by hand', () => {
+    const manual = (options = {}) => harness({ manual: ['left'], ...options });
+    it('turns a manual sleep off once the person has been up 10 minutes after the wake', async () => {
+        const h = manual({ alarms: { left: null } });
+        await h.runUntil('06:55', inBed('06:40'));
+        assert.deepEqual(h.offs, [['left', '06:50']]);
+        assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('06:50'));
+    });
+    it('keeps a manual sleep on past its set off while someone is in bed, then off when up', async () => {
+        const h = manual();
+        await h.runUntil('07:30', inBed('08:10'));
+        assert.equal(h.decide(), 'keep');
+        assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('10:30'));
+        await h.runUntil('08:30', inBed('08:10'));
+        assert.deepEqual(h.arms[0], ['left', '07:46', '07:31']);
+        assert.deepEqual(h.offs, [['left', '08:20']]);
+        assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('08:20'));
+    });
+    it('never changes the temperature of a manual sleep it keeps on', async () => {
+        // Up early, then a short trip out of bed after the wake: either can drop a Smart Schedule sleep to its base.
+        const stream = now => ({
+            left: now < t('05:00') || (now >= t('05:30') && now < t('06:35')) || (now >= t('06:40') && now < t('08:10')),
+        });
+        const h = manual({ start: `${DATE} 22:30`, smart: { left: { offWhenUp: true, upEarly: true } } });
+        await h.runUntil('07:30', stream);
+        assert.equal(h.decide(), 'keep');
+        await h.runUntil('08:30', stream);
+        assert.deepEqual(h.offs, [['left', '08:20']]);
+        assert.deepEqual(h.applied, []);
+    });
+    it('shows the latest off on the live view for a manual sleep', async () => {
+        const h = manual({ laterStart: '09:00', active: true });
+        try {
+            await h.runUntil('07:00', always);
+            const live = liveCurveState('left', h.now());
+            assert.equal(live?.phase, null);
+            assert.equal(live?.nextChange, null);
+            assert.equal(live?.hold, null);
+            assert.equal(live?.baseSince, null);
+            assert.equal(live?.offWhenUp?.by, iso('08:30'));
+        }
+        finally {
+            stopCurveController();
+        }
+    });
+    it('adds no history line for a manual sleep', async () => {
+        const h = manual();
+        await h.runUntil('07:30', inBed('08:10'));
+        assert.equal(h.decide(), 'keep');
+        await h.runUntil('11:00', inBed('08:10'));
+        assert.deepEqual(h.offs, [['left', '08:20']]);
+        assert.deepEqual(h.history, []);
+    });
+    it('does not follow a manual rhythm without the choice', async () => {
+        const h = manual({ smart: { left: {} } });
+        await h.runUntil('07:00', always);
+        assert.equal(h.controller.status('left', h.now()), null);
+        await h.runUntil('07:30', always);
+        assert.equal(h.decide(), 'off');
+        assert.equal(h.controller.powerOffFor('left', DATE), undefined);
+        await h.runUntil('08:00', always);
+        assert.deepEqual(h.offs, []);
+        assert.deepEqual(h.arms, []);
+    });
+    it('leaves a manual sleep kept on to its timer while paused', async () => {
+        const h = manual({ paused: now => now >= t('08:00') });
+        await h.runUntil('07:30', always);
+        assert.equal(h.decide(), 'keep');
+        await h.runUntil('10:31', always);
+        assert.deepEqual(h.arms.at(-1), ['left', '10:30', '08:00']);
+        assert.deepEqual(h.offs, []);
+        assert.equal(h.controller.isExtended('left', DATE), false);
+        assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('10:30'));
+    });
+    it('stops following a manual sleep when away mode turns on', async () => {
+        const h = manual();
+        await h.runUntil('07:30', always);
+        assert.equal(h.decide(), 'keep');
+        await h.runUntil('08:00', always);
+        h.setAway({ left: true, right: false });
+        await h.runUntil('08:05', always);
+        assert.deepEqual(h.offs, []);
+        assert.equal(h.controller.isExtended('left', DATE), false);
+        assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('08:01'));
+    });
+    it('hands a manual sleep to its timer when the choice is turned off mid-extension', async () => {
+        const h = manual();
+        await h.runUntil('07:30', always);
+        assert.equal(h.decide(), 'keep');
+        await h.runUntil('08:00', always);
+        const retimes = h.retimes();
+        h.setSmart({ left: {} });
+        await h.runUntil('08:05', always);
+        assert.deepEqual(h.offs, []);
+        assert.equal(h.retimes() > retimes, true);
+        assert.equal(h.controller.isExtended('left', DATE), false);
+        assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('08:01'));
+    });
+    for (const offWhenUp of [true, false]) {
+        it(`hands a manual sleep switched to Smart Schedule mid-extension to its timer, ${offWhenUp ? 'with' : 'without'} the choice`, async () => {
+            const h = manual();
+            await h.runUntil('07:30', always);
+            assert.equal(h.decide(), 'keep');
+            await h.runUntil('08:00', always);
+            const retimes = h.retimes();
+            h.setManual([]);
+            h.setSmart({ left: offWhenUp ? { offWhenUp: true } : {} });
+            await h.runUntil('08:05', always);
+            assert.deepEqual(h.offs, []);
+            assert.equal(h.retimes() > retimes, true);
+            assert.equal(h.controller.isExtended('left', DATE), false);
+            assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('08:01'));
+            assert.deepEqual(h.history, []);
+        });
+    }
+    it('hands a Smart Schedule sleep switched to manual mid-extension to its timer', async () => {
+        const h = harness();
+        await h.runUntil('07:30', always);
+        assert.equal(h.decide(), 'keep');
+        await h.runUntil('08:00', always);
+        h.setManual(['left']);
+        await h.runUntil('08:05', always);
+        assert.deepEqual(h.offs, []);
+        assert.equal(h.controller.isExtended('left', DATE), false);
+        assert.equal(h.controller.powerOffFor('left', DATE)?.toISOString(), iso('08:01'));
+        assert.deepEqual(h.history, []);
+    });
+    it('drops the Smart Schedule hold when the sleep is switched to manual', async () => {
+        const h = harness({ alarms: { left: null } });
+        await h.runUntil('06:10', always);
+        assert.equal(h.controller.noteManualChange('left', h.now()), 'held');
+        assert.notEqual(h.controller.status('left', h.now())?.holdUntil, null);
+        h.setManual(['left']);
+        await h.runUntil('06:15', always);
+        const status = h.controller.status('left', h.now());
+        assert.equal(status?.holdUntil, null);
+        assert.equal(status?.baseSince, null);
+        assert.equal(status?.phase, null);
+        assert.equal(status?.coolStart.toISOString(), local(`${DATE} 22:45`).toISOString());
+        assert.equal(h.controller.gate('left', DATE, h.now()), 'run');
+        await h.runUntil('06:55', inBed('06:40'));
+        assert.deepEqual(h.offs, [['left', '06:50']]);
+        assert.deepEqual(h.applied, []);
+        assert.deepEqual(h.history, []);
     });
 });
 //# sourceMappingURL=curveControllerOff.test.js.map

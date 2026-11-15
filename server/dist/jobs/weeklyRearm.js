@@ -11,6 +11,7 @@ import { isRebuilding } from './rebuildState.js';
 import { engineActivation } from './scheduleQueries.js';
 import { runningNight } from './nightBounds.js';
 import { isSchedulePaused } from './schedulePause.js';
+import { lastManualPowerChange } from './manualPowerChange.js';
 const MANUAL_ON_MS = MAX_ON_DURATION_SECONDS * 1000;
 // The firmware end a side on in tonight's weekly night should now have, or
 // null when what it was given still holds.
@@ -51,13 +52,14 @@ export function planWeeklyRearm(settings, schedules, side, now) {
 // Rhythms took over, or a rebuild is replacing this job.
 const weeklyLost = (rhythmsAtStart) => isRebuilding() || engineActivation().active || settingsDB.data.features.rhythms !== rhythmsAtStart;
 export async function rearmWeeklyNight(side) {
+    const startedAt = Date.now();
     const label = `weekly off time for ${side}`;
     const rhythmsAtStart = settingsDB.data.features.rhythms;
     await settingsDB.read();
     await schedulesDB.read();
     if (weeklyLost(rhythmsAtStart))
         return;
-    const plan = planWeeklyRearm(settingsDB.data, schedulesDB.data, side, new Date());
+    const plan = planWeeklyRearm(settingsDB.data, schedulesDB.data, side, new Date(startedAt));
     if (!plan)
         return;
     let isOn;
@@ -77,6 +79,10 @@ export async function rearmWeeklyNight(side) {
     }
     if (!isOn) {
         logger.info(`Skipping ${label}: the side is off`);
+        return;
+    }
+    if ((lastManualPowerChange(side) ?? -Infinity) >= startedAt) {
+        logger.info(`Skipping ${label}: changed by hand while it waited`);
         return;
     }
     logger.info(`Executing ${label}`);

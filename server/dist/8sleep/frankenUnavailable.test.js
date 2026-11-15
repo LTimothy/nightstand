@@ -34,7 +34,7 @@ mock.module(new URL('./unixSocketServer.js', import.meta.url).href, {
             }
         } },
 });
-const { disconnectFranken, isFrankenConnected, FrankenUnavailableError } = await import('./frankenServer.js');
+const { disconnectFranken, isFrankenConnected, connectFrankenWithin, FrankenUnavailableError } = await import('./frankenServer.js');
 const { FrankenSupersededError } = await import('./frankenErrors.js');
 const { executeFunction } = await import('./deviceApi.js');
 const { executeAlarm } = await import('../jobs/alarmScheduler.js');
@@ -61,6 +61,8 @@ async function connectFirmware(fault = {}) {
         const injected = message === '14\n\n' ? fault.status : message.startsWith('5\n') ? fault.alarm : undefined;
         if (injected === 'close')
             peer.destroy();
+        else if (injected === 'slow')
+            setTimeout(() => peer.write(leftOnStatus), 150);
         else if (injected === undefined)
             peer.write(message === '14\n\n' ? leftOnStatus : data);
     });
@@ -187,6 +189,26 @@ test('an alarm is not sent when the connection comes only after its deadline', a
     assert.ok(await outcome instanceof FrankenUnavailableError);
     await pause(50);
     assert.deepEqual(received, []);
+});
+test('a command whose deadline passes while it waits in the queue is never sent', async () => {
+    const connecting = connectFrankenWithin({ background: true });
+    const received = await connectFirmware({ status: 'slow' });
+    const franken = await connecting;
+    const status = franken.getDeviceStatus();
+    await assert.rejects(executeFunction('ALARM_LEFT', 'aa', { background: true, notAfter: Date.now() + 50 }), FrankenUnavailableError);
+    await status;
+    assert.equal(received.some(message => message.startsWith('5\n')), false);
+    await executeFunction('TEMP_LEVEL_RIGHT', '10');
+    assert.ok(received.includes('12\n10\n\n'), 'the next command still runs');
+});
+test('a queued command still inside its deadline is sent after the slow one', async () => {
+    const connecting = connectFrankenWithin({ background: true });
+    const received = await connectFirmware({ status: 'slow' });
+    const franken = await connecting;
+    const status = franken.getDeviceStatus();
+    await executeFunction('ALARM_LEFT', 'aa', { background: true, notAfter: Date.now() + 1_000 });
+    await status;
+    assert.ok(received.some(message => message.startsWith('5\n')));
 });
 test('a scheduled state command waits out an outage longer than the limit for other commands', async () => {
     const pending = executeFunction('LEFT_TEMP_DURATION', '0', { background: true, latest: true });

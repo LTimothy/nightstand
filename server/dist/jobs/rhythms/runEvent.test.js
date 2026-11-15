@@ -47,7 +47,7 @@ const { default: servicesDB } = await import('../../db/services.js');
 const { default: memoryDB } = await import('../../db/memoryDB.js');
 const { resolveSleeps, withPowerOff } = await import('./resolve.js');
 const { everyNight, testNight, testRhythmsDB } = await import('./testSupport.js');
-const { armExtensionStep, armedEnd, holdForHandBack, ANALYSIS_MAX_WINDOW_MS, REANALYSIS_DELAY_MS, firmwareSeconds, rearmRhythmSleep, resetOffTimes, runRhythmEvent, runSleepAnalysis, } = await import('./runEvent.js');
+const { armExtensionStep, armedEnd, holdForHandBack, ANALYSIS_MAX_WINDOW_MS, OFF_WHEN_UP_MARGIN_SECONDS, REANALYSIS_DELAY_MS, firmwareSeconds, rearmRhythmSleep, resetOffTimes, runRhythmEvent, runSleepAnalysis, } = await import('./runEvent.js');
 const { hasAlarmOccurrence, resetAlarmOccurrences } = await import('../alarmScheduler.js');
 const { resetAlarmActivity, trackAlarm } = await import('../alarmActivity.js');
 const { DEFAULT_SMART } = await import('../../db/rhythmsSchema.js');
@@ -421,6 +421,18 @@ describe('"When I get up" sleeps', () => {
         setNow('2026-09-28T21:30:00Z');
         await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
         assert.equal(updateOptions[0].onUntil.getTime(), sleep.end.getTime() + 900_000);
+    });
+    it('gives a manual "When I get up" sleep the longer firmware margin', async () => {
+        const side = everyNight(testNight('22:00', '06:00', { alarms: ['05:45'] }));
+        side.rhythms['every-night'].offWhenUp = true;
+        const from = at('2026-09-28T12:00:00Z');
+        const sleep = resolveSleeps({
+            db: testRhythmsDB(schedulesDB.data, side), side: 'left', timeZone: 'UTC', from, to: new Date(from.getTime() + 24 * 3600_000),
+        }).find(candidate => candidate.date === '2026-09-28');
+        assert.ok(sleep);
+        setNow('2026-09-28T21:30:00Z');
+        await runRhythmEvent('left', sleep, eventOf(sleep, 'power-on'));
+        assert.equal(updateOptions[0].onUntil.getTime(), sleep.end.getTime() + OFF_WHEN_UP_MARGIN_SECONDS * 1000);
     });
     it('keeps the side on at the set off while someone is in bed, and turns it off at the latest', async () => {
         const sleep = upSleepOn('2026-09-28');

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync, } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync, } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,25 +25,48 @@ const ROOT_RUN_PY = listed('scripts', '.py').filter(file => file !== 'scripts/pr
 // path under /home, is treated the same way in that file.
 const TREE_NAMES = ['LIVE', 'PREV', 'STAGE', 'FAILED', 'REPO_DIR', 'SRC_DIR', 'TMP', 'RECOVERY_SOURCE', 'STAGE_INNER',
     'PREV_DIR', 'FAILED_DIR', 'SERVER_DIR', 'UNZIP_DIR', 'TARGET_DIR'];
-// install.sh checks the fresh download with that download's digest script before the copy exists, as it always has.
-const FROM = { 'scripts/install.sh': 'system_scripts.py" publish "$SRC_DIR"' };
+// Lines above the publish that may use the fresh download, which only root has touched so far.
+const ABOVE_PUBLISH = {
+    'scripts/install.sh': [
+        // No installed copy of the digest script exists yet; this catches corruption, not tampering.
+        'ACTUAL_DIGEST=$(python3 "$SRC_DIR/scripts/tree_digest.py" "$SRC_DIR") || ACTUAL_DIGEST=""',
+    ],
+};
 // The one step that makes the copy runs the fresh tree's own tool, from a folder only root can write.
 const PUBLISH = /^COPY=\$\(python3 -B "\$(SRC_DIR|FRESH)\/scripts\/system_scripts\.py" publish "\$\1"\) \\$/;
 // The copy a publish prints is root's, whatever tree it was taken from.
 const MAKES_COPY = /^"?\$\((?:SSH ")?python3 -B "?\$\{?\w+\}?\/(?:scripts\/)?system_scripts\.py"? (?:publish|find)\b/;
 const ASSIGN = /(?:^|[;&|)]\s*)(?:local\s+|export\s+|readonly\s+)?([A-Za-z_]\w*)=(\S.*)?$/;
+const LOOP = /\bfor\s+([A-Za-z_]\w*)\s+in\s+(.*)$/;
+const READ = /(?:^|[;&|({]|\b(?:then|do|while|until|if|else))\s*(?:IFS=\S*\s+)?read\s+(?:-\S+\s+)*([A-Za-z_]\w*(?:\s+[A-Za-z_]\w*)*)/;
+const AS_OTHER_USER = /\b(?:sudo|runuser) -u /;
+const CHANGES_DIR = /^(?:cd|pushd)\s/;
+const dirParts = (line) => line.split(/(?<![\w-])(?=(?:cd|pushd)\s)/);
 const variable = (names) => String.raw `\$\{?(?:${[...names].join('|')})\}?(?![\w])`;
+// Each name a line binds, with the text its value comes from.
+function bindings(line) {
+    const found = [];
+    const assign = ASSIGN.exec(line);
+    if (assign && !MAKES_COPY.test(assign[2] ?? ''))
+        found.push([[assign[1]], assign[2] ?? '']);
+    const loop = LOOP.exec(line);
+    if (loop)
+        found.push([[loop[1]], loop[2]]);
+    const read = READ.exec(line);
+    if (read)
+        found.push([read[1].split(/\s+/), line]);
+    return found;
+}
 function treeNames(text) {
     const names = new Set(TREE_NAMES);
     const lines = text.split('\n').filter(line => !/^\s*#/.test(line));
     for (let grew = true; grew;) {
         grew = false;
-        for (const line of lines) {
-            const match = ASSIGN.exec(line);
-            if (!match || names.has(match[1]) || MAKES_COPY.test(match[2] ?? ''))
+        for (const [bound, value] of lines.flatMap(bindings)) {
+            if (bound.every(name => names.has(name)))
                 continue;
-            if (/\/home\//.test(match[2] ?? '') || new RegExp(variable(names)).test(match[2] ?? '')) {
-                names.add(match[1]);
+            if (/\/home\//.test(value) || new RegExp(variable(names)).test(value)) {
+                bound.forEach(name => names.add(name));
                 grew = true;
             }
         }
@@ -57,16 +80,46 @@ function shellOffenders(file, text) {
     const runs = new RegExp(String.raw `(?:^|[\s;&|(\x60])(?:/(?:usr/)?bin/)?(?:bash|sh|python3?|node|source|exec|\.)(?:\s+-[A-Za-z]+)*`
         + String.raw `\s+["']?(?:${tree}|/home/)`);
     const direct = new RegExp(String.raw `(?:^|[;&|]\s*|\b(?:then|do|else)\s+)["']?${tree}/[^\s"']+\.(?:sh|py)\b`);
-    const intoSystem = new RegExp(String.raw `\b(?:cp|install|rsync|ln)\s.*(?:${tree}|/home/).*\s["']?(?:/etc|/usr|/lib|/bin|/sbin|`
-        + String.raw `\$\{?(?:PYTHON_LIB_DIR|SYSTEMD_DIR|SUDOERS_FILE|TMPFILES_DIR)\b)`);
-    const lines = text.split('\n');
-    const start = FROM[file] ? lines.findIndex(line => line.includes(FROM[file])) : 0;
-    assert.ok(start >= 0, `${file}: missing ${FROM[file]}`);
-    return lines.map((line, index) => ({ line, at: `${file}:${index + 1}` })).slice(start)
+    const system = String.raw `["']?(?:/(?=["'\s]|$)|/etc|/usr|/lib|/bin|/sbin|\$\{?(?:PYTHON_LIB_DIR|SYSTEMD_DIR|SUDOERS_FILE|TMPFILES_DIR)\b)`;
+    const intoSystem = new RegExp(String.raw `\b(?:cp|mv|install|rsync|ln)\s.*(?:${tree}|/home/).*\s${system}`);
+    const untar = new RegExp(String.raw `\btar(?=\s.*(?:${tree}|/home/))(?=.*\s(?:-C\s*|--directory[=\s])${system})`);
+    // After cd into a tree, a relative path names that tree's files.
+    const intoTree = new RegExp(String.raw `^(?:cd|pushd)\s+(?:-[LP]\s+)*["']?(?:${tree}|/home/)`);
+    const relative = new RegExp(String.raw `(?:^|[\s;&|(\x60])(?:(?:bash|sh|python3?|node|source|exec|\.)(?:\s+-[A-Za-z]+)*\s+["']?`
+        + String.raw `(?:\.\/|[\w.-]+\/|[\w-]+\.(?:sh|py|js)\b)|\.\/)`
+        + String.raw `|(?:^\s*|[;&|]\s*|\b(?:then|do|else)\s+)["']?[\w.-]+\/[^\s"']+\.(?:sh|py)\b`
+        // -m puts the working directory on the path unless -I or -P keeps it off.
+        + String.raw `|\bpython3?(?:\s+-(?![A-Za-z]*[IP])[A-Za-z]+)*\s+-(?![A-Za-z]*[IP])[A-Za-z]*m\b`);
+    let inTree = false;
+    const lines = text.split('\n').map((line, index) => {
+        let here = inTree;
+        let fromTree = false;
+        for (const part of dirParts(line)) {
+            if (CHANGES_DIR.test(part))
+                here = intoTree.test(part);
+            if (here && relative.test(part.replace(/^(?:cd|pushd)\s+(?:-[LP]\s+)*\S+/, '')))
+                fromTree = true;
+        }
+        // Only a cd in root's own shell moves it: not one after sudo -u, in a subshell, in backticks or in quotes.
+        let outer = line.split(AS_OTHER_USER)[0].replace(/"[^"]*"|'[^']*'|`[^`]*`/g, quoted => (dirParts(quoted).length > 1 ? '' : quoted));
+        for (let before = ''; before !== outer;)
+            [before, outer] = [outer, outer.replace(/\([^()]*\)/g, '')];
+        for (const part of dirParts(outer))
+            if (CHANGES_DIR.test(part))
+                inTree = intoTree.test(part);
+        return { line, fromTree, at: `${file}:${index + 1}` };
+    });
+    const publishAt = lines.findIndex(({ line }) => PUBLISH.test(line.trim()));
+    const allowed = ABOVE_PUBLISH[file] ?? [];
+    assert.ok(!allowed.length || publishAt >= 0, `${file}: missing the publish step`);
+    for (const entry of allowed) {
+        assert.ok(lines.slice(0, publishAt).some(({ line }) => line.trim() === entry), `${file}: no line above the publish reads ${entry}`);
+    }
+    return lines.filter(({ line }, index) => !(index < publishAt && allowed.includes(line.trim())))
         // Comments, commands run as the server user, quoted text such as sudoers lines, and the publish step.
-        .filter(({ line }) => !/^\s*#/.test(line) && !/\b(?:sudo|runuser) -u /.test(line) && !/^\s*"[^"]*"\s*$/.test(line)
+        .filter(({ line }) => !/^\s*#/.test(line) && !AS_OTHER_USER.test(line) && !/^\s*"[^"]*"\s*$/.test(line)
         && !PUBLISH.test(line.trim()))
-        .filter(({ line }) => runs.test(line) || direct.test(line) || intoSystem.test(line))
+        .filter(({ line, fromTree }) => fromTree || runs.test(line) || direct.test(line) || intoSystem.test(line) || untar.test(line))
         .map(({ at, line }) => `${at}: ${line.trim()}`);
 }
 // Python lines that start an interpreter on anything but the scripts beside
@@ -158,8 +211,12 @@ describe('root runs nothing from the server user\'s folders', () => {
         assert.deepEqual(ROOT_RUN_PY.flatMap(file => pythonOffenders(file, read(file))), []);
     });
     it('catches each way a root-run script could run or install the server user\'s files', () => {
+        const install = read('scripts/install.sh').split('\n');
+        const publishAt = install.findIndex(line => PUBLISH.test(line.trim()));
+        install.splice(publishAt, 0, 'bash "$SRC_DIR/scripts/evil.sh"');
+        assert.deepEqual(shellOffenders('scripts/install.sh', install.join('\n')), [`scripts/install.sh:${publishAt + 1}: bash "$SRC_DIR/scripts/evil.sh"`]);
         const rollback = read('scripts/rollback_pod.sh');
-        for (const probe of [
+        assert.deepEqual([
             'bash "$RECOVERY_SOURCE/scripts/evil.sh"',
             'D=/home/dac/free-sleep; bash "$D/scripts/evil.sh"',
             'D=/home/dac/free-sleep\nE="$D/scripts"\nsource "$E/evil.sh"',
@@ -168,9 +225,27 @@ describe('root runs nothing from the server user\'s folders', () => {
             'install -m 755 "$STAGE/scripts/x" /usr/local/bin/x',
             'rsync -a "$LIVE/scripts/python/" "$PYTHON_LIB_DIR/"',
             'python3 -B "$STAGE_INNER/scripts/system_scripts.py" publish "$STAGE_INNER"',
-        ]) {
-            assert.notDeepEqual(shellOffenders('scripts/rollback_pod.sh', `${rollback}\n${probe}\n`), [], probe);
-        }
+            'for f in "$LIVE"/scripts/*.sh; do bash "$f"; done',
+            'cd "$LIVE" && bash scripts/evil.sh',
+            'cd /home/dac/free-sleep\nsh ./scripts/evil.sh',
+            'read -r D < /home/dac/where; bash "$D/evil.sh"',
+            'mv "$STAGE/x.service" /etc/systemd/system/x.service',
+            'tar -xf "$LIVE/x.tar" -C /etc',
+            'tar -C /usr/local -xzf /home/dac/x.tgz',
+            'cd "$LIVE" && scripts/evil.sh',
+            'cd "$LIVE" && exec scripts/evil.sh',
+            'cd "$LIVE" && python3 -m scripts.evil',
+            'tar -xf "$LIVE/x.tar" -C /',
+            'cp -a "$LIVE/rootfs/." /',
+            'cd "$LIVE"\nsudo -u dac sh -c "cd /tmp"\nbash scripts/evil.sh',
+            'cd "$LIVE"\n(cd /tmp && true)\nbash scripts/evil.sh',
+            'cd "$LIVE"\necho "then cd / to finish"\nbash scripts/evil.sh',
+            'cd -P "$LIVE" && bash scripts/evil.sh',
+            'pushd "$LIVE" && bash scripts/evil.sh',
+            'cd "$LIVE" && sudo -u dac npm ci\nbash scripts/evil.sh',
+            'cd /home/dac/free-sleep && sudo -u dac true\nbash scripts/evil.sh',
+            'cd "$LIVE"\nX=`cd /tmp; pwd`\nbash scripts/evil.sh',
+        ].filter(probe => shellOffenders('scripts/rollback_pod.sh', `${rollback}\n${probe}\n`).length === 0), []);
         const runner = read('scripts/switch_installation.py');
         for (const probe of [
             "        subprocess.run(['bash', str(source / 'scripts/setup_services.sh'), str(source), '--recovery-only'])",
@@ -275,6 +350,7 @@ describe('which copy root runs after a tree comes back', () => {
             const system = path.join(dir, 'system');
             const current = publish(system, tree(path.join(dir, 'current'), '3.7.1'));
             const previous = publish(system, tree(path.join(dir, 'previous'), '3.7.0'));
+            pointAt(system, previous);
             pointAt(system, current);
             const result = follow(system, path.join(dir, 'previous'));
             assert.equal(result.status, 0, result.stdout + result.stderr);
@@ -298,6 +374,47 @@ describe('which copy root runs after a tree comes back', () => {
                 assert.match(result.stderr, /keeps running the current ones/);
                 assert.equal(live(system), `copies/${path.basename(current)}`);
             }
+        }
+        finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+    it('follows only the live copy or the one it replaced', () => {
+        const dir = scratch();
+        try {
+            const system = path.join(dir, 'system');
+            const [a, b] = ['a', 'b'].map((name, index) => publish(system, tree(path.join(dir, name), `3.7.${index}`)));
+            pointAt(system, a);
+            pointAt(system, b);
+            publish(system, tree(path.join(dir, 'c'), '3.7.2'));
+            const steps = [
+                ['c', b, /Only the current copy or the one it replaced can run as root/], ['a', a, null], ['b', b, null]
+            ];
+            for (const [target, expected, warning] of steps) {
+                const result = follow(system, path.join(dir, target));
+                assert.equal(result.status, 0, result.stdout + result.stderr);
+                if (warning)
+                    assert.match(result.stderr, warning);
+                assert.equal(live(system), `copies/${path.basename(expected)}`, target);
+            }
+        }
+        finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+    it('prune keeps the copy the live one replaced', () => {
+        const dir = scratch();
+        try {
+            const system = path.join(dir, 'system');
+            const made = [0, 1, 2, 3, 4].map(index => {
+                const copy = publish(system, tree(path.join(dir, `t${index}`), `3.7.${index}`));
+                utimesSync(copy, 1000 + index, 1000 + index);
+                return copy;
+            });
+            pointAt(system, made[0]);
+            pointAt(system, made[4]);
+            assert.equal(spawnSync('python3', ['-B', TOOL, 'prune'], { env: env(system) }).status, 0);
+            assert.deepEqual(copies(system).sort(), [made[0], ...made.slice(2)].map(copy => path.basename(copy)).sort());
         }
         finally {
             rmSync(dir, { recursive: true, force: true });
@@ -332,6 +449,7 @@ describe('update.sh', () => {
         const dir = scratch();
         const release = tree(path.join(dir, 'release', 'nightstand-3.7.0'), '3.7.0');
         writeFileSync(path.join(release, 'scripts/archive-raw.sh'), 'RETENTION_HOURS=100\nMIN_FREE_KB=1\n');
+        chmodSync(path.join(release, 'scripts/archive-raw.sh'), 0o755);
         mkdirSync(path.join(dir, 'persistent/free-sleep-data'), { recursive: true });
         writeFileSync(path.join(dir, 'persistent/free-sleep-data/raw-archive.conf'), 'RETENTION_HOURS=200\n');
         spawnSync('python3', ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])',
@@ -392,6 +510,7 @@ echo "NEW_COPY=$NEW_COPY"`], { env: { ...env(path.join(dir, 'system')), FIXTURE:
             const copy = /NEW_COPY=(.*)/.exec(box.result.stdout)?.[1] ?? '';
             for (const file of [path.join(copy, 'scripts/archive-raw.sh'), path.join(box.stage, 'scripts/archive-raw.sh')]) {
                 assert.match(readFileSync(file, 'utf8'), /^RETENTION_HOURS=200$/m, file);
+                assert.ok(statSync(file).mode & 0o100, `${file} is not executable`);
             }
         }
         finally {
@@ -541,6 +660,23 @@ restore_dependencies "$FIXTURE/failed"`, 'test', path.join(repoRoot, 'scripts/re
             assert.doesNotMatch(result.stdout, /chown/);
             assert.match(result.stdout, /WARNING: could not move dependencies back/);
             assert.ok(existsSync(path.join(dir, 'failed/server/node_modules')));
+        }
+        finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+    it('puts a tree back when a folder planted at the target swallows it', () => {
+        const dir = scratch();
+        try {
+            mkdirSync(path.join(dir, 'live'));
+            writeFileSync(path.join(dir, 'live/marker'), 'tree');
+            // An mv without -T, racing a folder in at the target before the plain mv.
+            const result = spawnSync('bash', ['-c', `mv() { [ "$1" = -T ] && return 1; [ "$2" = "$FIXTURE/prev" ] && mkdir "$2"; command mv "$@"; }
+${helper(read('scripts/restore_helpers.sh'))}
+move_tree "$FIXTURE/live" "$FIXTURE/prev"`], { env: { ...process.env, FIXTURE: dir }, encoding: 'utf8' });
+            assert.equal(result.status, 1, result.stderr);
+            assert.deepEqual(readdirSync(path.join(dir, 'live')), ['marker']);
+            assert.deepEqual(readdirSync(path.join(dir, 'prev')), []);
         }
         finally {
             rmSync(dir, { recursive: true, force: true });

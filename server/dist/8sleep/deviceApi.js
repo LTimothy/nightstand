@@ -23,6 +23,6 @@ export const frankenCommands = {
 export async function executeFunction(command, arg = 'empty', options = {}) {
     logger.debug(`Executing command | command: ${command} | arg: ${typeof arg === 'string' ? arg : 'when sent'}`);
     const franken = await connectFrankenWithin(options, command);
-    await franken.callFunction(command, typeof arg === 'string' ? arg : arg());
+    await franken.callFunction(command, typeof arg === 'string' ? arg : arg(), options.notAfter);
 }
 //# sourceMappingURL=deviceApi.js.map

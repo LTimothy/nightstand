@@ -1,4 +1,5 @@
 import moment from 'moment-timezone';
+import { rhythmOffWhenUp } from '../../db/rhythmsSchema.js';
 import { wakeFromNight } from '../../db/rhythmWake.js';
 import { SCHEDULE_DAYS } from '../../db/scheduleKeys.js';
 import { addDays, rhythmSleepBounds, wallClock } from '../../db/rhythmTimes.js';
@@ -39,6 +40,14 @@ function resolveNight(side, date, source, timeZone) {
     const sleep = { side, date, rhythmId: source.rhythmId, start, end, wake, night, mode: source.mode, events };
     if (source.mode === 'smart' && source.smart)
         sleep.smart = { ...source.smart };
+    if (source.offWhenUp)
+        sleep.offWhenUp = true;
+    if (sleep.smart) {
+        if (source.offWhenUp)
+            sleep.smart.offWhenUp = true;
+        else
+            delete sleep.smart.offWhenUp;
+    }
     return sleep;
 }
 // Ends a sleep at its actual off: later while kept on for someone in bed,
@@ -50,7 +59,7 @@ export function withPowerOff(sleep, at) {
     events.push({ kind: 'power-off', at });
     return { ...sleep, end: at, setOff: sleep.end, wake: new Date(Math.min(sleep.wake.getTime(), at.getTime())), events };
 }
-export const turnsOffWhenUp = (sleep) => sleep.mode === 'smart' && sleep.smart?.offWhenUp === true;
+export const turnsOffWhenUp = (sleep) => sleep.offWhenUp === true;
 // A sleep starting the day before `from` can still be running at `from`.
 function resolveWindow(window, sourceFor) {
     const { side, timeZone, from, to } = window;
@@ -80,7 +89,10 @@ export function resolveSleeps(args) {
         const rhythm = rhythmId && Object.hasOwn(plan.rhythms, rhythmId) ? plan.rhythms[rhythmId] : undefined;
         if (!rhythm)
             return null;
-        return { rhythmId: rhythm.id, night: rhythm.night, wake: rhythm.wake, mode: rhythm.temperatureMode, smart: rhythm.smart };
+        return {
+            rhythmId: rhythm.id, night: rhythm.night, wake: rhythm.wake, mode: rhythm.temperatureMode, smart: rhythm.smart,
+            offWhenUp: rhythmOffWhenUp(rhythm),
+        };
     });
 }
 export function resolveLegacySleeps(args) {

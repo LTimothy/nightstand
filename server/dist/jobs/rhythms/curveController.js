@@ -1,4 +1,5 @@
 import { effectiveCoolStart, holdEnd, levelAt, MANUAL_HOLD_MAX_MS, phaseAt, } from '../../db/smartCurve.js';
+import { DEFAULT_SMART } from '../../db/rhythmsSchema.js';
 import { PRESENCE_STALE_MS } from '../../8sleep/presenceStale.js';
 import logger from '../../logger.js';
 import { turnsOffWhenUp } from './resolve.js';
@@ -55,7 +56,7 @@ export class CurveController {
             this.endOff(key, record, record.latest, 'cap', { retime: false });
             return 'off';
         }
-        if (record || !this.deps.smartOff || !turnsOffWhenUp(sleep))
+        if (record || !this.watchesOff(sleep))
             return 'off';
         const setOff = sleep.setOff ?? sleep.end;
         const target = { side, date: sleep.date };
@@ -159,10 +160,12 @@ export class CurveController {
                 continue;
             const sleeps = this.deps.sleeps(side, new Date(time - LOOKBACK_MS), new Date(time + LOOKAHEAD_MS));
             for (const sleep of sleeps) {
-                const curve = sleep.smartCurve;
-                if (sleep.mode !== 'smart' || !curve || !sleep.smart)
+                const smart = sleep.mode === 'smart' && sleep.smartCurve && sleep.smart ? sleep.smart : null;
+                const curve = smart ? sleep.smartCurve ?? null : null;
+                if (!curve && !this.watchesOff(sleep))
                     continue;
-                if (time < curve.bedtime.getTime() - WINDOW_BEFORE_MS || time >= sleep.end.getTime())
+                const from = curve ? curve.bedtime.getTime() - WINDOW_BEFORE_MS : sleep.start.getTime();
+                if (time < from || time >= sleep.end.getTime())
                     continue;
                 const key = keyOf(side, sleep.date);
                 // A paused night is not tracked; once the pause ends it is, as not observed if past its bedtime.
@@ -173,7 +176,7 @@ export class CurveController {
                     continue;
                 }
                 seen.add(key);
-                const state = this.stateFor(sleep, curve, sleep.smart);
+                const state = this.stateFor(sleep, curve, smart);
                 await this.step(state, snapshot, now);
             }
         }
@@ -208,17 +211,21 @@ export class CurveController {
         const key = keyOf(sleep.side, sleep.date);
         const existing = this.states.get(key);
         if (existing) {
+            if (existing.manual !== !curve)
+                this.changeMode(existing, sleep, curve);
             existing.rhythmId = sleep.rhythmId;
-            existing.smart = smart;
-            existing.daySleep = curve.daySleep;
-            existing.wake = curve.wake;
+            existing.smart = smart ?? DEFAULT_SMART;
+            existing.daySleep = curve?.daySleep ?? false;
+            existing.wake = curve?.wake ?? sleep.wake;
             existing.powerOff = sleep.end;
             existing.setOff = sleep.setOff ?? sleep.end;
             existing.sleepStart = sleep.start;
-            existing.offWhenUp = this.watchesOff(smart);
+            existing.offWhenUp = this.watchesOff(sleep);
             existing.alarms = alarmsOf(sleep);
-            existing.points = curve.points;
-            if (existing.bedtime.getTime() !== curve.bedtime.getTime())
+            existing.points = curve?.points ?? [];
+            if (!curve)
+                existing.bedtime = sleep.start;
+            else if (existing.bedtime.getTime() !== curve.bedtime.getTime())
                 this.moveBedtime(existing, curve);
             // A cool-down start that presence moved moves the end of a hold with it.
             if (existing.hold)
@@ -227,16 +234,18 @@ export class CurveController {
         }
         const state = {
             side: sleep.side,
+            manual: !curve,
+            modeChanged: false,
             date: sleep.date,
             rhythmId: sleep.rhythmId,
-            smart,
-            bedtime: curve.bedtime,
-            wake: curve.wake,
+            smart: smart ?? DEFAULT_SMART,
+            bedtime: curve?.bedtime ?? sleep.start,
+            wake: curve?.wake ?? sleep.wake,
             powerOff: sleep.end,
             setOff: sleep.setOff ?? sleep.end,
             sleepStart: sleep.start,
-            daySleep: curve.daySleep,
-            points: curve.points,
+            daySleep: curve?.daySleep ?? false,
+            points: curve?.points ?? [],
             start: { status: 'watching' },
             firstSight: true,
             presence: null,
@@ -246,12 +255,27 @@ export class CurveController {
             manualChanges: {},
             bedExitsLastHour: 0,
             lastSeen: {},
-            offWhenUp: this.watchesOff(smart),
+            offWhenUp: this.watchesOff(sleep),
             streak: null,
             alarms: alarmsOf(sleep),
         };
         this.states.set(key, state);
         return state;
+    }
+    // A sleep kept on is handed to the side's own timer, as when the choice is
+    // turned off. The new mode starts from its own bedtime, with no smart state.
+    changeMode(state, sleep, curve) {
+        const key = keyOf(state.side, state.date);
+        const record = this.offs.get(key);
+        if (record?.status === 'extended')
+            this.endOff(key, record, this.deps.now(), 'stopped', { retime: true });
+        state.manual = !curve;
+        state.modeChanged = true;
+        state.bedtime = curve?.bedtime ?? sleep.start;
+        state.start = { status: 'watching' };
+        state.hold = null;
+        state.upEarlyAt = null;
+        state.outOfBedAt = null;
     }
     // An edited bedtime keeps a decided start only when the new bedtime gives
     // the same one; otherwise presence decides again against the new bedtime.
@@ -272,8 +296,8 @@ export class CurveController {
     sidesFor(side) {
         return this.deps.awayMode()[otherSide(side)] ? [...SIDES] : [side];
     }
-    watchesOff(smart) {
-        return smart.offWhenUp === true && !!this.deps.smartOff;
+    watchesOff(sleep) {
+        return turnsOffWhenUp(sleep) && !!this.deps.smartOff;
     }
     // The side's next sleep after this one's set off, within reach of the latest off.
     nextSleepFor(side, date, setOff) {
@@ -461,6 +485,11 @@ export class CurveController {
         const time = now.getTime();
         const sides = this.sidesFor(state.side);
         const run = presenceRun(snapshot, sides, time, PRESENCE_STALE_MS);
+        // A manual sleep keeps its last scheduled temperature; only the turn-off follows presence.
+        if (state.manual) {
+            await this.stepOff(state, run, now);
+            return;
+        }
         const bridged = bridgeDropouts(state.presence, run, time);
         state.presence = bridged.kept;
         let moved = false;
@@ -495,7 +524,7 @@ export class CurveController {
         }
         const wake = state.wake.getTime();
         // A sleep that turns off when up holds the wake level until it does.
-        const outOfBed = !state.smart.offWhenUp && !state.upEarlyAt && !state.outOfBedAt && run.known && run.presentSince === null
+        const outOfBed = !state.offWhenUp && !state.upEarlyAt && !state.outOfBedAt && run.known && run.presentSince === null
             && time >= wake && time < wake + AFTER_WAKE_MS && wake < state.powerOff.getTime();
         if (outOfBed) {
             state.outOfBedAt = now;
@@ -528,6 +557,8 @@ export class CurveController {
         }
     }
     async finish(state) {
+        if (state.manual || state.modeChanged)
+            return;
         const start = state.start.status === 'decided'
             ? state.start
             : { coolStart: state.bedtime, confirmedAt: null, reason: 'not-observed' };

@@ -44,6 +44,11 @@ export class FrankenCommandTimeoutError extends Error {
         this.name = 'FrankenCommandTimeoutError';
     }
 }
+function assertBefore(notAfter) {
+    if (notAfter !== undefined && Date.now() > notAfter) {
+        throw new FrankenUnavailableError('Pod hardware became available too late for this command');
+    }
+}
 // The singleton types refer to the classes defined below.
 // eslint-disable-next-line no-use-before-define
 let frankenServer;
@@ -77,7 +82,7 @@ export class Franken {
         });
     }
     static separator = Buffer.from('\n\n');
-    async sendMessage(message) {
+    async sendMessage(message, notAfter) {
         logger.debug(`Sending message to sock | message: ${message}`);
         const commandNumber = message.split('\n', 1)[0] ?? '?';
         const startedAt = Date.now();
@@ -86,6 +91,7 @@ export class Franken {
         try {
             const execPromise = this.sequentialQueue.exec(async () => {
                 this.lifetime.signal.throwIfAborted();
+                assertBefore(notAfter);
                 const requestBytes = Buffer.concat([Buffer.from(message), Franken.separator]);
                 await this.write(requestBytes);
                 writeCompleted = true;
@@ -151,13 +157,13 @@ export class Franken {
             return arg;
         return arg.replace(/\n/gm, '');
     }
-    async callFunction(command, arg) {
+    async callFunction(command, arg, notAfter) {
         logger.debug(`Calling function | command: ${command} | arg: ${arg}`);
         const commandNumber = frankenCommands[command];
         const cleanedArg = this.tryStripNewlines(arg);
         logger.debug(`commandNumber: ${commandNumber}`);
         logger.debug(`cleanedArg: ${cleanedArg}`);
-        await this.sendMessage(`${commandNumber}\n${cleanedArg}`);
+        await this.sendMessage(`${commandNumber}\n${cleanedArg}`, notAfter);
     }
     async getDeviceStatus(getGestures = false) {
         const command = 'DEVICE_STATUS';
@@ -311,11 +317,6 @@ export async function disconnectFranken() {
 }
 // Newest waiting command per setting; older ones drop out when superseded.
 const latestWaiting = new Map();
-function assertBefore(notAfter) {
-    if (notAfter !== undefined && Date.now() > notAfter) {
-        throw new FrankenUnavailableError('Pod hardware became available too late for this command');
-    }
-}
 async function connectFrankenLatest(key, notAfter) {
     const ticket = Symbol(key);
     latestWaiting.set(key, ticket);

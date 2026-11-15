@@ -44,6 +44,24 @@ it('takes the shared operation lock, and refuses while another run holds it', as
         rmSync(dir, { recursive: true, force: true });
     }
 });
+it('picks the lock path from the override, /run/lock or the fallback', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-lock-path-'));
+    try {
+        const helpers = read(HELPERS);
+        const start = helpers.indexOf('operation_lock_path() {');
+        const body = helpers.slice(start, helpers.indexOf('\n}\n', start) + 3).replaceAll('/run/lock', path.join(dir, 'run-lock'));
+        const pick = (override) => spawnSync('bash', ['-c', `${body}\noperation_lock_path`], {
+            env: { ...process.env, NIGHTSTAND_OPERATION_LOCK: override }, encoding: 'utf8',
+        }).stdout.trim();
+        assert.equal(pick('/custom/op.lock'), '/custom/op.lock');
+        assert.equal(pick(''), '/tmp/free-sleep-operation.lock');
+        mkdirSync(path.join(dir, 'run-lock'));
+        assert.equal(pick(''), path.join(dir, 'run-lock/free-sleep-operation.lock'));
+    }
+    finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
 it('blocks the internet again after a restore even when the restored tree lost its block script', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-restore-block-'));
     try {

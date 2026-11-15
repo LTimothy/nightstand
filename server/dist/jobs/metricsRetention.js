@@ -22,9 +22,31 @@ export async function reusableBytes(client) {
     const [size] = await client.$queryRaw `PRAGMA page_size`;
     return Number(free.freelist_count) * Number(size.page_size);
 }
+// Movement of a night is only dropped once its saved summary holds the stages computed from it.
+// Driven from the summaries so each delete is a bounded range on the (side, timestamp) index.
+async function deleteSummarizedMovement(client, floors) {
+    let deleted = 0;
+    for (const side of ['left', 'right']) {
+        const nights = await client.$queryRaw(Prisma.sql `
+      SELECT entered_bed_at, left_bed_at FROM vitals_summaries
+      WHERE side = ${side} AND entered_bed_at < ${floors[side]} AND json_extract(payload, '$.stages') IS NOT NULL
+      ORDER BY entered_bed_at ASC`);
+        for (const night of nights) {
+            if (deleted >= BATCH_ROWS)
+                return deleted;
+            deleted += await client.$executeRaw(Prisma.sql `
+        DELETE FROM movement WHERE id IN (
+          SELECT id FROM movement
+          WHERE side = ${side} AND timestamp >= ${night.entered_bed_at}
+            AND timestamp <= ${Math.min(night.left_bed_at, floors[side] - 1)}
+          ORDER BY timestamp ASC LIMIT ${BATCH_ROWS - deleted})`);
+        }
+    }
+    return deleted;
+}
 // Summarize and delete in the same transaction. Small batches let the live writer run between them.
 export async function pruneMetrics(client, cutoffs, readAvailableBytes) {
-    const totals = { vitals: 0, batches: 0, stopped: 'complete' };
+    const totals = { vitals: 0, movement: 0, batches: 0, stopped: 'complete' };
     if (!cutoffs.lowDisk && cutoffs.detail === null)
         return totals;
     const floors = {};
@@ -73,6 +95,7 @@ export async function pruneMetrics(client, cutoffs, readAvailableBytes) {
             return totals;
         const batchFloors = lowDisk ? floors : detailFloors;
         let removed;
+        let movement = 0;
         try {
             removed = await client.$transaction(async (transaction) => {
                 const candidates = [];
@@ -83,8 +106,11 @@ export async function pruneMetrics(client, cutoffs, readAvailableBytes) {
           ORDER BY timestamp ASC, id ASC LIMIT ${BATCH_ROWS}`));
                 }
                 const rows = candidates.sort((left, right) => left.timestamp - right.timestamp || left.id - right.id).slice(0, BATCH_ROWS);
-                if (!rows.length)
-                    return -1;
+                if (!rows.length) {
+                    if (lowDisk)
+                        movement = await deleteSummarizedMovement(transaction, floors);
+                    return movement > 0 ? 0 : -1;
+                }
                 const nights = await transaction.sleep_records.findMany({ where: { OR: ['left', 'right'].flatMap(side => {
                             const timestamps = rows.filter(row => row.side === side).map(row => row.timestamp);
                             return timestamps.length ? [{ side, entered_bed_at: { lte: Math.max(...timestamps) + 60 },
@@ -112,6 +138,12 @@ export async function pruneMetrics(client, cutoffs, readAvailableBytes) {
                 throw error;
             totals.stopped = 'transaction timeout';
             return totals;
+        }
+        if (movement > 0) {
+            totals.movement += movement;
+            totals.batches++;
+            await new Promise(resolve => setImmediate(resolve));
+            continue;
         }
         if (removed <= 0) {
             totals.stopped = removed < 0 ? 'no eligible rows' : 'no progress';

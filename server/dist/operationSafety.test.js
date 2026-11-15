@@ -63,7 +63,9 @@ for (const name of ['install.sh', 'reset.sh']) {
         const start = source.indexOf('# Share admission');
         const end = source.indexOf(name === 'reset.sh' ? 'SOCK_PATH=""' : '# Variables', start);
         assert.ok(start >= 0 && end > start);
-        const admission = source.slice(start, end);
+        const helpers = script('restore_helpers.sh');
+        const pathStart = helpers.indexOf('operation_lock_path() {');
+        const admission = helpers.slice(pathStart, helpers.indexOf('\n}\n', pathStart) + 3) + source.slice(start, end);
         const run = () => spawnSync('bash', ['-c', admission + '\necho admitted'], {
             encoding: 'utf8', env: { ...process.env, NIGHTSTAND_OPERATION_LOCK: lock },
         });
@@ -236,6 +238,20 @@ it('an unrecognized archive script refuses a downgrade instead of deleting old d
     }
     finally {
         rmSync(folder, { recursive: true, force: true });
+    }
+});
+it('every copy of the lock path makes the same choice', () => {
+    const files = ['scripts/install.sh', 'scripts/health_check.sh', 'scripts/network_watchdog.sh', 'scripts/migrate/pod-installer.sh',
+        'scripts/switch_installation.py', 'scripts/recover_update.sh', 'scripts/setup_services.sh',
+        'server/src/jobs/operationLock.ts', 'scripts/restore_helpers.sh'];
+    for (const file of files) {
+        const text = readFileSync(path.join(root, file), 'utf8');
+        assert.ok(text.includes('NIGHTSTAND_OPERATION_LOCK'), `${file} honors the override`);
+        assert.ok(text.includes('/run/lock/free-sleep-operation.lock'), `${file} names the /run/lock path`);
+        assert.ok(text.includes('/tmp/free-sleep-operation.lock'), `${file} names the fallback`);
+        const others = (text.match(/(?<![\w/.])[\w/.][\w/.-]*operation\.lock/g) ?? [])
+            .filter(literal => !['/run/lock/free-sleep-operation.lock', '/tmp/free-sleep-operation.lock'].includes(literal));
+        assert.deepEqual(others, [], `${file} has another lock literal`);
     }
 });
 //# sourceMappingURL=operationSafety.test.js.map

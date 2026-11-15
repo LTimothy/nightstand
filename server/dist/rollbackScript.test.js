@@ -62,6 +62,13 @@ describe('rollback_pod.sh', () => {
         assert.match(otherFork, /bash "\$NIGHTSTAND_SCRIPTS\/setup_watchdog\.sh" --remove --switching /);
         assert.equal(success.match(/setup_watchdog/g)?.length, 2, 'a Nightstand target keeps the watchdog');
     });
+    it('leaves the rollback and revert units on the root-owned copy after a rollback to another fork', () => {
+        const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
+        const success = src.slice(src.indexOf('if [ "$HEALTHY" = yes ]; then'), src.indexOf('# --- swap back on failure'));
+        const otherFork = success.slice(success.indexOf('if [ "$TARGET_IS_NIGHTSTAND" != yes ]; then'), success.indexOf('\n  fi\n'));
+        assert.match(otherFork, /free-sleep-update\.service/);
+        assert.doesNotMatch(otherFork, /free-sleep-rollback\.service|free-sleep-revert\.service/);
+    });
     it('the systemd unit runs the script via bash and exists', () => {
         const full = path.join(repoRoot, UNIT);
         assert.equal(existsSync(full), true, `${UNIT} is missing`);

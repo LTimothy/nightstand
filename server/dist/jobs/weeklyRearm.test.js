@@ -47,6 +47,7 @@ let resetPowerOnTimes;
 let scheduleWeeklyRearm;
 let resetWeeklyArmed;
 let firmwareTimer;
+let noteManualPowerChange;
 let serverStatus;
 let setupJobs;
 before(async () => {
@@ -55,6 +56,7 @@ before(async () => {
     ({ schedulePowerOn, resetPowerOnTimes } = await import('./powerScheduler.js'));
     ({ scheduleWeeklyRearm } = await import('./weeklyRearm.js'));
     firmwareTimer = await import('./firmwareTimer.js');
+    ({ noteManualPowerChange } = await import('./manualPowerChange.js'));
     ({ resetWeeklyArmed } = firmwareTimer);
     ({ default: serverStatus } = await import('../serverStatus.js'));
     ({ setupJobs } = await import('./jobScheduler.js'));
@@ -179,6 +181,20 @@ describe('re-arming tonight after a weekly schedule edit', () => {
         duringStatusRead = () => { settingsDB.data.features.rhythms = true; };
         await rearm();
         assert.deepEqual(sent, []);
+    });
+    it('does not turn the side back on after a hand change while it waits for the Pod', async () => {
+        await powerOnThenWait();
+        await editMonday({ off: '09:00' });
+        duringStatusRead = () => noteManualPowerChange('left');
+        await rearm();
+        assert.deepEqual(sent, []);
+    });
+    it('still re-arms after a hand change made before it started', async () => {
+        await powerOnThenWait();
+        await editMonday({ off: '09:00' });
+        noteManualPowerChange('left', new Date(AT_2300 - 60_000));
+        await rearm();
+        assert.deepEqual(sent, [['LEFT_TEMP_DURATION', String(10 * 3600 + 300)]]);
     });
     it('never stores or plans an end that is not a time', async () => {
         firmwareTimer.noteWeeklyArmed('left', 'monday', FIRED, new Date(Number.NaN));

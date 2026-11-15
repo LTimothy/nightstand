@@ -61,9 +61,9 @@ export const FEATURES_MANIFEST = [
     {
         id: 'metrics-low-disk-protection',
         title: 'Low-disk protection',
-        description: 'On by default. Below 150 MiB free, deletes the oldest detailed vitals in bounded batches '
-            + 'until 16 MiB of SQLite pages are reusable. Keeps at least the last two nights of detail. '
-            + 'Never deletes nightly summaries, sleep records, scores or movement. '
+        description: 'On by default. Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized, '
+            + 'in bounded batches until 16 MiB of SQLite pages are reusable. Keeps at least the last two nights of detail. '
+            + 'Never deletes nightly summaries, sleep records or scores. '
             + 'Stops growth by reusing space; does not shrink the database file or run VACUUM.',
         category: 'biometrics',
         version: '3.7.0',
@@ -965,12 +965,15 @@ export const FEATURES_MANIFEST = [
             'server/src/jobs/rhythms/offWhenUp.test.ts', 'server/src/jobs/rhythms/resolveOff.test.ts', 'server/src/jobs/alarmActivity.test.ts',
             'server/src/jobs/rhythms/curveControllerOff.test.ts', 'server/src/jobs/rhythms/smartOffRuntime.test.ts',
             'app/src/pages/SchedulePage/ScheduleTimeline.getUp.test.tsx', 'app/src/api/rhythmsLiveOff.test.ts',
+            'app/src/pages/SchedulePage/rhythms/RhythmEditor.test.tsx', 'app/src/pages/SchedulePage/rhythms/RhythmEditor.fuzz.test.tsx',
+            'app/src/pages/ControlTempPage/pauseTimes.test.ts', 'app/src/mocks/rhythmsMock.test.ts',
         ],
         upstream_offer: false,
         rationale: 'On for a new install; an upgrade keeps the switch as it was. Its data lives only in rhythmsDB.json and '
             + 'it never writes schedulesDB.json, so turning it '
             + 'off, rolling back or switching to upstream leaves the weekly schedule exactly as it was.'
-            + ' A rhythm set to turn off when the person gets up carries one optional key, which 3.5.0 drops on read.',
+            + ' A rhythm set to turn off when the person gets up carries an optional key and its Smart Schedule copy; 3.5.0 and 3.7 '
+            + 'drop the rhythm key on read, so they turn a manual rhythm off at its set time.',
     },
     {
         id: 'rhythm-suggestions',
