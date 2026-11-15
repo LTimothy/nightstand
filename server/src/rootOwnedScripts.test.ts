@@ -101,12 +101,10 @@ function shellOffenders(file: string, text: string) {
       if (CHANGES_DIR.test(part)) here = intoTree.test(part);
       if (here && relative.test(part.replace(/^(?:cd|pushd)\s+(?:-[LP]\s+)*\S+/, ''))) fromTree = true;
     }
-    // Only a cd in root's own shell moves it: not one run as another user, in a subshell or in quotes.
-    if (!AS_OTHER_USER.test(line)) {
-      let outer = line.replace(/"[^"]*"|'[^']*'/g, quoted => (dirParts(quoted).length > 1 ? '' : quoted));
-      for (let before = ''; before !== outer;) [before, outer] = [outer, outer.replace(/\([^()]*\)/g, '')];
-      for (const part of dirParts(outer)) if (CHANGES_DIR.test(part)) inTree = intoTree.test(part);
-    }
+    // Only a cd in root's own shell moves it: not one after sudo -u, in a subshell, in backticks or in quotes.
+    let outer = line.split(AS_OTHER_USER)[0].replace(/"[^"]*"|'[^']*'|`[^`]*`/g, quoted => (dirParts(quoted).length > 1 ? '' : quoted));
+    for (let before = ''; before !== outer;) [before, outer] = [outer, outer.replace(/\([^()]*\)/g, '')];
+    for (const part of dirParts(outer)) if (CHANGES_DIR.test(part)) inTree = intoTree.test(part);
     return { line, fromTree, at: `${file}:${index + 1}` };
   });
   const publishAt = lines.findIndex(({ line }) => PUBLISH.test(line.trim()));
@@ -248,6 +246,9 @@ describe('root runs nothing from the server user\'s folders', () => {
       'cd "$LIVE"\necho "then cd / to finish"\nbash scripts/evil.sh',
       'cd -P "$LIVE" && bash scripts/evil.sh',
       'pushd "$LIVE" && bash scripts/evil.sh',
+      'cd "$LIVE" && sudo -u dac npm ci\nbash scripts/evil.sh',
+      'cd /home/dac/free-sleep && sudo -u dac true\nbash scripts/evil.sh',
+      'cd "$LIVE"\nX=`cd /tmp; pwd`\nbash scripts/evil.sh',
     ].filter(probe => shellOffenders('scripts/rollback_pod.sh', `${rollback}\n${probe}\n`).length === 0), []);
     const runner = read('scripts/switch_installation.py');
     for (const probe of [
