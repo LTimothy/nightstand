@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import {
-  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync,
+  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, utimesSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -363,6 +364,7 @@ describe('which copy root runs after a tree comes back', () => {
       const system = path.join(dir, 'system');
       const current = publish(system, tree(path.join(dir, 'current'), '3.7.1'));
       const previous = publish(system, tree(path.join(dir, 'previous'), '3.7.0'));
+      pointAt(system, previous);
       pointAt(system, current);
       const result = follow(system, path.join(dir, 'previous'));
       assert.equal(result.status, 0, result.stdout + result.stderr);
@@ -384,6 +386,41 @@ describe('which copy root runs after a tree comes back', () => {
         assert.match(result.stderr, /keeps running the current ones/);
         assert.equal(live(system), `copies/${path.basename(current)}`);
       }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('follows only the live copy or the one it replaced', () => {
+    const dir = scratch();
+    try {
+      const system = path.join(dir, 'system');
+      const [a, b] = ['a', 'b'].map((name, index) => publish(system, tree(path.join(dir, name), `3.7.${index}`)));
+      pointAt(system, a);
+      pointAt(system, b);
+      publish(system, tree(path.join(dir, 'c'), '3.7.2'));
+      const steps: [string, string, RegExp | null][] = [
+        ['c', b, /Only the current copy or the one it replaced can run as root/], ['a', a, null], ['b', b, null]];
+      for (const [target, expected, warning] of steps) {
+        const result = follow(system, path.join(dir, target));
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+        if (warning) assert.match(result.stderr, warning);
+        assert.equal(live(system), `copies/${path.basename(expected)}`, target);
+      }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('prune keeps the copy the live one replaced', () => {
+    const dir = scratch();
+    try {
+      const system = path.join(dir, 'system');
+      const made = [0, 1, 2, 3, 4].map(index => {
+        const copy = publish(system, tree(path.join(dir, `t${index}`), `3.7.${index}`));
+        utimesSync(copy, 1000 + index, 1000 + index);
+        return copy;
+      });
+      pointAt(system, made[0]);
+      pointAt(system, made[4]);
+      assert.equal(spawnSync('python3', ['-B', TOOL, 'prune'], { env: env(system) }).status, 0);
+      assert.deepEqual(copies(system).sort(), [made[0], ...made.slice(2)].map(copy => path.basename(copy)).sort());
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

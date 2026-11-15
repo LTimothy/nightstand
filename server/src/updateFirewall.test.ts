@@ -519,7 +519,7 @@ describe('legacy rollback OUTPUT policy recovery', () => {
           const tool = (...args: string[]) => spawnSync('python3', ['-B', path.join(repoRoot, 'scripts/system_scripts.py'), ...args],
             { env: f.env, encoding: 'utf8' }).stdout.trim();
           const newCopy = tool('publish', path.join(f.dir, 'live'));
-          tool('publish', path.join(f.dir, 'prev'));
+          tool('point', tool('publish', path.join(f.dir, 'prev')));
           tool('point', newCopy);
           const src = read('scripts/update.sh');
           const result = spawnSync('bash', ['-c', driver('scripts/update.sh', `

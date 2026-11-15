@@ -148,6 +148,7 @@ describe('interrupted update recovery', () => {
       const box = fixture();
       try {
         const original = publishTree(box.system, box.live);
+        pointTo(box.system, original);
         box.prepare();
         const target = publishTree(box.system, box.live);
         pointTo(box.system, target);

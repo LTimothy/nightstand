@@ -41,6 +41,10 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Updates and recovery
 
+- After a rollback or restore, root switches only to the current copy of the
+  scripts it runs or the copy that one replaced. A tree matching any other
+  copy, such as an older backup, keeps the current scripts. Cleanup now also
+  keeps the copy the current one replaced.
 - The Biometrics install script now says which download step failed or timed
   out, and stopping it with Ctrl-C or a signal stops the running download and
   reports a failed install. It also takes the update lock before restarting an

@@ -79,6 +79,7 @@ class SystemScriptsTests(unittest.TestCase):
         previous_tree = self.tree('previous', {'update.sh': ('echo 3.7.0\n', 0o755)})
         previous = self.publish(previous_tree)
         older = self.tree('older', {'update.sh': ('echo 3.6.1, never copied\n', 0o755)})
+        self.assertEqual(self.tool('point', previous).returncode, 0)
         self.assertEqual(self.tool('point', current).returncode, 0)
         self.assertEqual(self.live(), 'copies/' + current.name)
         self.assertEqual(self.tool('follow', previous_tree).returncode, 0)

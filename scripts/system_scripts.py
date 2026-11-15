@@ -4,9 +4,9 @@
 The install trees belong to the server user, so root runs their scripts from
 copies only root can write: SYSTEM/copies/<sha256>/scripts, named by the
 SHA-256 of the paths and contents copied, with SYSTEM/live pointing at the
-copy the units run. A tree whose scripts match a copy byte for byte uses that
-copy. A tree with none, from a release before copies or edited since, never
-runs as root.
+copy the units run and SYSTEM/prev at the one it replaced. A tree whose
+scripts match the live or the previous copy byte for byte uses that copy. Any
+other tree, from a release before copies or edited since, never runs as root.
 
   system_scripts.py publish TREE   copy TREE/scripts and print the copy;
                                    TREE must be this user's alone
@@ -14,10 +14,13 @@ runs as root.
                                    the same for the stage an updater from
                                    before copies hands off from
   system_scripts.py find TREE      print the copy matching TREE, or exit 1
-  system_scripts.py point COPY     make COPY the one root runs
-  system_scripts.py follow TREE    make TREE's copy the one root runs, if any
-  system_scripts.py prune          keep the live copy and the three newest,
-                                   and remove download folders over a day old
+  system_scripts.py point COPY     make COPY the one root runs, keeping the
+                                   one it replaces as the previous copy
+  system_scripts.py follow TREE    make TREE's copy the one root runs, if it
+                                   is the live or the previous copy
+  system_scripts.py prune          keep the live and previous copies and the
+                                   three newest, and remove download folders
+                                   over a day old
 
 Standard library only, for the Python versions Pods ship.
 """
@@ -164,18 +167,30 @@ def point(copy):
         sys.exit('not a published copy: %s' % copy)
     _owned_dir(SYSTEM)
     link = os.path.join(SYSTEM, 'live')
+    replaced = os.path.realpath(link)
+    if replaced != real and os.path.dirname(replaced) == copies and os.path.isdir(replaced):
+        _link(os.path.join(SYSTEM, 'prev'), replaced)
+    _link(link, real)
+    _sync_dir(SYSTEM)
+
+
+def _link(link, copy):
     temporary = '%s.%d' % (link, os.getpid())
     if os.path.lexists(temporary):
         os.unlink(temporary)
-    os.symlink(os.path.join('copies', os.path.basename(real)), temporary)
+    os.symlink(os.path.join('copies', os.path.basename(copy)), temporary)
     os.replace(temporary, link)
-    _sync_dir(SYSTEM)
 
 
 def follow(tree):
     copy = find(tree)
     if copy is None:
         print('No root-owned copy matches the scripts in %s; root keeps running the current ones' % tree,
+              file=sys.stderr)
+        return
+    allowed = [os.path.realpath(os.path.join(SYSTEM, name)) for name in ('live', 'prev')]
+    if os.path.realpath(copy) not in allowed:
+        print('Only the current copy or the one it replaced can run as root; root keeps running the current ones',
               file=sys.stderr)
         return
     point(copy)
@@ -195,7 +210,7 @@ def prune():
     copies = os.path.join(SYSTEM, 'copies')
     if not os.path.isdir(copies):
         return
-    live = os.path.basename(os.path.realpath(os.path.join(SYSTEM, 'live')))
+    kept = [os.path.basename(os.path.realpath(os.path.join(SYSTEM, name))) for name in ('live', 'prev')]
     ages = []
     for name in os.listdir(copies):
         try:
@@ -204,7 +219,7 @@ def prune():
         except FileNotFoundError:
             continue
     for _, name in sorted(ages, reverse=True)[KEEP:]:
-        if name != live:
+        if name not in kept:
             try:
                 shutil.rmtree(os.path.join(copies, name))
             except FileNotFoundError:
