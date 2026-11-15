@@ -775,4 +775,34 @@ ${block.replaceAll('/persistent/', `${dir}/persistent/`)}`], { encoding: 'utf8' 
         }
     });
 });
+// BusyBox unzip on the Pod makes every folder a GitHub zip lists 777, which the publish check refuses.
+describe('a download unzipped by BusyBox can still be published', () => {
+    const SECURE = /^find "\$(?:WORK\/tree|UNZIP_DIR)" -type d -exec chmod go-w \{\} \\; \|\|/;
+    const UNZIPS = ['scripts/update.sh', 'scripts/install.sh', 'scripts/migrate/pod-installer.sh'];
+    it('takes write access from group and others right after each unzip', () => {
+        for (const file of UNZIPS) {
+            const lines = read(file).split('\n');
+            const at = lines.findIndex(line => /^unzip /.test(line));
+            assert.ok(at >= 0, file);
+            assert.match(lines.slice(at + 1, at + 3).join('\n'), new RegExp(SECURE.source, 'm'), file);
+        }
+    });
+    it('publishes a tree whose folders came out 777 once that step has run', () => {
+        const dir = scratch();
+        try {
+            const work = tree(path.join(dir, 'tree', 'nightstand-9.9.9'), '9.9.9');
+            chmodSync(work, 0o777);
+            chmodSync(path.join(work, 'scripts'), 0o777);
+            const system = path.join(dir, 'system');
+            assert.notEqual(spawnSync('python3', ['-B', TOOL, 'publish', work], { env: env(system) }).status, 0);
+            const step = read('scripts/update.sh').split('\n').find(line => SECURE.test(line));
+            const ran = spawnSync('bash', ['-c', `WORK=${JSON.stringify(dir)}; fail() { exit 1; }; ${step}`]);
+            assert.equal(ran.status, 0, String(ran.stderr));
+            assert.ok(publish(system, work));
+        }
+        finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+});
 //# sourceMappingURL=rootOwnedScripts.test.js.map
