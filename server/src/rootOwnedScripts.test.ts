@@ -43,6 +43,9 @@ const MAKES_COPY = /^"?\$\((?:SSH ")?python3 -B "?\$\{?\w+\}?\/(?:scripts\/)?sys
 const ASSIGN = /(?:^|[;&|)]\s*)(?:local\s+|export\s+|readonly\s+)?([A-Za-z_]\w*)=(\S.*)?$/;
 const LOOP = /\bfor\s+([A-Za-z_]\w*)\s+in\s+(.*)$/;
 const READ = /(?:^|[;&|({]|\b(?:then|do|while|until|if|else))\s*(?:IFS=\S*\s+)?read\s+(?:-\S+\s+)*([A-Za-z_]\w*(?:\s+[A-Za-z_]\w*)*)/;
+const AS_OTHER_USER = /\b(?:sudo|runuser) -u /;
+const CHANGES_DIR = /^(?:cd|pushd)\s/;
+const dirParts = (line: string) => line.split(/(?<![\w-])(?=(?:cd|pushd)\s)/);
 const variable = (names: Set<string>) => String.raw`\$\{?(?:${[...names].join('|')})\}?(?![\w])`;
 
 // Each name a line binds, with the text its value comes from.
@@ -80,19 +83,29 @@ function shellOffenders(file: string, text: string) {
   const runs = new RegExp(String.raw`(?:^|[\s;&|(\x60])(?:/(?:usr/)?bin/)?(?:bash|sh|python3?|node|source|exec|\.)(?:\s+-[A-Za-z]+)*`
     + String.raw`\s+["']?(?:${tree}|/home/)`);
   const direct = new RegExp(String.raw`(?:^|[;&|]\s*|\b(?:then|do|else)\s+)["']?${tree}/[^\s"']+\.(?:sh|py)\b`);
-  const system = String.raw`["']?(?:/etc|/usr|/lib|/bin|/sbin|\$\{?(?:PYTHON_LIB_DIR|SYSTEMD_DIR|SUDOERS_FILE|TMPFILES_DIR)\b)`;
+  const system = String.raw`["']?(?:/(?=["'\s]|$)|/etc|/usr|/lib|/bin|/sbin|\$\{?(?:PYTHON_LIB_DIR|SYSTEMD_DIR|SUDOERS_FILE|TMPFILES_DIR)\b)`;
   const intoSystem = new RegExp(String.raw`\b(?:cp|mv|install|rsync|ln)\s.*(?:${tree}|/home/).*\s${system}`);
   const untar = new RegExp(String.raw`\btar(?=\s.*(?:${tree}|/home/))(?=.*\s(?:-C\s*|--directory[=\s])${system})`);
   // After cd into a tree, a relative path names that tree's files.
-  const intoTree = new RegExp(String.raw`^cd\s+["']?(?:${tree}|/home/)`);
-  const relative = new RegExp(String.raw`(?:^|[\s;&|(\x60])(?:(?:bash|sh|python3?|node|source|\.)(?:\s+-[A-Za-z]+)*\s+["']?`
-    + String.raw`(?:\.\/|[\w.-]+\/|[\w-]+\.(?:sh|py|js)\b)|\.\/)`);
+  const intoTree = new RegExp(String.raw`^(?:cd|pushd)\s+(?:-[LP]\s+)*["']?(?:${tree}|/home/)`);
+  const relative = new RegExp(String.raw`(?:^|[\s;&|(\x60])(?:(?:bash|sh|python3?|node|source|exec|\.)(?:\s+-[A-Za-z]+)*\s+["']?`
+    + String.raw`(?:\.\/|[\w.-]+\/|[\w-]+\.(?:sh|py|js)\b)|\.\/)`
+    + String.raw`|(?:^\s*|[;&|]\s*|\b(?:then|do|else)\s+)["']?[\w.-]+\/[^\s"']+\.(?:sh|py)\b`
+    // -m puts the working directory on the path unless -I or -P keeps it off.
+    + String.raw`|\bpython3?(?:\s+-(?![A-Za-z]*[IP])[A-Za-z]+)*\s+-(?![A-Za-z]*[IP])[A-Za-z]*m\b`);
   let inTree = false;
   const lines = text.split('\n').map((line, index) => {
+    let here = inTree;
     let fromTree = false;
-    for (const part of line.split(/(?<![\w-])(?=cd\s)/)) {
-      if (/^cd\s/.test(part)) inTree = intoTree.test(part);
-      if (inTree && relative.test(part.replace(/^cd\s+\S+/, ''))) fromTree = true;
+    for (const part of dirParts(line)) {
+      if (CHANGES_DIR.test(part)) here = intoTree.test(part);
+      if (here && relative.test(part.replace(/^(?:cd|pushd)\s+(?:-[LP]\s+)*\S+/, ''))) fromTree = true;
+    }
+    // Only a cd in root's own shell moves it: not one run as another user, in a subshell or in quotes.
+    if (!AS_OTHER_USER.test(line)) {
+      let outer = line.replace(/"[^"]*"|'[^']*'/g, quoted => (dirParts(quoted).length > 1 ? '' : quoted));
+      for (let before = ''; before !== outer;) [before, outer] = [outer, outer.replace(/\([^()]*\)/g, '')];
+      for (const part of dirParts(outer)) if (CHANGES_DIR.test(part)) inTree = intoTree.test(part);
     }
     return { line, fromTree, at: `${file}:${index + 1}` };
   });
@@ -104,7 +117,7 @@ function shellOffenders(file: string, text: string) {
   }
   return lines.filter(({ line }, index) => !(index < publishAt && allowed.includes(line.trim())))
     // Comments, commands run as the server user, quoted text such as sudoers lines, and the publish step.
-    .filter(({ line }) => !/^\s*#/.test(line) && !/\b(?:sudo|runuser) -u /.test(line) && !/^\s*"[^"]*"\s*$/.test(line)
+    .filter(({ line }) => !/^\s*#/.test(line) && !AS_OTHER_USER.test(line) && !/^\s*"[^"]*"\s*$/.test(line)
       && !PUBLISH.test(line.trim()))
     .filter(({ line, fromTree }) => fromTree || runs.test(line) || direct.test(line) || intoSystem.test(line) || untar.test(line))
     .map(({ at, line }) => `${at}: ${line.trim()}`);
@@ -225,6 +238,16 @@ describe('root runs nothing from the server user\'s folders', () => {
       'mv "$STAGE/x.service" /etc/systemd/system/x.service',
       'tar -xf "$LIVE/x.tar" -C /etc',
       'tar -C /usr/local -xzf /home/dac/x.tgz',
+      'cd "$LIVE" && scripts/evil.sh',
+      'cd "$LIVE" && exec scripts/evil.sh',
+      'cd "$LIVE" && python3 -m scripts.evil',
+      'tar -xf "$LIVE/x.tar" -C /',
+      'cp -a "$LIVE/rootfs/." /',
+      'cd "$LIVE"\nsudo -u dac sh -c "cd /tmp"\nbash scripts/evil.sh',
+      'cd "$LIVE"\n(cd /tmp && true)\nbash scripts/evil.sh',
+      'cd "$LIVE"\necho "then cd / to finish"\nbash scripts/evil.sh',
+      'cd -P "$LIVE" && bash scripts/evil.sh',
+      'pushd "$LIVE" && bash scripts/evil.sh',
     ].filter(probe => shellOffenders('scripts/rollback_pod.sh', `${rollback}\n${probe}\n`).length === 0), []);
     const runner = read('scripts/switch_installation.py');
     for (const probe of [
