@@ -664,6 +664,21 @@ restore_dependencies "$FIXTURE/failed"`, 'test', path.join(repoRoot, 'scripts/re
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  it('puts a tree back when a folder planted at the target swallows it', () => {
+    const dir = scratch();
+    try {
+      mkdirSync(path.join(dir, 'live'));
+      writeFileSync(path.join(dir, 'live/marker'), 'tree');
+      // An mv without -T, racing a folder in at the target before the plain mv.
+      const result = spawnSync('bash', ['-c', `mv() { [ "$1" = -T ] && return 1; [ "$2" = "$FIXTURE/prev" ] && mkdir "$2"; command mv "$@"; }
+${helper(read('scripts/restore_helpers.sh'))}
+move_tree "$FIXTURE/live" "$FIXTURE/prev"`], { env: { ...process.env, FIXTURE: dir }, encoding: 'utf8' });
+      assert.equal(result.status, 1, result.stderr);
+      assert.deepEqual(readdirSync(path.join(dir, 'live')), ['marker']);
+      assert.deepEqual(readdirSync(path.join(dir, 'prev')), []);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it('moves no tree with a plain mv', () => {
     // Files, not trees: the settings carried over from old installs and the restore progress note.
     const files = /SOURCE_FILE|RESTORE_STATE\.tmp/;

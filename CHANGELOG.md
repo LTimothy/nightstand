@@ -42,6 +42,9 @@ is a hard fork; for the history of the projects it descends from, see
 ### Updates and recovery
 
 - Boot recovery records the stock firewall like a normal start.
+- When a folder appears where an install tree is being moved and takes the
+  tree inside it, the scripts now move the tree back and stop instead of
+  leaving it there.
 - After a rollback or restore, root switches only to the current copy of the
   scripts it runs or the copy that one replaced. A tree matching any other
   copy, such as an older backup, keeps the current scripts. Cleanup now also

@@ -182,10 +182,17 @@ HBODY=
 move_tree() {
   [ -d "$1" ] && [ ! -L "$1" ] || return 1
   move_mark=$(mktemp "$1/.moving.XXXXXX") || return 1
-  mv -T "$1" "$2" 2>/dev/null \
-    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; } \
-    || { [ -d "$1" ] && [ ! -L "$1" ] && rm -f "$1/${move_mark##*/}"; return 1; }
-  [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/${move_mark##*/}" ] && rm -f "$2/${move_mark##*/}"
+  move_mark=${move_mark##*/}
+  if mv -T "$1" "$2" 2>/dev/null \
+    || { [ -d "$1" ] && [ ! -e "$2" ] && [ ! -L "$2" ] && mv "$1" "$2"; }; then
+    [ -d "$2" ] && [ ! -L "$2" ] && [ -f "$2/$move_mark" ] && rm -f "$2/$move_mark" && return 0
+    # A folder that appeared at $2 before the plain mv took the tree inside it.
+    move_back="$2/${1##*/}"
+    [ -d "$2" ] && [ ! -L "$2" ] && [ -d "$move_back" ] && [ ! -L "$move_back" ] && [ -f "$move_back/$move_mark" ] \
+      && { mv -T "$move_back" "$1" 2>/dev/null || { [ ! -e "$1" ] && [ ! -L "$1" ] && mv "$move_back" "$1"; }; }
+  fi
+  [ -d "$1" ] && [ ! -L "$1" ] && rm -f "$1/$move_mark"
+  return 1
 }
 
 # Stops a service that writes the data and confirms it is not running. The
