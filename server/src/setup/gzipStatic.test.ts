@@ -7,7 +7,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
-import { addVary, gzipStatic } from './gzipStatic.js';
+import { gzipStatic, serveApp } from './gzipStatic.js';
 
 const BODY = 'console.log("nightstand");\n'.repeat(500);
 let dir: string;
@@ -38,12 +38,7 @@ describe('gzipStatic', () => {
       if (req.headers['x-vary-origin']) res.setHeader('Vary', 'Origin');
       next();
     });
-    app.use(gzipStatic(dir));
-    app.use(express.static(dir, {
-      setHeaders: (res, file) => {
-        if (/\.(js|css)$/.test(file)) addVary(res, 'Accept-Encoding');
-      },
-    }));
+    serveApp(app, dir);
     server = app.listen(0);
     port = (server.address() as AddressInfo).port;
   });

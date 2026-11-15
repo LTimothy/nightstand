@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import type { ServerResponse } from 'node:http';
-import type { RequestHandler } from 'express';
+import express, { type Express, type RequestHandler } from 'express';
 
 type Entry = { mtimeMs: number; size: number; gz: Promise<Buffer> };
 
@@ -61,4 +61,14 @@ export function gzipStatic(publicDir: string): RequestHandler {
       next();
     }
   };
+}
+
+// Gzip first, then the plain files, both marking that the body depends on Accept-Encoding.
+export function serveApp(app: Express, publicDir: string): void {
+  app.use(gzipStatic(publicDir));
+  app.use(express.static(publicDir, {
+    setHeaders: (res, file) => {
+      if (/\.(js|css)$/.test(file)) addVary(res, 'Accept-Encoding');
+    },
+  }));
 }

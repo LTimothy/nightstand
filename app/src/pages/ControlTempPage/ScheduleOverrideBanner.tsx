@@ -24,7 +24,7 @@ export default function ScheduleOverrideBanner() {
   // Re-render when the hold ends so the banner drops away without waiting on a refetch.
   useEffect(() => {
     if (!isOverridden || !expiresAt) return;
-    const id = setTimeout(() => setExpired((n) => n + 1), Math.min(moment(expiresAt).diff(moment()) + 50, 2 ** 31 - 1));
+    const id = setTimeout(() => setExpired((n) => n + 1), moment(expiresAt).diff(moment()) + 50);
     return () => clearTimeout(id);
   }, [isOverridden, expiresAt]);
 
