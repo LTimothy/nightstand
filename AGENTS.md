@@ -200,10 +200,12 @@ for each day, and date changes:
   and keep presence-confirmed cool-down starts and manual holds in memory
   only. Each finished Smart Schedule sleep adds a line to
   `rhythms-history.jsonl` next to the LowDB folder, kept for 90 days.
-- "When I get up" (`smart.offWhenUp`): the rules are in `offWhenUp.ts` and
-  `server/src/db/smartOff.ts`, and `smartOffRuntime.ts` runs them. A side
-  turns off after 10 minutes out of bed, and no later than 3 hours past the
-  set off time.
+- "When I get up" (`offWhenUp` on the rhythm, mirrored in `smart.offWhenUp`
+  for older versions): the rules are in `offWhenUp.ts` and
+  `server/src/db/smartOff.ts`, and `smartOffRuntime.ts` runs them for rhythms
+  in either mode. A side turns off after 10 minutes out of bed, and no later
+  than 3 hours past the set off time. A manual sleep kept on past its set off
+  keeps its last scheduled temperature.
 
 Turning Rhythms off and leaving this version both go through
 `server/src/jobs/rhythms/handoff.ts`:
