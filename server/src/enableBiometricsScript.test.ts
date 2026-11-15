@@ -216,8 +216,11 @@ describe('enable_biometrics.sh', () => {
         assert.notEqual(result.status, 0, result.stdout + result.stderr);
         assert.ok(result.log.some(line => line.startsWith('curl') && line.includes('"status":"failed"')), result.log.join('\n'));
         const pid = Number(readFileSync(pids, 'utf8'));
-        for (let i = 0; i < 40 && alive(pid); i++) await new Promise(r => setTimeout(r, 50));
-        assert.equal(alive(pid), false, 'download child still running');
+        // An orphan the container's init never reaps stays a zombie, which holds nothing.
+        const state = () => spawnSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).stdout;
+        const running = () => alive(pid) && !state().startsWith('Z');
+        for (let i = 0; i < 40 && running(); i++) await new Promise(r => setTimeout(r, 50));
+        assert.equal(running(), false, `download child still running (${state().trim()})`);
         const free = spawnSync('python3', ['-c', 'import fcntl, sys; fcntl.flock(open(sys.argv[1]), fcntl.LOCK_EX | fcntl.LOCK_NB)', lock]);
         assert.equal(free.status, 0, 'lock still held');
       } finally {
