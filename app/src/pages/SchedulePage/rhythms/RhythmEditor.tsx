@@ -8,7 +8,7 @@ import ChevronLeft from '@mui/icons-material/ChevronLeft';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import ErrorBoundary from '@components/ErrorBoundary';
 import SectionHeading from '@components/SectionHeading';
-import { DEFAULT_SMART, type Rhythm, type SideRhythms, type SmartSchedule } from '@api/rhythmsSchema';
+import { DEFAULT_SMART, rhythmOffWhenUp, type Rhythm, type SideRhythms, type SmartSchedule } from '@api/rhythmsSchema';
 import { CURVE, isDaySleep } from '@api/smartCurve';
 import { useDeviceStatus } from '@api/deviceStatus';
 import { supportsRisePattern } from '@api/alarmPattern';
@@ -59,7 +59,7 @@ export default function RhythmEditor({
     name: original?.name ?? `Rhythm ${Object.keys(sideData.rhythms).length + 1}`,
     // New rhythms start on Smart Schedule; converted ones keep their hand-set rows.
     mode: (original?.temperatureMode ?? 'smart') as Rhythm['temperatureMode'],
-    smart: original?.smart ?? DEFAULT_SMART,
+    smart: withOffWhenUp(original?.smart ?? DEFAULT_SMART, !!original && rhythmOffWhenUp(original)),
     wake: original?.wake ?? DEFAULT_WAKE,
   }));
   const isUpdating = useAppStore(state => state.isUpdating);
@@ -135,7 +135,7 @@ export default function RhythmEditor({
   const save = async () => {
     if (!valid) return;
     const id = rhythmId ?? newRhythmId(trimmed, Object.keys(sideData.rhythms));
-    const rhythm: Rhythm = { id, name: trimmed, night, wake, temperatureMode: mode, smart };
+    const rhythm: Rhythm = { id, name: trimmed, night, wake, temperatureMode: mode, smart, ...(smart.offWhenUp ? { offWhenUp: true } : {}) };
     if (await onSave({ ...sideData, rhythms: { ...sideData.rhythms, [id]: rhythm } })) onClose(id);
     else setSaveFailures(count => count + 1);
   };
@@ -198,9 +198,7 @@ export default function RhythmEditor({
       hideTemperatures={ mode === 'smart' }
       bedtimeNote={ note }
       wake={ { time: wake, onChange: setWake } }
-      getUp={ mode === 'smart'
-        ? { on: smart.offWhenUp === true, tracking: trackingOn, onChange: on => setSmart(withOffWhenUp(smart, on)) }
-        : undefined }/>
+      getUp={ { on: smart.offWhenUp === true, tracking: trackingOn, onChange: on => setSmart(withOffWhenUp(smart, on)) } }/>
     <Box component="section" aria-labelledby="temperature-heading" sx={ { width: '100%', display: 'flex', flexDirection: 'column', gap: 1.5 } }>
       <SectionHeading id="temperature-heading">Temperature</SectionHeading>
       <ToggleButtonGroup
@@ -213,8 +211,6 @@ export default function RhythmEditor({
         onChange={ (_event, next: Rhythm['temperatureMode'] | null) => {
           if (!next) return;
           setMode(next);
-          // A rhythm set by hand has no "When I get up", so the choice is not kept hidden for later.
-          if (next === 'manual') setSmart(withOffWhenUp(smart, false));
         } }>
         <ToggleButton value="smart">Smart Schedule</ToggleButton>
         <ToggleButton value="manual">Set by hand</ToggleButton>

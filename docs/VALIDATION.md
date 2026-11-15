@@ -171,7 +171,7 @@ Smart Schedule's timings are my own estimates. With Biometrics on, the
 cool-down starts once you have been in bed for 20 minutes, but not before
 bedtime. If presence isn't reporting, it starts at bedtime, or when reporting
 stops if that is later. Either way it starts no more than two hours after
-bedtime. "When I get up" turns a side off about 10 minutes after you get
+bedtime. "When I get up", in either mode, turns a side off about 10 minutes after you get
 up, at most 3 hours past the scheduled off time. The Pod's own off timer is
 set 15 minutes past the scheduled off time and, while the side is kept on
 after it, stays at most 15 minutes ahead, so the side still turns off if

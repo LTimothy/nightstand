@@ -79,6 +79,20 @@ it('serves a live "When I get up" sleep with its latest off, and nothing for oth
   }
 });
 
+it('serves a live manual "When I get up" sleep with no phase', () => {
+  const db = createDemoRhythms(new Date('2026-09-28T19:00:00Z'));
+  db.left.rhythms.weekly = { ...db.left.rhythms.workday, id: 'weekly', temperatureMode: 'manual', offWhenUp: true };
+  db.left.week = { ...db.left.week, monday: 'weekly' };
+  resetMockRhythms(db, true);
+  try {
+    const live = mockLive('left', new Date('2026-09-29T10:00:00Z'));
+    expect(live?.phase).toBeNull();
+    expect(live?.offWhenUp?.by).toBe('2026-09-29T16:45:00.000Z');
+  } finally {
+    resetMockRhythms();
+  }
+});
+
 it('keeps the next-day wake clock after spring forward, as the resolver does', () => {
   const db = createDemoRhythms(MONDAY_NOON);
   const rhythm = db.left.rhythms.workday;

@@ -51,6 +51,7 @@ export const ResolvedSleepResponseSchema = z.object({
   night: responseSchema(DailyScheduleSchema.extend({ alarms: z.array(AlarmScheduleSchema).default([]) })),
   mode: z.enum(['manual', 'smart']).catch('manual'),
   smart: responseSchema(SmartScheduleSchema).optional(),
+  offWhenUp: z.boolean().optional().catch(undefined),
   smartCurve: SmartCurveSchema.optional().catch(undefined),
   events: EventsSchema,
 });

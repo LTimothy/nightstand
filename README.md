@@ -235,7 +235,8 @@ which starts the cool-down once you have been in bed for 20 minutes, but not
 before bedtime and never later than two hours after it.
 
 A rhythm can also turn a side off "When I get up": about 10 minutes after
-you get up, and no later than 3 hours past the scheduled off time.
+you get up, and no later than 3 hours past the scheduled off time. It works in either
+mode, and a rhythm set by hand keeps its last scheduled temperature until then.
 
 Both rely on presence, which in a shared bed can mistake the other sleeper
 for you. The [timings](docs/VALIDATION.md#smart-schedule) are my own

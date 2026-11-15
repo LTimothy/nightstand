@@ -85,6 +85,7 @@ it(`fuzzes editor conversion, toggles and reload (${FUZZ_EDITOR_RUNS} runs, seed
         verify();
         const draft = saved[saved.length - 1].rhythms.generated;
         expect(draft.smart.offWhenUp).toBe(label === 'When I get up' ? true : undefined);
+        expect(draft.offWhenUp).toBe(label === 'When I get up' ? true : undefined);
         expect(draft.night.power.off).toBe(label === 'At wake time' ? original.wake
           : label === '30 min after' ? clock(wakeMinutes + 30) : customOff);
         if (label === 'At a set time') {
@@ -113,7 +114,7 @@ it(`fuzzes editor conversion, toggles and reload (${FUZZ_EDITOR_RUNS} runs, seed
       const restored = saved[saved.length - 1].rhythms.generated;
       expect(restored.temperatureMode).toBe('manual');
       expect(restored.night.temperatures).toEqual(original.night.temperatures);
-      expect(restored.smart.offWhenUp).toBeUndefined();
+      expect(restored.offWhenUp).toBe(true);
       reloaded.unmount();
     });
   }

@@ -31,7 +31,7 @@ export function pauseResumeAt(
     const sleep = currentSleep(bed.sleeps, resume.toDate());
     if (!sleep?.events.some(event => event.kind === 'power-on') || local.isBefore(moment(sleep.start))) return undefined;
     // When I get up can extend a sleep, but resume stops at its scheduled off.
-    if (sleep.smart?.offWhenUp && !resume.isBefore(rhythmNightBounds(sleep.date, sleep.night.power, timeZone).end)) return undefined;
+    if (sleep.offWhenUp && !resume.isBefore(rhythmNightBounds(sleep.date, sleep.night.power, timeZone).end)) return undefined;
     return local;
   }
   if (bed.state !== 'legacy' || !schedule) return undefined;

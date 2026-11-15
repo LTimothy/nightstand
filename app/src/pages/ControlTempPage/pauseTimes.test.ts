@@ -207,6 +207,7 @@ describe('Rhythms resume across a spring gap', () => {
       alarm: { enabled: false, time: '02:30', vibrationIntensity: 30, vibrationPattern: 'rise', duration: 30, alarmTemperature: 83 },
       alarms: [] },
     smart: { baseLevel: 0, intensity: 'standard', warmStart: false, warmUp: true, upEarly: false, offWhenUp: true },
+    offWhenUp: true,
     events: [
       { kind: 'power-on', at: '2027-03-14T05:00:00Z', temperatureF: 82 },
       { kind: 'power-off', at: '2027-03-14T13:30:00Z' },
@@ -221,5 +222,12 @@ describe('Rhythms resume across a spring gap', () => {
   ])('checks the delayed resume against the resolved off at %s', (time, expected) => {
     const end = moment.tz(`2027-03-14 ${time}`, LA);
     expect(pauseResumeAt({ state: 'rhythms', sleeps: [sleep] }, undefined, LA, end)?.toISOString()).toBe(expected);
+  });
+
+  it('stops resume at the scheduled off for a manual "When I get up" sleep', () => {
+    const manual: ResolvedSleepResponse = { ...sleep, mode: 'manual', smart: undefined, offWhenUp: true };
+    expect(pauseResumeAt({ state: 'rhythms', sleeps: [manual] }, undefined, LA, moment.tz('2027-03-14 03:29:00', LA))).toBeUndefined();
+    expect(pauseResumeAt({ state: 'rhythms', sleeps: [manual] }, undefined, LA, moment.tz('2027-03-14 01:45:00', LA))?.toISOString())
+      .toBe('2027-03-14T09:45:00.000Z');
   });
 });

@@ -231,10 +231,11 @@ it('saves "When I get up" on a Smart Schedule rhythm with its usual turn off', a
   await waitFor(() => expect(onClose).toHaveBeenCalledWith('workday'));
   const saved = onSave.mock.calls[0][0].rhythms.workday;
   expect(saved.smart.offWhenUp).toBe(true);
+  expect(saved.offWhenUp).toBe(true);
   expect(saved.night.power.off).toBe('06:45');
 });
 
-it('drops "When I get up" when the rhythm switches to Set by hand', async () => {
+it('keeps "When I get up" when the rhythm switches to Set by hand', async () => {
   const sideData = createDemoRhythms(NOW).left;
   sideData.rhythms.workday.smart = { ...sideData.rhythms.workday.smart, offWhenUp: true };
   const { user, onSave, onClose } = renderEditor('workday', '', sideData, true);
@@ -243,7 +244,30 @@ it('drops "When I get up" when the rhythm switches to Set by hand', async () => 
   await waitFor(() => expect(onClose).toHaveBeenCalledWith('workday'));
   const saved = onSave.mock.calls[0][0].rhythms.workday;
   expect(saved.temperatureMode).toBe('manual');
-  expect('offWhenUp' in saved.smart).toBe(false);
+  expect(saved.offWhenUp).toBe(true);
+  expect(saved.smart.offWhenUp).toBe(true);
+});
+
+it('offers "When I get up" on a rhythm set by hand', async () => {
+  const { user, onSave, onClose } = renderEditor('weekend', '', createDemoRhythms(NOW).left, true);
+  const before = createDemoRhythms(NOW).left.rhythms.weekend.night.power.off;
+  fireEvent.mouseDown(await screen.findByLabelText('Turn off'));
+  fireEvent.click(screen.getByRole('option', { name: 'When I get up' }));
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalledWith('weekend'));
+  const saved = onSave.mock.calls[0][0].rhythms.weekend;
+  expect(saved.temperatureMode).toBe('manual');
+  expect(saved.offWhenUp).toBe(true);
+  expect(saved.smart.offWhenUp).toBe(true);
+  expect(saved.night.power.off).toBe(before);
+});
+
+it('shows a stray Smart Schedule flag on a rhythm set by hand as off', async () => {
+  const sideData = createDemoRhythms(NOW).left;
+  sideData.rhythms.weekend.smart = { ...sideData.rhythms.weekend.smart, offWhenUp: true };
+  renderEditor('weekend', '', sideData, true);
+  expect(await screen.findByLabelText('Turn off')).not.toHaveTextContent('When I get up');
+  expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
 });
 
 it('drops "When I get up" from a rhythm switched back to a time', async () => {
@@ -257,5 +281,6 @@ it('drops "When I get up" from a rhythm switched back to a time', async () => {
   await waitFor(() => expect(onClose).toHaveBeenCalledWith('workday'));
   const saved = onSave.mock.calls[0][0].rhythms.workday;
   expect('offWhenUp' in saved.smart).toBe(false);
+  expect('offWhenUp' in saved).toBe(false);
   expect(saved.night.power.off).toBe('07:00');
 });

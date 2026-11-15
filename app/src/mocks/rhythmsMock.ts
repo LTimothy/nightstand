@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { DEFAULT_SMART, RHYTHMS_FILE_VERSION, type Rhythm, type RhythmsDB, type SideRhythms } from '@api/rhythmsSchema';
+import { DEFAULT_SMART, RHYTHMS_FILE_VERSION, rhythmOffWhenUp, type Rhythm, type RhythmsDB, type SideRhythms } from '@api/rhythmsSchema';
 import { MAX_TEMPERATURES_PER_DAY, type AlarmSchedule, type DailySchedule, type DayOfWeek, type Schedules } from '@api/schedulesSchema';
 import type { HandoffReport, ResolvedSleepResponse, RhythmsLive, RhythmsResponse, SleepEvent } from '@api/rhythmsResponse';
 import type { RhythmsUpdate } from '@api/rhythms';
@@ -131,7 +131,8 @@ export function resolveMockSleeps(db: RhythmsDB, side: Side, timeZone: string, f
     events.sort((first, second) => Date.parse(first.at) - Date.parse(second.at) || KIND_ORDER[first.kind] - KIND_ORDER[second.kind]);
     sleeps.push({
       side, date, rhythmId: chosen.id, start: powerOn.toISOString(), end: end.toISOString(), wake: wakeAt.toISOString(), night: chosen.night,
-      mode: chosen.temperatureMode, ...(chosen.temperatureMode === 'smart' ? { smart: chosen.smart, smartCurve } : {}), events,
+      mode: chosen.temperatureMode, ...(rhythmOffWhenUp(chosen) ? { offWhenUp: true } : {}),
+      ...(chosen.temperatureMode === 'smart' ? { smart: chosen.smart, smartCurve } : {}), events,
     });
   }
   return sleeps;
@@ -149,12 +150,13 @@ export function mockLive(side: Side, now = new Date()): RhythmsLive | null {
   const sleeps = listMockSleeps(side, new Date(now.getTime() - day), new Date(now.getTime() + 2 * day));
   const index = sleeps.findIndex(sleep => Date.parse(sleep.start) <= now.getTime() && now.getTime() < Date.parse(sleep.end));
   const sleep = sleeps[index];
-  if (!sleep?.smart?.offWhenUp || !sleep.smartCurve) return null;
+  if (!sleep?.offWhenUp) return null;
   const next = sleeps.slice(index + 1).find(item => Date.parse(item.start) >= Date.parse(sleep.end));
   const by = latestOff({ setOff: new Date(sleep.end), nextStart: next ? new Date(next.start) : null });
-  const points = sleep.smartCurve.points.flatMap(({ at, level, phase }) => (phase ? [{ at: new Date(at), level, phase }] : []));
+  const points = (sleep.smartCurve?.points ?? []).flatMap(({ at, level, phase }) => (phase ? [{ at: new Date(at), level, phase }] : []));
   return {
-    side, date: sleep.date, phase: phaseAt(points, now), waiting: false, coolStart: sleep.smartCurve.coolStart,
+    side, date: sleep.date, phase: points.length ? phaseAt(points, now) : null, waiting: false,
+    coolStart: sleep.smartCurve?.coolStart ?? sleep.start,
     hold: null, baseSince: null, nextChange: null, offWhenUp: { by: by.toISOString() },
   };
 }

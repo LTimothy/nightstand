@@ -18,7 +18,7 @@ import WakeVibrationSheet from './AlarmSection/WakeVibrationSheet';
 
 // A rhythm passes `wake`: its own wake time, kept whether or not an alarm rings, which anchors the warm-up and the turn-off.
 // `bedtimeNote` is set for Smart Schedule, where power.on is the bedtime and the bed turns on before it.
-// `getUp` is set for Smart Schedule too: "When I get up" keeps power.off as the usual turn-off.
+// `getUp` is set for every rhythm: "When I get up" keeps power.off as the usual turn-off.
 export default function ScheduleTimeline({ format, risePattern = false, hideTemperatures = false, bedtimeNote, wake, getUp }: {
   format: TemperatureFormat; risePattern?: boolean; hideTemperatures?: boolean; bedtimeNote?: string;
   wake?: { time: string; onChange: (time: string) => void };

@@ -993,6 +993,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       'server/src/jobs/rhythms/offWhenUp.test.ts', 'server/src/jobs/rhythms/resolveOff.test.ts', 'server/src/jobs/alarmActivity.test.ts',
       'server/src/jobs/rhythms/curveControllerOff.test.ts', 'server/src/jobs/rhythms/smartOffRuntime.test.ts',
       'app/src/pages/SchedulePage/ScheduleTimeline.getUp.test.tsx', 'app/src/api/rhythmsLiveOff.test.ts',
+      'app/src/pages/SchedulePage/rhythms/RhythmEditor.test.tsx', 'app/src/pages/SchedulePage/rhythms/RhythmEditor.fuzz.test.tsx',
+      'app/src/pages/ControlTempPage/pauseTimes.test.ts', 'app/src/mocks/rhythmsMock.test.ts',
     ],
     upstream_offer: false,
     rationale: 'On for a new install; an upgrade keeps the switch as it was. Its data lives only in rhythmsDB.json and '
