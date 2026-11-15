@@ -14,7 +14,8 @@ export const DROPOUT_MS = 3 * MINUTE;
 export type SidePresence = { present: boolean; lastUpdatedAt?: string; stateChangedAt?: string };
 export type PresenceSnapshot = Record<Side, SidePresence>;
 export type PresenceRun = { known: boolean; presentSince: number | null; absentSince: number | null };
-export type KeptRun = { since: number; lastPresent: number; exitAt: number | null };
+// endedAt: where the run last seen present ended, kept through later blips.
+export type KeptRun = { since: number; lastPresent: number; exitAt: number | null; endedAt?: number | null };
 
 export type StartReason = 'confirmed' | 'unknown' | 'stale' | 'cap' | 'not-observed';
 export type StartState =
@@ -52,19 +53,42 @@ export function bridgeDropouts(
   kept: KeptRun | null, run: PresenceRun, now: number,
 ): { run: PresenceRun; kept: KeptRun | null } {
   if (!run.known) return { run, kept: null };
-  if (run.presentSince === null) return { run, kept: kept && { ...kept, exitAt: run.absentSince } };
+  if (run.presentSince === null) {
+    if (!kept) return { run, kept: null };
+    // The first exit seen after the run ends it. A later one belongs to a
+    // short entry that fell between two looks, which is not part of the run.
+    const endedAt = kept.exitAt === null ? run.absentSince : kept.endedAt ?? null;
+    return { run, kept: { ...kept, exitAt: run.absentSince, endedAt } };
+  }
   const gap = kept ? run.presentSince - (kept.exitAt ?? kept.lastPresent) : Infinity;
   const since = kept && gap <= DROPOUT_MS ? Math.min(kept.since, run.presentSince) : run.presentSince;
   return { run: { ...run, presentSince: since }, kept: { since, lastPresent: now, exitAt: null } };
 }
 
 // Confirmation: 20 unbroken minutes of presence inside [bedtime - 60 min,
-// bedtime + 2 h], counted from the window opening at the earliest.
-export function confirmationAt(run: PresenceRun, bedtime: Date, now: number): number | null {
-  if (!run.known || run.presentSince === null) return null;
+// bedtime + 2 h], counted from the window opening at the earliest. Presence
+// is looked at once a minute, so a run that reached 20 minutes and ended
+// before the next look still counts; kept, from bridgeDropouts, holds that
+// run's start and end.
+export function confirmationAt(
+  run: PresenceRun, bedtime: Date, now: number, kept: KeptRun | null = null,
+): number | null {
+  if (!run.known) return null;
+  const endedAt = kept?.endedAt;
+  let since: number;
+  let until: number;
+  if (run.presentSince !== null) {
+    since = run.presentSince;
+    until = now;
+  } else if (kept && typeof endedAt === 'number' && Number.isFinite(endedAt)) {
+    since = kept.since;
+    until = Math.min(now, endedAt);
+  } else {
+    return null;
+  }
   const opens = bedtime.getTime() - WINDOW_BEFORE_MS;
-  const confirmedAt = Math.max(opens, run.presentSince) + CONFIRM_MS;
-  if (confirmedAt > now || confirmedAt > bedtime.getTime() + CAP_MS) return null;
+  const confirmedAt = Math.max(opens, since) + CONFIRM_MS;
+  if (confirmedAt > until || confirmedAt > bedtime.getTime() + CAP_MS) return null;
   return confirmedAt;
 }
 
@@ -72,7 +96,7 @@ export function confirmationAt(run: PresenceRun, bedtime: Date, now: number): nu
 // starts before bedtime. Once decided, the start is final for the night.
 export function stepStart(
   state: StartState,
-  args: { run: PresenceRun; bedtime: Date; now: number; firstSight: boolean },
+  args: { run: PresenceRun; kept?: KeptRun | null; bedtime: Date; now: number; firstSight: boolean },
 ): StartState {
   if (state.status === 'decided') return state;
   const { run, now, firstSight } = args;
@@ -84,7 +108,7 @@ export function stepStart(
   if (now < bedtime - WINDOW_BEFORE_MS) return state;
   if (firstSight && now > bedtime + NOT_OBSERVED_GRACE_MS) return decided(bedtime, null, 'not-observed');
 
-  const confirmedAt = confirmationAt(run, args.bedtime, now);
+  const confirmedAt = confirmationAt(run, args.bedtime, now, args.kept ?? null);
   if (confirmedAt !== null) return decided(Math.max(bedtime, confirmedAt), confirmedAt, 'confirmed');
   if (now < bedtime) return { status: 'watching' };
   if (now >= bedtime + CAP_MS) return decided(bedtime + CAP_MS, null, 'cap');
