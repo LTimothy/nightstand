@@ -1,7 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { BlockList } from 'node:net';
@@ -16,7 +18,7 @@ const src = readFileSync(SCRIPT, 'utf8');
 // Runs the script against stub firewall commands and redirected resolver
 // files, and returns the logged rules and the script's output.
 function runBlock(resolvConf: string, tailscale: boolean, resolved?: string, faults: NodeJS.ProcessEnv = {},
-  hosts: { content?: string; symlink?: boolean; unwritable?: boolean } = {}) {
+  hosts: { content?: string; symlink?: boolean; unwritable?: boolean; missing?: boolean; old?: boolean } = {}) {
   const folder = mkdtempSync(path.join(tmpdir(), 'nightstand-dns-firewall-'));
   try {
     writeFileSync(path.join(folder, 'resolv.conf'), resolvConf);
@@ -45,8 +47,9 @@ echo "${tool} $*" >> "$RULE_LOG"
     const hostsFile = path.join(folder, 'hosts');
     const hostsTarget = hosts.symlink ? path.join(folder, 'hosts.real') : hostsFile;
     if (hosts.unwritable) mkdirSync(hostsFile);
-    else {
+    else if (!hosts.missing) {
       writeFileSync(hostsTarget, hosts.content ?? '127.0.0.1 localhost\n');
+      if (hosts.old) utimesSync(hostsTarget, 1000, 1000);
       if (hosts.symlink) symlinkSync(hostsTarget, hostsFile);
     }
     const script = src.replaceAll('/etc/hosts', hostsFile)
@@ -62,7 +65,10 @@ echo "${tool} $*" >> "$RULE_LOG"
     return { lines: readFileSync(path.join(folder, 'rules'), 'utf8').trim().split('\n'),
       attempts: readFileSync(path.join(folder, 'attempts'), 'utf8'),
       hostsText: existsSync(hostsTarget) && !hosts.unwritable ? readFileSync(hostsTarget, 'utf8') : '',
-      hostsIsLink: lstatSync(hostsFile).isSymbolicLink(), status: result.status, output: result.stdout, error: result.stderr };
+      hostsExists: existsSync(hostsFile),
+      hostsMtime: existsSync(hostsTarget) ? statSync(hostsTarget).mtimeMs : 0,
+      hostsIsLink: existsSync(hostsFile) && lstatSync(hostsFile).isSymbolicLink(),
+      status: result.status, output: result.stdout, error: result.stderr };
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -90,6 +96,26 @@ describe('block_internet_access.sh', () => {
     const { hostsText } = runBlock('', false, undefined, {}, { content: first });
     assert.equal(hostsText.split('# nightstand-block-start').length, 2);
     assert.equal(hostsText, first);
+  });
+
+  it('leaves an already blocked hosts file untouched', () => {
+    const first = runBlock('', false).hostsText;
+    const { hostsMtime } = runBlock('', false, undefined, {}, { content: first, old: true });
+    assert.equal(hostsMtime, 1000 * 1000);
+  });
+
+  it('leaves a missing hosts file missing', () => {
+    const { hostsExists, status, error, lines } = runBlock('', false, undefined, {}, { missing: true });
+    assert.equal(hostsExists, false);
+    assert.equal(status, 0);
+    assert.match(error, /hosts/i);
+    assert.ok(lines.includes('iptables -A OUTPUT -j REJECT'));
+  });
+
+  it('keeps lines after a repeated start marker', () => {
+    const content = '127.0.0.1 localhost\n# nightstand-block-start\n10.0.0.5 nas\n# nightstand-block-start\n0.0.0.0 x\n# nightstand-block-end\n';
+    const { hostsText } = runBlock('', false, undefined, {}, { content });
+    assert.ok(hostsText.split('\n').includes('10.0.0.5 nas'));
   });
 
   it('keeps lines after a start marker that has no end marker', () => {

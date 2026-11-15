@@ -100,27 +100,28 @@ FIREWALL_FAILED=no
 EIGHT_SLEEP_HOSTS="update-api.8slp.net raw-api-upload.8slp.net device-api-ws.8slp.net"
 HOSTS_FILE=/etc/hosts
 
-# Rewrites only the marked block. cat > keeps /etc/hosts a symlink if it is one.
+# Rewrites only the marked block, and only when it changed. cat > keeps
+# /etc/hosts a symlink if it is one. A failed read leaves the file alone.
 block_stock_update_hosts() {
-  local host merged
+  local host merged status
+  [ -f "$HOSTS_FILE" ] || return 1
   merged=$(mktemp) || return 1
-  {
-    # A start marker with no end marker keeps its following lines.
-    awk '
-      /^# nightstand-block-start$/ {skip = 1; held = ""; next}
-      /^# nightstand-block-end$/ && skip {skip = 0; held = ""; next}
-      skip {held = held $0 "\n"; next}
-      {print}
-      END {printf "%s", held}
-    ' "$HOSTS_FILE"
+  # A start marker with no end marker keeps its following lines.
+  awk '
+    /^# nightstand-block-start$/ {printf "%s", held; skip = 1; held = ""; next}
+    /^# nightstand-block-end$/ && skip {skip = 0; held = ""; next}
+    skip {held = held $0 "\n"; next}
+    {print}
+    END {printf "%s", held}
+  ' "$HOSTS_FILE" > "$merged" && {
     echo "# nightstand-block-start"
     for host in $EIGHT_SLEEP_HOSTS; do
       echo "0.0.0.0 $host"
       echo ":: $host"
     done
     echo "# nightstand-block-end"
-  } > "$merged" && cat "$merged" > "$HOSTS_FILE"
-  local status=$?
+  } >> "$merged" && { cmp -s "$merged" "$HOSTS_FILE" || cat "$merged" > "$HOSTS_FILE"; }
+  status=$?
   rm -f "$merged"
   return $status
 }
@@ -208,11 +209,9 @@ iptables -A OUTPUT -o tailscale0 -j ACCEPT
 #       - UDP everywhere: direct WireGuard peer connections + STUN
 #       - TCP/443: control plane (controlplane.tailscale.com) + DERP relays
 #       - DNS: to resolve controlplane.tailscale.com / derp*.tailscale.com
-#     These also let the pod reach any HTTPS host, Eight Sleep's cloud
-#     included, so they are added only while tailscaled is running. If you set
-#     up Tailscale later, re-run this script once it is active. Eight Sleep's
-#     OTA updates are also blocked at the systemd level (services masked per
-#     INSTALLATION.md); this firewall is a second layer.
+#     These also let the pod reach any HTTPS host (the hosts block above still
+#     applies), so they are added only while tailscaled is running.
+#     If you set up Tailscale later, re-run this script once it is active.
 if systemctl is-active --quiet tailscaled; then
   echo "tailscaled active: allowing its control-plane/DERP/STUN egress"
   iptables -A OUTPUT -p udp -j ACCEPT

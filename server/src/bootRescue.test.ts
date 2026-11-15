@@ -7,33 +7,34 @@ import { bootRescueStatus, readBootSettings } from './bootRescue.js';
 
 it('bootdelay 2 with matching slots is healthy', () => {
   assert.deepEqual(bootRescueStatus({ bootdelay: '2', currentSlot: 'a', nextSlot: 'a' }),
-    { status: 'healthy', message: 'Startup pauses for serial access (bootdelay 2).' });
+    { status: 'healthy', message: 'Serial rescue is available (bootdelay 2).' });
 });
 
 it('bootdelay -1 is healthy', () => {
   assert.deepEqual(bootRescueStatus({ bootdelay: '-1', currentSlot: 'a', nextSlot: 'a' }),
-    { status: 'healthy', message: 'Startup pauses for serial access (bootdelay -1).' });
+    { status: 'healthy', message: 'Serial rescue is available (bootdelay -1).' });
 });
 
 it('bootdelay -2 is failed', () => {
   assert.deepEqual(bootRescueStatus({ bootdelay: '-2', currentSlot: 'a', nextSlot: 'a' }), {
     status: 'failed',
     message: 'Startup no longer pauses for serial access (bootdelay -2), so serial rescue will not work. '
-      + 'Set it back with fw_setenv bootdelay 2 over SSH. This row updates after the next restart.',
+      + 'See Keeping Eight Sleep updates out in the installation guide.',
   });
 });
 
 it('bootdelay -2 with a pending slot switch shows both, bootdelay first', () => {
   const { status, message } = bootRescueStatus({ bootdelay: '-2', currentSlot: 'a', nextSlot: 'b' });
   assert.equal(status, 'failed');
-  assert.match(message, /^Startup no longer pauses .*This row updates after the next restart\. /);
-  assert.match(message, /\. The next restart will start from the other system slot\./);
+  assert.match(message, /^Startup no longer pauses .*installation guide\. /);
+  assert.match(message, /\. Boot settings list slot a now and slot b next\./);
 });
 
 it('current a and next b is failed', () => {
   assert.deepEqual(bootRescueStatus({ bootdelay: '2', currentSlot: 'a', nextSlot: 'b' }), {
     status: 'failed',
-    message: 'The next restart will start from the other system slot. A stock update may be waiting; check before restarting.',
+    message: 'Boot settings list slot a now and slot b next. A stock update may be waiting. '
+      + 'Do not restart or unplug the Pod; open an issue on GitHub.',
   });
 });
 

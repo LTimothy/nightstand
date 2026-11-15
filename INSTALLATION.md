@@ -248,18 +248,19 @@ doesn't exist are expected.
 
 ```bash
 # First save which of these are enabled, so they can be restored later
-[ -e /persistent/nightstand-stock/unit-states.txt ] || { mkdir -p /persistent/nightstand-stock && for unit in swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket swupdate-usb@; do echo "$unit $(systemctl is-enabled $unit 2>/dev/null || echo unknown)"; done > /persistent/nightstand-stock/unit-states.txt; }
-systemctl disable --now swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket swupdate-usb@
+[ -e /persistent/nightstand-stock/unit-states.txt ] || { mkdir -p /persistent/nightstand-stock && for unit in swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket; do echo "$unit $(systemctl is-enabled $unit 2>/dev/null || echo unknown)"; done > /persistent/nightstand-stock/unit-states.txt; }
+systemctl disable --now swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket
 systemctl mask swupdate-progress swupdate defibrillator eight-kernel telegraf vector frankenfirmware dac swupdate.socket swupdate-usb@
 ```
 
 ### Keeping Eight Sleep updates out
 
-Step 11 masks the update services, and step 19 adds a second layer. The
-firewall script (`block_internet_access.sh`) does two things for this. You
-run it in step 19, and it runs again with every update, rollback, restore and
-fork switch. The hosts file is kept across restarts, so once written the
-block stays. An existing install gets it with its next update.
+Step 11 masks the update services. On a Pod 5, Eight Sleep's
+`/opt/eight/bin/swupdate.sh` runs the updater directly, which masks do not
+stop, so the firewall script (`block_internet_access.sh`) adds two more
+guards. You run it in step 19, and it runs again with every update, rollback,
+restore and fork switch. On a Pod 5 the hosts file is kept across restarts.
+An existing install gets these with its next update.
 
 - Adds a block between `# nightstand-block-start` and `# nightstand-block-end`
   in `/etc/hosts` that points `update-api.8slp.net`,
@@ -272,9 +273,8 @@ firmware, so Nightstand leaves capybara running. Its connections are what the
 firewall and the hosts block refuse.
 
 With Tailscale running, the firewall opens HTTPS to any host (see
-[remote access](docs/REMOTE_ACCESS.md#5-turn-the-firewall-back-on)), so the
-hosts block is what stops Eight Sleep's updater there. I have not tested that
-on a Pod with Tailscale on.
+[remote access](docs/REMOTE_ACCESS.md#5-turn-the-firewall-back-on)), and the
+hosts block still points the hosts above at `0.0.0.0`.
 
 The boot setting that lets you rescue a Pod over the serial cable can also be
 changed by a stock update. Check it over SSH as root:
@@ -290,9 +290,11 @@ work. Restore it with:
 fw_setenv bootdelay 2
 ```
 
-System status shows this as a Boot rescue row, and also warns when the next
-restart would start from the other system slot. None of this helps a Pod that
-was already locked before Nightstand was installed.
+System status shows this as a Boot rescue row, read about once an hour. It
+also warns when the boot settings list a different slot for the next restart,
+which can mean a stock update is waiting. If you see that, do not restart or
+unplug the Pod, and open an issue on GitHub. None of this helps a Pod that was
+already locked before Nightstand was installed.
 
 ### 12. Set up internet access
 
@@ -498,9 +500,9 @@ Updates open only HTTPS and name lookups while they download, then apply
 these rules even if you skipped this step. The Biometrics install lifts the
 rules only while it downloads. If you start or stop Tailscale
 later, run the block script again
-([details](docs/REMOTE_ACCESS.md#5-turn-the-firewall-back-on)). Masking the
-update services in step 11 stops firmware updates; the firewall is a second
-layer.
+([details](docs/REMOTE_ACCESS.md#5-turn-the-firewall-back-on)). Step 11
+masks the update services, and this script also adds the hosts block
+([details](#keeping-eight-sleep-updates-out)).
 
 ### 20. Remote access with Tailscale (optional)
 

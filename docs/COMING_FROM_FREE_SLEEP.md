@@ -206,6 +206,11 @@ Fahrenheit, and maps base-control taps to alarm dismissal (with no action when
 there is no alarm). Extra and one-time alarms don't run upstream; the backup
 keeps the original settings.
 
+The `/etc/hosts` block for Eight Sleep's update hosts and the USB update mask
+stay after the switch. The
+[restore table](../INSTALLATION.md#what-installation-changes-on-the-pod) has the
+commands to undo them.
+
 Nightstand's own services, including the network watchdog, and its hardware
 watchdog setting are removed (on some Pods the watchdog turns off at the next
 restart). Backups and `raw-archive/` stay; the switch log prints the

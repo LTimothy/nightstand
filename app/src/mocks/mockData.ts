@@ -443,7 +443,7 @@ const createServerStatus = (): ServerStatus => ({
     name: 'Boot rescue',
     status: 'healthy',
     description: 'Whether serial rescue still works',
-    message: 'Startup pauses for serial access (bootdelay 2).',
+    message: 'Serial rescue is available (bootdelay 2).',
   },
   database: {
     name: 'Database',

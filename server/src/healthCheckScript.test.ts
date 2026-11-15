@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -236,7 +236,7 @@ describe('health_check.sh', () => {
   const settings = (file: string): Record<string, string | null> => JSON.parse(readFileSync(file, 'utf8'));
   const nulls = { bootdelay: null, currentSlot: null, nextSlot: null };
 
-  it('writes boot settings from fw_printenv once per boot', () => {
+  it('writes boot settings from fw_printenv once an hour', () => {
     // Most runs exit early, so the write has to come before those exits.
     const t = setup({ active: 'inactive' });
     t.run(); t.run();
@@ -245,17 +245,35 @@ describe('health_check.sh', () => {
       { checkedAt: undefined, bootdelay: '2', currentSlot: 'a', nextSlot: 'a' });
     assert.ok(!Number.isNaN(Date.parse(written.checkedAt ?? '')));
     assert.equal(statSync(t.bootSettings).mode & 0o777, 0o644);
-    assert.equal(t.log().match(/^fw_printenv bootdelay current_slot next_slot$/gm)?.length, 1);
+    assert.equal(t.log().match(/^fw_printenv $/gm)?.length, 1);
     assert.match(t.log(), /^timeout 10 /m);
     t.cleanup();
   });
 
-  it('does not rewrite an existing file', () => {
+  it('does not rewrite a file under an hour old', () => {
     const t = setup();
     writeFileSync(t.bootSettings, 'kept');
     t.run();
     assert.equal(readFileSync(t.bootSettings, 'utf8'), 'kept');
     assert.doesNotMatch(t.log(), /fw_printenv/);
+    t.cleanup();
+  });
+
+  it('rereads a file over an hour old', () => {
+    const t = setup();
+    writeFileSync(t.bootSettings, 'stale');
+    const old = new Date(Date.now() - 61 * 60 * 1000);
+    utimesSync(t.bootSettings, old, old);
+    t.run();
+    assert.equal(settings(t.bootSettings).bootdelay, '2');
+    t.cleanup();
+  });
+
+  it('keeps bootdelay when the slot names are not defined', () => {
+    const t = setup({ fwPrintenv: 'printf "baudrate=115200\\nbootdelay=2\\n"' });
+    t.run();
+    assert.deepEqual({ ...settings(t.bootSettings), checkedAt: undefined },
+      { checkedAt: undefined, bootdelay: '2', currentSlot: null, nextSlot: null });
     t.cleanup();
   });
 

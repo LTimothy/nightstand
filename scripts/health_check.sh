@@ -16,15 +16,14 @@ FW_PRINTENV="${NIGHTSTAND_FW_PRINTENV:-fw_printenv}"
 LIMIT=3
 STARTUP_GRACE=120
 
-# Records the U-Boot boot settings for the Status page, once per boot since
-# /run is tmpfs. Read only. On a bad environment fw_printenv warns on stderr
-# and prints defaults rather than the Pod's, so any stderr output counts as
-# unknown too.
+# Records the U-Boot boot settings for the Status page. On a bad environment
+# fw_printenv warns on stderr and prints defaults, so any stderr counts as
+# unknown. No names are passed, since one undefined name fails the whole call.
 record_boot_settings() {
   local tmp out ok=1
-  [ -e "$BOOT_SETTINGS" ] && return 0
+  [ -n "$(find "$BOOT_SETTINGS" -mmin -60 2>/dev/null)" ] && return 0
   tmp=$(mktemp "$(dirname "$BOOT_SETTINGS")/.nightstand-boot-settings.XXXXXX") || return 0
-  out=$(timeout 10 "$FW_PRINTENV" bootdelay current_slot next_slot 2>"$tmp") || ok=0
+  out=$(timeout 10 "$FW_PRINTENV" 2>"$tmp") || ok=0
   [ -s "$tmp" ] && ok=0
   value() {
     local v=''

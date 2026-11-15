@@ -161,7 +161,6 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
   bootRescue: {
     group: 'core',
     blurb: 'Whether serial rescue still works',
-    meaning: { healthy: 'Serial rescue still works.', not_started: 'Boot settings not read yet.' },
   },
   database: {
     group: 'core',
