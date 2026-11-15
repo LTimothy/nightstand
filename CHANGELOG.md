@@ -18,6 +18,8 @@ is a hard fork; for the history of the projects it descends from, see
 
 ### Fixes
 
+- The weekly off-time re-arm no longer turns a side back on when it was
+  changed by hand while the re-arm waited for the Pod.
 - After a hand change near a scheduled one, Bed says "Holding your
   temperature" with the clock time scheduled changes resume, instead of
   calling it a paused schedule.
