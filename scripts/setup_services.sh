@@ -57,6 +57,9 @@ files = [("recover_update.sh", recovery, 0o755), ("restore_helpers.sh", recovery
          ("systemd/free-sleep-recover-update.service", systemd, 0o644),
          ("systemd/free-sleep-recover-update.timer", systemd, 0o644)]
 for source, directory, mode in files:
+    # Copies published by older releases do not carry the stock recorder.
+    if source == "record_stock.sh" and not os.path.exists(repo + "/scripts/" + source):
+        continue
     with open(repo + "/scripts/" + source) as handle:
         content = handle.read().replace("/usr/local/lib/nightstand/recovery", recovery)
     descriptor, temporary = tempfile.mkstemp(dir=directory, prefix=".recovery-")

@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, statSync,
+  chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync,
   symlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -268,6 +268,16 @@ describe('setup_services.sh', () => {
     assert.equal(box.read(file), readFileSync(path.join(repoRoot, 'scripts/record_stock.sh'), 'utf8'));
     assert.equal(statSync(file).mode & 0o777, 0o755);
     assert.ok(existsSync(path.join(box.recovery, 'block_internet_access.sh')));
+  });
+
+  it('still installs boot recovery from a copy that predates the stock recorder', () => {
+    const box = sandbox({ withRecovery: true });
+    const copy = box.publish();
+    rmSync(path.join(copy, 'scripts/record_stock.sh'));
+    const result = box.run([copy]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(existsSync(path.join(box.recovery, 'block_internet_access.sh')));
+    assert.equal(existsSync(path.join(box.recovery, 'record_stock.sh')), false);
   });
 
   it('grants a sudoers rule for every command the server runs through sudo', () => {
