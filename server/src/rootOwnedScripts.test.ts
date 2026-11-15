@@ -29,25 +29,43 @@ const ROOT_RUN_PY = listed('scripts', '.py').filter(file => file !== 'scripts/pr
 // path under /home, is treated the same way in that file.
 const TREE_NAMES = ['LIVE', 'PREV', 'STAGE', 'FAILED', 'REPO_DIR', 'SRC_DIR', 'TMP', 'RECOVERY_SOURCE', 'STAGE_INNER',
   'PREV_DIR', 'FAILED_DIR', 'SERVER_DIR', 'UNZIP_DIR', 'TARGET_DIR'];
-// install.sh checks the fresh download with that download's digest script before the copy exists, as it always has.
-const FROM: Record<string, string> = { 'scripts/install.sh': 'system_scripts.py" publish "$SRC_DIR"' };
+// Lines above the publish that may use the fresh download, which only root has touched so far.
+const ABOVE_PUBLISH: Record<string, string[]> = {
+  'scripts/install.sh': [
+    // No installed copy of the digest script exists yet; this catches corruption, not tampering.
+    'ACTUAL_DIGEST=$(python3 "$SRC_DIR/scripts/tree_digest.py" "$SRC_DIR") || ACTUAL_DIGEST=""',
+  ],
+};
 // The one step that makes the copy runs the fresh tree's own tool, from a folder only root can write.
 const PUBLISH = /^COPY=\$\(python3 -B "\$(SRC_DIR|FRESH)\/scripts\/system_scripts\.py" publish "\$\1"\) \\$/;
 // The copy a publish prints is root's, whatever tree it was taken from.
 const MAKES_COPY = /^"?\$\((?:SSH ")?python3 -B "?\$\{?\w+\}?\/(?:scripts\/)?system_scripts\.py"? (?:publish|find)\b/;
 const ASSIGN = /(?:^|[;&|)]\s*)(?:local\s+|export\s+|readonly\s+)?([A-Za-z_]\w*)=(\S.*)?$/;
+const LOOP = /\bfor\s+([A-Za-z_]\w*)\s+in\s+(.*)$/;
+const READ = /(?:^|[;&|({]|\b(?:then|do|while|until|if|else))\s*(?:IFS=\S*\s+)?read\s+(?:-\S+\s+)*([A-Za-z_]\w*(?:\s+[A-Za-z_]\w*)*)/;
 const variable = (names: Set<string>) => String.raw`\$\{?(?:${[...names].join('|')})\}?(?![\w])`;
+
+// Each name a line binds, with the text its value comes from.
+function bindings(line: string): [string[], string][] {
+  const found: [string[], string][] = [];
+  const assign = ASSIGN.exec(line);
+  if (assign && !MAKES_COPY.test(assign[2] ?? '')) found.push([[assign[1]], assign[2] ?? '']);
+  const loop = LOOP.exec(line);
+  if (loop) found.push([[loop[1]], loop[2]]);
+  const read = READ.exec(line);
+  if (read) found.push([read[1].split(/\s+/), line]);
+  return found;
+}
 
 function treeNames(text: string) {
   const names = new Set(TREE_NAMES);
   const lines = text.split('\n').filter(line => !/^\s*#/.test(line));
   for (let grew = true; grew;) {
     grew = false;
-    for (const line of lines) {
-      const match = ASSIGN.exec(line);
-      if (!match || names.has(match[1]) || MAKES_COPY.test(match[2] ?? '')) continue;
-      if (/\/home\//.test(match[2] ?? '') || new RegExp(variable(names)).test(match[2] ?? '')) {
-        names.add(match[1]);
+    for (const [bound, value] of lines.flatMap(bindings)) {
+      if (bound.every(name => names.has(name))) continue;
+      if (/\/home\//.test(value) || new RegExp(variable(names)).test(value)) {
+        bound.forEach(name => names.add(name));
         grew = true;
       }
     }
@@ -62,16 +80,33 @@ function shellOffenders(file: string, text: string) {
   const runs = new RegExp(String.raw`(?:^|[\s;&|(\x60])(?:/(?:usr/)?bin/)?(?:bash|sh|python3?|node|source|exec|\.)(?:\s+-[A-Za-z]+)*`
     + String.raw`\s+["']?(?:${tree}|/home/)`);
   const direct = new RegExp(String.raw`(?:^|[;&|]\s*|\b(?:then|do|else)\s+)["']?${tree}/[^\s"']+\.(?:sh|py)\b`);
-  const intoSystem = new RegExp(String.raw`\b(?:cp|install|rsync|ln)\s.*(?:${tree}|/home/).*\s["']?(?:/etc|/usr|/lib|/bin|/sbin|`
-    + String.raw`\$\{?(?:PYTHON_LIB_DIR|SYSTEMD_DIR|SUDOERS_FILE|TMPFILES_DIR)\b)`);
-  const lines = text.split('\n');
-  const start = FROM[file] ? lines.findIndex(line => line.includes(FROM[file])) : 0;
-  assert.ok(start >= 0, `${file}: missing ${FROM[file]}`);
-  return lines.map((line, index) => ({ line, at: `${file}:${index + 1}` })).slice(start)
+  const system = String.raw`["']?(?:/etc|/usr|/lib|/bin|/sbin|\$\{?(?:PYTHON_LIB_DIR|SYSTEMD_DIR|SUDOERS_FILE|TMPFILES_DIR)\b)`;
+  const intoSystem = new RegExp(String.raw`\b(?:cp|mv|install|rsync|ln)\s.*(?:${tree}|/home/).*\s${system}`);
+  const untar = new RegExp(String.raw`\btar(?=\s.*(?:${tree}|/home/))(?=.*\s(?:-C\s*|--directory[=\s])${system})`);
+  // After cd into a tree, a relative path names that tree's files.
+  const intoTree = new RegExp(String.raw`^cd\s+["']?(?:${tree}|/home/)`);
+  const relative = new RegExp(String.raw`(?:^|[\s;&|(\x60])(?:(?:bash|sh|python3?|node|source|\.)(?:\s+-[A-Za-z]+)*\s+["']?`
+    + String.raw`(?:\.\/|[\w.-]+\/|[\w-]+\.(?:sh|py|js)\b)|\.\/)`);
+  let inTree = false;
+  const lines = text.split('\n').map((line, index) => {
+    let fromTree = false;
+    for (const part of line.split(/(?<![\w-])(?=cd\s)/)) {
+      if (/^cd\s/.test(part)) inTree = intoTree.test(part);
+      if (inTree && relative.test(part.replace(/^cd\s+\S+/, ''))) fromTree = true;
+    }
+    return { line, fromTree, at: `${file}:${index + 1}` };
+  });
+  const publishAt = lines.findIndex(({ line }) => PUBLISH.test(line.trim()));
+  const allowed = ABOVE_PUBLISH[file] ?? [];
+  assert.ok(!allowed.length || publishAt >= 0, `${file}: missing the publish step`);
+  for (const entry of allowed) {
+    assert.ok(lines.slice(0, publishAt).some(({ line }) => line.trim() === entry), `${file}: no line above the publish reads ${entry}`);
+  }
+  return lines.filter(({ line }, index) => !(index < publishAt && allowed.includes(line.trim())))
     // Comments, commands run as the server user, quoted text such as sudoers lines, and the publish step.
     .filter(({ line }) => !/^\s*#/.test(line) && !/\b(?:sudo|runuser) -u /.test(line) && !/^\s*"[^"]*"\s*$/.test(line)
       && !PUBLISH.test(line.trim()))
-    .filter(({ line }) => runs.test(line) || direct.test(line) || intoSystem.test(line))
+    .filter(({ line, fromTree }) => fromTree || runs.test(line) || direct.test(line) || intoSystem.test(line) || untar.test(line))
     .map(({ at, line }) => `${at}: ${line.trim()}`);
 }
 
@@ -168,8 +203,13 @@ describe('root runs nothing from the server user\'s folders', () => {
   });
 
   it('catches each way a root-run script could run or install the server user\'s files', () => {
+    const install = read('scripts/install.sh').split('\n');
+    const publishAt = install.findIndex(line => PUBLISH.test(line.trim()));
+    install.splice(publishAt, 0, 'bash "$SRC_DIR/scripts/evil.sh"');
+    assert.deepEqual(shellOffenders('scripts/install.sh', install.join('\n')),
+      [`scripts/install.sh:${publishAt + 1}: bash "$SRC_DIR/scripts/evil.sh"`]);
     const rollback = read('scripts/rollback_pod.sh');
-    for (const probe of [
+    assert.deepEqual([
       'bash "$RECOVERY_SOURCE/scripts/evil.sh"',
       'D=/home/dac/free-sleep; bash "$D/scripts/evil.sh"',
       'D=/home/dac/free-sleep\nE="$D/scripts"\nsource "$E/evil.sh"',
@@ -178,9 +218,14 @@ describe('root runs nothing from the server user\'s folders', () => {
       'install -m 755 "$STAGE/scripts/x" /usr/local/bin/x',
       'rsync -a "$LIVE/scripts/python/" "$PYTHON_LIB_DIR/"',
       'python3 -B "$STAGE_INNER/scripts/system_scripts.py" publish "$STAGE_INNER"',
-    ]) {
-      assert.notDeepEqual(shellOffenders('scripts/rollback_pod.sh', `${rollback}\n${probe}\n`), [], probe);
-    }
+      'for f in "$LIVE"/scripts/*.sh; do bash "$f"; done',
+      'cd "$LIVE" && bash scripts/evil.sh',
+      'cd /home/dac/free-sleep\nsh ./scripts/evil.sh',
+      'read -r D < /home/dac/where; bash "$D/evil.sh"',
+      'mv "$STAGE/x.service" /etc/systemd/system/x.service',
+      'tar -xf "$LIVE/x.tar" -C /etc',
+      'tar -C /usr/local -xzf /home/dac/x.tgz',
+    ].filter(probe => shellOffenders('scripts/rollback_pod.sh', `${rollback}\n${probe}\n`).length === 0), []);
     const runner = read('scripts/switch_installation.py');
     for (const probe of [
       "        subprocess.run(['bash', str(source / 'scripts/setup_services.sh'), str(source), '--recovery-only'])",
