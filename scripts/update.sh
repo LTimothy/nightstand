@@ -387,6 +387,8 @@ mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
   || fail "could not create a download folder in $SYSTEM_DIR; live install untouched"
 curl -fL --max-time 300 -o "$WORK/release.zip" "$RESOLVED_ZIP_URL" || fail "download failed"
 unzip -q "$WORK/release.zip" -d "$WORK/tree" || fail "unzip failed"
+# BusyBox unzip makes the folders GitHub lists 777; only root can reach this one.
+find "$WORK/tree" -type d -exec chmod go-w {} \; || fail "could not secure the download; live install untouched"
 # GitHub names the archive's top dir after the repo and ref (repo-name + "-" +
 # branch or tag), so resolve it dynamically rather than hardcoding it.
 STAGED_DIR=$(find "$WORK/tree" -mindepth 1 -maxdepth 1 -type d | head -n1)

@@ -263,6 +263,8 @@ mkdir -p "$SYSTEM_DIR" && WORK=$(mktemp -d "$SYSTEM_DIR/.download.XXXXXX") \
 curl -fL --max-time 300 -o "$WORK/release.zip" "${TAG_ZIP_URL_PREFIX}${TARGET_VERSION}.zip" \
   || fail "download failed; their server was never touched"
 unzip -q "$WORK/release.zip" -d "$WORK/tree" || fail "unzip failed; their server was never touched"
+# BusyBox unzip makes the folders GitHub lists 777; only root can reach this one.
+find "$WORK/tree" -type d -exec chmod go-w {} \; || fail "could not secure the download; their server was never touched"
 FRESH=$(find "$WORK/tree" -mindepth 1 -maxdepth 1 -type d | head -n1)
 [ -n "$FRESH" ] || fail "unexpected zip layout; their server was never touched"
 # No copy of ours is installed yet, so the downloaded digest script does the
