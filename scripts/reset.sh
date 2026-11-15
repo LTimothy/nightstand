@@ -24,18 +24,7 @@ if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
 fi
 
 # Share admission with updates and stream reconciliation through service restarts.
-if [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ]; then
-  OPERATION_LOCK=$(operation_lock_path)
-  if [ -e "$OPERATION_LOCK" ]; then exec 9<"$OPERATION_LOCK"; else exec 9>>"$OPERATION_LOCK"; fi \
-    || { echo "Cannot open the operation lock"; exit 1; }
-  if command -v flock >/dev/null 2>&1; then
-    flock -n 9 || { echo "Another update, rollback, switch, install or reset is already running"; exit 1; }
-  else
-    python3 -I -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null \
-      || { echo "Another operation is already running (or lock unavailable)"; exit 1; }
-  fi
-  export NIGHTSTAND_OPERATION_OWNER=$$
-fi
+take_operation_lock || { echo "Another update, rollback, switch, install or reset is already running"; exit 1; }
 
 # Prints file $1 only when it is a plain file, never through a link the
 # server user left in its folder.

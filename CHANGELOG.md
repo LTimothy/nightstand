@@ -52,7 +52,9 @@ is a hard fork; for the history of the projects it descends from, see
 - The Biometrics install script now says which download step failed or timed
   out, and stopping it with Ctrl-C or a signal stops the running download and
   reports a failed install. It also takes the update lock before restarting an
-  already installed stream.
+  already installed stream. A download that times out is stopped too, so it
+  no longer holds the update lock, and a failed install is still reported
+  when the SSH session showing its output drops.
 - The firewall script now also blocks Eight Sleep's update hosts in
   `/etc/hosts` and masks the USB update unit. It is applied at step 19 and
   again with every update, rollback, restore and fork switch, so an existing

@@ -86,8 +86,8 @@ run_step() {
   STEP_PID=$!
   set +m
   wait "$STEP_PID" || rc=$?
-  STEP_PID=
-  [ "$rc" -ne 0 ] || return 0
+  # Kept on failure so the EXIT trap stops whatever the step left running.
+  [ "$rc" -ne 0 ] || { STEP_PID=; return 0; }
   if [ "$rc" -eq 124 ] || [ "$rc" -eq 143 ]; then
     echo "$label timed out after $seconds seconds or was stopped"
   else
@@ -103,6 +103,7 @@ trap 'exit 143' TERM
 # Catch any errors
 trap '
   rc=$?;
+  trap "" PIPE
   set +e
   [ -z "${STEP_PID:-}" ] || kill -s TERM "--" "-$STEP_PID" 2>/dev/null
   if [ "$rc" -ne 0 ]; then

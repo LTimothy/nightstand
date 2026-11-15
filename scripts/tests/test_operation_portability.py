@@ -39,13 +39,13 @@ class PortabilityTests(unittest.TestCase):
                 if not missing:
                     (root / 'missing').mkdir()
                 text = source(name)
+                helpers = source('restore_helpers.sh')
+                lock = helpers[helpers.index('take_operation_lock() {'):]
+                lock = lock[:lock.index('\n}\n') + 3]
                 if name in ('install.sh', 'reset.sh'):
                     body = text.split('# Share admission', 1)[1].split('\n\n', 1)[0]
-                    body = path_helper() + '# Share admission' + body + '\n'
+                    body = path_helper() + lock + '# Share admission' + body + '\n'
                 else:
-                    helpers = source('restore_helpers.sh')
-                    lock = helpers[helpers.index('take_operation_lock() {'):]
-                    lock = lock[:lock.index('\n}\n') + 3]
                     body = path_helper() + lock + text.split('# Keep the descriptor across updater exec handoffs; all three operations share it.')[1].split('\nesac', 1)[0] + '\nesac\n'
                 body = body.replace('/run/lock', str(root / 'missing')).replace('/tmp/free-sleep-operation.lock', str(root / 'fallback.lock'))
                 env = {k: v for k, v in os.environ.items() if not k.startswith('NIGHTSTAND_OPERATION_')}

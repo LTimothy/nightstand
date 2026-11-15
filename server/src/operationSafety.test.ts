@@ -65,7 +65,9 @@ for (const name of ['install.sh', 'reset.sh']) {
     assert.ok(start >= 0 && end > start);
     const helpers = script('restore_helpers.sh');
     const pathStart = helpers.indexOf('operation_lock_path() {');
-    const admission = helpers.slice(pathStart, helpers.indexOf('\n}\n', pathStart) + 3) + source.slice(start, end);
+    const lockStart = helpers.indexOf('take_operation_lock() {');
+    const admission = helpers.slice(pathStart, helpers.indexOf('\n}\n', pathStart) + 3)
+      + helpers.slice(lockStart, helpers.indexOf('\n}\n', lockStart) + 3) + source.slice(start, end);
     const run = () => spawnSync('bash', ['-c', admission + '\necho admitted'], {
       encoding: 'utf8', env: { ...process.env, NIGHTSTAND_OPERATION_LOCK: lock },
     });
@@ -107,7 +109,10 @@ for (const name of ['install.sh', 'reset.sh']) {
       const end = source.indexOf(name === 'reset.sh' ? 'SOCK_PATH=""' : '# Variables', start);
       assert.ok(start >= 0 && end > start);
       const handoff = path.join(folder, 'handoff.sh');
+      const helpers = script('restore_helpers.sh');
+      const lockStart = helpers.indexOf('take_operation_lock() {');
       writeFileSync(handoff, `
+${helpers.slice(lockStart, helpers.indexOf('\n}\n', lockStart) + 3)}
 flock() {
   python3 -c 'import fcntl, sys; fcntl.flock(open(sys.argv[1], "r"), fcntl.LOCK_EX | fcntl.LOCK_NB)' "$NIGHTSTAND_OPERATION_LOCK" \
     && { echo 'gap: independent contender acquired lock'; return 1; }
