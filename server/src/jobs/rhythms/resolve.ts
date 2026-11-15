@@ -74,10 +74,9 @@ function resolveNight(side: Side, date: string, source: NightSource, timeZone: s
   events.sort((a, b) => a.at.getTime() - b.at.getTime() || KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
   const sleep: ResolvedSleep = { side, date, rhythmId: source.rhythmId, start, end, wake, night, mode: source.mode, events };
   if (source.mode === 'smart' && source.smart) sleep.smart = { ...source.smart };
-  if (source.offWhenUp) sleep.offWhenUp = true;
-  if (sleep.smart) {
-    if (source.offWhenUp) sleep.smart.offWhenUp = true;
-    else delete sleep.smart.offWhenUp;
+  if (source.offWhenUp) {
+    sleep.offWhenUp = true;
+    if (sleep.smart) sleep.smart.offWhenUp = true;
   }
   return sleep;
 }
