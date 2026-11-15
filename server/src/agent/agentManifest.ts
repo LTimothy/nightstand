@@ -151,6 +151,7 @@ export const AGENT_MANIFEST: AgentEntry[] = [
   { path: 'server/src/setup/routes.ts', mode: 'patch', why: 'aggregates every route in the tree, so a copy imports routes stock does not have' },
 
   // Tests travel with the code they cover.
+  { path: 'server/testFileGuard.mjs', mode: 'add', why: 'the carried test script reports through it, failing when a test file goes unreported' },
   { path: 'server/src/updaterScripts.test.ts', mode: 'add', why: 'pins update.sh invariants' },
   { path: 'server/src/rollbackScript.test.ts', mode: 'add', why: 'pins rollback_pod.sh invariants' },
   { path: 'server/src/switchToUpstreamScript.test.ts', mode: 'add', why: 'pins switch-to-upstream.sh invariants' },
