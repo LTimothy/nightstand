@@ -17,6 +17,12 @@ def source(name):
     return (ROOT / 'scripts' / name).read_text()
 
 
+def path_helper():
+    helpers = source('restore_helpers.sh')
+    start = helpers.index('operation_lock_path() {')
+    return helpers[start:helpers.index('\n}\n', start) + 3]
+
+
 class PortabilityTests(unittest.TestCase):
     def test_python_lock_and_missing_run_lock_directory(self):
         scripts = ['update.sh', 'rollback_pod.sh', 'switch-to-upstream.sh', 'install.sh', 'reset.sh']
@@ -35,12 +41,12 @@ class PortabilityTests(unittest.TestCase):
                 text = source(name)
                 if name in ('install.sh', 'reset.sh'):
                     body = text.split('# Share admission', 1)[1].split('\n\n', 1)[0]
-                    body = '# Share admission' + body + '\n'
+                    body = path_helper() + '# Share admission' + body + '\n'
                 else:
                     helpers = source('restore_helpers.sh')
                     lock = helpers[helpers.index('take_operation_lock() {'):]
                     lock = lock[:lock.index('\n}\n') + 3]
-                    body = lock + text.split('# Keep the descriptor across updater exec handoffs; all three operations share it.')[1].split('\nesac', 1)[0] + '\nesac\n'
+                    body = path_helper() + lock + text.split('# Keep the descriptor across updater exec handoffs; all three operations share it.')[1].split('\nesac', 1)[0] + '\nesac\n'
                 body = body.replace('/run/lock', str(root / 'missing')).replace('/tmp/free-sleep-operation.lock', str(root / 'fallback.lock'))
                 env = {k: v for k, v in os.environ.items() if not k.startswith('NIGHTSTAND_OPERATION_')}
                 env['PATH'] = str(bindir)
@@ -54,6 +60,32 @@ class PortabilityTests(unittest.TestCase):
                 finally:
                     holder.communicate('\n', timeout=5)
                 self.assertEqual(subprocess.run(['/bin/bash', '-c', command], env=env, capture_output=True).returncode, 0)
+
+    def test_busy_checks_see_the_fallback_and_python_lock(self):
+        for name in ['health_check.sh', 'network_watchdog.sh']:
+            with self.subTest(script=name), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                bindir = root / 'bin'
+                bindir.mkdir()
+                (bindir / 'python3').symlink_to(sys.executable)
+                text = source(name)
+                start = text.index('lock_held() {')
+                body = text[text.index('LOCK="${NIGHTSTAND_OPERATION_LOCK'):].split('\n', 2)[:2]
+                body = '\n'.join(body) + '\nPROC_LOCKS=' + str(root / 'no-proc-locks') + '\n' + text[start:text.index('\n}\n', start) + 3]
+                fallback = root / 'fallback.lock'
+                body = body.replace('/run/lock', str(root / 'missing')).replace('/tmp/free-sleep-operation.lock', str(fallback))
+                env = {k: v for k, v in os.environ.items() if not k.startswith('NIGHTSTAND_')}
+                env['PATH'] = str(bindir)
+                busy = lambda: subprocess.run(['/bin/bash', '-c', body + '\nlock_held'], env=env).returncode == 0
+                self.assertFalse(busy())
+                holder = subprocess.Popen([sys.executable, '-c', 'import fcntl, sys\nf = open(sys.argv[1], "a")\nfcntl.flock(f, fcntl.LOCK_EX)\nprint("held", flush=True)\nsys.stdin.readline()', str(fallback)],
+                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+                try:
+                    self.assertEqual(holder.stdout.readline().strip(), 'held')
+                    self.assertTrue(busy())
+                finally:
+                    holder.communicate('\n', timeout=5)
+                self.assertFalse(busy())
 
     def test_all_pre_floor_tags_cap_retention(self):
         manifest = json.loads((ROOT / 'fixtures/compat/archive-pre-floor-tags.json').read_text())

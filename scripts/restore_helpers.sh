@@ -202,15 +202,25 @@ run_limited() {
   return "$status"
 }
 
+# Where the operation lock lives. The /tmp fallback stays so older releases
+# agree on the path.
+operation_lock_path() {
+  if [ -n "${NIGHTSTAND_OPERATION_LOCK:-}" ]; then
+    printf '%s\n' "$NIGHTSTAND_OPERATION_LOCK"
+  elif [ -d /run/lock ]; then
+    echo /run/lock/free-sleep-operation.lock
+  else
+    echo /tmp/free-sleep-operation.lock
+  fi
+}
+
 # The lock updates, rollbacks, switches and the Biometrics install share, on
 # fd 9. The owner variable keeps it across the updater's exec handoff.
 # Returns 1 when the lock cannot be opened, 2 while another run holds it.
 take_operation_lock() {
   [ "${NIGHTSTAND_OPERATION_OWNER:-}" != "$$" ] || return 0
-  local lock="${NIGHTSTAND_OPERATION_LOCK:-/run/lock/free-sleep-operation.lock}"
-  if [ -z "${NIGHTSTAND_OPERATION_LOCK:-}" ] && [ ! -d /run/lock ]; then
-    lock=/tmp/free-sleep-operation.lock
-  fi
+  local lock
+  lock=$(operation_lock_path)
   if [ -e "$lock" ]; then exec 9<"$lock"; else exec 9>>"$lock"; fi || return 1
   if command -v flock >/dev/null 2>&1; then
     flock -n 9 || return 2
