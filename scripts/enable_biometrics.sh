@@ -5,7 +5,7 @@ SCRIPTS=/usr/local/lib/nightstand/live/scripts
 
 WAN_OPEN=no
 say() { echo "$*"; }
-source "$SCRIPTS/restore_helpers.sh"
+source "$SCRIPTS/restore_helpers.sh" || exit 1
 if ! take_operation_lock; then
   echo "An update, rollback, switch or install is running. Run this again when it has finished."
   exit 1
@@ -76,8 +76,13 @@ run_step() {
   local label=$1 seconds=$2 rc=0
   shift 2
   set -m
-  # set -e would end run_limited early on its watchdog cleanup.
-  { set +e; run_limited "$seconds" "$@"; } &
+  if timeout 1 true 2>/dev/null; then
+    # GNU timeout leaves the job's group unless it leads the job.
+    timeout "$seconds" "$@" </dev/null &
+  else
+    # set -e would end run_limited early on its watchdog cleanup.
+    { set +e; run_limited "$seconds" "$@"; } </dev/null &
+  fi
   STEP_PID=$!
   set +m
   wait "$STEP_PID" || rc=$?

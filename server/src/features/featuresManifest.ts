@@ -1000,7 +1000,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'On for a new install; an upgrade keeps the switch as it was. Its data lives only in rhythmsDB.json and '
       + 'it never writes schedulesDB.json, so turning it '
       + 'off, rolling back or switching to upstream leaves the weekly schedule exactly as it was.'
-      + ' A rhythm set to turn off when the person gets up carries one optional key, which 3.5.0 drops on read.',
+      + ' A rhythm set to turn off when the person gets up carries an optional key and its Smart Schedule copy; 3.5.0 and 3.7 '
+      + 'drop the rhythm key on read, so they turn a manual rhythm off at its set time.',
   },
   {
     id: 'rhythm-suggestions',

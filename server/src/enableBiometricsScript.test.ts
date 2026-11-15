@@ -29,7 +29,8 @@ function run({ installed = false, calibrationFails = false, refuseOn = false, na
   mkdirSync(path.join(home, 'venv', 'bin'), { recursive: true });
   mkdirSync(bin);
   writeFileSync(path.join(scripts, 'is_biometrics_installed.py'), `import sys\nsys.exit(${installed ? 1 : 0})\n`);
-  writeFileSync(path.join(scripts, 'restore_helpers.sh'), readFileSync(path.join(repoRoot, 'scripts/restore_helpers.sh'), 'utf8'));
+  writeFileSync(path.join(scripts, 'restore_helpers.sh'),
+    stubs['restore_helpers.sh'] ?? readFileSync(path.join(repoRoot, 'scripts/restore_helpers.sh'), 'utf8'));
   for (const name of ['unblock_internet_access.sh', 'block_internet_access.sh', 'setup_python.sh',
     'install_python_packages.sh', 'setup_streamer_service.sh']) {
     const fails = pipFails && name === 'install_python_packages.sh';
@@ -231,6 +232,13 @@ describe('enable_biometrics.sh', () => {
       holder.kill();
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('stops without blaming an update when its helpers cannot be loaded', () => {
+    const result = run({ stubs: { 'restore_helpers.sh': 'return 1' } });
+    assert.equal(result.status, 1);
+    assert.doesNotMatch(result.stdout, /is running/);
+    assert.deepEqual(result.log, []);
   });
 
   const dash = spawnSync('sh', ['-c', 'command -v dash']).stdout?.toString().trim();

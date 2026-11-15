@@ -9,7 +9,7 @@ const NOTE = "Uses the bed's presence sensing. In a shared bed it can mistake th
   + 'if it stops reporting, the bed follows the clock.';
 
 const HELPER = "After your wake time, it turns off once you've been out of bed for 10 minutes and your alarms are done."
-  + ' Still in bed at 8:30 AM? It stays on at your wake temperature until you get up, for up to 3 more hours.';
+  + ' Still in bed at 8:30 AM? It stays on at its last temperature until you get up, for up to 3 more hours.';
 
 beforeEach(() => {
   useAppStore.setState({ side: 'right', isUpdating: false });

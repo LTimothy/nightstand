@@ -113,7 +113,7 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
   const offClock = moment(schedule.power.off, 'HH:mm').format('h:mm A');
   const upNote = getUp?.tracking
     ? "After your wake time, it turns off once you've been out of bed for 10 minutes and your alarms are done."
-      + ` Still in bed at ${offClock}? It stays on at your wake temperature until you get up, for up to 3 more hours.`
+      + ` Still in bed at ${offClock}? It stays on at its last temperature until you get up, for up to 3 more hours.`
     : `Needs Biometrics. Until it is on, the bed turns off at ${offClock}.`;
 
   const freezeRows = () => setEditing(previous => {
