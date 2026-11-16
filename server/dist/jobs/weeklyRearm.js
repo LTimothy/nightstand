@@ -51,7 +51,8 @@ export function planWeeklyRearm(settings, schedules, side, now) {
 }
 // Rhythms took over, or a rebuild is replacing this job.
 const weeklyLost = (rhythmsAtStart) => isRebuilding() || engineActivation().active || settingsDB.data.features.rhythms !== rhythmsAtStart;
-export async function rearmWeeklyNight(side) {
+// plannedAt: when the re-arm was planned, so a hand change in the wait before it ran also counts.
+export async function rearmWeeklyNight(side, plannedAt = Date.now()) {
     const startedAt = Date.now();
     const label = `weekly off time for ${side}`;
     const rhythmsAtStart = settingsDB.data.features.rhythms;
@@ -81,7 +82,7 @@ export async function rearmWeeklyNight(side) {
         logger.info(`Skipping ${label}: the side is off`);
         return;
     }
-    if ((lastManualPowerChange(side) ?? -Infinity) >= startedAt) {
+    if ((lastManualPowerChange(side) ?? -Infinity) >= plannedAt) {
         logger.info(`Skipping ${label}: changed by hand while it waited`);
         return;
     }
@@ -108,7 +109,7 @@ const REARM_DELAY_MS = 1000;
 export function scheduleWeeklyRearm(settings, schedules, side, now = new Date()) {
     if (!planWeeklyRearm(settings, schedules, side, now))
         return false;
-    schedule.scheduleJob(`${side}-weekly-rearm`, new Date(now.getTime() + REARM_DELAY_MS), () => rearmWeeklyNight(side));
+    schedule.scheduleJob(`${side}-weekly-rearm`, new Date(now.getTime() + REARM_DELAY_MS), () => rearmWeeklyNight(side, now.getTime()));
     return true;
 }
 //# sourceMappingURL=weeklyRearm.js.map

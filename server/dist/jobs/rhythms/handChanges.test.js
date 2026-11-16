@@ -9,11 +9,11 @@ process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
 // The Smart Schedule controller's answers, set per test.
 const smart = {
-    gate: 'run', holdUntil: null, coolStart: undefined,
+    gate: 'run', holdUntil: null, coolStart: undefined, powerOff: undefined,
 };
 mock.module(new URL('./curveController.js', import.meta.url).href, {
     namedExports: {
-        smartResolveHooks: { coolStartFor: () => smart.coolStart, powerOffFor: () => undefined },
+        smartResolveHooks: { coolStartFor: () => smart.coolStart, powerOffFor: () => smart.powerOff },
         smartTemperatureGate: () => smart.gate,
         smartCurveStatus: () => (smart.holdUntil ? { holdUntil: smart.holdUntil } : null),
         smartManualChange: () => 'not-smart',
@@ -62,6 +62,7 @@ beforeEach(async () => {
     smart.gate = 'run';
     smart.holdUntil = null;
     smart.coolStart = undefined;
+    smart.powerOff = undefined;
     useRhythm(HAND);
 });
 after(() => rmSync(folder, { recursive: true, force: true }));
@@ -289,6 +290,11 @@ describe('hand change', () => {
             assert.deepEqual(await record('left', over), []);
         });
     }
+    it('writes nothing once a sleep kept on for someone in bed passes its set off', async () => {
+        smart.powerOff = new Date('2026-10-02T07:00:00.000Z');
+        assert.deepEqual(await record('left', {}, new Date('2026-10-02T06:04:00.000Z')), []);
+        assert.equal((await record('left', {}, new Date('2026-10-02T05:50:00.000Z'))).length, 1);
+    });
     it('writes nothing outside a Rhythms sleep', async () => {
         assert.deepEqual(await record('left', {}, new Date('2026-10-02T12:00:00.000Z')), []);
     });

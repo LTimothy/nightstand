@@ -247,7 +247,7 @@ it('an unrecognized archive script refuses a downgrade instead of deleting old d
 });
 it('every copy of the lock path makes the same choice', () => {
     const files = ['scripts/install.sh', 'scripts/health_check.sh', 'scripts/network_watchdog.sh', 'scripts/migrate/pod-installer.sh',
-        'scripts/switch_installation.py', 'scripts/recover_update.sh', 'scripts/setup_services.sh',
+        'scripts/switch_installation.py', 'scripts/recover_update.sh', 'scripts/recover_switch.sh', 'scripts/setup_services.sh',
         'server/src/jobs/operationLock.ts', 'scripts/restore_helpers.sh'];
     for (const file of files) {
         const text = readFileSync(path.join(root, file), 'utf8');
