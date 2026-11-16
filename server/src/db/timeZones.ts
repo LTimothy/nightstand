@@ -42,3 +42,8 @@ export const TIME_ZONES = [
 
 // eslint-disable-next-line @typescript-eslint/no-type-alias
 export type TimeZone = typeof TIME_ZONES[number];
+
+// node-schedule reads Node's built-in zone data, which can predate a zone going
+// to one offset all year; moment-timezone already has these.
+const FIXED_OFFSETS: Partial<Record<string, string>> = { 'America/Vancouver': 'UTC-7', 'America/Edmonton': 'UTC-6' };
+export const scheduleZone = (zone: string): string => FIXED_OFFSETS[zone] ?? zone;

@@ -4,7 +4,7 @@ import moment from 'moment-timezone';
 import { DailySchedule, DayOfWeek, Side, Time } from '../db/schedulesSchema.js';
 import { getDayIndexForTime, logJob } from './utils.js';
 import { Settings } from '../db/settingsSchema.js';
-import { TimeZone } from '../db/timeZones.js';
+import { scheduleZone, TimeZone } from '../db/timeZones.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import serverStatus from '../serverStatus.js';
 import logger from '../logger.js';
@@ -23,7 +23,7 @@ const scheduleAdjustment = (timeZone: TimeZone, side: Side, day: DayOfWeek, time
   onRule.dayOfWeek = dayOfWeekIndex;
   onRule.hour = onHour;
   onRule.minute = onMinute;
-  onRule.tz = timeZone;
+  onRule.tz = scheduleZone(timeZone);
 
   schedule.scheduleJob(`${side}-${day}-${time}-${temperature}-temperature-adjustment`, onRule, async (fireDate?: Date) => {
     try {

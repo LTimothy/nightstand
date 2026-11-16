@@ -4,6 +4,7 @@ import logger from '../../logger.js';
 import type { Settings } from '../../db/settingsSchema.js';
 import type { Side } from '../../db/schedulesSchema.js';
 import type { RhythmsDB } from '../../db/rhythmsSchema.js';
+import { scheduleZone } from '../../db/timeZones.js';
 import { SCHEDULE_SIDES } from '../../db/scheduleKeys.js';
 import { getDeviceStatusCoalesced, isFrankenConnected } from '../../8sleep/frankenServer.js';
 import { effectiveSides } from '../scheduleQueries.js';
@@ -203,7 +204,7 @@ function scheduleHorizon(timeZone: string, extend: () => void): void {
   if (schedule.scheduledJobs[RHYTHMS_HORIZON_JOB]) return;
   const rule = new schedule.RecurrenceRule();
   rule.minute = 0;
-  rule.tz = timeZone;
+  rule.tz = scheduleZone(timeZone);
   schedule.scheduleJob(RHYTHMS_HORIZON_JOB, rule, extend);
 }
 

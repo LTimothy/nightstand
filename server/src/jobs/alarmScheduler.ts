@@ -6,6 +6,7 @@ import logger from '../logger.js';
 import serverStatus from '../serverStatus.js';
 import schedulesDB from '../db/schedules.js';
 import settingsDB, { updateSettings } from '../db/settings.js';
+import { scheduleZone } from '../db/timeZones.js';
 import { Alarm, AlarmJob, DailySchedule, DayOfWeek, Side } from '../db/schedulesSchema.js';
 import type { ResolvedSleep } from './rhythms/resolve.js';
 import { dailyAlarmSchedules } from '../db/scheduleAlarms.js';
@@ -322,7 +323,7 @@ export const scheduleAlarm = (settingsData: Settings, side: Side, day: DayOfWeek
     const [alarmHour, alarmMinute] = time.split(':').map(Number);
     alarmRule.hour = alarmHour;
     alarmRule.minute = alarmMinute;
-    alarmRule.tz = settingsData.timeZone;
+    alarmRule.tz = scheduleZone(settingsData.timeZone);
 
     logJob('Scheduling alarm job', side, day, dayIndex, time);
 

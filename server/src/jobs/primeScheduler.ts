@@ -2,7 +2,7 @@ import schedule from 'node-schedule';
 import { Settings } from '../db/settingsSchema.js';
 import logger from '../logger.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
-import { TimeZone } from '../db/timeZones.js';
+import { scheduleZone, TimeZone } from '../db/timeZones.js';
 import { executeCalibrateSensors } from './calibrateSensors.js';
 import { Side } from '../db/schedulesSchema.js';
 import moment from 'moment-timezone';
@@ -22,7 +22,7 @@ const scheduleRebootJob = (onHour: number, onMinute: number, timeZone: TimeZone)
   const dailyRule = new schedule.RecurrenceRule();
   dailyRule.hour = onHour;
   dailyRule.minute = onMinute;
-  dailyRule.tz = timeZone;
+  dailyRule.tz = scheduleZone(timeZone);
 
   const time = `${String(onHour).padStart(2,'0')}:${String(onMinute).padStart(2,'0')}`;
   logger.debug(`Scheduling daily reboot job at ${time}`);
@@ -56,7 +56,7 @@ const scheduleCalibrationJob = (onHour: number, onMinute: number, timeZone: Time
   const dailyRule = new schedule.RecurrenceRule();
   dailyRule.hour = onHour;
   dailyRule.minute = onMinute;
-  dailyRule.tz = timeZone;
+  dailyRule.tz = scheduleZone(timeZone);
 
   const time = `${String(onHour).padStart(2,'0')}:${String(onMinute).padStart(2,'0')}`;
   logger.debug(`Scheduling daily calibration job at ${time} for ${side}`);
@@ -89,7 +89,7 @@ const scheduleRetentionJob = (timeZone: TimeZone, primeTime?: string) => {
   const { hour, minute } = retentionClock(primeTime);
   dailyRule.hour = hour;
   dailyRule.minute = minute;
-  dailyRule.tz = timeZone;
+  dailyRule.tz = scheduleZone(timeZone);
   schedule.scheduleJob('daily-metrics-retention', dailyRule, () => runMetricsRetention());
 };
 
@@ -118,7 +118,7 @@ export const schedulePrimingRebootAndCalibration = (settingsData: Settings) => {
   const [onHour, onMinute] = time.split(':').map(Number);
   dailyRule.hour = onHour;
   dailyRule.minute = onMinute;
-  dailyRule.tz = timeZone;
+  dailyRule.tz = scheduleZone(timeZone);
 
   const restart = rebootClock(time);
   scheduleRebootJob(restart.hour, restart.minute, timeZone);

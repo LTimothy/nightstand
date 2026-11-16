@@ -10,6 +10,7 @@ import logger from '../logger.js';
 import servicesDB from '../db/services.js';
 import memoryDB from '../db/memoryDB.js';
 import settingsDB from '../db/settings.js';
+import { scheduleZone } from '../db/timeZones.js';
 import { isTempScheduleOverridden } from './scheduleOverride.js';
 import { describePause, isSchedulePaused } from './schedulePause.js';
 import { SLEEP_ANALYSIS_HOUR, SLEEP_ANALYSIS_MINUTE } from '../sleepAnalysisSchedule.js';
@@ -90,7 +91,7 @@ export const schedulePowerOn = (settingsData: Settings, side: Side, day: DayOfWe
   const time = power.on;
   onRule.hour = onHour;
   onRule.minute = onMinute;
-  onRule.tz = settingsData.timeZone;
+  onRule.tz = scheduleZone(settingsData.timeZone);
 
   logJob('Scheduling power on job', side, day, dayOfWeekIndex, time);
   schedule.scheduleJob(`${side}-${day}-${time}-power-on`, onRule, weeklyPowerOnJob(side, day, power, timeZone));
@@ -106,7 +107,7 @@ export const scheduleSleepAnalysis = (settingsData: Settings, side: Side, skipAt
   const dailyRule = new schedule.RecurrenceRule();
   dailyRule.hour = SLEEP_ANALYSIS_HOUR;
   dailyRule.minute = SLEEP_ANALYSIS_MINUTE;
-  dailyRule.tz = settingsData.timeZone;
+  dailyRule.tz = scheduleZone(settingsData.timeZone);
   const time = `${String(SLEEP_ANALYSIS_HOUR).padStart(2, '0')}:${String(SLEEP_ANALYSIS_MINUTE).padStart(2, '0')}`;
 
   logger.debug(`Scheduling daily sleep-analyzer job for ${side} at ${time}`);
@@ -152,7 +153,7 @@ export const schedulePowerOff = (settingsData: Settings, side: Side, day: DayOfW
   const [offHour, offMinute] = time.split(':').map(Number);
   offRule.hour = offHour;
   offRule.minute = offMinute;
-  offRule.tz = settingsData.timeZone;
+  offRule.tz = scheduleZone(settingsData.timeZone);
   logJob('Scheduling power off job', side, day, dayOfWeekIndex, time);
 
   schedule.scheduleJob(`${side}-${day}-${time}-power-off`, offRule, async (fireDate: Date) => {
