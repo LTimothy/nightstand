@@ -5,6 +5,7 @@ import logger from '../logger.js';
 import serverStatus from '../serverStatus.js';
 import schedulesDB from '../db/schedules.js';
 import settingsDB, { updateSettings } from '../db/settings.js';
+import { scheduleZone } from '../db/timeZones.js';
 import { dailyAlarmSchedules } from '../db/scheduleAlarms.js';
 import { executeFunction } from '../8sleep/deviceApi.js';
 import { compareTimes, getDayIndexForTime, isValidTime, logJob } from './utils.js';
@@ -314,7 +315,7 @@ export const scheduleAlarm = (settingsData, side, day, dailySchedule) => {
         const [alarmHour, alarmMinute] = time.split(':').map(Number);
         alarmRule.hour = alarmHour;
         alarmRule.minute = alarmMinute;
-        alarmRule.tz = settingsData.timeZone;
+        alarmRule.tz = scheduleZone(settingsData.timeZone);
         logJob('Scheduling alarm job', side, day, dayIndex, time);
         const jobName = `${side}-${day}-${time}-${alarmIndex}-alarm`;
         schedule.scheduleJob(jobName, alarmRule, (fireDate) => trackAlarm(side, jobName, async () => {

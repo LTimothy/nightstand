@@ -39,4 +39,8 @@ export const TIME_ZONES = [
     'Australia/Sydney', // New South Wales
     'Pacific/Auckland', // New Zealand
 ];
+// node-schedule reads Node's built-in zone data, which can predate a zone going
+// to one offset all year; moment-timezone already has these.
+const FIXED_OFFSETS = { 'America/Vancouver': 'UTC-7', 'America/Edmonton': 'UTC-6' };
+export const scheduleZone = (zone) => FIXED_OFFSETS[zone] ?? zone;
 //# sourceMappingURL=timeZones.js.map

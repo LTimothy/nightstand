@@ -1,6 +1,7 @@
 import moment from 'moment-timezone';
 import schedule from 'node-schedule';
 import logger from '../../logger.js';
+import { scheduleZone } from '../../db/timeZones.js';
 import { SCHEDULE_SIDES } from '../../db/scheduleKeys.js';
 import { getDeviceStatusCoalesced, isFrankenConnected } from '../../8sleep/frankenServer.js';
 import { effectiveSides } from '../scheduleQueries.js';
@@ -192,7 +193,7 @@ function scheduleHorizon(timeZone, extend) {
         return;
     const rule = new schedule.RecurrenceRule();
     rule.minute = 0;
-    rule.tz = timeZone;
+    rule.tz = scheduleZone(timeZone);
     schedule.scheduleJob(RHYTHMS_HORIZON_JOB, rule, extend);
 }
 // A side with no sleep ending in the day before noon, such as one with no

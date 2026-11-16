@@ -1,6 +1,7 @@
 import schedule from 'node-schedule';
 import moment from 'moment-timezone';
 import { getDayIndexForTime, logJob } from './utils.js';
+import { scheduleZone } from '../db/timeZones.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import serverStatus from '../serverStatus.js';
 import logger from '../logger.js';
@@ -15,7 +16,7 @@ const scheduleAdjustment = (timeZone, side, day, time, temperature, powerOn) => 
     onRule.dayOfWeek = dayOfWeekIndex;
     onRule.hour = onHour;
     onRule.minute = onMinute;
-    onRule.tz = timeZone;
+    onRule.tz = scheduleZone(timeZone);
     schedule.scheduleJob(`${side}-${day}-${time}-${temperature}-temperature-adjustment`, onRule, async (fireDate) => {
         try {
             await settingsDB.read();

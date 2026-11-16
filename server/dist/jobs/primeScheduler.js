@@ -1,6 +1,7 @@
 import schedule from 'node-schedule';
 import logger from '../logger.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
+import { scheduleZone } from '../db/timeZones.js';
 import { executeCalibrateSensors } from './calibrateSensors.js';
 import moment from 'moment-timezone';
 import settingsDB from '../db/settings.js';
@@ -17,7 +18,7 @@ const scheduleRebootJob = (onHour, onMinute, timeZone) => {
     const dailyRule = new schedule.RecurrenceRule();
     dailyRule.hour = onHour;
     dailyRule.minute = onMinute;
-    dailyRule.tz = timeZone;
+    dailyRule.tz = scheduleZone(timeZone);
     const time = `${String(onHour).padStart(2, '0')}:${String(onMinute).padStart(2, '0')}`;
     logger.debug(`Scheduling daily reboot job at ${time}`);
     schedule.scheduleJob(`daily-reboot-${time}`, dailyRule, async () => {
@@ -51,7 +52,7 @@ const scheduleCalibrationJob = (onHour, onMinute, timeZone, side) => {
     const dailyRule = new schedule.RecurrenceRule();
     dailyRule.hour = onHour;
     dailyRule.minute = onMinute;
-    dailyRule.tz = timeZone;
+    dailyRule.tz = scheduleZone(timeZone);
     const time = `${String(onHour).padStart(2, '0')}:${String(onMinute).padStart(2, '0')}`;
     logger.debug(`Scheduling daily calibration job at ${time} for ${side}`);
     schedule.scheduleJob(`daily-calibration-${time}-${side}`, dailyRule, async () => {
@@ -81,7 +82,7 @@ const scheduleRetentionJob = (timeZone, primeTime) => {
     const { hour, minute } = retentionClock(primeTime);
     dailyRule.hour = hour;
     dailyRule.minute = minute;
-    dailyRule.tz = timeZone;
+    dailyRule.tz = scheduleZone(timeZone);
     schedule.scheduleJob('daily-metrics-retention', dailyRule, () => runMetricsRetention());
 };
 // Calibration runs at a fixed time of day, decoupled from the prime time.
@@ -108,7 +109,7 @@ export const schedulePrimingRebootAndCalibration = (settingsData) => {
     const [onHour, onMinute] = time.split(':').map(Number);
     dailyRule.hour = onHour;
     dailyRule.minute = onMinute;
-    dailyRule.tz = timeZone;
+    dailyRule.tz = scheduleZone(timeZone);
     const restart = rebootClock(time);
     scheduleRebootJob(restart.hour, restart.minute, timeZone);
     logger.debug(`Scheduling daily prime job at ${primePodDaily.time}`);
