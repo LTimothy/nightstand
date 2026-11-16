@@ -32,20 +32,43 @@ export function presenceRun(snapshot, sides, now, staleMs) {
 export function bridgeDropouts(kept, run, now) {
     if (!run.known)
         return { run, kept: null };
-    if (run.presentSince === null)
-        return { run, kept: kept && { ...kept, exitAt: run.absentSince } };
+    if (run.presentSince === null) {
+        if (!kept)
+            return { run, kept: null };
+        // The first exit seen after the run ends it. A later one belongs to a
+        // short entry that fell between two looks, which is not part of the run.
+        const endedAt = kept.exitAt === null ? run.absentSince : kept.endedAt ?? null;
+        return { run, kept: { ...kept, exitAt: run.absentSince, endedAt } };
+    }
     const gap = kept ? run.presentSince - (kept.exitAt ?? kept.lastPresent) : Infinity;
     const since = kept && gap <= DROPOUT_MS ? Math.min(kept.since, run.presentSince) : run.presentSince;
     return { run: { ...run, presentSince: since }, kept: { since, lastPresent: now, exitAt: null } };
 }
 // Confirmation: 20 unbroken minutes of presence inside [bedtime - 60 min,
-// bedtime + 2 h], counted from the window opening at the earliest.
-export function confirmationAt(run, bedtime, now) {
-    if (!run.known || run.presentSince === null)
+// bedtime + 2 h], counted from the window opening at the earliest. Presence
+// is looked at once a minute, so a run that reached 20 minutes and ended
+// before the next look still counts; kept, from bridgeDropouts, holds that
+// run's start and end.
+export function confirmationAt(run, bedtime, now, kept = null) {
+    if (!run.known)
         return null;
+    const endedAt = kept?.endedAt;
+    let since;
+    let until;
+    if (run.presentSince !== null) {
+        since = run.presentSince;
+        until = now;
+    }
+    else if (kept && typeof endedAt === 'number' && Number.isFinite(endedAt)) {
+        since = kept.since;
+        until = Math.min(now, endedAt);
+    }
+    else {
+        return null;
+    }
     const opens = bedtime.getTime() - WINDOW_BEFORE_MS;
-    const confirmedAt = Math.max(opens, run.presentSince) + CONFIRM_MS;
-    if (confirmedAt > now || confirmedAt > bedtime.getTime() + CAP_MS)
+    const confirmedAt = Math.max(opens, since) + CONFIRM_MS;
+    if (confirmedAt > until || confirmedAt > bedtime.getTime() + CAP_MS)
         return null;
     return confirmedAt;
 }
@@ -63,7 +86,7 @@ export function stepStart(state, args) {
         return state;
     if (firstSight && now > bedtime + NOT_OBSERVED_GRACE_MS)
         return decided(bedtime, null, 'not-observed');
-    const confirmedAt = confirmationAt(run, args.bedtime, now);
+    const confirmedAt = confirmationAt(run, args.bedtime, now, args.kept ?? null);
     if (confirmedAt !== null)
         return decided(Math.max(bedtime, confirmedAt), confirmedAt, 'confirmed');
     if (now < bedtime)

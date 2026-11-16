@@ -495,7 +495,9 @@ export class CurveController {
         let moved = false;
         if (state.start.status !== 'decided') {
             const before = coolStartOverride(state.start, state.bedtime) ?? state.bedtime;
-            state.start = stepStart(state.start, { run: bridged.run, bedtime: state.bedtime, now: time, firstSight: state.firstSight });
+            state.start = stepStart(state.start, {
+                run: bridged.run, kept: bridged.kept, bedtime: state.bedtime, now: time, firstSight: state.firstSight,
+            });
             const after = coolStartOverride(state.start, state.bedtime) ?? state.bedtime;
             if (state.start.status === 'decided') {
                 logger.info(`smart schedule ${state.side} ${state.date}: cool-down from ${after.toISOString()} (${state.start.reason})`);

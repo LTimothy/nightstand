@@ -65,8 +65,9 @@ function harness(options = {}) {
         recordHistory: async (summary) => { history.push(summary); },
     });
     // Mirrors POST /api/metrics/presence: stateChangedAt moves only on a change.
-    const report = (side, present) => {
-        const stamp = moment(clock).tz(TZ).format();
+    // at places a report between two ticks; it defaults to the tick itself.
+    const report = (side, present, at = clock) => {
+        const stamp = moment(at).tz(TZ).format();
         const current = presence[side];
         if (!current.stateChangedAt || current.present !== present)
             current.stateChangedAt = stamp;
@@ -92,7 +93,7 @@ function harness(options = {}) {
         return resolved;
     };
     return {
-        controller, applied, reasons, history, runUntil,
+        controller, applied, reasons, history, runUntil, report,
         retimes: () => retimes,
         now: () => clock,
         curve,
@@ -208,6 +209,30 @@ describe('CurveController presence dropouts', () => {
         assert.equal(h.history[0].confirmedAt, local(`${DATE} 22:20`).toISOString());
         assert.equal(h.history[0].coolStart, local(`${DATE} 22:45`).toISOString());
         assert.equal(h.retimes(), 0);
+    });
+    it('confirms a run that reached 20 minutes and ended between two ticks', async () => {
+        // In bed from 22:40:30 to 23:00:45. The ticks at 23:00 and 23:01 see
+        // 19.5 minutes and then an exit, so only the ended run shows the 20.
+        const h = harness();
+        await h.runUntil(`${DATE} 22:40`);
+        h.report('left', true, new Date(local(`${DATE} 22:40`).getTime() + 30_000));
+        await h.runUntil(`${DATE} 23:00`, () => ({ left: true }));
+        h.report('left', false, new Date(local(`${DATE} 23:00`).getTime() + 45_000));
+        await h.runUntil('2026-09-30 07:31', () => ({ left: false }));
+        const at = new Date(local(`${DATE} 23:00`).getTime() + 30_000).toISOString();
+        assert.equal(h.history[0].startReason, 'confirmed');
+        assert.equal(h.history[0].confirmedAt, at);
+        assert.equal(h.history[0].coolStart, at);
+    });
+    it('does not confirm a run that ended short of 20 minutes between two ticks', async () => {
+        const h = harness();
+        await h.runUntil(`${DATE} 22:40`);
+        h.report('left', true, new Date(local(`${DATE} 22:40`).getTime() + 30_000));
+        await h.runUntil(`${DATE} 23:00`, () => ({ left: true }));
+        h.report('left', false, new Date(local(`${DATE} 23:00`).getTime() + 15_000));
+        await h.runUntil('2026-09-30 07:31', () => ({ left: false }));
+        assert.equal(h.history[0].startReason, 'cap');
+        assert.equal(h.history[0].confirmedAt, null);
     });
 });
 describe('CurveController dropping a sleep', () => {

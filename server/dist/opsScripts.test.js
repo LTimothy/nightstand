@@ -29,6 +29,10 @@ describe('this repo\'s own tooling (not part of the agent overlay)', () => {
             assert.ok(mode & 0o111, `${script} must carry the exec bit`);
         });
     }
+    it('rollback.sh waits as long as deploy.sh for the server to answer', () => {
+        const src = readFileSync(path.join(repoRoot, 'ops/rollback.sh'), 'utf8');
+        assert.match(src, /for _ in \$\(seq 1 30\); do\n {2}sleep 3\n/);
+    });
     it('reset_db.sh recreates the database with migrate deploy, not migrate dev', () => {
         const src = readFileSync(path.join(repoRoot, 'scripts/reset_db.sh'), 'utf8');
         assert.doesNotMatch(src, /migrate dev|npm run migrate/);
