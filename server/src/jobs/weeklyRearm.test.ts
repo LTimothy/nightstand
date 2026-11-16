@@ -119,12 +119,13 @@ async function editMonday(change: Partial<typeof POWER>) {
 }
 
 // Plans the re-arm the way a rebuild does and runs it now.
-async function rearm(): Promise<boolean> {
+async function rearm(beforeRun = () => {}): Promise<boolean> {
   const planned = scheduleWeeklyRearm(settingsDB.data, schedulesDB.data, 'left', new Date());
   const job = nodeSchedule.scheduledJobs[REARM] as unknown as { cancel(): void; invoke(): Promise<void> } | undefined;
   assert.equal(Boolean(job), planned);
   if (job) {
     job.cancel();
+    beforeRun();
     await job.invoke();
   }
   return planned;
@@ -204,6 +205,17 @@ describe('re-arming tonight after a weekly schedule edit', () => {
     await editMonday({ off: '09:00' });
     duringStatusRead = () => noteManualPowerChange('left');
     await rearm();
+    assert.deepEqual(sent, []);
+  });
+
+  it('does not turn the side back on after a hand change in the second before it runs', async () => {
+    await powerOnThenWait();
+    await editMonday({ off: '09:00' });
+    await rearm(() => {
+      setNow(Date.now() + 500);
+      noteManualPowerChange('left');
+      setNow(Date.now() + 500);
+    });
     assert.deepEqual(sent, []);
   });
 

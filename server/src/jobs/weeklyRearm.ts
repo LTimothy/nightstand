@@ -56,7 +56,8 @@ export function planWeeklyRearm(settings: Settings, schedules: Schedules, side: 
 const weeklyLost = (rhythmsAtStart: boolean) =>
   isRebuilding() || engineActivation().active || settingsDB.data.features.rhythms !== rhythmsAtStart;
 
-export async function rearmWeeklyNight(side: Side): Promise<void> {
+// plannedAt: when the re-arm was planned, so a hand change in the wait before it ran also counts.
+export async function rearmWeeklyNight(side: Side, plannedAt = Date.now()): Promise<void> {
   const startedAt = Date.now();
   const label = `weekly off time for ${side}`;
   const rhythmsAtStart = settingsDB.data.features.rhythms;
@@ -82,7 +83,7 @@ export async function rearmWeeklyNight(side: Side): Promise<void> {
     logger.info(`Skipping ${label}: the side is off`);
     return;
   }
-  if ((lastManualPowerChange(side) ?? -Infinity) >= startedAt) {
+  if ((lastManualPowerChange(side) ?? -Infinity) >= plannedAt) {
     logger.info(`Skipping ${label}: changed by hand while it waited`);
     return;
   }
@@ -109,6 +110,6 @@ const REARM_DELAY_MS = 1000;
 // edited schedule now gives it. Runs as a job so the next rebuild cancels it.
 export function scheduleWeeklyRearm(settings: Settings, schedules: Schedules, side: Side, now = new Date()): boolean {
   if (!planWeeklyRearm(settings, schedules, side, now)) return false;
-  schedule.scheduleJob(`${side}-weekly-rearm`, new Date(now.getTime() + REARM_DELAY_MS), () => rearmWeeklyNight(side));
+  schedule.scheduleJob(`${side}-weekly-rearm`, new Date(now.getTime() + REARM_DELAY_MS), () => rearmWeeklyNight(side, now.getTime()));
   return true;
 }
