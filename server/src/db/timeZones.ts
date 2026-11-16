@@ -1,47 +1,89 @@
 // UTC first, then west to east by standard offset.
 export const TIME_ZONES = [
-  'UTC', // Coordinated Universal Time
-  'Pacific/Honolulu', // Hawaii
-  'America/Anchorage', // Alaska
-  'America/Los_Angeles', // Pacific Time (US & Canada)
-  'America/Vancouver', // British Columbia
-  'America/Phoenix', // Arizona
-  'America/Denver', // Mountain Time (US & Canada)
-  'America/Edmonton', // Alberta and Saskatchewan
-  'America/Mexico_City', // Mexico
-  'America/Chicago', // Central Time (US & Canada)
-  'America/Bogota', // Colombia
-  'America/New_York', // Eastern Time (US & Canada)
-  'America/Puerto_Rico', // Puerto Rico
-  'America/Halifax', // Atlantic Time (Canada)
-  'America/Santiago', // Chile
-  'America/St_Johns', // Newfoundland
-  'America/Sao_Paulo', // Brazil
-  'Atlantic/Reykjavik', // Iceland
-  'Europe/London', // UK
-  'Europe/Berlin', // Central European Time
-  'Africa/Lagos', // West Africa Time
-  'Europe/Helsinki', // Eastern European Time
-  'Africa/Cairo', // Egypt
-  'Africa/Johannesburg', // South Africa Time
-  'Asia/Jerusalem', // Israel
-  'Europe/Moscow', // Moscow Time
-  'Asia/Dubai', // Gulf Standard Time
-  'Asia/Karachi', // Pakistan
-  'Asia/Kolkata', // India Standard Time
-  'Asia/Bangkok', // Indochina Time
-  'Asia/Shanghai', // China Standard Time
-  'Australia/Perth', // Western Australia
-  'Asia/Tokyo', // Japan Standard Time
-  'Australia/Darwin', // Northern Territory
-  'Australia/Adelaide', // South Australia
-  'Australia/Brisbane', // Queensland
-  'Australia/Sydney', // New South Wales
-  'Pacific/Auckland', // New Zealand
+  'UTC',
+  'Pacific/Honolulu',
+  'America/Anchorage',
+  'America/Los_Angeles',
+  'America/Vancouver',
+  'America/Phoenix',
+  'America/Denver',
+  'America/Edmonton',
+  'America/Mexico_City',
+  'America/Chicago',
+  'America/Bogota',
+  'America/New_York',
+  'America/Puerto_Rico',
+  'America/Halifax',
+  'America/Santiago',
+  'America/St_Johns',
+  'America/Sao_Paulo',
+  'Atlantic/Reykjavik',
+  'Europe/London',
+  'Europe/Berlin',
+  'Africa/Lagos',
+  'Europe/Helsinki',
+  'Africa/Cairo',
+  'Africa/Johannesburg',
+  'Asia/Jerusalem',
+  'Europe/Moscow',
+  'Asia/Dubai',
+  'Asia/Karachi',
+  'Asia/Kolkata',
+  'Asia/Bangkok',
+  'Asia/Shanghai',
+  'Australia/Perth',
+  'Asia/Tokyo',
+  'Australia/Darwin',
+  'Australia/Adelaide',
+  'Australia/Brisbane',
+  'Australia/Sydney',
+  'Pacific/Auckland',
 ] as const;
 
 // eslint-disable-next-line @typescript-eslint/no-type-alias
 export type TimeZone = typeof TIME_ZONES[number];
+
+// The app shows these rather than browser zone names, which vary by browser and lag zone changes.
+export const TIME_ZONE_LABELS: Record<TimeZone, string> = {
+  'UTC': 'UTC',
+  'Pacific/Honolulu': 'Hawaii (Honolulu)',
+  'America/Anchorage': 'Alaska (Anchorage)',
+  'America/Los_Angeles': 'Pacific Time (Los Angeles)',
+  'America/Vancouver': 'British Columbia (Vancouver)',
+  'America/Phoenix': 'Arizona (Phoenix)',
+  'America/Denver': 'Mountain Time (Denver)',
+  'America/Edmonton': 'Alberta and Saskatchewan (Edmonton)',
+  'America/Mexico_City': 'Central Mexico (Mexico City)',
+  'America/Chicago': 'Central Time (Chicago)',
+  'America/Bogota': 'Colombia (Bogotá)',
+  'America/New_York': 'Eastern Time (New York)',
+  'America/Puerto_Rico': 'Puerto Rico (San Juan)',
+  'America/Halifax': 'Atlantic Time (Halifax)',
+  'America/Santiago': 'Chile (Santiago)',
+  'America/St_Johns': "Newfoundland (St. John's)",
+  'America/Sao_Paulo': 'Brasília Time (São Paulo)',
+  'Atlantic/Reykjavik': 'Iceland (Reykjavík)',
+  'Europe/London': 'United Kingdom (London)',
+  'Europe/Berlin': 'Central European Time (Berlin)',
+  'Africa/Lagos': 'West Africa Time (Lagos)',
+  'Europe/Helsinki': 'Eastern European Time (Helsinki)',
+  'Africa/Cairo': 'Egypt (Cairo)',
+  'Africa/Johannesburg': 'South Africa (Johannesburg)',
+  'Asia/Jerusalem': 'Israel (Jerusalem)',
+  'Europe/Moscow': 'Western Russia (Moscow)',
+  'Asia/Dubai': 'Gulf Time (Dubai)',
+  'Asia/Karachi': 'Pakistan (Karachi)',
+  'Asia/Kolkata': 'India (Kolkata)',
+  'Asia/Bangkok': 'Indochina Time (Bangkok)',
+  'Asia/Shanghai': 'China (Shanghai)',
+  'Australia/Perth': 'Western Australia (Perth)',
+  'Asia/Tokyo': 'Japan (Tokyo)',
+  'Australia/Darwin': 'Northern Territory (Darwin)',
+  'Australia/Adelaide': 'South Australia (Adelaide)',
+  'Australia/Brisbane': 'Queensland (Brisbane)',
+  'Australia/Sydney': 'New South Wales and Victoria (Sydney)',
+  'Pacific/Auckland': 'New Zealand (Auckland)',
+};
 
 // node-schedule reads Node's built-in zone data, which can predate a zone going
 // to one offset all year; moment-timezone already has these.

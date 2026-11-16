@@ -6,6 +6,13 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [Unreleased]
+
+### Fixes
+
+- Time zones show the same name on every device. British Columbia and Alberta
+  no longer show as Pacific and Mountain Time, which they left this month.
+
 ## [3.8.0] - 2026-11-16
 
 Adds "When I get up" for rhythms set by hand, frees disk space from older
