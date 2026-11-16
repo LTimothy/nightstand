@@ -14,7 +14,11 @@ if ! has_switch_journal "$TRANSACTIONS"; then
   exit 0
 fi
 HELPER="$RECOVERY_DIR/recover_switch.py"
-OPERATION_LOCK=$(operation_lock_path)
+# Inline, not the helper: a half-copied recovery folder may still hold an older restore_helpers.sh.
+OPERATION_LOCK="${NIGHTSTAND_OPERATION_LOCK:-/run/lock/free-sleep-operation.lock}"
+if [ -z "${NIGHTSTAND_OPERATION_LOCK:-}" ] && [ ! -d /run/lock ]; then
+  OPERATION_LOCK=/tmp/free-sleep-operation.lock
+fi
 case "${1:-}" in
   --startup-check) exec python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" startup-check --unit "${2:-}" --operation-lock "$OPERATION_LOCK" ;;
   --check) exec python3 -E -s -B "$HELPER" --root "$TRANSACTIONS" check ;;
