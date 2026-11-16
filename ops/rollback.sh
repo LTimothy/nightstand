@@ -106,8 +106,13 @@ else
   "
 fi
 
-sleep 8
-if curl -sf --max-time 5 "http://$POD_IP:3000/api/deviceStatus" >/dev/null; then
+# Up to 90s like deploy.sh: the server answers 503 until the hardware connects, about 20s.
+HEALTHY=no
+for _ in $(seq 1 30); do
+  sleep 3
+  curl -sf --max-time 5 "http://$POD_IP:3000/api/deviceStatus" >/dev/null && { HEALTHY=yes; break; }
+done
+if [ "$HEALTHY" = yes ]; then
   echo "==> Rollback complete and server is healthy"
 else
   echo "==> Rollback applied but server not answering yet - check: $POD_SSH_HINT journalctl -u free-sleep -n 100" >&2

@@ -230,7 +230,7 @@ it('a restore service start failure is reported as failure', () => {
 
 for (const mode of ['previous', 'backup']) {
   it(`ops rollback ${mode} restores the biometrics service with code`, () => {
-    const script = section('ops/rollback.sh', 'if [ "${1:-}" = "--from" ]; then', '\nsleep 8');
+    const script = section('ops/rollback.sh', 'if [ "${1:-}" = "--from" ]; then', '\n# Up to 90s like deploy.sh');
     const result = run(script, `
 BACKUPS="$FIXTURE/backups"; MOVE_TREE=
 SSH() { echo "$*" > "$FIXTURE/ssh"; }
@@ -1147,7 +1147,7 @@ for (const mode of ['previous', 'backup']) {
   it(`ops rollback ${mode} moves no tree into a symlink planted where the live tree goes`, () => {
     const target = mode === 'backup' ? '$PREV' : '$LIVE-failed';
     const result = run(section('ops/rollback.sh', "MOVE_TREE='", '\nif ssh ') +
-      section('ops/rollback.sh', 'if [ "${1:-}" = "--from" ]; then', '\nsleep 8'), `
+      section('ops/rollback.sh', 'if [ "${1:-}" = "--from" ]; then', '\n# Up to 90s like deploy.sh'), `
 BACKUPS="$FIXTURE/backups"; mkdir -p "$BACKUPS/fixture"
 tar czf "$BACKUPS/fixture/code.tar.gz" -C "$FIXTURE" prev
 ${plantAfterRm(target)}
