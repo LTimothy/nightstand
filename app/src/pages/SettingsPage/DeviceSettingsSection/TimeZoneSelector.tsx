@@ -2,6 +2,7 @@ import { friendlyTimeZone } from '../../../lib/timeZone';
 import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
+import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import { DeepPartial } from 'ts-essentials';
@@ -35,12 +36,19 @@ export default function TimeZoneSelector({ settings, updateSettings }: TimeZoneS
           disabled={ isUpdating || !settings }
           value={ settings?.timeZone || '' }
           label="Time zone"
+          renderValue={ friendlyTimeZone }
           onChange={ handleChange }
         >
           {
             // A stored zone outside the list still needs an option, or the select shows blank.
             [...(settings?.timeZone && !TIME_ZONES.includes(settings.timeZone) ? [settings.timeZone] : []), ...TIME_ZONES].map(zone => (
-              <MenuItem value={ zone } key={ zone } sx={ { whiteSpace: 'normal' } }>{ friendlyTimeZone(zone) }</MenuItem>
+              <MenuItem value={ zone } key={ zone } sx={ { whiteSpace: 'normal' } }>
+                <ListItemText
+                  primary={ friendlyTimeZone(zone) }
+                  secondary={ friendlyTimeZone(zone) === zone ? undefined : zone }
+                  slotProps={ { secondary: { sx: { fontFamily: 'monospace', fontSize: 12 } } } }
+                />
+              </MenuItem>
             ))
           }
         </Select>
