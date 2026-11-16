@@ -159,6 +159,8 @@ function changeLine(settings: Settings, side: Side, change: HandChange, now: Dat
   if (!driver || isSchedulePaused(settings, driver, now) || !engineActivation().active) return null;
   const sleep = currentSleep(driver, now);
   if (!sleep?.rhythmId || change.on === false) return null;
+  // Kept on past its set off for someone still in bed: no plan to measure against.
+  if (sleep.setOff && now.getTime() >= sleep.setOff.getTime()) return null;
   const targetF = Math.round(Math.min(MAX_TEMPERATURE_F, Math.max(MIN_TEMPERATURE_F, change.targetF)));
   const baseLevel = sleep.smart?.baseLevel ?? 0;
   const curve = sleep.mode === 'smart' && sleep.smartCurve ? sleep.smartCurve.points : null;
