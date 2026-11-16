@@ -110,6 +110,32 @@ describe('confirmationAt', () => {
   it('never confirms after the cap', () => {
     assert.equal(confirmationAt(presentSince(t('00:30', '2026-09-30')), BEDTIME, t('01:00', '2026-09-30')), null);
   });
+
+  describe('a run that ended since the last look', () => {
+    const SECOND = 1000;
+    const ended = (since: number, exitAt: number): KeptRun => ({ since, lastPresent: exitAt - 30 * SECOND, exitAt, endedAt: exitAt });
+    it('confirms once it reached 20 minutes before the exit', () => {
+      const kept = ended(t('22:40') + 30 * SECOND, t('23:00') + 45 * SECOND);
+      assert.equal(confirmationAt(absentSince(t('23:00') + 45 * SECOND), BEDTIME, t('23:01'), kept), t('23:00') + 30 * SECOND);
+    });
+    it('does not confirm a run that ended short of 20 minutes', () => {
+      const kept = ended(t('22:40') + 30 * SECOND, t('23:00') + 15 * SECOND);
+      assert.equal(confirmationAt(absentSince(t('23:00') + 15 * SECOND), BEDTIME, t('23:01'), kept), null);
+    });
+    it('counts it only from the window opening and never past the cap', () => {
+      const early = ended(t('21:00'), t('22:10'));
+      assert.equal(confirmationAt(absentSince(t('22:10')), BEDTIME, t('22:30'), early), t('22:05'));
+      const tooEarly = ended(t('21:00'), t('21:50'));
+      assert.equal(confirmationAt(absentSince(t('21:50')), BEDTIME, t('22:30'), tooEarly), null);
+      const late = ended(t('00:30', '2026-09-30'), t('00:55', '2026-09-30'));
+      assert.equal(confirmationAt(absentSince(t('00:55', '2026-09-30')), BEDTIME, t('01:00', '2026-09-30'), late), null);
+    });
+    it('ignores a kept run that has not ended, and unknown presence', () => {
+      const running: KeptRun = { since: t('22:00'), lastPresent: t('22:30'), exitAt: null };
+      assert.equal(confirmationAt(absentSince(t('22:31')), BEDTIME, t('22:32'), running), null);
+      assert.equal(confirmationAt(UNKNOWN, BEDTIME, t('23:30'), ended(t('22:00'), t('22:30'))), null);
+    });
+  });
 });
 
 describe('stepStart', () => {
@@ -175,6 +201,44 @@ describe('stepStart', () => {
   it('uses the clock when first seen after bedtime', () => {
     const state = replay(() => presentSince(t('23:00')), t('23:30'), t('23:40'));
     assert.deepEqual(state, { status: 'decided', coolStart: BEDTIME, confirmedAt: null, reason: 'not-observed' });
+  });
+
+  it('does not join a short entry between two ticks to a run that ended earlier', () => {
+    // In bed 22:30:20 to 22:46:49, out, back 22:51:09 to 22:51:57 (between two looks), out again.
+    // Seen on a real night: the run lasted 16.5 minutes and must not read as 21.6.
+    const SECOND = 1000;
+    const runAt = (now: number) => {
+      if (now < t('22:30') + 20 * SECOND) return absentSince(t('19:00'));
+      if (now < t('22:46') + 49 * SECOND) return presentSince(t('22:30') + 20 * SECOND);
+      if (now < t('22:51') + 9 * SECOND) return absentSince(t('22:46') + 49 * SECOND);
+      if (now < t('22:51') + 57 * SECOND) return presentSince(t('22:51') + 9 * SECOND);
+      return absentSince(t('22:51') + 57 * SECOND);
+    };
+    let state: StartState = { status: 'watching' };
+    let kept: KeptRun | null = null;
+    for (let now = t('21:45'); now <= t('23:00'); now += MINUTE) {
+      const bridged = bridgeDropouts(kept, runAt(now), now);
+      kept = bridged.kept;
+      state = stepStart(state, { run: bridged.run, kept, bedtime: BEDTIME, now, firstSight: now === t('21:45') });
+    }
+    assert.deepEqual(state, { status: 'waiting' });
+  });
+
+  it('confirms a run that reached 20 minutes and ended between two ticks', () => {
+    // Present 22:40:30 to 23:00:45, looked at on the minute through bridgeDropouts as the controller does.
+    const entry = t('22:40') + 30_000;
+    const exit = t('23:00') + 45_000;
+    const runAt = (now: number) => (now < entry ? absentSince(t('19:00')) : now < exit ? presentSince(entry) : absentSince(exit));
+    let state: StartState = { status: 'watching' };
+    let kept: KeptRun | null = null;
+    for (let now = t('21:45'); now <= t('23:05'); now += MINUTE) {
+      const bridged = bridgeDropouts(kept, runAt(now), now);
+      kept = bridged.kept;
+      state = stepStart(state, { run: bridged.run, kept, bedtime: BEDTIME, now, firstSight: now === t('21:45') });
+    }
+    assert.deepEqual(state, {
+      status: 'decided', coolStart: new Date(t('23:00') + 30_000), confirmedAt: new Date(t('23:00') + 30_000), reason: 'confirmed',
+    });
   });
 
   it('does nothing before the window opens', () => {
