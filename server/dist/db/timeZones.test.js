@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import moment from 'moment-timezone';
 import schedule from 'node-schedule';
-import { scheduleZone, TIME_ZONES } from './timeZones.js';
+import { scheduleZone, TIME_ZONE_LABELS, TIME_ZONES } from './timeZones.js';
 it('every listed time zone is known to moment-timezone', () => {
     for (const zone of TIME_ZONES)
         assert.ok(moment.tz.zone(zone), zone);
@@ -25,5 +25,11 @@ it('schedules jobs on the offset moment-timezone uses, summer and winter', () =>
             assert.equal(moment(fired).tz(zone).format('HH:mm'), '22:00', `${zone} ${from}`);
         }
     }
+});
+it('lists zones west to east by standard offset, each with its own label', () => {
+    const standard = (zone) => Math.min(...['2027-01-15', '2027-07-15'].map(day => moment.tz(day, zone).utcOffset()));
+    const offsets = TIME_ZONES.slice(1).map(standard);
+    assert.deepEqual(offsets, [...offsets].sort((a, b) => a - b));
+    assert.equal(new Set(Object.values(TIME_ZONE_LABELS)).size, TIME_ZONES.length);
 });
 //# sourceMappingURL=timeZones.test.js.map

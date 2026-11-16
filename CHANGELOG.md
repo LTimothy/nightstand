@@ -6,12 +6,17 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
-## [Unreleased]
+## [3.8.1] - 2026-11-16
+
+Shows the same time zone names on every device.
 
 ### Fixes
 
-- Time zones show the same name on every device. British Columbia and Alberta
-  no longer show as Pacific and Mountain Time, which they left this month.
+- Time zones show the same name on every device, with the zone ID under each
+  name in the menu. British Columbia and Alberta no longer show as Pacific and
+  Mountain Time, which no longer match them.
+
+Checked on: Pod 5, the time zone menu opened against the live Pod and the zone switched and restored; no nights on this code yet.
 
 ## [3.8.0] - 2026-11-16
 
