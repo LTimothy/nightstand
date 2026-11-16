@@ -6,7 +6,11 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
-## [Unreleased]
+## [3.8.0] - 2026-11-16
+
+Adds "When I get up" for rhythms set by hand, frees disk space from older
+nights' movement when space runs low, and makes the update and recovery
+scripts safer.
 
 ### Changes
 
@@ -15,6 +19,10 @@ is a hard fork; for the history of the projects it descends from, see
 - Low-disk protection also deletes movement for nights that already have a
   saved summary with sleep stages, once no detailed vitals are left to delete.
   The two latest nights and their stages are kept.
+- Settings offers 17 more time zones, including British Columbia, Arizona,
+  Alberta, Atlantic Canada, Newfoundland, Mexico, Eastern Europe and South,
+  West and Northern Australia, now listed west to east. Updated time zone
+  data keeps British Columbia on UTC-7 all year from 2026-11-01.
 
 ### Fixes
 
@@ -60,12 +68,13 @@ is a hard fork; for the history of the projects it descends from, see
 - The firewall script now also blocks Eight Sleep's update hosts in
   `/etc/hosts` and masks the USB update unit. It is applied at step 19 and
   again with every update, rollback, restore and fork switch, so an existing
-  install gets it with its next update. The hosts block also applies while
-  Tailscale is on.
+  install gets it with its next update.
 - The firewall no longer accepts inbound UDP from source port 123.
 - System status has a Boot rescue row. It shows whether startup still pauses
   for serial access and warns when the boot settings list a different slot
   for the next restart. See [installation](INSTALLATION.md#keeping-eight-sleep-updates-out).
+
+Checked on: Pod 5, 3.8.0 code deployed over SSH, rolled back and deployed again, serving with both sides on, schedules rebuilt after switching the time zone to British Columbia and back; no nights on this code yet.
 
 ## [3.7.3] - 2026-11-14
 
