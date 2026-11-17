@@ -12,7 +12,7 @@ const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance senso
 const CAP_PRESENCE = 'Capacitance presence on other Pods (beta)';
 const UNCHECKED_CAP_PRESENCE = 'On a Pod other than a Pod 5, the capacitance sensors only time the heart rate '
   + 'and breathing estimates. On, schedules, presence auto-off and the in-bed indicator follow them too, once both '
-  + 'sides are learned. Tested on one Pod 3 so far. A Pod 5 always works this way.';
+  + 'sides are learned. Checked against recorded nights from one Pod 3. A Pod 5 always works this way.';
 const biometricsOff = () => {
   const services = getServices();
   server.use(http.get('*/api/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));

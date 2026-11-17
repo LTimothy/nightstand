@@ -555,6 +555,11 @@ class HeardUncheckedLiveTest(unittest.TestCase):
         entry = next(second for second, present in left if present and second >= 3000)
         self.assertLess(entry, 3100)
         self.assertTrue(present_at(left, 5000))
+        # The side piezo had in bed is posted out at the switch and back in by capacitance.
+        right = changes_by_side(transitions(run.posts))['right']
+        self.assertTrue(present_at(right, 2999))
+        self.assertIn((3000, False), right)
+        self.assertTrue(present_at(right, 3100))
 
     def test_turning_the_switch_off_mid_night_returns_the_server_to_piezo(self):
         records = legacy_records(LIGHT_BESIDE_HEAVY)

@@ -622,8 +622,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       + 'tracking uses capacitance only to decide when vitals are taken, and the server keeps hearing the vibration '
       + 'sensor. An owner who has checked it against their own nights can turn this on. It waits for the learned '
       + 'levels of both sides and once-a-second piezo, as before, and the guard that hands back to the vibration sensor '
-      + 'when capacitance places nobody in a bed in use for 10 of 15 minutes keeps running, so presence auto-off '
-      + 'is never left without someone it can see. Off leaves everything as before.',
+      + 'when capacitance places nobody in a bed in use for 10 of 15 minutes keeps running. It does not catch one '
+      + 'sleeper missed beside a detected partner. Off leaves everything as before.',
   },
   {
     id: 'daily-reboot',
