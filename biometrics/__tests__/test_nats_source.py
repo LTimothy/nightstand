@@ -33,6 +33,10 @@ START = datetime.fromtimestamp(scenarios.T0, timezone.utc)
 END = START + timedelta(seconds=599)
 
 
+class NotFound(Exception):
+    pass
+
+
 EXPIRED = SimpleNamespace(headers={'Status': '408', 'Description': 'Request Timeout'}, data=b'')
 
 
@@ -40,7 +44,8 @@ class FakeJetStream:
     """A connection and JetStream context serving payloads to pull requests on one consumer."""
 
     def __init__(self, payloads, timestamps=None, empty_responses=0, silent_requests=0, stalled=False,
-                 retention='limits', server_name=None):
+                 retention='limits', server_name=None, stream='raw'):
+        self.stream = stream
         self.payloads = payloads
         self.server_name = server_name
         self.timestamps = timestamps or [START + timedelta(seconds=i // 3) for i in range(len(payloads))]
@@ -54,14 +59,20 @@ class FakeJetStream:
         self.offset = 0
         self.closed = False
 
+    async def find_stream_name_by_subject(self, subject):
+        assert subject == 'rawmem.>'
+        if self.stream == 'raw':
+            raise NotFound()
+        return self.stream
+
     async def stream_info(self, stream):
-        assert stream == 'raw'
+        assert stream == self.stream
         return SimpleNamespace(config=SimpleNamespace(retention=self.retention,
                                subjects=['raw.log', 'raw.sens.piezo', 'raw.sens.capsense']),
                                state=SimpleNamespace(messages=len(self.payloads), last_seq=len(self.payloads)))
 
     async def add_consumer(self, stream, config):
-        assert stream == 'raw'
+        assert stream == self.stream
         assert config.ack_policy == 'none'
         assert config.deliver_policy == 'by_start_time'
         assert config.opt_start_time == START - timedelta(minutes=2)
@@ -82,7 +93,7 @@ class FakeJetStream:
         return SimpleNamespace(subject=subject)
 
     async def publish(self, subject, payload, reply=''):
-        assert subject == f'$JS.API.CONSUMER.MSG.NEXT.raw.{self.consumer}' and reply == '_INBOX.test'
+        assert subject == f'$JS.API.CONSUMER.MSG.NEXT.{self.stream}.{self.consumer}' and reply == '_INBOX.test'
         asyncio.get_running_loop().create_task(self.deliver(json.loads(payload)['batch']))
 
     async def deliver(self, batch):
@@ -105,11 +116,11 @@ class FakeJetStream:
             await self.callback(EXPIRED)
 
     async def consumer_info(self, stream, consumer):
-        assert stream == 'raw' and consumer == self.consumer
+        assert stream == self.stream and consumer == self.consumer
         return SimpleNamespace(num_pending=len(self.payloads) - self.offset)
 
     async def delete_consumer(self, stream, consumer):
-        assert stream == 'raw' and consumer == self.consumer
+        assert stream == self.stream and consumer == self.consumer
         self.deleted.append(consumer)
 
     def jetstream(self, **kwargs):
@@ -136,7 +147,10 @@ def install_nats(monkeypatch, client, connect_stalled=False):
     api.AckPolicy = SimpleNamespace(NONE='none')
     api.DeliverPolicy = SimpleNamespace(BY_START_TIME='by_start_time')
     api.RetentionPolicy = SimpleNamespace(LIMITS='limits')
-    for name, value in [('nats', module), ('nats.js', ModuleType('nats.js')), ('nats.js.api', api)]:
+    errors = ModuleType('nats.js.errors')
+    errors.NotFoundError = NotFound
+    for name, value in [('nats', module), ('nats.js', ModuleType('nats.js')), ('nats.js.api', api),
+                        ('nats.js.errors', errors)]:
         monkeypatch.setitem(sys.modules, name, value)
 
 
@@ -357,6 +371,20 @@ def test_malformed_records_and_placeholders_do_not_hide_valid_records(monkeypatc
                 cbor2.dumps({'ts': 'later'}), cbor2.dumps(record)]
     source, client = source_records(monkeypatch, payloads)
     assert list(source.iter_window_records(START, END)) == [record]
+    assert client.closed and client.deleted
+
+
+def test_newer_firmware_stream_is_read(monkeypatch):
+    record = {'type': 'log', 'ts': scenarios.T0}
+    source, client = source_records(monkeypatch, [cbor2.dumps(record)], stream='rawmem')
+    assert list(source.iter_window_records(START, END)) == [record]
+    assert client.closed and client.deleted
+
+
+def test_messages_that_never_decode_are_not_an_empty_night(monkeypatch):
+    source, client = source_records(monkeypatch, [b'\xff', b'\x9f', cbor2.dumps({'seq': 0, 'data': b''})])
+    with pytest.raises(RuntimeError, match='none of 3 messages held a record'):
+        list(source.iter_window_records(START, END))
     assert client.closed and client.deleted
 
 

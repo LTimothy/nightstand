@@ -19,7 +19,7 @@ class NotFound(Exception):
     pass
 
 
-def fake_client(retention='limits', fetches=None, messages=None):
+def fake_client(retention='limits', fetches=None, messages=None, rawmem_stream=None):
     class Config:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
@@ -30,6 +30,8 @@ def fake_client(retention='limits', fetches=None, messages=None):
         fetches = [messages or [message], asyncio.CancelledError()]
     subscription = Mock(fetch=AsyncMock(side_effect=fetches))
     jetstream = Mock()
+    jetstream.find_stream_name_by_subject = AsyncMock(
+        return_value=rawmem_stream, side_effect=None if rawmem_stream else NotFound())
     jetstream.stream_info = AsyncMock(return_value=types.SimpleNamespace(
         config=types.SimpleNamespace(subjects=['raw.log', 'raw.sens.piezo'], retention=retention),
         state=types.SimpleNamespace(first_seq=1, last_seq=100)))
@@ -105,6 +107,23 @@ class TestSession(LiveReaderTestCase):
         message.ack.assert_not_called()
         jetstream.delete_consumer.assert_awaited_once_with('raw', 'owned')
         connection.close.assert_awaited_once()
+
+    def test_newer_firmware_stream_is_preferred(self):
+        modules, _, _, jetstream, _, _ = fake_client(rawmem_stream='rawmem')
+        with patch.object(stream, 'update_health'):
+            self.run_session(modules)
+        jetstream.find_stream_name_by_subject.assert_awaited_once_with('rawmem.>')
+        jetstream.stream_info.assert_awaited_once_with('rawmem')
+        self.assertEqual(jetstream.add_consumer.call_args.args[0], 'rawmem')
+        self.assertEqual(jetstream.pull_subscribe_bind.call_args.kwargs['stream'], 'rawmem')
+        jetstream.delete_consumer.assert_any_await('rawmem', 'owned')
+
+    def test_undecodable_messages_warn_once(self):
+        modules, _, _, _, subscription, _ = fake_client()
+        subscription.fetch.side_effect = [[Mock(data=b'\x9f')] * 3, asyncio.CancelledError()]
+        with patch.object(stream, 'update_health'), patch.object(stream.logger, 'warning') as warning:
+            self.run_session(modules)
+        self.assertEqual(sum('decoding NATS' in call.args[0] for call in warning.call_args_list), 1)
 
     def test_rejects_retention_that_could_remove_firmware_records(self):
         for retention in ('interest', 'workqueue'):

@@ -60,6 +60,7 @@ from service_health import update_health, update_sensor_temps, update_pump_healt
 from pump_speed import PumpSpeed
 from raw_decoder import decode_row
 from firmware_telemetry import firmware_delivery
+from nats_source import stream_name
 
 # Bound pending work when processing falls behind.
 piezo_record_queue = queue.Queue(maxsize=120)
@@ -90,6 +91,7 @@ _experimental_logged = set()
 STREAM_HEALTH_INTERVAL_SECONDS = 60
 RECENT_RECORD_WINDOW = timedelta(minutes=2)
 NATS_URL = 'nats://127.0.0.1:4222'
+# The stream an earlier version's consumer was left on.
 NATS_STREAM = 'raw'
 SOURCE_IDLE_SECONDS = 30 * 60
 NATS_REQUEST_SECONDS = 5
@@ -590,7 +592,7 @@ async def _nats_session(processing_thread, raw_files=None):
     from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy, RetentionPolicy
     from nats.js.errors import NotFoundError
 
-    connection = jetstream = consumer_name = None
+    connection = jetstream = consumer_name = stream = None
 
     async def note_error(error):
         logger.debug(f'NATS client: {error}')
@@ -601,7 +603,8 @@ async def _nats_session(processing_thread, raw_files=None):
                                         max_reconnect_attempts=1, reconnect_time_wait=0,
                                         error_cb=note_error)
         jetstream = connection.jetstream(timeout=NATS_REQUEST_SECONDS)
-        info = await jetstream.stream_info(NATS_STREAM)
+        stream = await stream_name(jetstream, NotFoundError)
+        info = await jetstream.stream_info(stream)
         if info.config.retention != RetentionPolicy.LIMITS:
             raise RuntimeError('NATS raw stream retention must be limits for a read-only consumer')
         await _remove_legacy_consumer(jetstream, NotFoundError)
@@ -612,7 +615,7 @@ async def _nats_session(processing_thread, raw_files=None):
         else:
             start = {'deliver_policy': DeliverPolicy.BY_START_SEQUENCE, 'opt_start_seq': resume}
         consumer_name = 'nightstand_live_' + uuid4().hex
-        created = await jetstream.add_consumer(NATS_STREAM, config=ConsumerConfig(
+        created = await jetstream.add_consumer(stream, config=ConsumerConfig(
             name=consumer_name,
             ack_policy=AckPolicy.NONE,
             inactive_threshold=60.0,
@@ -621,9 +624,10 @@ async def _nats_session(processing_thread, raw_files=None):
         ))
         consumer_name = created.name
         subscription = await jetstream.pull_subscribe_bind(
-            stream=NATS_STREAM, consumer=consumer_name,
+            stream=stream, consumer=consumer_name,
             pending_msgs_limit=50, pending_bytes_limit=4 * 1024 * 1024)
-        logger.info(f'Consuming NATS JetStream stream={NATS_STREAM}')
+        logger.info(f'Consuming NATS JetStream stream={stream} subjects={getattr(info.config, "subjects", None)}')
+        decode_warned = False
         last_health_update = time.monotonic()
         last_nats_record = time.monotonic()
         reading_raw = False
@@ -643,7 +647,7 @@ async def _nats_session(processing_thread, raw_files=None):
                 messages = await subscription.fetch(25, timeout=RAW_POLL_SECONDS if silent else NATS_REQUEST_SECONDS)
             except asyncio.TimeoutError:
                 # An inactive consumer may have expired while no sensors were publishing.
-                await jetstream.consumer_info(NATS_STREAM, consumer_name)
+                await jetstream.consumer_info(stream, consumer_name)
                 continue
             for message in messages:
                 sequence = _stream_sequence(message)
@@ -658,11 +662,14 @@ async def _nats_session(processing_thread, raw_files=None):
                         if _ingest_or_skip(record, 'NATS'):
                             last_nats_record = time.monotonic()
                 except Exception as error:
-                    logger.warning(f'Error decoding NATS raw message, skipping: {error}')
+                    # An unknown payload format would otherwise warn for every message.
+                    if not decode_warned:
+                        decode_warned = True
+                        logger.warning(f'Error decoding NATS raw message, skipping this and later ones: {error}')
     finally:
         try:
             if jetstream is not None and consumer_name is not None:
-                await asyncio.wait_for(jetstream.delete_consumer(NATS_STREAM, consumer_name), NATS_REQUEST_SECONDS)
+                await asyncio.wait_for(jetstream.delete_consumer(stream, consumer_name), NATS_REQUEST_SECONDS)
         except Exception as error:
             logger.warning(f'Could not remove live NATS consumer: {error}')
         finally:

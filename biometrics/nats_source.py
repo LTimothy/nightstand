@@ -15,6 +15,8 @@ logger = get_logger()
 
 NATS_URL = 'nats://127.0.0.1:4222'
 STREAM = 'raw'
+# Firmware build 4b7552d5 publishes rawmem.* subjects, and its raw stream can keep old messages, so this wins.
+NEW_SUBJECTS = 'rawmem.>'
 START_MARGIN = timedelta(minutes=2)
 # Records can be published later than their own time; one RAW file spans 15 minutes.
 END_MARGIN = timedelta(minutes=15)
@@ -64,26 +66,35 @@ def _payload_records(payload):
     return plain_records(row['data'] if isinstance(row, dict) and 'data' in row else payload)
 
 
-async def _connect(nats, note_error):
+async def stream_name(jetstream, not_found):
+    try:
+        return await jetstream.find_stream_name_by_subject(NEW_SUBJECTS)
+    except not_found:
+        return STREAM
+
+
+async def _connect(nats, note_error, not_found):
     # max_reconnect_attempts=0 retries forever in nats-py; 1 with no wait gives two quick attempts.
     connection = await nats.connect(NATS_URL, connect_timeout=CONNECT_TIMEOUT, allow_reconnect=False,
                                     max_reconnect_attempts=1, reconnect_time_wait=0, error_cb=note_error)
     try:
         jetstream = connection.jetstream(timeout=REQUEST_TIMEOUT)
-        info = await jetstream.stream_info(STREAM)
+        stream = await stream_name(jetstream, not_found)
+        info = await jetstream.stream_info(stream)
     except BaseException:
         try:
             await asyncio.wait_for(connection.close(), REQUEST_TIMEOUT)
         except Exception:
             pass
         raise
-    return connection, jetstream, info
+    return connection, jetstream, stream, info
 
 
-async def _window_records(start_time, end_time, message_limit, deadline):
+async def _window_records(start_time, end_time, message_limit, deadline, decoded):
     try:
         import nats
         from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy, RetentionPolicy
+        from nats.js.errors import NotFoundError
     except ImportError as error:
         raise NatsUnavailableError('nats-py is not installed; NATS history is unavailable') from error
 
@@ -103,9 +114,10 @@ async def _window_records(start_time, end_time, message_limit, deadline):
 
     try:
         try:
-            connection, jetstream, info = await asyncio.wait_for(_connect(nats, note_error), SETUP_TIMEOUT)
+            connection, jetstream, stream, info = await asyncio.wait_for(
+                _connect(nats, note_error, NotFoundError), SETUP_TIMEOUT)
         except Exception as error:
-            raise NatsUnavailableError(f'NATS stream {STREAM} is unavailable: {error!r}') from error
+            raise NatsUnavailableError(f'NATS sensor stream is unavailable: {error!r}') from error
         # A refused first attempt is reported here too; only errors after connecting can drop records.
         client_error = None
         # Delivering with no acknowledgments must not remove firmware records.
@@ -114,7 +126,7 @@ async def _window_records(start_time, end_time, message_limit, deadline):
         if not info.state.messages:
             return
         last_sequence = info.state.last_seq
-        created = await jetstream.add_consumer(STREAM, config=ConsumerConfig(
+        created = await jetstream.add_consumer(stream, config=ConsumerConfig(
             name='nightstand_window_' + uuid4().hex,
             deliver_policy=DeliverPolicy.BY_START_TIME,
             opt_start_time=start_time - START_MARGIN,
@@ -145,7 +157,7 @@ async def _window_records(start_time, end_time, message_limit, deadline):
         inbox = connection.new_inbox()
         await connection.subscribe(inbox, cb=receive, pending_msgs_limit=BATCH_SIZE * 2,
                                    pending_bytes_limit=16 * 1024 * 1024)
-        next_subject = f'$JS.API.CONSUMER.MSG.NEXT.{STREAM}.{consumer_name}'
+        next_subject = f'$JS.API.CONSUMER.MSG.NEXT.{stream}.{consumer_name}'
         request = json.dumps({'batch': BATCH_SIZE, 'expires': int(REQUEST_TIMEOUT * 1e9)}).encode()
         loop = asyncio.get_running_loop()
         last_delivery = loop.time()
@@ -169,7 +181,7 @@ async def _window_records(start_time, end_time, message_limit, deadline):
             if status is not None and status[:3] not in ('404', '408', '409'):
                 raise RuntimeError(f'NATS history request failed: {status}; window is incomplete')
             if not messages:
-                pending = await jetstream.consumer_info(STREAM, consumer_name)
+                pending = await jetstream.consumer_info(stream, consumer_name)
                 check_client_error()
                 if pending.num_pending == 0:
                     return
@@ -188,8 +200,10 @@ async def _window_records(start_time, end_time, message_limit, deadline):
                 count += 1
                 if count > message_limit:
                     raise RuntimeError(f'NATS history message limit exceeded ({message_limit}); window is incomplete')
+                decoded['messages'] += 1
                 try:
                     records = list(_payload_records(message.data))
+                    decoded['ok'] += bool(records)
                 except (cbor2.CBORDecodeError, ValueError, TypeError):
                     records = []
                 for record in records:
@@ -205,7 +219,7 @@ async def _window_records(start_time, end_time, message_limit, deadline):
         try:
             if jetstream is not None and consumer_name is not None:
                 # Only this run's consumer is deleted. Inactivity also expires it after a killed job.
-                await asyncio.wait_for(jetstream.delete_consumer(STREAM, consumer_name), REQUEST_TIMEOUT)
+                await asyncio.wait_for(jetstream.delete_consumer(stream, consumer_name), REQUEST_TIMEOUT)
         except Exception as error:
             logger.warning(f'Could not remove NATS history consumer {consumer_name}: {error}')
         finally:
@@ -256,7 +270,8 @@ def iter_window_records(start_time, end_time, limits=None):
         raise ValueError('NATS history limits must be positive')
     loop = asyncio.new_event_loop()
     deadline = loop.time() + limits.seconds
-    records = _window_records(start_time, end_time, limits.messages, deadline)
+    decoded = {'messages': 0, 'ok': 0}
+    records = _window_records(start_time, end_time, limits.messages, deadline, decoded)
     try:
         while True:
             remaining = deadline - loop.time()
@@ -269,6 +284,10 @@ def iter_window_records(start_time, end_time, limits=None):
                     raise
                 raise TimeoutError('NATS history total timeout; window is incomplete') from error
             if not batch:
+                # A payload format this reader does not know must not pass as an empty night.
+                if decoded['messages'] and not decoded['ok']:
+                    raise RuntimeError(f"NATS history: none of {decoded['messages']} messages held a record; "
+                                       'window is incomplete')
                 return
             for record in batch:
                 if loop.time() >= deadline:

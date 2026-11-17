@@ -18,6 +18,10 @@ is a hard fork; for the history of the projects it descends from, see
   The hardware watchdog still turns on only from G53, the revision it was
   checked on. Hub revisions reported by @jalen-cheng and in @Geczy's
   hardware page.
+- Biometrics reads the NATS stream that holds `rawmem.*` subjects when the Pod
+  has one, which newer Pod 5 firmware is reported to use in place of `raw.*`.
+  It is untested on that firmware. A night whose NATS messages hold no
+  readable records now fails as incomplete instead of passing as empty.
 
 ### Changes
 
