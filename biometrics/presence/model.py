@@ -12,7 +12,7 @@ from .sensors import CapFormat
 
 DEVICE_LABEL_PATHS = ('/deviceinfo/device-label', '/persistent/deviceinfo/device-label')
 # The lowest hub revision the server reports as a Pod 5.
-POD5_HUB_REVISION = 'G53'
+POD5_HUB_REVISION = 'G43'
 
 _unknown_logged = False
 

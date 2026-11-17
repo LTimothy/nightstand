@@ -250,16 +250,17 @@ not verified base control on a physical base.
 
 Nightstand's `detectCoverVersion` and `detectHubVersion` in
 [`loadDeviceStatus.ts`](https://github.com/LTimothy/nightstand/blob/dbc024b00d79d0f79e6c8f8bf9f2a740c2e38333/server/src/8sleep/loadDeviceStatus.ts)
-guess Pod 5 from cover revision `J00` and up and hub revision `G53` and up.
-The comments cite Discord, not an official specification. ❓ Both
-thresholds are unconfirmed.
+guess Pod 5 from cover revision `J00` and up and hub revision `G43` and up.
+Pod 5 hubs have reported G43, G45 and G53; no Pod 4 hub revision has been
+reported, so G43 is the lowest revision seen rather than a known boundary.
+The hardware watchdog keeps a stricter G53 rule, since it was checked on one
+G53 hub. ❓ Both thresholds are unconfirmed.
 
 📖 [Geczy's hardware page](https://github.com/Geczy/free-sleep/commit/39e2b25e631299e26a175f375b7914336e364b80)
 instead uses cover `J50` and up and hub `G40` and up for Pod 5. Its comments
 cite a `J55` Pod 5 cover, an `I14` Pod 4 cover and one user's `G43` Pod 5
-hub. Those observations do not confirm the boundaries either. This
-disagreement is unresolved; no detection thresholds change here. Pod
-owners can help by sharing the hub and cover model and hardware-revision
+hub. Those observations do not confirm the boundaries either. Pod owners
+can help by sharing the hub and cover model and hardware-revision
 segments from their labels, with serial numbers omitted.
 
 <a id="other-pod-generations"></a>

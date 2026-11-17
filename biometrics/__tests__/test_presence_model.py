@@ -36,7 +36,7 @@ class ModelTestCase(unittest.TestCase):
 
 class IsPod5Test(ModelTestCase):
     def test_the_hub_revision_decides_as_on_the_server(self):
-        for revision, expected in (('G53', True), ('H10', True), ('G52', False), ('G00', False), ('F99', False)):
+        for revision, expected in (('G53', True), ('G45', True), ('G43', True), ('H10', True), ('G42', False), ('G00', False), ('F99', False)):
             with self.subTest(revision=revision):
                 self.assertIs(is_pod5([self.label(f'AAAA-BB-{revision}-CCCC\n')]), expected)
 

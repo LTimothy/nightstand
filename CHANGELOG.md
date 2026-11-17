@@ -13,6 +13,11 @@ is a hard fork; for the history of the projects it descends from, see
 - On Pod 4 and Pod 5 firmware without `/opt/eight/bin/frank.sh`, the installer
   and the server read the firmware socket path from the frank service instead
   of falling back to the Pod 3 path. By @jalen-cheng and @tonekk.
+- A Pod 5 whose hub label shows revision G43 to G52 is no longer reported as
+  a Pod 4, so its cover buttons and presence settings follow the Pod 5 rules.
+  The hardware watchdog still turns on only from G53, the revision it was
+  checked on. Hub revisions reported by @jalen-cheng and in @Geczy's
+  hardware page.
 
 ### Changes
 

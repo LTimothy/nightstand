@@ -18,7 +18,7 @@
 #
 # It is turned on only for the Pod 5 it was checked on: the mtk-wdt driver
 # with a 31 second maximum, on a hub whose device label shows revision G53 or
-# later (the rule the server uses for "Pod 5"). The first arming can reset
+# later (stricter than the server's G43 rule for "Pod 5"). The first arming can reset
 # the Pod, so callers run it only after they succeed. It is also left off where
 # there is no watchdog device, where systemd is older than 230, where
 # something else already set RuntimeWatchdogSec, where another program holds
