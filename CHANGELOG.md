@@ -6,7 +6,9 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
-## [Unreleased]
+## [3.8.2] - 2026-11-17
+
+Reads the firmware socket path on Pods without frank.sh and reports more Pod 5 hubs correctly.
 
 ### Fixes
 
@@ -28,6 +30,8 @@ is a hard fork; for the history of the projects it descends from, see
 - The install guide's Wi-Fi step is skipped on a Pod that is already online,
   changes only the new profile's ID, and says how to undo it. Reported by
   @jalen-cheng.
+
+Checked on: no Pod; the frank unit, hub revision and NATS stream paths are covered by tests only; no nights on this code yet.
 
 ## [3.8.1] - 2026-11-16
 

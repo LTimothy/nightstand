@@ -836,6 +836,18 @@ ${links.map(([at, to]) => `    [ "$a" != '${at}' ] || ln -s '${to}' '${at}'`).jo
             assert.equal(existsSync(path.join(dir, 'home/free-sleep-database/settingsDB.json')), false);
         });
     });
+    it('install.sh reads the socket path from the frank unit when frank.sh is missing', () => {
+        box((dir, data) => {
+            const block = between('scripts/install.sh', '# Puts text $2', 'skipping write."\n    fi\n  fi\nfi\n')
+                .replace('/opt/eight/bin/frank.sh', path.join(dir, 'missing'));
+            // BSD grep has no -P; sed stands in for it on the unit text.
+            const stubs = 'systemctl() { printf \'[Service]\\nEnvironment="DAC_SOCKET=/run/dac.sock"\\n\'; }\n'
+                + 'grep() { sed -n \'s/.*DAC_SOCKET=\\([^ "]*dac\\.sock\\).*/\\1/p\'; }\n';
+            const result = run(dir, stubs + block);
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+            assert.equal(readFileSync(path.join(data, 'dac_sock_path.txt'), 'utf8'), '/run/dac.sock\n');
+        });
+    });
     it('install.sh reads an old settings file without following a link swapped in after its check', () => {
         box((dir, data) => {
             const source = path.join(dir, 'home/free-sleep-database/settingsDB.json');

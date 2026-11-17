@@ -113,19 +113,16 @@ const loadDeviceLabel = async () => {
     logger.info('Device label not found');
     return undefined;
 };
+// The lowest Pod 5 hub reported is G43; no Pod 4 hub revision has been reported.
+export const hubVersionFromRevision = (hwRev) => hwRev >= 'G43' ? Version.Pod5 : hwRev >= 'G00' ? Version.Pod4 : undefined;
 const detectHubVersion = async () => {
     try {
         const label = await loadDeviceLabel();
         if (!label)
             return Version.NotFound;
-        const hwRev = label.split('-')[2];
-        if (hwRev >= 'G53') {
-            // Guessing Pod 5 here, based off Discord
-            // https://discord.com/channels/1326539919467745361/1430959872408686775/1431033889924579419
-            return Version.Pod5;
-        }
-        else if (hwRev >= 'G00') {
-            return Version.Pod4;
+        const fromRevision = hubVersionFromRevision(label.split('-')[2]);
+        if (fromRevision) {
+            return fromRevision;
         }
         else {
             const pod3PathExists = await access('/deviceinfo/device-label', constants.F_OK)

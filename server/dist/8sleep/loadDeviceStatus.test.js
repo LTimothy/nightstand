@@ -95,4 +95,12 @@ describe('loadDeviceStatus', () => {
         }
     });
 });
+describe('hubVersionFromRevision', () => {
+    it('reads G43 and later as Pod 5, earlier G revisions as Pod 4', () => {
+        for (const [revision, expected] of [['G53', 'Pod 5'], ['G45', 'Pod 5'], ['G43', 'Pod 5'], ['G42', 'Pod 4'], ['G00', 'Pod 4']]) {
+            assert.equal(mod.hubVersionFromRevision(revision), expected, revision);
+        }
+        assert.equal(mod.hubVersionFromRevision('F99'), undefined);
+    });
+});
 //# sourceMappingURL=loadDeviceStatus.test.js.map
