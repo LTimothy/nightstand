@@ -55,8 +55,8 @@ the network watchdog once they succeed, with the limits
 [installation step 13](../INSTALLATION.md#13-install-the-nightstand-server)
 describes. Other models are left as they are for now.
 
-The switch keeps your four-tap alarm action. The app has no tap editor; to
-change it, see `taps` under [`/api/settings`](../server/API.md#apisettings).
+The switch keeps your four-tap alarm action. To change it, use Settings >
+Bed and sides > Tap gestures.
 
 ## Before you start
 
@@ -188,7 +188,8 @@ no button). Read
 
 To Eight Sleep's software: see
 [Going back to the Eight Sleep app](../INSTALLATION.md#going-back-to-the-eight-sleep-app).
-On a Pod 5 there is no tested way back.
+On a Pod 5 there is no tested way back, and a reset may leave you unable to
+install again, so please don't reset one for now.
 
 ### Switching to upstream
 

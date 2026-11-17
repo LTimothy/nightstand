@@ -567,12 +567,15 @@ I haven't run this exact command against a Pod.
 2. Reset the firmware:
    - [Pod 3](docs/pod_3_teardown/6_firmware_reset.jpeg)
    - [Pod 4](docs/pod_4_teardown/3_reset_firmware.png)
-   - Pod 5: Eight Sleep's support page gives the same reset for Pod 2 through
-     Pod 5: hold the small button on the back of the hub while you plug it in,
-     release when the light blinks green, and wait for blue. I expect it to
-     work, but I haven't tried it after an install and haven't found anyone
-     who has. If the Pod stops booting, the serial cable is the only known
-     way back in. Do not try to go back by re-enabling the services step 11
+   - Pod 5: please don't reset for now. Eight Sleep's support page gives the
+     same reset for Pod 2 through Pod 5: hold the small button on the back of
+     the hub while you plug it in, release when the light blinks green, and
+     wait for blue. I haven't tried it after an install and haven't found
+     anyone who has. Once it is set up in the app again, the Pod updates its
+     firmware, and some Pod 5 units on newer firmware have a locked
+     bootloader ([issue #6](https://github.com/LTimothy/nightstand/issues/6)),
+     so you may not be able to install Nightstand again. If the Pod stops
+     booting, the serial cable is the only known way back in. Do not try to go back by re-enabling the services step 11
      turned off: that lets the Pod update its firmware, which can remove the
      root access you set up, and I haven't tried it.
      [What installation changes on the Pod](#what-installation-changes-on-the-pod)
