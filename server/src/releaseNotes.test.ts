@@ -31,3 +31,30 @@ it('fails for a version without a section', () => {
   const failResult = spawnSync('python3', args, { cwd: dir });
   assert.notEqual(failResult.status, 0);
 });
+
+it('fails until the changelog credits an outside author by handle', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-notes-'));
+  const git = (...args: string[]) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+  const commit = (email: string, message: string) => git(
+    '-c', 'user.name=x', '-c', `user.email=${email}`, 'commit', '-q', '--allow-empty', '-m', message
+  );
+  git('init', '-q');
+  git('config', 'user.email', 'me@example.com');
+  commit('me@example.com', 'one');
+  git('tag', 'v1.0.0');
+  commit('11404482+Some-One@users.noreply.github.com', 'fix');
+  writeFileSync(path.join(dir, 'checked.md'), 'x');
+  const run = (entry: string) => {
+    writeFileSync(path.join(dir, 'CHANGELOG.md'), `# Changelog\n\n## [1.1.0] - 2026-11-16\n\n- ${entry}\n`);
+    return spawnSync(
+      'python3',
+      [path.join(repoRoot, 'scripts/release_notes.py'), '1.1.0', 'checked.md'],
+      { cwd: dir, encoding: 'utf8' }
+    );
+  };
+  const uncredited = run('A fix.');
+  assert.notEqual(uncredited.status, 0);
+  assert.match(uncredited.stderr, /@Some-One/);
+  assert.notEqual(run('A fix. By @Some-One-Else.').status, 0);
+  assert.equal(run('A fix. By @Some-One.').status, 0);
+});

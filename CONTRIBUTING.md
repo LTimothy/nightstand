@@ -184,6 +184,10 @@ still ported from them. Credit goes where the work came from:
   "Adapted from [EpicPi's pull request 51 to
   throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep/pull/51)."
   Reports and ideas are credited by handle the same way.
+- A merged pull request's changelog line ends with "By @handle." for its
+  author. `scripts/release_notes.py` refuses to print a release's notes
+  while a pull request author has no credit by handle in its section, and
+  lists any other outside commits to check by hand.
 
 ## Versioning
 
