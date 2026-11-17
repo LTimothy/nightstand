@@ -49,6 +49,7 @@ scripts safer.
   Bed, and only says "Starts warming" when it actually warms.
 - Smart Schedule counts 20 minutes in bed that end just before its once a
   minute check. Such a night used to keep warming until the 2 hour limit.
+  By @Ali-Al1.
 - A Smart Schedule rhythm card compares your nights by the changes you made
   by hand, so the curve's own steps, or an earlier warm-up setting, no longer
   show as differences.
