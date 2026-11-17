@@ -35,11 +35,14 @@ Nightstand comes with no warranty (see [License](#license)).
 
 ### Going back
 
-- There is no tested way back to Eight Sleep's software on a Pod 5. Eight
-  Sleep's support page gives a reset for Pod 2 through Pod 5
-  ([steps](INSTALLATION.md#going-back-to-the-eight-sleep-app)). I expect it
-  to work, but I haven't tried it after an install and haven't found anyone
-  who has, and I haven't tried the Pod 3 and Pod 4 steps either. If the Pod
+- There is no tested way back to Eight Sleep's software on a Pod 5, and I'd
+  ask you not to reset one for now. Eight Sleep's support page gives a reset
+  for Pod 2 through Pod 5
+  ([steps](INSTALLATION.md#going-back-to-the-eight-sleep-app)), but I haven't
+  tried it after an install and haven't found anyone who has. After a reset
+  the Pod updates its firmware, and some Pod 5 units on newer firmware have a
+  locked bootloader, so you may not be able to install Nightstand again. I
+  haven't tried the Pod 3 and Pod 4 steps either. If the Pod
   stops booting, the serial cable gives you a root shell to repair it. That
   doesn't restore Eight Sleep's software, and neither does switching to
   free-sleep.
@@ -92,8 +95,8 @@ is already being kept on past it (at the latest off time while its schedule
 is paused). One turned on by hand goes off after 12 hours. Temperature
 changes and alarms stop until Nightstand is back.
 
-Nightstand restarts itself if it crashes or stops answering. On a Pod 5 it
-also sets up watchdogs that restart the Pod if its system freezes, or if the
+Nightstand restarts itself if it crashes or stops answering. On a Pod 5 whose
+hub label shows revision G53 or later, it also sets up watchdogs that restart the Pod if its system freezes, or if the
 stock Wi-Fi driver has crashed and the network stays down
 ([how and how often](INSTALLATION.md#13-install-the-nightstand-server)).
 Whether a restart brings Wi-Fi back isn't confirmed yet. Other models are
