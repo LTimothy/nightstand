@@ -50,6 +50,7 @@ export default function SettingsPage() {
   const biometricsInstalled = services?.biometrics?.jobs?.installation?.status === 'healthy';
   const featureSwitches = [biometricsEnabled && settings?.features?.presenceAutoOff,
     biometricsEnabled && settings?.features?.biometricsV2,
+    biometricsEnabled && settings?.features?.biometricsV2 && settings?.features?.uncheckedCapPresence,
     settings?.features?.levelTemps, settings?.features?.oneOffAlarms, biometricsInstalled && biometricsEnabled,
     settings?.features?.rhythms,
     settings?.features?.rhythms && settings?.features?.rhythmSuggestions,

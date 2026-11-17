@@ -118,6 +118,9 @@ export const defaultFeatures = {
   nightstandTheme: true,
   rhythms: true,
   biometricsV2: false,
+  // With biometricsV2 on a Pod or capacitance format not yet checked (not a Pod 5), let
+  // schedules, presence auto-off and the in-bed indicator follow capacitance presence.
+  uncheckedCapPresence: false,
   firmwareTargetReadout: false,
   firmwareHealth: true,
   tapDiagnostics: false,
@@ -136,6 +139,7 @@ const FeaturesSchema = z.object({
   nightstandTheme: z.boolean(),
   rhythms: z.boolean(),
   biometricsV2: z.boolean(),
+  uncheckedCapPresence: z.boolean(),
   firmwareTargetReadout: z.boolean(),
   firmwareHealth: z.boolean(),
   tapDiagnostics: z.boolean(),

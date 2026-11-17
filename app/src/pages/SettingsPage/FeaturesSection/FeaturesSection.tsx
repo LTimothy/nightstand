@@ -20,6 +20,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
 const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. '
   + 'It changes the nightly sleep records and the heart rate and breathing estimates.';
+const UNCHECKED_CAP_PRESENCE = 'On a Pod other than a Pod 5, the capacitance sensors only time the heart rate '
+  + 'and breathing estimates. On, schedules, presence auto-off and the in-bed indicator follow them too, once both '
+  + 'sides are learned. Tested on one Pod 3 so far. A Pod 5 always works this way.';
 const child = { pl: 2, borderLeft: 1, borderColor: 'divider' };
 
 export default function FeaturesSection() {
@@ -191,6 +194,20 @@ export default function FeaturesSection() {
             onChange={ (next) => updateFeature({ biometricsV2: next }) }
             description={ needsBiometrics || NEW_SLEEP_TRACKING }
           />
+          <Box sx={ child }>
+            <FeatureToggleRow
+              label="Capacitance presence on other Pods (beta)"
+              disabled={ isUpdating || features?.uncheckedCapPresence === undefined || !biometricsEnabled
+                || !features?.biometricsV2 }
+              checked={ !!features?.biometricsV2 && !!features?.uncheckedCapPresence }
+              onChange={ (next) => updateFeature({ uncheckedCapPresence: next }) }
+              description={ needsBiometrics || (!features?.biometricsV2
+                ? <TurnOnFirst
+                  parent="New sleep tracking"
+                  href="#biometrics"/>
+                : UNCHECKED_CAP_PRESENCE) }
+            />
+          </Box>
           <FeatureToggleRow
             label="Cooling warning"
             disabled={ isUpdating || features?.coolingWarning === undefined || !biometricsEnabled }

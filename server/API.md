@@ -213,6 +213,7 @@ generic message; the details go to the server log.
     "nightstandTheme": true,
     "rhythms": false,
     "biometricsV2": false,
+    "uncheckedCapPresence": false,
     "coverButtons": false
   }
 }
@@ -298,6 +299,13 @@ generic message; the details go to the server log.
   validating. `features.rhythms` is the Rhythms switch (see `/api/rhythms`
   below); it changes only through `POST /api/rhythms/enable` and
   `POST /api/rhythms/disable`. `biometricsV2` is New sleep tracking.
+  `uncheckedCapPresence` (default false) matters only with `biometricsV2` on,
+  on a Pod or capacitance format not yet checked (any Pod but a Pod 5). Off,
+  capacitance there only decides when vitals are taken and the presence the
+  server hears comes from the vibration sensor. On, the server hears
+  capacitance presence, as it does on a Pod 5, once both sides have a
+  learned level; the vibration sensor takes it back whenever capacitance
+  places nobody in a bed in use for 10 of 15 minutes.
 
 ### POST
 

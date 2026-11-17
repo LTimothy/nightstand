@@ -76,6 +76,14 @@ In `biometrics/stream/presence_floor.py`:
 Off by default, and tested only on my Pod 5 with `capSense2` records. Reading
 another format in code doesn't mean it works on another Pod.
 
+On any other Pod, capacitance decides only when vitals are taken, and the
+presence the server hears (schedules, presence auto-off, the in-bed
+indicator) stays on the vibration sensor, unless the owner turns on
+Capacitance presence on other Pods (`uncheckedCapPresence`). That switch was
+checked on one Pod 3 writing `capSense`, over six nights replayed from RAW
+files: both sides used learned levels near 1,000 counts, and capacitance
+never put an empty side in bed beside an occupied one.
+
 | File | Constant | Value | Meaning |
 | --- | --- | --- | --- |
 | `biometrics/presence/params.py` | `DEFAULT_ENTER_DELTA` | 4 | Starting entry rise in `capSense2` units, before a side has a learned rise. |
@@ -85,7 +93,7 @@ another format in code doesn't mean it works on another Pod.
 | `biometrics/presence/detector.py` | `enter_seconds` / `exit_seconds` | 20 s / 60 s | Confirmation before a side reads occupied or empty. |
 | Same file | `BED_QUIET_SECONDS` / `PIEZO_ALIVE_MARGIN` / `ENTER_ALIVE_SECONDS` | 90 s / 2 / 5 s | Whole-bed quiet period, activity multiplier over the floor, and active seconds needed within entry confirmation. |
 | `biometrics/presence/sensors.py` | `CAPSENSE.unit` | 75 | Converts the fixed levels from `capSense2` units to `capSense` counts, giving a starting entry level of 300 counts. That level is an assumption, not a measurement: it has not been tested on a Pod that writes `capSense`, and each side's learned level takes over after its first good night. |
-| `biometrics/presence/guard.py` | `UNEXPLAINED_SECONDS` of `UNEXPLAINED_WINDOW_SECONDS` | 600 of 900 | On a Pod or format not yet tested, the vibration sensor takes back vitals recording when the bed reads in use for 10 of 15 minutes but capacitance places nobody in it. Longer than any entry, much shorter than the 45 minute auto-off. |
+| `biometrics/presence/guard.py` | `UNEXPLAINED_SECONDS` of `UNEXPLAINED_WINDOW_SECONDS` | 600 of 900 | On a Pod or format not yet tested, the vibration sensor takes back vitals recording, and the presence the server hears when the owner has let capacitance drive it there, when the bed reads in use for 10 of 15 minutes but capacitance places nobody in it. Longer than any entry, much shorter than the 45 minute auto-off. |
 | `biometrics/presence/piezo.py` | `ONE_PER_SECOND_SHARE` | 0.9 | On a Pod or format not yet tested, the new tracking runs only when at least 90% of record steps are one second, since it counts piezo records as seconds. |
 
 ## Vitals filters

@@ -41,15 +41,28 @@ SIDE_SWAP_SECONDS = 120
 # How far ahead of the clock a reading may be stamped and still count as current.
 CAP_FUTURE_TOLERANCE_SECONDS = 5
 
-# (params, baselines) for a checked format, (params, baselines, format) for one that is not.
+# (params, baselines) for a checked format, (params, baselines, format) for one that is not,
+# and (params, baselines, format, True) for one that is not but whose owner has let the
+# server hear capacitance presence.
 PresenceInputs = Union[
     Tuple[DetectorParams, Dict[str, CapBaseline]],
     Tuple[DetectorParams, Dict[str, CapBaseline], CapFormat],
+    Tuple[DetectorParams, Dict[str, CapBaseline], CapFormat, bool],
 ]
 
 
 def _inputs_format(inputs) -> CapFormat:
     return inputs[2] if len(inputs) > 2 else CAPSENSE2
+
+
+def _server_hears(inputs) -> bool:
+    """Whether the presence the server hears comes from the capacitance detector these inputs run."""
+    return _inputs_format(inputs).validated or (len(inputs) > 3 and inputs[3] is True)
+
+
+def _calibration(inputs):
+    """The inputs without the server choice: what a declined calibration is remembered by."""
+    return tuple(inputs[:3])
 
 
 class _QuietProcessor(BiometricProcessor):
@@ -144,9 +157,11 @@ class StreamProcessor:
         A change of detector ends any current session, so the new one starts
         from an empty bed. New calibration for a running detector waits until
         nobody is in the bed. Inputs handed back for not fitting the bed are
-        refused until calibration changes them. On an unchecked format the
-        server keeps hearing the piezo detector, unbroken, and capacitance
-        decides only when vitals are taken.
+        refused until calibration changes them, whoever hears them. On an
+        unchecked format the server keeps hearing the piezo detector,
+        unbroken, and capacitance decides only when vitals are taken, unless
+        the inputs say the server hears capacitance; the guard runs either way.
+        A change in who the server hears starts over, as a change of format does.
         """
         if inputs is None:
             if self.presence is not None:
@@ -162,24 +177,31 @@ class StreamProcessor:
                 self._presence_inputs = None
                 self._guard = None
             return
-        if inputs == self._declined_inputs:
+        if _calibration(inputs) == self._declined_inputs:
             return
-        if self.presence is not None and _inputs_format(inputs) != _inputs_format(self._presence_inputs):
+        if self.presence is not None and (_inputs_format(inputs) != _inputs_format(self._presence_inputs)
+                                          or _server_hears(inputs) != _server_hears(self._presence_inputs)):
             self.use_presence_v2(None)
         if self.presence is not None and (inputs == self._presence_inputs or any(self.presence.state().values())):
             return
         validated = _inputs_format(inputs).validated
+        heard = _server_hears(inputs)
         # Built before anything is swapped: a failure here must leave presence as it was.
         detector = PresenceDetector(inputs[0])
         guard = None if validated else UnexplainedUseGuard(inputs[0])
         if self.presence is None:
-            logger.info('Presence switching to the capacitance detector')
-            if validated:
+            if heard:
+                logger.info('Presence switching to the capacitance detector'
+                            + ('' if validated else ', which the server hears on this unchecked format'))
                 self._end_sessions()
             else:
+                logger.info('Presence switching to the capacitance detector for vitals; '
+                            'the server keeps hearing the vibration sensor')
                 quiet = (self._quiet_processor('left'), self._quiet_processor('right'))
                 self._piezo_presence = (self.left_processor, self.right_processor)
                 self.left_processor, self.right_processor = quiet
+        else:
+            logger.info('The capacitance detector takes the new calibration')
         self.presence = detector
         self._presence_inputs = inputs
         self._presence_epoch = None
@@ -290,7 +312,7 @@ class StreamProcessor:
             logger.warning('Capacitance did not explain the bed in use for 10 of the last 15 minutes, so the '
                            'vibration sensor decides who is in bed and the legacy estimators take vitals until '
                            'calibration changes')
-            declined = self._presence_inputs
+            declined = _calibration(self._presence_inputs)
             self.use_presence_v2(None)
             self._declined_inputs = declined
             return

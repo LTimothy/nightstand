@@ -68,7 +68,7 @@ it('counts new sleep tracking once it is on', async () => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, biometricsV2: true } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('6 of 10 on')).toBeVisible();
+  expect(await screen.findByText('6 of 11 on')).toBeVisible();
 });
 
 it.each(['Pod 4', 'Pod 5'])('leaves cover buttons out of the count on a %s hub', async hubVersion => {
@@ -78,14 +78,14 @@ it.each(['Pod 4', 'Pod 5'])('leaves cover buttons out of the count on a %s hub',
     http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, coverButtons: true } })),
   );
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('5 of 10 on')).toBeVisible();
+  expect(await screen.findByText('5 of 11 on')).toBeVisible();
 });
 
 const featureCount = async (features: Record<string, boolean>) => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, ...features } })));
   const { unmount } = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  const text = (await screen.findByText(/^\d+ of 10 on$/)).textContent!;
+  const text = (await screen.findByText(/^\d+ of 11 on$/)).textContent!;
   unmount();
   return Number(text.split(' ')[0]);
 };
@@ -111,7 +111,13 @@ it('does not count dependent feature switches while biometrics is off', async ()
   const services = getServices();
   server.use(http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('3 of 10 on')).toBeVisible();
+  expect(await screen.findByText('3 of 11 on')).toBeVisible();
+});
+
+it('counts capacitance presence on other Pods only while new sleep tracking is on', async () => {
+  const off = await featureCount({ biometricsV2: false, uncheckedCapPresence: false });
+  expect(await featureCount({ biometricsV2: false, uncheckedCapPresence: true })).toBe(off);
+  expect(await featureCount({ biometricsV2: true, uncheckedCapPresence: true })).toBe(off + 2);
 });
 
 it('counts Cooling warning while Biometrics is on', async () => {
@@ -132,7 +138,7 @@ it('does not count Cooling warning while Biometrics is off', async () => {
     http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })),
   );
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('3 of 10 on')).toBeVisible();
+  expect(await screen.findByText('3 of 11 on')).toBeVisible();
 });
 
 it('counts retention as off when future deletions are disabled', async () => {
@@ -141,7 +147,7 @@ it('counts retention as off when future deletions are disabled', async () => {
     ...settings, features: { ...settings.features, metricsLowDiskProtection: false },
   })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('4 of 10 on')).toBeVisible();
+  expect(await screen.findByText('4 of 11 on')).toBeVisible();
 });
 
 

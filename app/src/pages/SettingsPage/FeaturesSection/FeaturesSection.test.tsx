@@ -9,6 +9,10 @@ import FeaturesSection from './FeaturesSection';
 const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
 const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. '
   + 'It changes the nightly sleep records and the heart rate and breathing estimates.';
+const CAP_PRESENCE = 'Capacitance presence on other Pods (beta)';
+const UNCHECKED_CAP_PRESENCE = 'On a Pod other than a Pod 5, the capacitance sensors only time the heart rate '
+  + 'and breathing estimates. On, schedules, presence auto-off and the in-bed indicator follow them too, once both '
+  + 'sides are learned. Tested on one Pod 3 so far. A Pod 5 always works this way.';
 const biometricsOff = () => {
   const services = getServices();
   server.use(http.get('*/api/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));
@@ -25,19 +29,20 @@ describe('FeaturesSection', () => {
       .toEqual(['Everyday', 'Sleep tracking', 'Storage']);
     expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm', 'Level temperature display']);
     expect(within(everyday).getByRole('button', { name: 'Delete notes' })).toBeVisible();
-    expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)', 'Cooling warning']);
+    expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)',
+      'Capacitance presence on other Pods (beta)', 'Cooling warning']);
     expect(within(tracking).getByRole('combobox', { name: 'Keep raw sensor recordings' })).toBeVisible();
     expect(within(tracking).getByText('Sleep analysis reads these. About 0.4 GB a day. '
       + 'Oldest removed first if storage runs low.')).toBeVisible();
     expect(switchNames(storage)).toEqual(['Low-disk protection', 'Prune detail after 30 days']);
   });
 
-  it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Cooling warning']])(
+  it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Capacitance presence on other Pods (beta)'], ['Cooling warning']])(
     'disables %s while Biometrics is off and links to it', async label => {
       biometricsOff();
       renderWithProviders(<FeaturesSection />);
       const tracking = await screen.findByRole('region', { name: 'Sleep tracking' });
-      await waitFor(() => expect(within(tracking).getAllByRole('link', { name: 'Turn on Biometrics first' })).toHaveLength(3));
+      await waitFor(() => expect(within(tracking).getAllByRole('link', { name: 'Turn on Biometrics first' })).toHaveLength(4));
       const toggle = within(tracking).getByRole('switch', { name: label });
       expect(toggle).toBeDisabled();
       const row = toggle.closest('.MuiBox-root')!.parentElement!;
@@ -137,6 +142,37 @@ describe('FeaturesSection', () => {
     await user.click(toggle);
 
     expect(posted).toEqual({ features: { biometricsV2: true } });
+  });
+
+  it('keeps capacitance presence on other Pods off and waiting until new sleep tracking is on', async () => {
+    renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: CAP_PRESENCE });
+    expect(toggle).not.toBeChecked();
+    expect(toggle).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Turn on New sleep tracking first' })).toHaveAttribute('href', '#biometrics');
+    expect(screen.queryByText(UNCHECKED_CAP_PRESENCE)).not.toBeInTheDocument();
+  });
+
+  it('posts uncheckedCapPresence alone when it is switched on under new sleep tracking', async () => {
+    let posted: unknown;
+    const settings = getSettings();
+    server.use(
+      http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, biometricsV2: true } })),
+      http.post('*/api/settings', async ({ request }) => {
+        posted = await request.json();
+        return HttpResponse.json({});
+      }),
+    );
+
+    const { user } = renderWithProviders(<FeaturesSection />);
+
+    const toggle = await screen.findByRole('switch', { name: CAP_PRESENCE });
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText(UNCHECKED_CAP_PRESENCE)).toBeVisible();
+    await user.click(toggle);
+
+    await waitFor(() => expect(posted).toEqual({ features: { uncheckedCapPresence: true } }));
   });
 
   it('shows and copies the root-owned installer path when biometrics is not installed', async () => {

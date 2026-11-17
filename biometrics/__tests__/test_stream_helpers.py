@@ -39,6 +39,7 @@ for _name in LOGGER_NAMES:
     get_logger(_name).folder_path = _tmp_folder
 
 import stream
+import stream_processor
 from presence import model
 from presence.sensors import CAPSENSE, CAPSENSE2
 
@@ -315,6 +316,30 @@ class TestPresenceMode(CapPresenceTestCase):
         self.assertAlmostEqual(params.left.enter_delta, 360.0)
         self.assertEqual(params.left.offset_limit, 225.0)
 
+    def test_the_owner_switch_lets_the_server_hear_an_unchecked_format_once_ready(self):
+        profiles = cap_profiles(CAPSENSE)
+        with unittest.mock.patch.object(stream, 'unchecked_cap_presence_enabled', return_value=True):
+            self.assertIsNone(self._legacy_inputs(profiles))
+            for side in ('left', 'right'):
+                profiles[side]['cap_occupied'] = {'level': 900.0, 'provenance': {'format': 'capSense', 'normalizationVersion': 1}}
+            self.assertIsNone(self._legacy_inputs(profiles, cadence_ok=False))
+            params, baselines, cap_format, heard = self._legacy_inputs(profiles)
+        self.assertIs(cap_format, CAPSENSE)
+        self.assertIs(heard, True)
+        self.assertAlmostEqual(params.left.enter_delta, 360.0)
+        with unittest.mock.patch.object(stream, 'unchecked_cap_presence_enabled', return_value=False):
+            self.assertEqual(len(self._legacy_inputs(profiles)), 3)
+
+    def test_the_owner_switch_changes_nothing_on_a_pod_5(self):
+        with unittest.mock.patch.object(stream, 'unchecked_cap_presence_enabled', return_value=True):
+            self.assertEqual(len(self._capsense2_inputs(True)), 2)
+
+    def test_the_owner_switch_needs_new_sleep_tracking(self):
+        self.latest.update(time.time(), (500.0, 500.0, 500.0), (500.0, 500.0, 500.0), CAPSENSE)
+        with unittest.mock.patch.object(stream, 'biometrics_v2_enabled', return_value=False), \
+                unittest.mock.patch.object(stream, 'unchecked_cap_presence_enabled', return_value=True):
+            self.assertIsNone(stream._presence_v2_inputs(unittest.mock.Mock()))
+
     def _capsense2_inputs(self, pod5, profiles=None, cadence_ok=True):
         self.latest.update(time.time(), (12.0, 12.0, 12.0), (12.0, 12.0, 12.0))
         processor = unittest.mock.Mock()
@@ -481,6 +506,38 @@ class TestUncheckedFormatRunning(CapPresenceTestCase):
         self._refresh()
         self.assertIsNone(self.processor.presence)
         self.assertEqual((self.processor.left_processor, self.processor.right_processor), self.piezo)
+
+    def test_turning_the_owner_switch_on_and_off_moves_the_server_between_detectors(self):
+        self._refresh()
+        quiet = self.processor.presence
+        with unittest.mock.patch.object(stream, 'unchecked_cap_presence_enabled', return_value=True):
+            with self.assertLogs(stream_processor.logger, level='INFO') as logs:
+                self._refresh()
+        self.assertIsNotNone(self.processor.presence)
+        self.assertIsNot(self.processor.presence, quiet)
+        self.assertIsNone(self.processor._piezo_presence)
+        self.assertIsNotNone(self.processor._guard)
+        self.assertEqual((self.processor.left_processor, self.processor.right_processor), self.piezo)
+        self.assertTrue(any('which the server hears' in line for line in logs.output))
+        self._refresh()
+        self.assertEqual(self.processor._piezo_presence, self.piezo)
+        self.assertIsNotNone(self.processor._guard)
+
+    def test_a_declined_calibration_stays_declined_when_the_owner_switch_changes(self):
+        self._refresh()
+        declined = self.processor._presence_inputs
+        self.processor.use_presence_v2(None)
+        self.processor._declined_inputs = declined
+        with unittest.mock.patch.object(stream, 'unchecked_cap_presence_enabled', return_value=True):
+            self._refresh()
+        self.assertIsNone(self.processor.presence)
+
+    def test_new_levels_into_a_running_detector_are_logged(self):
+        self._refresh()
+        self.profiles['right']['cap_occupied'] = {'level': 600.0, 'provenance': {'format': 'capSense', 'normalizationVersion': 1}}
+        with self.assertLogs(stream_processor.logger, level='INFO') as logs:
+            self._refresh()
+        self.assertTrue(any('takes the new calibration' in line for line in logs.output))
 
     def test_the_refresh_takes_new_levels_into_a_running_detector(self):
         self._refresh()
