@@ -333,7 +333,7 @@ else
     echo "File $SRC_FILE not found, checking the frank service for the dac.sock path..."
     result=$(systemctl cat frank 2>/dev/null | grep -oP '(?<=DAC_SOCKET=)[^ "]*dac\.sock' | head -n 1 || true)
     if [ -n "$result" ]; then
-      echo "$result" > "$DEST_FILE"
+      install_file text "$result" "$DEST_FILE"
       echo "DAC socket path saved to $DEST_FILE"
     else
       echo "No dac.sock path found in the frank service, skipping write."

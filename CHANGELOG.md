@@ -6,6 +6,14 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [Unreleased]
+
+### Fixed
+
+- On Pod 4 and Pod 5 firmware without `/opt/eight/bin/frank.sh`, the installer
+  and the server read the firmware socket path from the frank service instead
+  of falling back to the Pod 3 path. By @jalen-cheng and @tonekk.
+
 ## [3.8.1] - 2026-11-16
 
 Shows the same time zone names on every device.

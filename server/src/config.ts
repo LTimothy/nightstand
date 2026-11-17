@@ -21,21 +21,33 @@ function checkIfDacSockPathConfigured(): string | undefined {
 }
 
 
-const FRANK_SCRIPT = '/opt/eight/bin/frank.sh';
+// Some firmware has no frank.sh and sets DAC_SOCKET in the unit; an /etc unit overrides the /lib one.
+const FRANK_SOURCES = ['/opt/eight/bin/frank.sh', '/etc/systemd/system/frank.service', '/lib/systemd/system/frank.service'];
 
-// The installer copies the firmware's socket path out of frank.sh; read it
+// The installer copies the firmware's socket path out of these files; read it
 // the same way when that copy is missing, rather than assume a Pod 3.
 export function sockPathFromFrankScript(text: string): string | undefined {
-  return /DAC_SOCKET=([^\s]*dac\.sock)/.exec(text)?.[1];
+  return /DAC_SOCKET=([^\s"]*dac\.sock)/.exec(text)?.[1];
+}
+
+export function sockPathFromSources(read: (file: string) => string | undefined, files = FRANK_SOURCES): string | undefined {
+  for (const file of files) {
+    const text = read(file);
+    const found = text === undefined ? undefined : sockPathFromFrankScript(text);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 function sockPathFromFirmware(): string | undefined {
-  try {
-    return existsSync(FRANK_SCRIPT) ? sockPathFromFrankScript(readFileSync(FRANK_SCRIPT, 'utf8')) : undefined;
-  } catch (error) {
-    logger.error(error);
-    return undefined;
-  }
+  return sockPathFromSources((file) => {
+    try {
+      return existsSync(file) ? readFileSync(file, 'utf8') : undefined;
+    } catch (error) {
+      logger.error(error);
+      return undefined;
+    }
+  });
 }
 
 // An empty copy counts as missing, so the firmware's path still wins over the Pod 3 default.
@@ -92,7 +104,7 @@ class Config {
       logger.debug(`'Custom dac.sock path configured, using ${dacSockPath}`);
       return dacSockPath;
     } else if (!this.remoteDevMode){
-      logger.debug('No dac.sock path configured, defaulting to pod 3 path');
+      logger.warn(`No dac.sock path in ${process.env.DATA_FOLDER}dac_sock_path.txt or the frank files, defaulting to the Pod 3 path`);
       return FIRMWARE_MAP.pod3FirmwareReset.dacLocation;
 
     } else if (this.remoteDevMode) {
