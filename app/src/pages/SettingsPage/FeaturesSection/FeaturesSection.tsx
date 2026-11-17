@@ -14,6 +14,8 @@ import { Services, useServices, postServices } from '@api/services.ts';
 import { useSettings, postSettings } from '@api/settings.ts';
 import { Settings } from '@api/settingsSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
+import { useDeviceStatus } from '@api/deviceStatus.ts';
+import { Version } from '@api/deviceStatusSchema.ts';
 import { DeepPartial } from 'ts-essentials';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
@@ -29,6 +31,9 @@ export default function FeaturesSection() {
   const [error, setError] = useState<string | null>(null);
   const { data: services, refetch: refetchServices, isLoading: servicesLoading, isError: servicesError } = useServices();
   const { data: settings, refetch: refetchSettings, isLoading: settingsLoading, isError: settingsError } = useSettings();
+  const { data: deviceStatus } = useDeviceStatus();
+  // A Pod 5 always hears capacitance presence, so its switch would do nothing there.
+  const showCapPresence = !!deviceStatus && deviceStatus.hubVersion !== Version.Pod5;
   const setIsUpdating = useAppStore((state) => state.setIsUpdating);
   const isUpdating = useAppStore((state) => state.isUpdating);
   const [rhythmsDialog, setRhythmsDialog] = useState<'enable' | 'disable'>();
@@ -194,7 +199,7 @@ export default function FeaturesSection() {
             onChange={ (next) => updateFeature({ biometricsV2: next }) }
             description={ needsBiometrics || NEW_SLEEP_TRACKING }
           />
-          <Box sx={ child }>
+          { showCapPresence && <Box sx={ child }>
             <FeatureToggleRow
               label="Capacitance presence on other Pods (beta)"
               disabled={ isUpdating || features?.uncheckedCapPresence === undefined || !biometricsEnabled
@@ -207,7 +212,7 @@ export default function FeaturesSection() {
                   href="#biometrics"/>
                 : UNCHECKED_CAP_PRESENCE) }
             />
-          </Box>
+          </Box> }
           <FeatureToggleRow
             label="Cooling warning"
             disabled={ isUpdating || features?.coolingWarning === undefined || !biometricsEnabled }

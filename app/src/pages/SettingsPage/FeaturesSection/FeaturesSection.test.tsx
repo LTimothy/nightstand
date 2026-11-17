@@ -17,10 +17,13 @@ const biometricsOff = () => {
   const services = getServices();
   server.use(http.get('*/api/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));
 };
+// The mock Pod is a Pod 5, which has no capacitance presence switch.
+const onPod4 = () => server.use(http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: 'Pod 4' })));
 const switchNames = (region: HTMLElement) => within(region).getAllByRole('switch').map(control => control.getAttribute('aria-label'));
 
 describe('FeaturesSection', () => {
   it('groups the switches into Everyday, Sleep tracking and Storage cards', async () => {
+    onPod4();
     renderWithProviders(<FeaturesSection />);
     const everyday = await screen.findByRole('region', { name: 'Everyday' });
     const tracking = screen.getByRole('region', { name: 'Sleep tracking' });
@@ -39,6 +42,7 @@ describe('FeaturesSection', () => {
 
   it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Capacitance presence on other Pods (beta)'], ['Cooling warning']])(
     'disables %s while Biometrics is off and links to it', async label => {
+      onPod4();
       biometricsOff();
       renderWithProviders(<FeaturesSection />);
       const tracking = await screen.findByRole('region', { name: 'Sleep tracking' });
@@ -145,6 +149,7 @@ describe('FeaturesSection', () => {
   });
 
   it('keeps capacitance presence on other Pods off and waiting until new sleep tracking is on', async () => {
+    onPod4();
     renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: CAP_PRESENCE });
     expect(toggle).not.toBeChecked();
@@ -154,6 +159,7 @@ describe('FeaturesSection', () => {
   });
 
   it('posts uncheckedCapPresence alone when it is switched on under new sleep tracking', async () => {
+    onPod4();
     let posted: unknown;
     const settings = getSettings();
     server.use(
@@ -173,6 +179,12 @@ describe('FeaturesSection', () => {
     await user.click(toggle);
 
     await waitFor(() => expect(posted).toEqual({ features: { uncheckedCapPresence: true } }));
+  });
+
+  it('leaves out the capacitance presence switch on a Pod 5', async () => {
+    renderWithProviders(<FeaturesSection />);
+    const tracking = await screen.findByRole('region', { name: 'Sleep tracking' });
+    expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)', 'Cooling warning']);
   });
 
   it('shows and copies the root-owned installer path when biometrics is not installed', async () => {

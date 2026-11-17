@@ -10,6 +10,7 @@ import SideSettings from './SideSettings.tsx';
 import { SubpageShell } from '../DataPage/Header.tsx';
 import { useServices } from '@api/services.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
+import { Version } from '@api/deviceStatusSchema.ts';
 import { useStatusSummary } from '../StatusPage/useStatusSummary';
 import { Settings } from '@api/settingsSchema.ts';
 import { postSettings, useSettings } from '@api/settings.ts';
@@ -50,7 +51,9 @@ export default function SettingsPage() {
   const biometricsInstalled = services?.biometrics?.jobs?.installation?.status === 'healthy';
   const featureSwitches = [biometricsEnabled && settings?.features?.presenceAutoOff,
     biometricsEnabled && settings?.features?.biometricsV2,
-    biometricsEnabled && settings?.features?.biometricsV2 && settings?.features?.uncheckedCapPresence,
+    // Counted only where its row shows: not on a Pod 5.
+    ...(device && device.hubVersion !== Version.Pod5
+      ? [biometricsEnabled && settings?.features?.biometricsV2 && settings?.features?.uncheckedCapPresence] : []),
     settings?.features?.levelTemps, settings?.features?.oneOffAlarms, biometricsInstalled && biometricsEnabled,
     settings?.features?.rhythms,
     settings?.features?.rhythms && settings?.features?.rhythmSuggestions,
