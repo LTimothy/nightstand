@@ -300,12 +300,24 @@ already locked before Nightstand was installed.
 
 This connects the Pod to your Wi-Fi. Pod 3 with an SD card: skip this step.
 
-Replace `WIFI_NAME` (it appears twice) and `PASSWORD` with your network's name
-and password. Use your regular network rather than a guest network. Upstream's
-guide says not to use one, alongside other ways of keeping the Pod off the
-internet, without giving a further reason. The Pod needs internet access for
-the next step; step 19 limits it afterward. The later steps also assume the
-Pod, your computer and your phone share a normal home network.
+First check whether the Pod is already online, which it is if it was set up in
+the Eight Sleep app:
+
+```bash
+nmcli -t -f NAME,DEVICE connection show --active
+```
+
+If that lists a connection on `wlan0`, skip the rest of this step. Adding a
+second profile to a Pod that is already connected has left it off Wi-Fi after
+a reboot.
+
+Otherwise, replace `WIFI_NAME` (it appears twice) and `PASSWORD` with your
+network's name and password. Use your regular network rather than a guest
+network. Upstream's guide says not to use one, alongside other ways of keeping
+the Pod off the internet, without giving a further reason. The Pod needs
+internet access for the next step; step 19 limits it afterward. The later
+steps also assume the Pod, your computer and your phone share a normal home
+network.
 
 ```bash
 nmcli connection add type wifi con-name WIFI_NAME ifname wlan0 ssid WIFI_NAME wifi-sec.key-mgmt wpa-psk wifi-sec.psk "PASSWORD" ipv4.method auto ipv6.method auto
@@ -313,12 +325,21 @@ nmcli connection reload
 ```
 
 Optional: to stop the blinking blue "waiting to be set up" light, copy the
-Wi-Fi profiles, then change their ID and reload:
+Wi-Fi profiles, then change the ID of the profile you just added and reload.
+Change only that one: giving every profile the same ID can keep the Pod off
+Wi-Fi after a reboot.
 
 ```bash
 cp -a /persistent/system-connections /persistent/system-connections.stock
-sed -i 's/uuid=.*/uuid=700a7a76-2105-4f46-b1b4-c9f3c791c440/' /persistent/system-connections/*.nmconnection
+sed -i 's/uuid=.*/uuid=700a7a76-2105-4f46-b1b4-c9f3c791c440/' /persistent/system-connections/WIFI_NAME.nmconnection
 nmcli connection reload
+```
+
+If you changed the ID and the Pod does not rejoin Wi-Fi after a reboot, put the
+copied profiles back over the serial console and reboot:
+
+```bash
+rm -rf /persistent/system-connections && cp -a /persistent/system-connections.stock /persistent/system-connections && reboot
 ```
 
 ### 13. Install the Nightstand server

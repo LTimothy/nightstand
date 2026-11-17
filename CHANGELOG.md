@@ -8,11 +8,17 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
-### Fixed
+### Fixes
 
 - On Pod 4 and Pod 5 firmware without `/opt/eight/bin/frank.sh`, the installer
   and the server read the firmware socket path from the frank service instead
   of falling back to the Pod 3 path. By @jalen-cheng and @tonekk.
+
+### Changes
+
+- The install guide's Wi-Fi step is skipped on a Pod that is already online,
+  changes only the new profile's ID, and says how to undo it. Reported by
+  @jalen-cheng.
 
 ## [3.8.1] - 2026-11-16
 
