@@ -78,14 +78,14 @@ it.each(['Pod 4', 'Pod 5'])('leaves cover buttons out of the count on a %s hub',
     http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, coverButtons: true } })),
   );
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('5 of 10 on')).toBeVisible();
+  expect(await screen.findByText(`5 of ${hubVersion === 'Pod 4' ? 11 : 10} on`)).toBeVisible();
 });
 
 const featureCount = async (features: Record<string, boolean>) => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, ...features } })));
   const { unmount } = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  const text = (await screen.findByText(/^\d+ of 10 on$/)).textContent!;
+  const text = (await screen.findByText(/^\d+ of \d+ on$/)).textContent!;
   unmount();
   return Number(text.split(' ')[0]);
 };
@@ -112,6 +112,22 @@ it('does not count dependent feature switches while biometrics is off', async ()
   server.use(http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
   expect(await screen.findByText('3 of 10 on')).toBeVisible();
+});
+
+it('counts capacitance presence on other Pods only while new sleep tracking is on', async () => {
+  server.use(http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: 'Pod 4' })));
+  const off = await featureCount({ biometricsV2: false, uncheckedCapPresence: false });
+  expect(await featureCount({ biometricsV2: false, uncheckedCapPresence: true })).toBe(off);
+  expect(await featureCount({ biometricsV2: true, uncheckedCapPresence: true })).toBe(off + 2);
+});
+
+it('leaves capacitance presence on other Pods out of the count on a Pod 5', async () => {
+  const settings = getSettings();
+  server.use(http.get('*/settings', () => HttpResponse.json({
+    ...settings, features: { ...settings.features, biometricsV2: true, uncheckedCapPresence: true },
+  })));
+  renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
+  expect(await screen.findByText('6 of 10 on')).toBeVisible();
 });
 
 it('counts Cooling warning while Biometrics is on', async () => {

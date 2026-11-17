@@ -74,13 +74,14 @@ def fake_vitals(self, signal, epoch, update_breathing=False, update_hrv=False):
             'hrv': self.hrv, 'breathing_rate': self.breathing_rate}
 
 
-def run_live(records, inputs=(PARAMS, BASELINES), switch_on_at=None, switch_off_at=None):
+def run_live(records, inputs=(PARAMS, BASELINES), switch_on_at=None, switch_off_at=None, switches=None):
     """Feed records through StreamProcessor as the stream does.
 
     Returns every post to the server (second, side, present), every vitals
     insert (side, second, hrv), each second's presence as the vitals see it
     (second, side, present), and the processor. inputs reach the processor
-    with the first piezo record, or at second switch_on_at.
+    with the first piezo record, or at second switch_on_at. switches maps a
+    second to the inputs the stream hands over then, None included.
     """
     _PresenceCoordinator._latest = {'left': 0.0, 'right': 0.0}
     posts, inserts, held = [], [], []
@@ -113,6 +114,8 @@ def run_live(records, inputs=(PARAMS, BASELINES), switch_on_at=None, switch_off_
                 processor.use_presence_v2(inputs)
             if switch_off_at is not None and second == switch_off_at:
                 processor.use_presence_v2(None)
+            if switches and second in switches:
+                processor.use_presence_v2(switches[second])
             processor.process_piezo_record(record)
             held.append((second, 'left', processor.left_processor.present))
             held.append((second, 'right', processor.right_processor.present))
@@ -458,6 +461,116 @@ class OtherPodLiveTest(unittest.TestCase):
         self.assertEqual(run.posts, run_live(records, None).posts)
         run.processor.use_presence_v2(OTHER_POD_INPUTS)
         self.assertIsNone(run.processor.presence)
+
+
+# The owner's switch on: the server hears capacitance on the unchecked format.
+HEARD_INPUTS = LEGACY_INPUTS + (True,)
+# A light sleeper beside a heavier one, whose movement reaches the light
+# sleeper's piezo more strongly than the light sleeper's own: the vibration
+# sensor gives the whole bed to the heavier one, as on a real Pod 3 night.
+LIGHT_BESIDE_HEAVY = Night(seconds=6000, left=((600, 5400),), right=((900, 5100),),
+                           piezo=(1_000_000.0, 5_000_000.0), crosstalk=0.7)
+# One person on the right; the empty left side picks them up through the frame.
+RIGHT_ALONE = Night(seconds=6000, right=((600, 5400),), piezo=(5_000_000.0, 5_000_000.0), crosstalk=0.9)
+
+
+def changes_by_side(changes):
+    return {side: [(second, present) for second, change_side, present in changes if change_side == side]
+            for side in ('left', 'right')}
+
+
+def present_at(side_changes, second):
+    present = False
+    for changed_at, value in side_changes:
+        if changed_at > second:
+            break
+        present = value
+    return present
+
+
+class HeardUncheckedLiveTest(unittest.TestCase):
+    """capSense with the owner's switch on: the server hears the capacitance detector, and the guard still runs."""
+
+    def test_the_inputs_say_the_server_hears_capacitance_and_keep_the_guard(self):
+        processor = StreamProcessor(legacy_records(Night(seconds=1))[0], cap_source=LatestCap())
+        with unittest.mock.patch.object(BiometricProcessor, '_update_presence_api', lambda *args: None):
+            processor.use_presence_v2(HEARD_INPUTS)
+        self.assertIsNotNone(processor.presence)
+        self.assertIsNotNone(processor._guard)
+        self.assertIsNone(processor._piezo_presence)
+
+    def test_the_server_hears_each_side_as_capacitance_places_it(self):
+        records = legacy_records(scenarios.STAGGERED)
+        heard = run_live(records, HEARD_INPUTS)
+        quiet = run_live(records, LEGACY_INPUTS)
+        self.assertEqual(transitions(heard.posts), heard.held)
+        # The detector itself is the same with or without the switch.
+        self.assertEqual(heard.held, quiet.held)
+        self.assertEqual(heard.inserts, quiet.inserts)
+
+    def test_a_light_sleeper_beside_a_heavier_one_is_heard_in_bed(self):
+        records = legacy_records(LIGHT_BESIDE_HEAVY)
+        piezo = changes_by_side(transitions(run_live(records, None).posts))
+        heard = changes_by_side(transitions(run_live(records, HEARD_INPUTS).posts))
+        # Piezo loses the left sleeper while the right one is in bed.
+        self.assertFalse(present_at(piezo['left'], 3000))
+        self.assertEqual([present for _, present in heard['left']], [True, False])
+        entered, left_at = heard['left'][0][0], heard['left'][1][0]
+        self.assertLess(abs(entered - 600), 60)
+        self.assertLess(abs(left_at - 5400), 90)
+
+    def test_an_empty_side_beside_one_person_is_never_heard_in_bed(self):
+        records = legacy_records(RIGHT_ALONE)
+        heard = changes_by_side(transitions(run_live(records, HEARD_INPUTS).posts))
+        self.assertEqual(heard['left'], [])
+        self.assertEqual([present for _, present in heard['right']], [True, False])
+
+    def test_capacitance_that_misses_the_bed_hands_the_server_back_to_piezo(self):
+        records = legacy_records(MISFIT, 1.0)
+        with self.assertLogs(stream_processor_module.logger, level='WARNING') as logs:
+            run = run_live(records, HEARD_INPUTS)
+        self.assertTrue(any('the vibration sensor decides who is in bed' in line for line in logs.output))
+        self.assertIsNone(run.processor.presence)
+        # After the hand-back the piezo detector posts, and it places someone in the bed again.
+        handed_back = max(second for second, _, present in run.posts if not present)
+        self.assertTrue(any(present for second, _, present in run.posts if second > handed_back - 600))
+        self.assertTrue(run.posts[-1][2])
+        self.assertEqual(run.processor._declined_inputs, LEGACY_INPUTS)
+
+    def test_a_declined_calibration_stays_declined_with_the_switch_on_or_off(self):
+        with self.assertLogs(stream_processor_module.logger, level='WARNING'):
+            run = run_live(legacy_records(MISFIT, 1.0), HEARD_INPUTS)
+        for inputs in (HEARD_INPUTS, LEGACY_INPUTS, legacy_inputs() + (True,)):
+            run.processor.use_presence_v2(inputs)
+            self.assertIsNone(run.processor.presence)
+
+    def test_turning_the_switch_on_mid_night_starts_the_server_on_capacitance(self):
+        records = legacy_records(LIGHT_BESIDE_HEAVY)
+        run = run_live(records, LEGACY_INPUTS, switches={3000: HEARD_INPUTS})
+        self.assertIsNone(run.processor._piezo_presence)
+        self.assertIsNotNone(run.processor._guard)
+        left = changes_by_side(transitions(run.posts))['left']
+        # Piezo had lost the left sleeper; the switch starts over from an empty bed and capacitance places them.
+        self.assertFalse(present_at(left, 2999))
+        entry = next(second for second, present in left if present and second >= 3000)
+        self.assertLess(entry, 3100)
+        self.assertTrue(present_at(left, 5000))
+        # The side piezo had in bed is posted out at the switch and back in by capacitance.
+        right = changes_by_side(transitions(run.posts))['right']
+        self.assertTrue(present_at(right, 2999))
+        self.assertIn((3000, False), right)
+        self.assertTrue(present_at(right, 3100))
+
+    def test_turning_the_switch_off_mid_night_returns_the_server_to_piezo(self):
+        records = legacy_records(LIGHT_BESIDE_HEAVY)
+        run = run_live(records, HEARD_INPUTS, switches={3000: LEGACY_INPUTS})
+        self.assertIsNotNone(run.processor._piezo_presence)
+        self.assertIsNotNone(run.processor.presence)
+        left = changes_by_side(transitions(run.posts))['left']
+        self.assertTrue(present_at(left, 2999))
+        self.assertIn((3000, False), left)
+        # From here the piezo detector posts, and it loses the left sleeper beside the right one.
+        self.assertFalse(present_at(left, 4500))
 
 
 def with_stray_records(records, seconds):

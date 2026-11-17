@@ -10,7 +10,7 @@ from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from get_logger import data_folder
-from features import biometrics_v2_enabled
+from features import biometrics_v2_enabled, unchecked_cap_presence_enabled
 
 
 class BiometricsV2EnabledTest(unittest.TestCase):
@@ -71,6 +71,37 @@ class BiometricsV2EnabledTest(unittest.TestCase):
             self.assertTrue(biometrics_v2_enabled())
         with mock.patch.dict(os.environ, {'DATA_FOLDER': os.path.join(self.folder.name, 'none')}):
             self.assertFalse(biometrics_v2_enabled())
+
+
+class UncheckedCapPresenceEnabledTest(unittest.TestCase):
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
+        self.path = os.path.join(self.folder.name, 'settingsDB.json')
+
+    def _write(self, text: str):
+        with open(self.path, 'w') as handle:
+            handle.write(text)
+
+    def test_true_only_when_its_own_switch_is_exactly_true(self):
+        self._write(json.dumps({'features': {'biometricsV2': True, 'uncheckedCapPresence': True}}))
+        self.assertTrue(unchecked_cap_presence_enabled(self.path))
+        for value in (False, 'true', 1, None):
+            with self.subTest(value=value):
+                self._write(json.dumps({'features': {'biometricsV2': True, 'uncheckedCapPresence': value}}))
+                self.assertFalse(unchecked_cap_presence_enabled(self.path))
+
+    def test_new_sleep_tracking_alone_does_not_turn_it_on(self):
+        self._write(json.dumps({'features': {'biometricsV2': True}}))
+        self.assertFalse(unchecked_cap_presence_enabled(self.path))
+        self.assertTrue(biometrics_v2_enabled(self.path))
+
+    def test_off_when_the_file_is_missing_or_broken(self):
+        self.assertFalse(unchecked_cap_presence_enabled(self.path))
+        self._write('{"features": {"uncheckedCapPresence": tr')
+        self.assertFalse(unchecked_cap_presence_enabled(self.path))
+        self._write(json.dumps({'features': ['uncheckedCapPresence']}))
+        self.assertFalse(unchecked_cap_presence_enabled(self.path))
 
 
 if __name__ == '__main__':

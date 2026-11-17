@@ -147,6 +147,17 @@ describe('FEATURES_MANIFEST', () => {
     }
   });
 
+  it('lists capacitance presence on other Pods as off by default, needing new sleep tracking, with files that exist', () => {
+    const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === 'unchecked-cap-presence');
+    assert.ok(entry, 'unchecked-cap-presence has no featuresManifest entry');
+    assert.equal(entry.flag, 'uncheckedCapPresence');
+    assert.equal(entry.default, false);
+    assert.deepEqual(entry.depends_on, ['biometrics-v2']);
+    for (const file of [...entry.touchpoints, ...entry.tests]) {
+      assert.ok(existsSync(path.join(repoRoot, file)), `${file} does not exist`);
+    }
+  });
+
   // No bundle releases exist yet, so this passes vacuously today. It is the
   // guard that arms the moment the first one lands.
   it('has every feature id named by a bundle release', () => {

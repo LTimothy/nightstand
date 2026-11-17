@@ -50,7 +50,7 @@ logger = get_logger('free-sleep-stream')
 import vendored  # noqa: F401
 
 import calibration
-from features import biometrics_v2_enabled
+from features import biometrics_v2_enabled, unchecked_cap_presence_enabled
 from presence.model import on_this_pod
 from presence.params import baselines_from_calibration, learned_levels, params_from_calibration
 from presence.sensors import TYPE_NAME_LENGTH, printable_type, read_cap, unknown_cap_type
@@ -207,7 +207,9 @@ def _presence_v2_inputs(stream_processor=None):
 
     (params, baselines) for a checked format on a Pod 5; (params, baselines,
     format) otherwise, which runs only once both sides have a learned level
-    and piezo records are seen to come once a second.
+    and piezo records are seen to come once a second. With the owner's
+    uncheckedCapPresence switch on, that becomes (params, baselines, format,
+    True), and the server hears the capacitance detector as on a Pod 5.
     """
     if not biometrics_v2_enabled():
         return None
@@ -226,6 +228,8 @@ def _presence_v2_inputs(stream_processor=None):
         return params, baselines
     if not _experimental_ready(stream_processor, profiles, cap_format):
         return None
+    if unchecked_cap_presence_enabled():
+        return params, baselines, cap_format, True
     return params, baselines, cap_format
 
 
