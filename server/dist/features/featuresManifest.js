@@ -568,6 +568,37 @@ export const FEATURES_MANIFEST = [
             + 'the setting and ignore it.',
     },
     {
+        id: 'unchecked-cap-presence',
+        title: 'Capacitance presence on other Pods (beta)',
+        description: 'On a Pod other than a Pod 5, lets Smart Schedule, presence auto-off and the in-bed indicator '
+            + 'follow the capacitance presence of New sleep tracking instead of the vibration sensor, once the nightly '
+            + 'analysis has learned both sides. A Pod 5 does this whenever New sleep tracking is on.',
+        category: 'biometrics',
+        version: '3.9.0',
+        flag: 'uncheckedCapPresence',
+        default: false,
+        touchpoints: [
+            'biometrics/features.py', 'biometrics/stream/stream.py', 'biometrics/stream/stream_processor.py',
+            'server/src/db/settingsSchema.ts', 'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+            'app/src/pages/SettingsPage/SettingsPage.tsx',
+        ],
+        depends_on: ['biometrics-v2'],
+        reversible: true,
+        tests: [
+            'biometrics/__tests__/test_features.py', 'biometrics/__tests__/test_stream_presence.py',
+            'biometrics/__tests__/test_stream_helpers.py',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.test.tsx',
+            'app/src/pages/SettingsPage/SettingsPage.categories.test.tsx',
+        ],
+        upstream_offer: false,
+        rationale: 'Off by default: on a Pod or capacitance format not yet checked against sleepers\' notes, New sleep '
+            + 'tracking uses capacitance only to decide when vitals are taken, and the server keeps hearing the vibration '
+            + 'sensor. An owner who has checked it against their own nights can turn this on. It waits for the learned '
+            + 'levels of both sides and once-a-second piezo, as before, and the guard that hands back to the vibration sensor '
+            + 'when capacitance places nobody in a bed in use for 10 of 15 minutes keeps running. It does not catch one '
+            + 'sleeper missed beside a detected partner. Off leaves everything as before.',
+    },
+    {
         id: 'daily-reboot',
         title: 'Daily reboot',
         description: 'Restarts the pod an hour before daily priming.',
