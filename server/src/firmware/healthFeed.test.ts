@@ -11,7 +11,8 @@ const session = 'a'.repeat(32);
 it('is not interrupted in the first 120 s after the stream starts', () => {
   const feed = new HealthFeed();
   feed.beginSession(session, 1000);
-  feed.observe(record('moisture', 1090), session, 1090);
+  feed.observe({ ...record('write-failures', 1080), value: 1 }, session, 1080);
+  feed.observe({ ...record('write-failures', 1090), value: 2 }, session, 1090);
   assert.equal(feed.snapshot(1100).interrupted, false);
   assert.equal(feed.snapshot(1120).interrupted, true);
 });

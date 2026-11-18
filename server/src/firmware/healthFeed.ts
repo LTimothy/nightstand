@@ -85,7 +85,7 @@ export class HealthFeed {
       freshness: item.historical ? 'Historical' : now - item.lastSeen <= FIRMWARE_FRESH_SECONDS ? 'Recent' : 'Earlier' }));
     const missingSince = this.lastSensor ?? this.firstObservation;
     const interrupted = !sensorFresh && missingSince !== undefined && now - missingSince >= 120
-      && incidents.some(item => item.severity !== 'diagnostic' && item.freshness === 'Recent');
+      && incidents.some(item => item.severity === 'warning' && item.freshness === 'Recent');
     return { sensorFresh, incidents, interrupted };
   }
 }
