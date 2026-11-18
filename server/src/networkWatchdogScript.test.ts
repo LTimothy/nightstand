@@ -859,6 +859,18 @@ describe('network_watchdog.sh', () => {
     none.cleanup();
   });
 
+  it('prefers wlan0 over the driver\'s other wireless interfaces', () => {
+    const t = pod({ wireless: ['ap0', 'p2p0', 'wlan0'], state: `boot=${BOOT}\ndown_since=0\n` });
+    t.run();
+    assert.equal(reconnects(t.log()), 1);
+    assert.doesNotMatch(t.log(), /device connect (ap0|p2p0)/);
+    t.cleanup();
+    const other = pod({ wireless: ['p2p0', 'wlan1'], state: `boot=${BOOT}\ndown_since=0\n` });
+    other.run();
+    assert.match(other.log(), /^nmcli -w 30 device connect p2p0$/m, 'otherwise the first one');
+    other.cleanup();
+  });
+
   it('rejects unknown arguments', () => {
     const t = pod({ kernel: WLAN_OOPS });
     const r = t.run(['--now']);

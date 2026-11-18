@@ -99,11 +99,14 @@ Nightstand restarts itself if it crashes or stops answering. On a Pod 5 whose
 hub label shows revision G43 or later, it also sets up watchdogs that restart the Pod if its system freezes, or if the
 stock Wi-Fi driver has crashed and the network stays down
 ([how and how often](INSTALLATION.md#13-install-the-nightstand-server)).
-When the network has been down for 3 minutes, it first tries one Wi-Fi
-reconnect, before any restart.
 The hardware watchdog was checked on a G53 hub, not yet on G43 to G52.
-Whether a restart brings Wi-Fi back isn't confirmed yet. Other models are
-left as they are.
+Whether a restart brings Wi-Fi back isn't confirmed yet. Other models get
+no restarts.
+
+On any Pod with that stock Wi-Fi driver, with or without the hardware
+watchdog, Nightstand first tries one Wi-Fi reconnect when the network has
+been down for 3 minutes, before any restart. The reconnect was checked after
+a deliberate disconnect on one Pod 5, not after a real outage.
 
 ### What happens if an install fails?
 

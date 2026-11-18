@@ -319,8 +319,9 @@ if [ "$DOWN_FOR" -ge "$RECONNECT_DOWN" ]; then
   fi
 fi
 
+# The driver can also add p2p0 or ap0, which sort before wlan0.
 IFACE=
-for dir in "$SYS_NET"/*/wireless; do
+for dir in "$SYS_NET"/wlan0/wireless "$SYS_NET"/*/wireless; do
   [ -d "$dir" ] || continue
   IFACE=${dir%/wireless}; IFACE=${IFACE##*/}
   break
