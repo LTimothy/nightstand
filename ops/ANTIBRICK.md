@@ -308,8 +308,10 @@ auto-off switch.
   `scripts/setup_watchdog.sh --auto` once they have succeeded. It turns on
   systemd's runtime watchdog (30 seconds), so a frozen system restarts the
   Pod. It does so only on a Pod 5: the `mtk-wdt` driver with a 31 second
-  maximum and a hub revision of G43 or later. It was checked on a G53 hub,
-  not on G43 to G52. It first tries the setting for 60 seconds from `/run`, so a
+  maximum (the MT8365 watchdog) and a hub revision from G43 up to, but not
+  including, I00. Pod 5 hubs have reported G43, G45 and G55; a newer
+  generation is left alone until someone checks one. It was checked on one
+  Pod 5 hub, not yet on others. It first tries the setting for 60 seconds from `/run`, so a
   watchdog that does not work resets the Pod once rather than at every boot,
   and a failed trial is recorded so later runs do not try again. A deploy
   does not run it.

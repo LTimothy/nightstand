@@ -738,7 +738,7 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     title: 'Hardware watchdog',
     description: 'After a successful install or update, sets systemd\'s RuntimeWatchdogSec to 30 seconds through a drop-in, '
       + 'after a one-minute trial from /run, so a frozen kernel or PID 1 resets the Pod. Pod 5 only (mtk-wdt, 31 s '
-      + 'maximum, hub revision G43 or later; checked on a G53 hub, not on G43 to G52); skipped where the device, '
+      + 'maximum, hub revision G43 up to but not including I00; checked on one Pod 5 hub, not yet on others); skipped where the device, '
       + 'systemd or the driver\'s timeout limits cannot hold it, after a trial that did not finish, and after the owner '
       + 'turned it off with --remove.',
     category: 'safety',

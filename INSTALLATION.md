@@ -397,13 +397,14 @@ If something goes wrong:
   `NIGHTSTAND_CHANNEL=beta` in front of it. That also changes the saved
   channel to beta.
 
-On a Pod 5 whose hub label shows revision G43 or later, the installer then
-sets the hardware watchdog to restart the Pod
+On a Pod 5 whose hub label shows revision G43 up to, but not including, I00,
+the installer then sets the hardware watchdog (MT8365 driver) to restart the Pod
 after about 30 seconds if its system freezes. It tries the setting for about
 a minute first. If the trial fails, the watchdog stays off and later updates
 don't try again. A failure the script can't catch restarts the Pod once.
-Other models are left as they are for now. I checked the watchdog on a G53
-hub, not on G43 to G52. I checked setup, removal,
+Other models are left as they are for now, and so is a newer generation
+until someone checks one. Pod 5 hubs have reported G43, G45 and G55. I
+checked the watchdog on one Pod 5 hub, not yet on others. I checked setup, removal,
 persistence across a reboot and recovery from a deliberate freeze on my
 Pod 5.
 

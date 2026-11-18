@@ -250,11 +250,15 @@ not verified base control on a physical base.
 
 Nightstand's `detectCoverVersion` and `detectHubVersion` in
 [`loadDeviceStatus.ts`](https://github.com/LTimothy/nightstand/blob/dbc024b00d79d0f79e6c8f8bf9f2a740c2e38333/server/src/8sleep/loadDeviceStatus.ts)
-guess Pod 5 from cover revision `J00` and up and hub revision `G43` and up.
-Pod 5 hubs have reported G43, G45 and G53; no Pod 4 hub revision has been
-reported, so G43 is the lowest revision seen rather than a known boundary.
-The hardware watchdog uses the same G43 rule. It was checked on a G53 hub,
-not on G43 to G52. ❓ The threshold is unconfirmed.
+guess Pod 5 from cover revision `J00` up to `K00` and hub revision `G43` up
+to `I00`, not including the upper bound. A revision must be one capital
+letter and two digits. A revision at or past the upper bound, or one in
+another form, reads as unknown, so a newer generation is left alone until
+someone checks one. Pod 5 hubs have reported G43, G45 and G55, and Pod 5
+covers J55. The boundary between Pod 4 and Pod 5 hubs is not known.
+The hardware watchdog uses the same hub range with the MT8365 watchdog
+driver. It was checked on one Pod 5 hub, not yet on others. ❓ The
+thresholds are unconfirmed.
 
 📖 [Geczy's hardware page](https://github.com/Geczy/free-sleep/commit/39e2b25e631299e26a175f375b7914336e364b80)
 instead uses cover `J50` and up and hub `G40` and up for Pod 5. Its comments
