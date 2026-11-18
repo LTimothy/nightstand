@@ -102,6 +102,26 @@ describe('FeaturesSection', () => {
     expect(posted).toEqual({ features: { journalInMemory: true } });
   });
 
+  it("offers the Pod's target temperatures on a Pod 5 only", async () => {
+    let posted: unknown;
+    server.use(http.post('*/api/settings', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({});
+    }));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: "Show the Pod's target temperatures" });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    expect(posted).toEqual({ features: { targetTemperatureLabels: true } });
+  });
+
+  it("hides the Pod's target temperatures on a Pod 4", async () => {
+    onPod4();
+    renderWithProviders(<FeaturesSection />);
+    await screen.findByRole('switch', { name: 'Level temperature display' });
+    expect(screen.queryByRole('switch', { name: "Show the Pod's target temperatures" })).toBeNull();
+  });
+
   it('posts the flag change when a feature toggle is switched', async () => {
     let posted: unknown;
     server.use(

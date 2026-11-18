@@ -37,6 +37,7 @@ import {
   MAX_RHYTHMS_PER_SIDE, restoreDate, restoreDeleted, restoreRhythm, restoreWeekDays, restoreDates, setDateChange, setDateChanges,
   setWeekDays, weekPickMessage, type DateChoice,
 } from './rhythmsModel';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 const SHORT_COMING_UP = 7;
 const LONG_COMING_UP = 14;
@@ -97,7 +98,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
     if (headingFocus) document.getElementById('rhythms-heading')?.focus({ preventScroll: true });
   }, [headingFocus]);
   const timeZone = settings?.timeZone ?? moment.tz.guess();
-  const format = settings?.temperatureFormat ?? 'fahrenheit';
+  const format = useTemperatureFormat();
   const today = moment.tz(timeZone).format('YYYY-MM-DD');
   const from = moment.tz(today, timeZone).subtract(1, 'day');
   const { data: resolved = [] } = useResolvedSleeps(side, from.toISOString(), from.clone().add(15, 'days').toISOString());

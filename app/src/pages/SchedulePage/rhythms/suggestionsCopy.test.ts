@@ -31,6 +31,8 @@ describe('temperatures', () => {
     expect(pairTemperatures(82, 79, 'level')).toEqual(['0', '−1']);
     expect(pairTemperatures(82, 83, 'celsius')).toEqual(['28°C', '28.5°C']);
     expect(pairTemperatures(82, 79, 'fahrenheit')).toEqual(['82°F', '79°F']);
+    expect(pairTemperatures(81, 82, 'fahrenheitTarget')).toEqual(['79.5°F', '80.2°F']);
+    expect(pairTemperatures(80, 83, 'fahrenheitTarget')).toEqual(['79°F', '81°F']);
   });
 
   it('reads clock times the way the rest of the app does', () => {
@@ -294,6 +296,16 @@ describe('the sentence under a rhythm card\'s chart', () => {
     const held = block({ f: 83, farF: 80, schedule: [{ x: 15, f: 82 }], turned: null });
     expect(typicalNightText([held], '23:00', 'level', false)).toBe(
       'On half or more nights you kept it at 83°F while the schedule went down to 80°F.');
+  });
+
+  it('prints held and far values as targets, never legacy °F, in a target format', () => {
+    const held = block({ f: 81, farF: 82, schedule: [{ x: 15, f: 80 }], turned: null });
+    const text = typicalNightText([held], '23:00', 'fahrenheitTarget', false);
+    expect(text).not.toMatch(/81°F|82°F/);
+    expect(text).toContain('79.5°F');
+    expect(text).toContain('80.2°F');
+    const celsius = typicalNightText([block({ f: 75, farF: 76, schedule: [{ x: 15, f: 75 }], turned: null })], '23:00', 'celsiusTarget', false);
+    expect(celsius).not.toContain('°F');
   });
 
   it('shows both values in °F when two levels would read the same', () => {

@@ -10,6 +10,7 @@ import SideControl from './SideControl';
 const fixture = vi.hoisted(() => ({
   setSide: vi.fn(), usePresence: vi.fn(), enabled: true,
   settings: {
+    features: { targetTemperatureLabels: false },
     left: { name: 'Alex', awayMode: false, scheduleOverrides: { pause: { active: false, expiresAt: '' } } },
     right: { name: 'Sam', awayMode: false, scheduleOverrides: { pause: { active: false, expiresAt: '' } } },
   },
@@ -33,6 +34,7 @@ vi.mock('@api/services.ts', () => ({
 }));
 beforeEach(() => {
   fixture.enabled = true;
+  fixture.settings.features.targetTemperatureLabels = false;
   fixture.settings.left.awayMode = false;
   fixture.settings.right.awayMode = false;
   fixture.settings.left.scheduleOverrides.pause = { active: false, expiresAt: '' };
@@ -154,6 +156,13 @@ it('colours a live temperature on the compact tiles', () => {
   fixture.status = { left: { isOn: true, targetTemperatureF: 84, currentTemperatureF: 82 }, right: { isOn: false } };
   render(<SideControl/>);
   expect(screen.getByText('84°F')).toHaveStyle({ color: scale(84) });
+});
+
+it('labels the Pod\'s target on a Pod 5 when the option is on', () => {
+  fixture.settings.features.targetTemperatureLabels = true;
+  fixture.status = { hubVersion: 'Pod 5', left: { isOn: true, targetTemperatureF: 83, currentTemperatureF: 82 }, right: { isOn: false } };
+  render(<SideControl/>);
+  expect(screen.getByText('81°F')).toBeInTheDocument();
 });
 
 it('draws a paused side that is on in grey, since the schedule is not driving it', () => {

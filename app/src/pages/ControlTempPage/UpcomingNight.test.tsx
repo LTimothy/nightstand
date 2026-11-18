@@ -9,6 +9,9 @@ import UpcomingNight from './UpcomingNight';
 import ScheduleOverrideBanner from './ScheduleOverrideBanner';
 
 const fixture = vi.hoisted(() => ({ expiresAt: '2026-09-28T20:00:00Z', on: '19:00', bed: { state: 'legacy' } as unknown }));
+vi.mock('@api/deviceStatus.ts', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/deviceStatus.ts')>()), useDeviceStatus: () => ({ data: undefined }),
+}));
 vi.mock('@state/appStore.tsx', () => ({ useAppStore: () => ({ side: 'left' }) }));
 vi.mock('@api/settings.ts', () => ({ useSettings: () => ({ data: {
   timeZone: 'UTC', temperatureFormat: 'fahrenheit', left: { awayMode: false,

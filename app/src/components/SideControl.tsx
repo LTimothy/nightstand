@@ -11,6 +11,7 @@ import { temperatureColor } from '@lib/temperatureColor';
 import { media, palette, radius, weight } from '@design/tokens';
 import { useDeviceFreshness } from '../pages/ControlTempPage/useDeviceFreshness';
 import { NOT_RESPONDING } from '../pages/ControlTempPage/bedText';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 function presenceLabel(observation: PresenceSide | undefined): string | undefined {
   const elapsed = Date.now() - Date.parse(observation?.stateChangedAt ?? '');
@@ -57,7 +58,7 @@ export default function SideControl({ compact = true, mergeAwaySides = true, bef
     const id = setInterval(() => setTick(t => t + 1), 30_000);
     return () => clearInterval(id);
   }, []);
-  const format = settings?.temperatureFormat ?? 'fahrenheit';
+  const format = useTemperatureFormat();
   const other = side === 'left' ? 'right' : 'left';
   const both = mergeAwaySides && settings?.[other]?.awayMode && !settings?.[side]?.awayMode;
   const keys = both ? [side] : ['left', 'right'] as const;

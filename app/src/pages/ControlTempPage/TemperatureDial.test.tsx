@@ -246,3 +246,30 @@ it('draws an empty frame with the stale caption when nothing ever loaded', () =>
   expect(container.querySelector('[data-caption-slot]')).toHaveTextContent('Schedules and alarms may not run.');
   expect(container.querySelector('[data-controls-row]')).toBeEmptyDOMElement();
 });
+
+it('reads the firmware target at the coldest stored stop in a target format', () => {
+  render(<TemperatureDial status={ { ...on, targetTemperatureF: 55, currentTemperatureF: 55 } } refetch={ vi.fn() } format="fahrenheitTarget"/>);
+  expect(screen.getByRole('heading', { level: 2, name: '50°F' })).toBeInTheDocument();
+  expect(screen.getByText('Currently at 50°F')).toBeInTheDocument();
+});
+
+it('labels the Currently at line from the raw firmware level in a target format', () => {
+  const status = { ...on, targetTemperatureF: 83, currentTemperatureF: 55, currentTemperatureLevel: -99 };
+  const { rerender } = render(<TemperatureDial status={ status } refetch={ vi.fn() } format="fahrenheitTarget"/>);
+  expect(screen.getByText('Currently at 59°F')).toBeInTheDocument();
+  rerender(<TemperatureDial status={ { ...status, currentTemperatureLevel: NaN } } refetch={ vi.fn() } format="fahrenheitTarget"/>);
+  expect(screen.getByText('Currently at 50°F')).toBeInTheDocument();
+  rerender(<TemperatureDial status={ status } refetch={ vi.fn() } format="fahrenheit"/>);
+  expect(screen.getByText('Currently at 55°F')).toBeInTheDocument();
+});
+
+it('titles the dial from the two numbers it shows in a target format', () => {
+  // Stored 55 F reads 50 F, but the firmware sits one level up, at 59 F: the bed is still cooling.
+  render(<TemperatureDial
+    status={ { ...on, targetTemperatureF: 55, currentTemperatureF: 55, currentTemperatureLevel: -99 } }
+    refetch={ vi.fn() }
+    format="fahrenheitTarget"/>);
+  expect(screen.getByText('Currently at 59°F')).toBeInTheDocument();
+  expect(screen.getByText('Cooling to')).toBeInTheDocument();
+});
+

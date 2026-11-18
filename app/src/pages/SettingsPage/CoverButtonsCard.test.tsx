@@ -18,6 +18,7 @@ const fahrenheit = (change: (settings: ReturnType<typeof getSettings>) => void =
 
 function pod(hubVersion: string, coverVersion: string, settings = fahrenheit()) {
   const posted: unknown[] = [];
+  server.use(http.get('*/api/settings', () => HttpResponse.json(settings)));
   server.use(http.get('*/api/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion, coverVersion })));
   const ui = <CoverButtonsCard
     settings={ settings }

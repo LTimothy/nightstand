@@ -4,7 +4,7 @@ export const STALE_AFTER_MS = 120_000;
 // long after it started is not one to wait for.
 export const REFRESH_GRACE_MS = 5_000;
 
-export type DialStatus = { isOn: boolean; targetTemperatureF: number; currentTemperatureF: number };
+export type DialStatus = { isOn: boolean; targetTemperatureF: number; currentTemperatureF: number; currentTemperatureLevel?: number };
 
 export type BedFrame =
   | { kind: 'loading' }

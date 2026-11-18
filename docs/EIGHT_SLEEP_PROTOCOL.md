@@ -61,7 +61,9 @@ for the separate Pod 3 intensity report.
 
 Nightstand's `82.5 + (level/100) * 27.5` formula is a legacy display and
 command convention, not a verified firmware temperature scale. Saved
-Fahrenheit values and outgoing level commands keep that convention.
+Fahrenheit values and outgoing level commands keep that convention. The
+optional target labels on a Pod 5 relabel those stops with the curve; nothing
+stored or sent changes.
 `frzTherm.target` reports the thermostat target in Celsius, separately from
 measured water or mattress temperature.
 

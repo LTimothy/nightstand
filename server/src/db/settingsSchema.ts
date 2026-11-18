@@ -132,6 +132,7 @@ export const defaultFeatures = {
   coverButtons: false,
   // The systemd journal in RAM (scripts/journal_storage.sh), from the next restart.
   journalInMemory: false,
+  targetTemperatureLabels: false,
 } as const;
 const FeaturesSchema = z.object({
   sleepScore: z.boolean(),
@@ -151,6 +152,7 @@ const FeaturesSchema = z.object({
   rhythmSuggestions: z.boolean(),
   coverButtons: z.boolean(),
   journalInMemory: z.boolean(),
+  targetTemperatureLabels: z.boolean(),
 }).strict();
 
 export const SettingsSchema = z.object({

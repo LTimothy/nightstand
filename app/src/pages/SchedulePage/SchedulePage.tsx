@@ -34,6 +34,7 @@ import { discardTitle } from './discardTitle';
 import { friendlyTimeZone } from '@lib/timeZone';
 import ErrorBoundary from '@components/ErrorBoundary.tsx';
 import SchedulePauseNotice from '../ControlTempPage/SchedulePauseNotice.tsx';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 
 const getAdjustedDayOfWeek = (timeZone?: string): DayOfWeek => {
@@ -71,7 +72,7 @@ export default function SchedulePage({ notice: noticeProp }: { notice?: Notice }
   const { data: settings, refetch: refetchSettings, isError: settingsError } = useSettings();
   const { data: deviceStatus } = useDeviceStatus();
   const risePattern = supportsRisePattern(deviceStatus?.hubVersion, deviceStatus?.coverVersion);
-  const format = settings?.temperatureFormat ?? 'fahrenheit';
+  const format = useTemperatureFormat();
   const [saveError, setSaveError] = useState('');
   const [pendingChange, setPendingChange] = useState<{ day: number } | { side: 'left' | 'right' } | { leave: () => void }>();
   const changesPresent = useScheduleStore(state => state.changesPresent);

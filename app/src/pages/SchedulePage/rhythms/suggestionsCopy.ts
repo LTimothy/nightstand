@@ -3,7 +3,9 @@ import moment from 'moment-timezone';
 import type { Dismissed, NightLog, Rhythm, RhythmNights, SuggestionRow, ThenBack } from '@api/rhythmsSchema';
 import { minutesAfterOn, temperatureInPowerWindow } from '@api/rhythmWake';
 import { SUGGESTION_RULES, type SuggestionRules } from '@api/suggestionRules';
-import { displayTemperature, fahrenheitToLevel, levelToFahrenheit, type TemperatureFormat } from '@lib/temperatureConversions';
+import {
+  displayTemperature, fahrenheitToLevel, formatTemperature, isTargetFormat, levelToFahrenheit, type TemperatureFormat,
+} from '@lib/temperatureConversions';
 import { clockAfterOn } from './nightsChartModel';
 import type { Block } from './rhythmOverlay';
 import { formatDate, type SuggestionStart } from './rhythmsModel';
@@ -54,6 +56,9 @@ export const clockOf = (time: string) => moment(time, 'HH:mm').format('h:mm A');
 export function pairTemperatures(fromF: number, toF: number, format: TemperatureFormat): [string, string] {
   const shared = format === 'level' && fromF !== toF && fahrenheitToLevel(fromF) === fahrenheitToLevel(toF);
   const shown: TemperatureFormat = shared ? 'fahrenheit' : format;
+  // In a target format two stops can share a label; one decimal tells them apart.
+  const precise = isTargetFormat(format) && fromF !== toF && formatTemperature(fromF, format) === formatTemperature(toF, format);
+  if (precise) return [formatTemperature(fromF, format, 1), formatTemperature(toF, format, 1)];
   return [displayTemperature(fromF, shown), displayTemperature(toF, shown)];
 }
 
@@ -144,7 +149,8 @@ export function typicalNightText(blocks: Block[], on: string, format: Temperatur
     if (!block.turned) {
       // Both printed values share a unit, so a level pair never mixes a level with °F.
       const [held, far] = pairTemperatures(block.f, block.farF, format);
-      const [now, then] = held === value ? [held, far] : [block.f, block.farF].map(f => displayTemperature(f, 'fahrenheit'));
+      const [now, then] = held === value ? [held, far]
+        : [block.f, block.farF].map(f => (isTargetFormat(format) ? formatTemperature(f, format, 1) : displayTemperature(f, 'fahrenheit')));
       return `kept it at ${now} while ${what} went ${block.farF < block.f ? 'down' : 'up'} to ${then}`;
     }
     const previous = blocks[index - 1];

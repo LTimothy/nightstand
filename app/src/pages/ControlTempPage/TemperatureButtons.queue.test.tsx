@@ -10,7 +10,7 @@ import { TemperatureFormat } from '@lib/temperatureConversions';
 
 const api = vi.hoisted(() => ({ post: vi.fn() }));
 const preferences = vi.hoisted(() => ({ format: 'fahrenheit' as TemperatureFormat }));
-vi.mock('@api/deviceStatus.ts', () => ({ postDeviceStatus: api.post }));
+vi.mock('@api/deviceStatus.ts', () => ({ postDeviceStatus: api.post, useDeviceStatus: () => ({ data: undefined }) }));
 vi.mock('@api/settings.ts', () => ({
   useSettings: () => ({ data: { temperatureFormat: preferences.format, left: { awayMode: false }, right: { awayMode: false } } }),
 }));

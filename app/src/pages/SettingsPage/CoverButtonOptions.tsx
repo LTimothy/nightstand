@@ -9,6 +9,7 @@ import TemperatureStepper from '../SchedulePage/TemperatureStepper';
 import TemperatureChangeSelect from './TemperatureChangeSelect';
 import FeatureToggleRow from './FeaturesSection/FeatureToggleRow';
 import { coverButtonsPatch, DEFAULT_LOGO_F, readCoverButtons, type CoverButtonsPath, type CoverButtonValues } from './coverButtons';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 const SIDES = [['left', 'Left'], ['right', 'Right']] as const;
 
@@ -81,7 +82,7 @@ function SideButtons({ title, side, path, format, disabled, save }: {
 export default function CoverButtonOptions({ path, settings, disabled, save }: {
   path: CoverButtonsPath; settings: Settings; disabled: boolean; save: (patch: DeepPartial<Settings>) => void;
 }) {
-  const format = settings.temperatureFormat ?? 'fahrenheit';
+  const format = useTemperatureFormat();
   return <Stack
     spacing={ 3 }
     // Indented under the switch on a Pod 4 hub; a Pod 5 hub has no switch to sit under.

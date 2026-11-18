@@ -1,6 +1,8 @@
 import { Box, Typography } from '@mui/material';
 import { media, numeralTracking, palette, weight } from '@design/tokens';
-import { displayTemperature, type TemperatureFormat } from '@lib/temperatureConversions.ts';
+import {
+  displayTemperature, fahrenheitToDisplay, firmwareLevelToDisplay, formatDisplayValue, isTargetFormat, type TemperatureFormat,
+} from '@lib/temperatureConversions.ts';
 
 type TemperatureLabelProps = {
   isOn: boolean;
@@ -8,6 +10,8 @@ type TemperatureLabelProps = {
   sliderColor: string;
   currentTargetTemp: number;
   currentTemperatureF: number;
+  // Raw firmware level, used in a target format.
+  currentLevel?: number;
   format: TemperatureFormat;
   // Set while the status is stale: "at 9:41 PM".
   lastKnownAt?: string;
@@ -41,12 +45,20 @@ const numeralSize = (format: TemperatureFormat) => format === 'level'
   };
 
 export default function TemperatureLabel({
-  isOn, sliderTemp, sliderColor, currentTargetTemp, currentTemperatureF, format, lastKnownAt,
+  isOn, sliderTemp, sliderColor, currentTargetTemp, currentTemperatureF, currentLevel, format, lastKnownAt,
 }: TemperatureLabelProps) {
   const pending = sliderTemp !== currentTargetTemp;
-  const topTitle = lastKnownAt ? 'Last known' : pending ? 'Set to' : currentTemperatureF < currentTargetTemp ? 'Warming to'
-    : currentTemperatureF > currentTargetTemp ? 'Cooling to' : 'Holding at';
+  // The line is a measurement: the firmware's own reading, not the stored stop.
+  const reading = isTargetFormat(format) && currentLevel !== undefined && Number.isFinite(currentLevel)
+    ? firmwareLevelToDisplay(currentLevel, format) : undefined;
+  // The title compares what the two lines show, so they never disagree.
+  const [now, goal] = reading !== undefined ? [reading, fahrenheitToDisplay(currentTargetTemp, format)]
+    : [currentTemperatureF, currentTargetTemp];
+  const topTitle = lastKnownAt ? 'Last known' : pending ? 'Set to' : now < goal ? 'Warming to'
+    : now > goal ? 'Cooling to' : 'Holding at';
   const value = displayTemperature(sliderTemp, format);
+  const current = !isTargetFormat(format) ? displayTemperature(currentTemperatureF, format)
+    : formatDisplayValue(reading ?? fahrenheitToDisplay(currentTemperatureF, format), format);
   const sign = /^[+\u2212]/.test(value) ? value[0] : '';
   return <Box sx={ centreSx }>
     { isOn ? <>
@@ -61,7 +73,7 @@ export default function TemperatureLabel({
         { value.slice(sign.length) }
       </Typography>
       { lastKnownAt ? <Typography sx={ lineSx }>{ lastKnownAt }</Typography>
-        : <Typography sx={ currentSx }>Currently at { displayTemperature(currentTemperatureF, format) }</Typography> }
+        : <Typography sx={ currentSx }>Currently at { current }</Typography> }
     </> : <>
       { lastKnownAt && <Typography sx={ lineSx }>Last known</Typography> }
       <Typography sx={ offSx }>Off</Typography>

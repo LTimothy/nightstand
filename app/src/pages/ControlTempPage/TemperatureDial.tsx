@@ -12,12 +12,13 @@ import { useControlTempStore } from './controlTempStore.tsx';
 import DialRing from './DialRing';
 import { DIAL_HEIGHT, DIAL_WIDTH } from './dialGeometry';
 import TemperatureButtons from './TemperatureButtons.tsx';
+import type { DialStatus } from './bedFrame.ts';
 import TemperatureLabel, { centreSx } from './TemperatureLabel.tsx';
 import { usePendingGrey } from './usePendingGrey';
 
 type TemperatureDialProps = {
   // The side's status: live, or the last known one while staleSince is set.
-  status?: { isOn: boolean; targetTemperatureF: number; currentTemperatureF: number };
+  status?: DialStatus;
   staleSince?: Date;
   // Nothing to show yet: every slot keeps its size.
   loading?: boolean;
@@ -92,6 +93,7 @@ export default function TemperatureDial({
         sliderColor={ away || paused || unconfirmed ? palette.text.secondary : temperatureColor(targetLevel) }
         currentTargetTemp={ status.targetTemperatureF }
         currentTemperatureF={ status.currentTemperatureF }
+        currentLevel={ status.currentTemperatureLevel }
         format={ format }
         lastKnownAt={ staleSince && lastKnownAt(staleSince, settings?.timeZone) }/> }
     </Box>

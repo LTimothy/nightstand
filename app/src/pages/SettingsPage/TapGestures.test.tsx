@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { renderWithProviders } from '@test/renderWithProviders';
+import { renderWithProviders as render } from '@test/renderWithProviders';
 import { server } from '@test/setup';
 import { getDeviceStatus, getSettings } from '../../mocks/mockData';
 import { useAppStore } from '@state/appStore';
 import TapGestures from './TapGestures';
+
+// The format hook reads the fetched settings, so serve the element's own props.
+function renderWithProviders(ui: React.ReactElement<{ settings: Record<string, unknown> }>) {
+  server.use(http.get('*/api/settings', () => HttpResponse.json(ui.props.settings)));
+  return render(ui);
+}
 
 // The mock taps: double tap cooler by 1, triple tap warmer by 1, quad tap stop alarm, on both sides.
 const left = () => screen.getByRole('group', { name: 'Left side taps' });
@@ -20,12 +26,12 @@ describe('TapGestures', () => {
     useAppStore.setState({ isUpdating: false });
   });
 
-  it('shows each side\'s actions in the user\'s format', () => {
+  it('shows each side\'s actions in the user\'s format', async () => {
     renderWithProviders(<TapGestures
       settings={ { ...getSettings(), temperatureFormat: 'celsius' } }
       updateSettings={ vi.fn() }/>);
     expect(within(left()).getByRole('combobox', { name: 'Left Double tap' })).toHaveTextContent('Cooler');
-    expect(within(left()).getByRole('combobox', { name: 'Left Double tap step' })).toHaveTextContent('0.6°C');
+    await waitFor(() => expect(within(left()).getByRole('combobox', { name: 'Left Double tap step' })).toHaveTextContent('0.6°C'));
     expect(within(left()).getByRole('combobox', { name: 'Left Quad tap' })).toHaveTextContent('Stop alarm');
     expect(within(left()).getByText('Only while an alarm rings or is snoozed.')).toBeVisible();
     expect(screen.getByRole('group', { name: 'Right side taps' })).toBeVisible();
@@ -64,6 +70,17 @@ describe('TapGestures', () => {
     expect(within(left()).getByText('Also turns the side on.')).toBeVisible();
     fireEvent.click(within(left()).getByRole('button', { name: 'Increase left quad tap temperature' }));
     expect(updateSettings).toHaveBeenCalledWith({ left: { taps: { quadTap: { type: 'set_temperature', temperatureF: 81 } } } });
+  });
+
+  it('reads the firmware target and whole steps in a target format', async () => {
+    const settings = structuredClone(getSettings());
+    settings.left.taps.quadTap = { type: 'set_temperature', temperatureF: 55 };
+    settings.temperatureFormat = 'fahrenheit';
+    settings.features = { ...settings.features, targetTemperatureLabels: true };
+    renderWithProviders(<TapGestures settings={ settings } updateSettings={ vi.fn() }/>);
+    await waitFor(() => expect(within(left()).getByText('50°F')).toBeVisible());
+    await userEvent.click(within(left()).getByRole('combobox', { name: 'Left Triple tap step' }));
+    expect(screen.getByRole('option', { name: '1 step' })).toBeVisible();
   });
 
   it('saves a new step', async () => {

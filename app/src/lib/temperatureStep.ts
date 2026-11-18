@@ -1,4 +1,6 @@
-import { fahrenheitToLevel, levelToFahrenheit, MAX_TEMP_F, MIN_TEMP_F, TemperatureFormat } from './temperatureConversions';
+import {
+  fahrenheitToLevel, formatTemperature, isTargetFormat, levelToFahrenheit, MAX_TEMP_F, MIN_TEMP_F, TemperatureFormat,
+} from './temperatureConversions';
 
 export type TemperatureStepState = {
   value: number;
@@ -12,6 +14,12 @@ export function stepTemperature(
 ): TemperatureStepState {
   const history = previous?.value === value && previous.format === format ? previous.history : [];
   if (!Number.isFinite(value)) return { value, format, history: [] };
+  if (isTargetFormat(format)) {
+    // Neighbouring stops can share a label, so walk until the label changes.
+    let next = value;
+    do next += direction; while (next > MIN_TEMP_F && next < MAX_TEMP_F && formatTemperature(next, format) === formatTemperature(value, format));
+    return { value: Math.max(MIN_TEMP_F, Math.min(MAX_TEMP_F, next)), format, history: [] };
+  }
   const last = history[history.length - 1];
   const reversing = format === 'level' && last?.direction === -direction;
   const requested = reversing ? last.value : format === 'level'

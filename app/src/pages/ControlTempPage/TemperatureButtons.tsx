@@ -10,6 +10,7 @@ import { useSettings } from '@api/settings.ts';
 import { MIN_TEMP_F, MAX_TEMP_F } from '@lib/temperatureConversions.ts';
 import { stepTemperature, TemperatureStepState } from '@lib/temperatureStep';
 import { bedCommandMessage } from '@lib/requestError.ts';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 type TemperatureButtonsProps = {
   refetch: any;
@@ -29,7 +30,7 @@ export default function TemperatureButtons({ refetch, currentTargetTemp, statusU
   }, [setStoreUpdating]);
   const { deviceStatus, setDeviceStatus, beginEdit, endEdit, setCommandError } = useControlTempStore();
   const { data: settings } = useSettings();
-  const format = settings?.temperatureFormat ?? 'fahrenheit';
+  const format = useTemperatureFormat();
   const steps = useRef<{ side: typeof side; state?: TemperatureStepState }>({ side });
   if (steps.current.side !== side || steps.current.state?.value !== deviceStatus?.[side]?.targetTemperatureF
     || steps.current.state?.format !== format) steps.current = { side };

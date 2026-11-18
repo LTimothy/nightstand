@@ -16,6 +16,7 @@ import type { Settings } from '@api/settingsSchema';
 import { serverMessage } from '@lib/requestError';
 import { formatTemperature } from '@lib/temperatureConversions';
 import { conversionDifference, describeDays, MAX_NAME_LENGTH, rhythmUsage } from '../../SchedulePage/rhythms/rhythmsModel';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 type Side = 'left' | 'right';
 const SIDES: Side[] = ['left', 'right'];
@@ -29,6 +30,7 @@ export default function EnableRhythmsDialog({ onClose, onDone }: { onClose: () =
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: settings } = useSettings();
+  const format = useTemperatureFormat();
   const { data: deviceStatus } = useDeviceStatus();
   // Turning on again keeps the saved rhythms, so the text depends on whether there are any.
   const saved = useRhythms();
@@ -115,7 +117,7 @@ export default function EnableRhythmsDialog({ onClose, onDone }: { onClose: () =
               const problem = nameProblem(value);
               const days = describeDays(rhythmUsage(db[side], rhythm.id, today).days);
               const differs = conversionDifference(rhythm, rhythms.filter(other => other.id !== rhythm.id),
-                fahrenheit => formatTemperature(fahrenheit, settings?.temperatureFormat ?? 'fahrenheit'),
+                fahrenheit => formatTemperature(fahrenheit, format),
                 supportsRisePattern(deviceStatus?.hubVersion, deviceStatus?.coverVersion));
               return <TextField
                 key={ rhythm.id }

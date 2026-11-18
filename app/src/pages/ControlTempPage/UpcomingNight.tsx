@@ -19,11 +19,13 @@ import SmartPhaseLine from './SmartPhaseLine';
 import { currentSleep, isEveningSleep, nextSleepEvent, preWarms, sleepAt, warmStartBedtime, withArticle } from './sleepEvents';
 import { useBedSleeps } from './useBedSleeps';
 import { cardSx, headingSx, tonightLineSx } from './tonightStyles';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 export default function UpcomingNight() {
   const { side } = useAppStore();
   const { data: schedules, isError: schedulesError, refetch: refetchSchedules } = useSchedules();
   const { data: settings, isError: settingsError, refetch: refetchSettings } = useSettings();
+  const format = useTemperatureFormat();
   const bed = useBedSleeps(side);
   const [pauseOpen, setPauseOpen] = useState(false);
   const editingPause = useRef(false);
@@ -78,7 +80,7 @@ export default function UpcomingNight() {
   };
   const rhythmLabel = event ? nameOf(event.at) : undefined;
   const temperature =
-    event && event.temperature !== undefined ? displayTemperature(event.temperature, settings.temperatureFormat) : '';
+    event && event.temperature !== undefined ? displayTemperature(event.temperature, format) : '';
   const override = settings[side].scheduleOverrides.temperatureSchedules;
   const paused = override.disabled && moment(override.expiresAt).isAfter(moment());
   const eventPaused = paused && !!event && moment(override.expiresAt).isAfter(event.at);

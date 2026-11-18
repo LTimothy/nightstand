@@ -9,11 +9,13 @@ import { smartLineForSleep } from './smartPhase';
 import { STALE_AFTER_MS } from './bedFrame';
 import { tonightLineSx } from './tonightStyles';
 import { useDeviceFreshness } from './useDeviceFreshness';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 // A Smart Schedule hold lives in the server's memory, not in settings, so the
 // hold and the delayed cool-down come from GET /rhythms/live.
 export default function SmartPhaseLine({ sleep, side }: { sleep: ResolvedSleepResponse; side: Side }) {
   const { data: settings } = useSettings();
+  const format = useTemperatureFormat();
   const { data: deviceStatus, frameFor } = useDeviceFreshness();
   const frame = frameFor(side);
   const { data: live, isError: liveFailed, dataUpdatedAt: liveAt } = useRhythmsLive(side);
@@ -23,13 +25,13 @@ export default function SmartPhaseLine({ sleep, side }: { sleep: ResolvedSleepRe
   const night = !liveFailed && live?.date === sleep.date && now.getTime() - liveAt <= STALE_AFTER_MS ? live : undefined;
   const target = deviceStatus?.[side]?.targetTemperatureF;
   const until = night?.hold ? new Date(night.hold.until) : undefined;
-  const inCurve = !!smartLineForSleep(sleep, { now, timeZone: settings.timeZone, format: settings.temperatureFormat, waiting: false,
+  const inCurve = !!smartLineForSleep(sleep, { now, timeZone: settings.timeZone, format, waiting: false,
     runtime: 'live' });
   // While the bed is not responding, its caption already says schedules may not run.
   const line = frame.kind === 'live' && smartLineForSleep(sleep, {
     now,
     timeZone: settings.timeZone,
-    format: settings.temperatureFormat,
+    format,
     waiting: !!night?.waiting,
     runtime: night ? 'live' : 'unknown',
     coolStart: night ? new Date(night.coolStart) : undefined,

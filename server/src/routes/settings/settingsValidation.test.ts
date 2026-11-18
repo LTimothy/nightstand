@@ -7,6 +7,7 @@ import { createServer, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
 import express from 'express';
 import moment from 'moment-timezone';
+import { defaultFeatures } from '../../db/settingsSchema.js';
 
 // Isolated DATA_FOLDER, set before the dynamic imports (config.ts reads it at
 // import time). Same pattern as jobs/scheduleOverride.test.ts.
@@ -156,6 +157,16 @@ describe('POST /settings features.journalInMemory', () => {
     assert.equal((await postSettings({ features: { coverButtons: false } })).status, 200);
     assert.equal((await postSettings({ features: { journalInMemory: false } })).status, 200);
     assert.deepEqual(journalSyncs, [true, false]);
+  });
+});
+
+describe('POST /settings features.targetTemperatureLabels', () => {
+  it('is off by default', () => {
+    assert.equal(defaultFeatures.targetTemperatureLabels, false);
+  });
+  it('accepts the switch and rejects a non-boolean', async () => {
+    assert.equal((await postSettings({ features: { targetTemperatureLabels: true } })).status, 200);
+    assert.equal((await postSettings({ features: { targetTemperatureLabels: 'yes' } })).status, 400);
   });
 });
 

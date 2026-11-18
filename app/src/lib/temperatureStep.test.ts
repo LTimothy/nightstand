@@ -1,4 +1,5 @@
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { formatTemperature } from './temperatureConversions';
 import { stepTemperature } from './temperatureStep';
 
 it.each([1, -1] as const)('reverses multiple level steps exactly in direction %s', direction => {
@@ -41,4 +42,19 @@ it.each(['fahrenheit', 'celsius', 'level'] as const)('only ever steps to whole F
       state = stepTemperature(state.value, format, direction, state);
     }
   }
+});
+
+describe('target formats', () => {
+  it('steps to the next visible label', () => {
+    expect(stepTemperature(57, 'fahrenheitTarget', 1).value).toBe(59);
+    expect(stepTemperature(56, 'fahrenheitTarget', -1).value).toBe(55);
+    expect(stepTemperature(55, 'fahrenheitTarget', -1).value).toBe(55);
+    expect(stepTemperature(110, 'celsiusTarget', 1).value).toBe(110);
+  });
+
+  it.each(['fahrenheitTarget', 'celsiusTarget'] as const)('every %s step up changes the label', format => {
+    for (let f = 55; f < 110; f++) {
+      expect(formatTemperature(stepTemperature(f, format, 1).value, format)).not.toBe(formatTemperature(f, format));
+    }
+  });
 });

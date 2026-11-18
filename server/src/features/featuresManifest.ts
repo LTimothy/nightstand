@@ -1179,4 +1179,35 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'Optional: it cuts flash writes but loses the system log from before each restart, which is what '
       + 'explains a crash or a watchdog reset. Nightstand\'s own logs stay on flash.',
   },
+  {
+    id: 'target-temperature-labels',
+    title: 'Show the Pod\'s target temperatures',
+    description: 'Labels each temperature with the target the Pod 5 firmware reports for it. Stored settings, schedules and '
+      + 'the API are unchanged. Off by default.',
+    category: 'ui',
+    version: '3.10.0',
+    flag: 'targetTemperatureLabels',
+    default: false,
+    touchpoints: [
+      'app/src/lib/temperatureConversions.ts', 'app/src/lib/temperatureStep.ts', 'app/src/lib/useTemperatureFormat.ts',
+      'app/src/components/SideControl.tsx', 'app/src/pages/ControlTempPage/ControlTempPage.tsx',
+      'app/src/pages/SchedulePage/SchedulePage.tsx', 'app/src/pages/SchedulePage/rhythms/RhythmsPage.tsx',
+      'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+      'app/src/pages/ControlTempPage/UpcomingNight.tsx', 'app/src/pages/ControlTempPage/SmartPhaseLine.tsx',
+      'app/src/pages/ControlTempPage/TemperatureButtons.tsx', 'app/src/pages/SchedulePage/ScheduleChart.tsx',
+      'app/src/pages/SettingsPage/TapGestures.tsx', 'app/src/pages/SettingsPage/CoverButtonOptions.tsx',
+      'app/src/pages/SettingsPage/FeaturesSection/EnableRhythmsDialog.tsx', 'app/src/pages/StatusPage/FirmwarePanel.tsx',
+      'app/src/pages/SchedulePage/rhythms/suggestionsCopy.ts', 'app/src/pages/SettingsPage/TemperatureChangeSelect.tsx',
+    ],
+    depends_on: [],
+    reversible: true,
+    tests: [
+      'app/src/lib/temperatureConversions.test.ts', 'app/src/lib/temperatureStep.test.ts', 'app/src/lib/useTemperatureFormat.test.tsx',
+      'app/src/components/SideControl.test.tsx',
+      'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.test.tsx',
+    ],
+    upstream_offer: false,
+    rationale: 'Optional: every temperature shows a new number, which is confusing without warning. '
+      + 'Settings and schedules are unchanged.',
+  },
 ];

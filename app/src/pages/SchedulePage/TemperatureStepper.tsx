@@ -3,7 +3,8 @@ import { Box, IconButton } from '@mui/material';
 import Add from '@mui/icons-material/Add';
 import Remove from '@mui/icons-material/Remove';
 import {
-  fahrenheitToDisplay, displayBounds, MIN_TEMP_F, MAX_TEMP_F, fahrenheitToLevel, formatTemperature, TemperatureFormat,
+  fahrenheitToDisplay, displayBounds, MIN_TEMP_F, MAX_TEMP_F, fahrenheitToLevel, formatTemperature, isTargetFormat,
+  TemperatureFormat,
 } from '@lib/temperatureConversions';
 import { stepTemperature, TemperatureStepState } from '@lib/temperatureStep';
 import { temperatureColor } from '@lib/temperatureColor';
@@ -72,8 +73,9 @@ export default function TemperatureStepper({ value, format, label, disabled, onC
           step(event.key === 'ArrowUp' ? 1 : -1);
         }
       } }
-      sx={ { minWidth: 62, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
-        fontSize: 24, fontWeight: weight.medium, fontVariantNumeric: 'tabular-nums', opacity: disabled ? 0.5 : 1,
+      sx={ { minWidth: isTargetFormat(format) ? 80 : 62, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        textAlign: 'center', fontSize: 24, fontWeight: weight.medium,
+        fontVariantNumeric: 'tabular-nums', opacity: disabled ? 0.5 : 1,
         '&:focus-visible': { outline: '2px solid', outlineOffset: 3, borderRadius: 1 } } }>{ formatTemperature(value, format) }</Box>
     <IconButton
       aria-label={ `Increase ${label.toLowerCase()}` }

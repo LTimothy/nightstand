@@ -54,7 +54,9 @@ export default function SettingsPage() {
     // Counted only where its row shows: not on a Pod 5.
     ...(device && device.hubVersion !== Version.Pod5
       ? [biometricsEnabled && settings?.features?.biometricsV2 && settings?.features?.uncheckedCapPresence] : []),
-    settings?.features?.levelTemps, settings?.features?.oneOffAlarms, biometricsInstalled && biometricsEnabled,
+    settings?.features?.levelTemps,
+    ...(device?.hubVersion === Version.Pod5 ? [settings?.features?.targetTemperatureLabels] : []),
+    settings?.features?.oneOffAlarms, biometricsInstalled && biometricsEnabled,
     settings?.features?.rhythms,
     settings?.features?.rhythms && settings?.features?.rhythmSuggestions,
     settings?.features?.metricsRetention, settings?.features?.metricsLowDiskProtection, settings?.features?.journalInMemory,

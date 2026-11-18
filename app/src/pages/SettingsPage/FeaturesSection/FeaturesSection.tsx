@@ -153,6 +153,13 @@ export default function FeaturesSection() {
           onChange={ (next) => updateFeature({ levelTemps: next }) }
           description="Show the -10 to +10 scale as a temperature option."
         />
+        { deviceStatus?.hubVersion === Version.Pod5 && <FeatureToggleRow
+          label="Show the Pod's target temperatures"
+          disabled={ isUpdating || features?.targetTemperatureLabels === undefined }
+          checked={ features?.targetTemperatureLabels ?? false }
+          onChange={ (next) => updateFeature({ targetTemperatureLabels: next }) }
+          description="Uses the Pod 5 firmware's measured targets instead of the usual straight-line scale. Settings are unchanged."
+        /> }
       </Section>
       <Section title="Sleep tracking">
         <Box id="biometrics" tabIndex={ -1 } />

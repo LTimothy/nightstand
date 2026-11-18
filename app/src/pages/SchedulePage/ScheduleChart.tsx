@@ -17,11 +17,14 @@ import {
   TemperatureFormat,
   fahrenheitToLevel,
   levelToFahrenheit,
+  seriesValueFormatter,
+  unitOf,
 } from '@lib/temperatureConversions.ts';
 
 
 import { temperatureColor } from '@lib/temperatureColor';
 import { minutesSincePowerOn, temperatureInPowerWindow, timeInPowerWindow } from './scheduleValidation';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 export type Point = { x: Date; y: number; temperature: number; rowId: string };
 
@@ -156,7 +159,7 @@ export default function TemperatureScheduleChart() {
   const { data: settings } = useSettings();
   const theme = useTheme();
 
-  const format = settings?.temperatureFormat ?? 'fahrenheit';
+  const format = useTemperatureFormat();
   const timeZone = settings?.timeZone ?? moment.tz.guess();
   const { min: yMin, max: yMax } = displayBounds(format);
 
@@ -209,8 +212,9 @@ export default function TemperatureScheduleChart() {
         }] }
         series={ [{
           id: 'targeTempF',
-          label: format === 'level' ? 'Target level' : format === 'celsius' ? 'Target °C' : 'Target °F',
+          label: unitOf(format) === 'level' ? 'Target level' : unitOf(format) === 'celsius' ? 'Target °C' : 'Target °F',
           data: yData,
+          valueFormatter: seriesValueFormatter(points.map(p => p.temperature), format),
           area: true,
           baseline: fahrenheitToDisplay(levelToFahrenheit(0), format),
           showMark: false,

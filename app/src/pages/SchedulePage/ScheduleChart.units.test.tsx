@@ -3,6 +3,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { getSchedules } from '../../mocks/mockData';
 import { useScheduleStore } from './scheduleStore';
 import TemperatureScheduleChart from './ScheduleChart';
+vi.mock('@api/deviceStatus.ts', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/deviceStatus.ts')>()), useDeviceStatus: () => ({ data: undefined }),
+}));
 vi.mock('@api/settings.ts', () => ({ useSettings: () => ({ data: { temperatureFormat: 'level', timeZone: 'Asia/Tokyo' } }) }));
 vi.mock('@mui/x-charts/LineChart', () => ({
   LineChart: ({ yAxis, xAxis, onAxisClick }: {

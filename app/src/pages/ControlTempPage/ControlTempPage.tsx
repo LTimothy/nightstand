@@ -24,6 +24,7 @@ import { media } from '@design/tokens';
 import { BED_MAX_WIDTH, BED_PADDING_X } from '@components/pageRail';
 import { useSettings } from '@api/settings.ts';
 import { isSchedulePaused } from '@api/schedulePause.ts';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 const STALE_TILES = { left: NOT_RESPONDING, right: NOT_RESPONDING };
 const LOADING_TILES = { left: '', right: '' };
@@ -47,6 +48,7 @@ export default function ControlTempPage() {
   const { refetch, data: deviceStatus, dataUpdatedAt, frame } = useBedFrame();
   const syncFromServer = useControlTempStore((state) => state.syncFromServer);
   const { data: settings, isError: settingsError } = useSettings();
+  const format = useTemperatureFormat();
   const { side } = useAppStore();
   const commandError = useControlTempStore((state) => state.commandError);
   const setCommandError = useControlTempStore((state) => state.setCommandError);
@@ -99,7 +101,7 @@ export default function ControlTempPage() {
             away={ away }
             paused={ paused }
             refetch={ refetch }
-            format={ settings?.temperatureFormat ?? 'fahrenheit' }
+            format={ format }
             whenOff={ <ErrorBoundary componentName="Last night summary">
               <LastNightSummary lastNight={ lastNight } />
             </ErrorBoundary> }/>

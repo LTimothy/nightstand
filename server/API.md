@@ -215,7 +215,8 @@ generic message; the details go to the server log.
     "biometricsV2": false,
     "uncheckedCapPresence": false,
     "coverButtons": false,
-    "journalInMemory": false
+    "journalInMemory": false,
+    "targetTemperatureLabels": false
   }
 }
 ```
@@ -299,6 +300,8 @@ generic message; the details go to the server log.
   `journalInMemory` is Keep the system log in memory, off by default. Saving
   it runs `scripts/journal_storage.sh` through sudo, which writes or removes a
   journald drop-in; the change applies at the next restart of the Pod.
+  `targetTemperatureLabels` is Show the Pod's target temperatures, off by default,
+  for a Pod 5. It only changes how the app labels temperatures.
   `nightstandTheme` is no longer read and stays so stored settings keep
   validating. `features.rhythms` is the Rhythms switch (see `/api/rhythms`
   below); it changes only through `POST /api/rhythms/enable` and

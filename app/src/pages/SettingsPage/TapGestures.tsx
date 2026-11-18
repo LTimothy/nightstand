@@ -11,6 +11,7 @@ import { weight } from '@design/tokens';
 import TemperatureStepper from '../SchedulePage/TemperatureStepper';
 import TemperatureChangeSelect from './TemperatureChangeSelect';
 import { ACTIONS, actionOf, GESTURE_LABELS, tapFor, type ActionKey } from './tapActions';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 const SNOOZE_SECONDS = [60, 120, 180, 240, 300, 360, 420, 480, 540, 600];
 const SIDES = [['left', 'Left'], ['right', 'Right']] as const;
@@ -88,8 +89,8 @@ export default function TapGestures({ settings, updateSettings }: Props) {
   const { isUpdating } = useAppStore();
   const baseConfigured = useBaseConfigured();
   const sideId = useId();
+  const format = useTemperatureFormat();
   if (!settings) return null;
-  const format = settings.temperatureFormat ?? 'fahrenheit';
   return <Stack spacing={ 3 }>
     <Typography
       variant="body2"

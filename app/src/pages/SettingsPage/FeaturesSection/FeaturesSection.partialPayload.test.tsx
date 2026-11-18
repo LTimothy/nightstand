@@ -69,6 +69,7 @@ it.each([
   ['presenceAutoOff', 'Presence auto-off'],
   ['biometricsV2', 'New sleep tracking (beta)'],
   ['levelTemps', 'Level temperature display'], ['oneOffAlarms', 'One-time alarm'],
+  ['targetTemperatureLabels', 'Show the Pod\'s target temperatures'],
 ])('disables only the missing feature %s', async (key, name) => {
   const settings = getSettings();
   const features: Record<string, unknown> = { ...settings.features };

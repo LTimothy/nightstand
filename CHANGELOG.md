@@ -6,6 +6,18 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [Unreleased]
+
+### Features
+
+- Settings > Features > Show the Pod's target temperatures, Pod 5 only and off
+  by default, labels each setting with the Pod 5 firmware's measured target
+  instead of the straight-line scale free-sleep has used. Your settings,
+  schedules and the API are unchanged. The curve was measured on
+  Pod 5s by [seanpassino](https://github.com/seanpassino) and
+  [jalen-cheng](https://github.com/jalen-cheng), and matches the maintainer's
+  Pod 5 logs.
+
 ## [3.9.0] - 2026-11-17
 
 Lets other Pods opt in to capacitance presence, quiets System status, and adds a Wi-Fi reconnect and an option to keep the system log in memory.

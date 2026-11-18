@@ -4,9 +4,11 @@ import { useFirmware } from '@api/firmware';
 import { useDeviceStatus } from '@api/deviceStatus';
 import TapDiagnostics from './TapDiagnostics';
 import FirmwareReadout from './FirmwareReadout';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 export default function FirmwarePanel() {
   const { data: settings } = useSettings();
+  const format = useTemperatureFormat();
   const enabled = settings?.features?.firmwareTargetReadout === true || settings?.features?.firmwareHealth === true
     || settings?.features?.tapDiagnostics === true || settings?.features?.coolingWarning === true;
   const query = useFirmware(enabled);
@@ -28,7 +30,7 @@ export default function FirmwarePanel() {
         </Alert>) }
     </Paper> }
     { settings?.features.tapDiagnostics && <TapDiagnostics data={ query.data } /> }
-    { settings?.features.firmwareTargetReadout && target && <FirmwareReadout data={ query.data } format={ settings.temperatureFormat } /> }
+    { settings?.features.firmwareTargetReadout && target && <FirmwareReadout data={ query.data } format={ format } /> }
     { settings?.features.firmwareHealth && query.data.availability !== 'Monitoring unavailable' && <Paper variant="outlined" sx={ { p: 2 } }>
       <Typography component="h2" variant="h6">Firmware health details</Typography>
       <Typography>{ query.data.sensorFresh ? 'Recent sensor readings received.' : 'No recent readings' }</Typography>

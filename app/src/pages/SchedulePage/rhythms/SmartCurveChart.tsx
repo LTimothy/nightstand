@@ -10,7 +10,7 @@ import type { DailySchedule } from '@api/schedulesSchema';
 import type { SmartSchedule } from '@api/rhythmsSchema';
 import { curveBounds } from '@api/smartCurve';
 import {
-  fahrenheitToDisplay, formatDisplayValue, formatTemperature, levelToFahrenheit, type TemperatureFormat,
+  fahrenheitToDisplay, formatDisplayValue, formatTemperature, levelToFahrenheit, seriesValueFormatter, type TemperatureFormat,
 } from '@lib/temperatureConversions';
 import { palette } from '@design/tokens';
 import { CHART_END_PADDING_MS, HorizontalTempGradient, type Point } from '../ScheduleChart';
@@ -73,6 +73,7 @@ export default function SmartCurveChart({ night, wake, smart, before, date, time
     })
     : preview.series.map(point => ({ x: point.at, y: clamp(display(point.level)), temperature: levelToFahrenheit(point.level), rowId: '' }));
   const beforeData = previous ? times.map(time => clamp(display(levelAtTime(previous.series, time)))) : [];
+  const beforeStored = previous ? times.map(time => levelToFahrenheit(levelAtTime(previous.series, time))) : [];
   if (points.length < 2) return null;
   const axisColor = theme.palette.text.secondary;
   const label = (level: number) => formatTemperature(levelToFahrenheit(level), format);
@@ -104,12 +105,14 @@ export default function SmartCurveChart({ night, wake, smart, before, date, time
           id: 'smart-curve',
           label: 'Smart Schedule',
           data: points.map(point => point.y),
+          valueFormatter: seriesValueFormatter(points.map(point => point.temperature), format),
           area: true,
           baseline: min,
           showMark: false,
           curve: 'stepAfter',
         }, ...(previous ? [{
-          id: 'before', label: 'Now', data: beforeData, showMark: false, curve: 'stepAfter' as const, color: palette.text.secondary,
+          id: 'before', label: 'Now', data: beforeData, valueFormatter: seriesValueFormatter(beforeStored, format), showMark: false,
+          curve: 'stepAfter' as const, color: palette.text.secondary,
         }] : [])] }
         margin={ { right: 32, left: 36, top: 5, bottom: 24 } }
         sx={ {
