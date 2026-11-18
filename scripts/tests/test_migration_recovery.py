@@ -297,17 +297,21 @@ bash "$TEST_BASE/restore.sh"
         start = source.index('cleanup_nightstand_services() {')
         end = source.index('\n}\n', start) + 3
         with tempfile.TemporaryDirectory() as folder:
-            systemd = Path(folder)
+            systemd = Path(folder) / 'system'
+            journald = Path(folder) / 'journald.conf.d' / '10-nightstand-memory.conf'
+            journald.parent.mkdir()
+            journald.write_text('fixture')
             names = ['free-sleep-archive-raw.service', 'free-sleep-archive-raw.timer', 'free-sleep-health.service', 'free-sleep-health.timer', 'free-sleep-network-watchdog.service', 'free-sleep-network-watchdog.timer', 'free-sleep.service.d/10-nightstand-limits.conf', 'free-sleep-stream.service.d/10-nightstand-limits.conf', 'free-sleep.service.d/user.conf']
             for name in names:
                 file = systemd / name
-                file.parent.mkdir(exist_ok=True)
+                file.parent.mkdir(parents=True, exist_ok=True)
                 file.write_text('fixture')
-            result = subprocess.run(['bash', '-c', 'SYSTEMD_DIR="$1"; systemctl() { :; };\n' + source[start:end] + '\ncleanup_nightstand_services', 'test', folder], capture_output=True, text=True)
+            result = subprocess.run(['bash', '-c', 'SYSTEMD_DIR="$1"; systemctl() { :; };\n' + source[start:end] + '\ncleanup_nightstand_services', 'test', str(systemd)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             for name in names[:-1]:
                 self.assertFalse((systemd / name).exists(), name)
             self.assertTrue((systemd / names[-1]).exists())
+            self.assertFalse(journald.exists())
 
     def test_sentinel_terminates_installer_before_restoring(self):
         source = (ROOT / 'scripts/migrate/restore-original-fork.sh').read_text()

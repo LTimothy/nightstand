@@ -57,7 +57,7 @@ export default function SettingsPage() {
     settings?.features?.levelTemps, settings?.features?.oneOffAlarms, biometricsInstalled && biometricsEnabled,
     settings?.features?.rhythms,
     settings?.features?.rhythms && settings?.features?.rhythmSuggestions,
-    settings?.features?.metricsRetention, settings?.features?.metricsLowDiskProtection,
+    settings?.features?.metricsRetention, settings?.features?.metricsLowDiskProtection, settings?.features?.journalInMemory,
     biometricsEnabled && settings?.features?.coolingWarning];
   const enabledFeatures = featureSwitches.filter(Boolean).length;
   const zone = settings?.timeZone ? friendlyTimeZone(settings.timeZone) : 'Time zone not set';

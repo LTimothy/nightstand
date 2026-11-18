@@ -505,7 +505,8 @@ if [ "$HEALTHY" = yes ]; then
   # Upstream free-sleep never installs these. They take effect at the next service start.
   rm -f /etc/systemd/system/free-sleep.service.d/10-nightstand-limits.conf \
     /etc/systemd/system/free-sleep.service.d/20-nightstand-restart.conf \
-    /etc/systemd/system/free-sleep-stream.service.d/10-nightstand-limits.conf
+    /etc/systemd/system/free-sleep-stream.service.d/10-nightstand-limits.conf \
+    /etc/systemd/journald.conf.d/10-nightstand-memory.conf
   systemctl daemon-reload >/dev/null 2>&1 || true
   # Upstream never turns on the hardware watchdog; take Nightstand's setting out.
   if [ -f "$NIGHTSTAND_SCRIPTS/setup_watchdog.sh" ]; then

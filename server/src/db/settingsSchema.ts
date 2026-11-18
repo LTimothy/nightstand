@@ -130,6 +130,8 @@ export const defaultFeatures = {
   rhythmSuggestions: true,
   // The buttons on a Pod 5 cover (buttonMonitor.ts). Off: no RAW file is read.
   coverButtons: false,
+  // The systemd journal in RAM (scripts/journal_storage.sh), from the next restart.
+  journalInMemory: false,
 } as const;
 const FeaturesSchema = z.object({
   sleepScore: z.boolean(),
@@ -148,6 +150,7 @@ const FeaturesSchema = z.object({
   metricsLowDiskProtection: z.boolean(),
   rhythmSuggestions: z.boolean(),
   coverButtons: z.boolean(),
+  journalInMemory: z.boolean(),
 }).strict();
 
 export const SettingsSchema = z.object({

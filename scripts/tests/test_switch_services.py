@@ -90,6 +90,14 @@ class SwitchServicesTests(unittest.TestCase):
         self.assertTrue((self.config.systemd / 'free-sleep-update.service.d/nightstand-switch-recovery.conf').exists() is False)
         self.assertTrue(any(item['name'] == 'reconcile-system' for item in self.store.load('switch')['intents']))
 
+    def test_switch_to_upstream_removes_the_journal_drop_in(self):
+        dropin = self.root / 'etc/systemd/journald.conf.d/10-nightstand-memory.conf'
+        self.assertIn(dropin, self.config.files())
+        dropin.write_text('[Journal]\nStorage=volatile\n')
+        self.snapshot()
+        self.apply()
+        self.assertFalse(dropin.exists())
+
     def test_reject_failure_reaches_drop_fallback_in_both_families(self):
         bindir = self.root / 'bin'
         bindir.mkdir()

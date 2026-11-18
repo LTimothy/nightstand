@@ -148,7 +148,8 @@ cleanup_nightstand_services() {
     "$SYSTEMD_DIR/free-sleep-health.timer" "$SYSTEMD_DIR/free-sleep-health.service" \
     "$SYSTEMD_DIR/free-sleep-network-watchdog.timer" "$SYSTEMD_DIR/free-sleep-network-watchdog.service" \
     "$SYSTEMD_DIR/free-sleep.service.d/10-nightstand-limits.conf" \
-    "$SYSTEMD_DIR/free-sleep-stream.service.d/10-nightstand-limits.conf"
+    "$SYSTEMD_DIR/free-sleep-stream.service.d/10-nightstand-limits.conf" \
+    "$SYSTEMD_DIR/../journald.conf.d/10-nightstand-memory.conf"
   systemctl daemon-reload >/dev/null 2>&1 || true
 }
 

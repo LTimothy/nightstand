@@ -60,6 +60,7 @@ class Configuration:
                   self.systemd / 'free-sleep.service.d/20-nightstand-restart.conf',
                   self.systemd / 'free-sleep-stream.service.d/10-nightstand-limits.conf']
         paths += [self.systemd / 'free-sleep.service', self.systemd / 'free-sleep-stream.service']
+        paths += [self.root / 'etc/systemd/journald.conf.d/10-nightstand-memory.conf']
         return paths
 
 
@@ -209,7 +210,7 @@ def apply(store, transaction, config, direction):
             remove(config.systemd / unit)
         for path in config.files():
             if path.name in ('10-nightstand-limits.conf', '20-nightstand-restart.conf',
-                             '10-nightstand-watchdog.conf'):
+                             '10-nightstand-watchdog.conf', '10-nightstand-memory.conf'):
                 remove(path)
         if config.sudoers.exists():
             lines = config.sudoers.read_text().splitlines(keepends=True)

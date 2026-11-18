@@ -2,7 +2,7 @@
 # Saves the Pod's original system files the first time Nightstand changes
 # them, so they can be put back by hand. Never overwrites a saved copy and
 # never fails its caller.
-# Usage: record_stock.sh ssh|firewall|units
+# Usage: record_stock.sh ssh|firewall|units|journald
 set -u
 STOCK="${NIGHTSTAND_STOCK_DIR:-/persistent/nightstand-stock}"
 ROOT="${NIGHTSTAND_ROOT:-}"
@@ -106,6 +106,10 @@ case "${1:-}" in
     elif [ ! -e "$STOCK/.ours.unit-states.txt" ]; then
       note unit-states.txt original
     fi
+    ;;
+  journald)
+    # Nightstand only adds this drop-in; the Pod ships without it.
+    keep /etc/systemd/journald.conf.d/10-nightstand-memory.conf journald-10-nightstand-memory.conf original
     ;;
 esac
 exit 0

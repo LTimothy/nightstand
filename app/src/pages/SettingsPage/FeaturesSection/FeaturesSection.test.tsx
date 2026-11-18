@@ -37,7 +37,7 @@ describe('FeaturesSection', () => {
     expect(within(tracking).getByRole('combobox', { name: 'Keep raw sensor recordings' })).toBeVisible();
     expect(within(tracking).getByText('Sleep analysis reads these. About 0.4 GB a day. '
       + 'Oldest removed first if storage runs low.')).toBeVisible();
-    expect(switchNames(storage)).toEqual(['Low-disk protection', 'Prune detail after 30 days']);
+    expect(switchNames(storage)).toEqual(['Low-disk protection', 'Prune detail after 30 days', 'Keep the system log in memory']);
   });
 
   it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Capacitance presence on other Pods (beta)'], ['Cooling warning']])(
@@ -85,6 +85,21 @@ describe('FeaturesSection', () => {
     expect(posted).toEqual([
       { features: { metricsRetention: true } }, { features: { metricsLowDiskProtection: false } },
     ]);
+  });
+
+  it('keeps the system log on flash by default and posts journalInMemory when it is switched on', async () => {
+    let posted: unknown;
+    server.use(http.post('*/api/settings', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({});
+    }));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: 'Keep the system log in memory' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText('Saves flash wear. Keeps only the most recent 64 MB, and clears when the Pod restarts. '
+      + 'Nightstand\'s own logs are kept.')).toBeVisible();
+    await user.click(toggle);
+    expect(posted).toEqual({ features: { journalInMemory: true } });
   });
 
   it('posts the flag change when a feature toggle is switched', async () => {

@@ -219,4 +219,14 @@ describe('the scripts that change system files record them first', () => {
     assert.equal(spawnSync('bash', ['-n', script]).status, 0);
     assert.ok(statSync(script).mode & 0o111);
   });
+
+  it('records the journald drop-in as absent once', () => {
+    const t = setup();
+    t.run('journald');
+    t.run('journald');
+    assert.ok(existsSync(path.join(t.stock, 'journald-10-nightstand-memory.conf.absent')));
+    const lines = readFileSync(path.join(t.stock, 'recorded.txt'), 'utf8').match(/^journald-10-nightstand-memory\.conf\.absent \S+ original$/gm);
+    assert.equal(lines?.length, 1);
+    rmSync(t.dir, { recursive: true, force: true });
+  });
 });

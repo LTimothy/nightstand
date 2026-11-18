@@ -1160,4 +1160,23 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     upstream_offer: false,
     rationale: 'Always on: it only reads three kernel files and changes nothing, so there is nothing to turn off.',
   },
+  {
+    id: 'journal-in-memory',
+    title: 'Keep the system log in memory',
+    description: 'Keeps the systemd journal in RAM instead of on flash, from the next restart of the Pod. Off by default.',
+    category: 'platform',
+    version: '3.9.0',
+    flag: 'journalInMemory',
+    default: false,
+    touchpoints: [
+      'scripts/journal_storage.sh', 'scripts/record_stock.sh', 'scripts/setup_services.sh',
+      'server/src/jobs/journalStorage.ts', 'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+    ],
+    depends_on: [],
+    reversible: true,
+    tests: ['server/src/journalStorageScript.test.ts', 'server/src/jobs/journalStorage.test.ts'],
+    upstream_offer: false,
+    rationale: 'Optional: it cuts flash writes but loses the system log from before each restart, which is what '
+      + 'explains a crash or a watchdog reset. Nightstand\'s own logs stay on flash.',
+  },
 ];

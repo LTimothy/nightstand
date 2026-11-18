@@ -18,6 +18,10 @@ process.env.ENV = 'local';
 mock.module(new URL('../../jobs/pauseHold.js', import.meta.url).href, {
   namedExports: { holdForPause: async () => {}, endPauseHold: async () => {}, pauseHoldUntil: () => undefined },
 });
+const journalSyncs: boolean[] = [];
+mock.module(new URL('../../jobs/journalStorage.js', import.meta.url).href, {
+  namedExports: { syncJournalStorage: async (inMemory: boolean) => { journalSyncs.push(inMemory); } },
+});
 
 let settingsRouter: express.Router;
 
@@ -143,6 +147,16 @@ describe('POST /settings rawArchiveRetentionDays', () => {
       assert.equal(res.status, 400, `expected 400, got ${res.status}`);
     });
   }
+});
+
+describe('POST /settings features.journalInMemory', () => {
+  it('syncs the journal drop-in only when the switch is in the update', async () => {
+    journalSyncs.length = 0;
+    assert.equal((await postSettings({ features: { journalInMemory: true } })).status, 200);
+    assert.equal((await postSettings({ features: { coverButtons: false } })).status, 200);
+    assert.equal((await postSettings({ features: { journalInMemory: false } })).status, 200);
+    assert.deepEqual(journalSyncs, [true, false]);
+  });
 });
 
 describe('POST /settings schedule pause', () => {

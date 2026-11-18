@@ -349,6 +349,13 @@ the hardware watchdog setting.
   rules again.
 - On a Pod 5, the hardware watchdog and network watchdog may be on (see
   above). Check with `systemctl show -p RuntimeWatchdogUSec`.
+- With Settings > Features > Keep the system log in memory on, the systemd
+  journal lives in RAM from the next restart, so `journalctl` shows nothing
+  from earlier restarts made with the switch on. Nightstand's own logs under
+  `/persistent/free-sleep-data/logs/` are unaffected. While this release runs,
+  turn the switch off to undo it. A rollback to an older release, which has no
+  switch, keeps the file; remove
+  `/etc/systemd/journald.conf.d/10-nightstand-memory.conf` as root to undo it.
 - Release checks run in the browser against this fork's release list on
   GitHub and follow the saved channel. The Pod's firewall does not block
   browser requests.

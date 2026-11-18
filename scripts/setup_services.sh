@@ -253,6 +253,9 @@ RULES=(
   "$USERNAME ALL=(ALL) NOPASSWD: /bin/sh /usr/local/lib/nightstand/live/scripts/disable_biometrics.sh"
   # The app's Biometrics switch turns the stream on with exactly this command.
   "$USERNAME ALL=(root) NOPASSWD: /bin/systemctl enable --now free-sleep-stream.service"
+  # The Keep the system log in memory switch, with exactly these two arguments.
+  "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh memory"
+  "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh disk"
 )
 
 # Build the new file beside the old one and check it before it goes live: a

@@ -214,7 +214,8 @@ generic message; the details go to the server log.
     "rhythms": false,
     "biometricsV2": false,
     "uncheckedCapPresence": false,
-    "coverButtons": false
+    "coverButtons": false,
+    "journalInMemory": false
   }
 }
 ```
@@ -295,6 +296,9 @@ generic message; the details go to the server log.
   for the logo. The plus and minus mapping comes from the Pod's logs; the
   logo is not yet checked on a Pod. While off, the server opens no RAW files
   for buttons.
+  `journalInMemory` is Keep the system log in memory, off by default. Saving
+  it runs `scripts/journal_storage.sh` through sudo, which writes or removes a
+  journald drop-in; the change applies at the next restart of the Pod.
   `nightstandTheme` is no longer read and stays so stored settings keep
   validating. `features.rhythms` is the Rhythms switch (see `/api/rhythms`
   below); it changes only through `POST /api/rhythms/enable` and

@@ -218,7 +218,8 @@ if [ "$HEALTHY" = yes ]; then
       /etc/systemd/system/free-sleep-health.service /etc/systemd/system/free-sleep-health.timer \
       /etc/systemd/system/free-sleep-network-watchdog.service /etc/systemd/system/free-sleep-network-watchdog.timer \
       /etc/systemd/system/free-sleep.service.d/10-nightstand-limits.conf \
-      /etc/systemd/system/free-sleep-stream.service.d/10-nightstand-limits.conf
+      /etc/systemd/system/free-sleep-stream.service.d/10-nightstand-limits.conf \
+      /etc/systemd/journald.conf.d/10-nightstand-memory.conf
     # That fork runs its own updater from its tree, as it did before this one.
     sed -i 's#/usr/local/lib/nightstand/live/scripts/#/home/dac/free-sleep/scripts/#g' /etc/systemd/system/free-sleep-update.service
     systemctl daemon-reload

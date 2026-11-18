@@ -238,6 +238,13 @@ export default function FeaturesSection() {
           onChange={ (next) => updateFeature({ metricsRetention: next }) }
           description="Deletes detailed vitals older than 30 days. Summaries, scores and movement stay. Cannot be undone."
         />
+        <FeatureToggleRow
+          label="Keep the system log in memory"
+          disabled={ isUpdating || features?.journalInMemory === undefined }
+          checked={ features?.journalInMemory ?? false }
+          onChange={ (next) => updateFeature({ journalInMemory: next }) }
+          description="Saves flash wear. Keeps only the most recent 64 MB, and clears when the Pod restarts. Nightstand's own logs are kept."
+        />
       </Section>
       { rhythmsDialog === 'enable' && <EnableRhythmsDialog
         onClose={ () => setRhythmsDialog(undefined) }
