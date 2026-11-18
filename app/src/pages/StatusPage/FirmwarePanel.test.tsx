@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
-import { getSettings } from '../../mocks/mockData';
+import { getDeviceStatus, getSettings } from '../../mocks/mockData';
 import FirmwareReadout from './FirmwareReadout';
 import FirmwarePanel from './FirmwarePanel';
 import type { FirmwareSnapshot } from '@api/firmware';
@@ -23,7 +23,7 @@ it('shows an independent firmware target to a tenth in Fahrenheit', () => {
     format="fahrenheit"
   />);
   expect(screen.getByText('Left firmware target: 77.1°F')).toBeInTheDocument();
-  expect(screen.getByText('Right firmware target: Disabled')).toBeInTheDocument();
+  expect(screen.getByText('Right firmware target: Off')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Firmware target', level: 2 })).toBeInTheDocument();
 });
 it('distinguishes stale, unavailable and monitoring off', () => {
@@ -103,3 +103,18 @@ it('shows neither readout while the firmware readings are still loading', async 
   expect(await screen.findByText('Firmware target')).toBeInTheDocument();
   expect(screen.getByText('Cooling warning')).toBeInTheDocument();
 });
+
+it.each([[false, 'Side is off.'], [true, 'Waiting for fresh cooling data.']])(
+  'with the side on=%s and no cooling data, says: %s', async (isOn, text) => {
+    const settings = getSettings();
+    const status = getDeviceStatus();
+    server.use(
+      http.get('*/api/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features,
+        firmwareHealth: false, firmwareTargetReadout: false, tapDiagnostics: false, coolingWarning: true } })),
+      http.get('*/api/deviceStatus', () => HttpResponse.json({ ...status, left: { ...status.left, isOn } })),
+      http.get('*/api/services/firmware', () => HttpResponse.json(snapshot('Monitoring active', true,
+        { left: { state: 'disabled' }, right: { state: 'unavailable' } }))),
+    );
+    renderWithProviders(<FirmwarePanel/>);
+    expect(await screen.findByText(`Left: ${text}`)).toBeInTheDocument();
+  });

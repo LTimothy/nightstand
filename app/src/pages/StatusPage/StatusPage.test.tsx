@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { renderApp, renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
-import { getServerStatus } from '../../mocks/mockData';
+import { getDeviceStatus, getServerStatus } from '../../mocks/mockData';
 import StatusPage from './StatusPage';
 
 describe('StatusPage', () => {
@@ -355,4 +355,11 @@ it('shows and clears a clock warning without expanding healthy details', async (
   expect(alert).toBeVisible();
   act(() => queryClient.setQueryData(['useServerStatus'], { status: data }));
   await waitFor(() => expect(screen.queryByRole('alert', { name: 'Clock warning' })).not.toBeInTheDocument());
+});
+
+it.each([['Pod 5', false], ['Pod 4', true]])('with a %s hub, shows the Cover buttons row: %s', async (hubVersion, shown) => {
+  server.use(http.get('/api/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion })));
+  const { user } = renderWithProviders(<StatusPage />);
+  await user.click(await screen.findByRole('button', { name: /Core services/ }));
+  await waitFor(() => expect(screen.queryAllByText('Cover buttons').length > 0).toBe(shown));
 });

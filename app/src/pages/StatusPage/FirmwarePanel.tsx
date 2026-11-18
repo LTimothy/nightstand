@@ -1,6 +1,7 @@
 import { Alert, Paper, Stack, Typography } from '@mui/material';
 import { useSettings } from '@api/settings';
 import { useFirmware } from '@api/firmware';
+import { useDeviceStatus } from '@api/deviceStatus';
 import TapDiagnostics from './TapDiagnostics';
 import FirmwareReadout from './FirmwareReadout';
 
@@ -9,6 +10,7 @@ export default function FirmwarePanel() {
   const enabled = settings?.features?.firmwareTargetReadout === true || settings?.features?.firmwareHealth === true
     || settings?.features?.tapDiagnostics === true || settings?.features?.coolingWarning === true;
   const query = useFirmware(enabled);
+  const { data: device } = useDeviceStatus();
   if (!enabled) return null;
   if (query.isError) return <Alert severity="info">Firmware telemetry unavailable</Alert>;
   if (!query.data) return null;
@@ -20,7 +22,8 @@ export default function FirmwarePanel() {
       { query.data.availability === 'Monitoring unavailable' ? <Typography>Monitoring unavailable</Typography>
         : (['left', 'right'] as const).map(side => <Alert severity={ query.data!.cooling[side].active ? 'warning' : 'info' } key={ side }>
           { side === 'left' ? 'Left' : 'Right' }: { query.data!.cooling[side].active ? query.data!.cooling[side].message
-            : query.data!.cooling[side].state === 'unavailable' ? 'Waiting for fresh cooling data.'
+            : query.data!.cooling[side].state === 'unavailable'
+              ? device?.[side].isOn === false ? 'Side is off.' : 'Waiting for fresh cooling data.'
               : query.data!.cooling[side].state === 'collecting' ? 'Collecting an hour of cooling history.' : 'No cooling warning.' }
         </Alert>) }
     </Paper> }
