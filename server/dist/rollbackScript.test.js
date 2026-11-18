@@ -61,6 +61,8 @@ describe('rollback_pod.sh', () => {
         // --switching records no owner choice, so a later install turns it on.
         assert.match(otherFork, /bash "\$NIGHTSTAND_SCRIPTS\/setup_watchdog\.sh" --remove --switching /);
         assert.equal(success.match(/setup_watchdog/g)?.length, 2, 'a Nightstand target keeps the watchdog');
+        assert.match(otherFork, /\/etc\/systemd\/journald\.conf\.d\/10-nightstand-memory\.conf/);
+        assert.equal(success.match(/10-nightstand-memory/g)?.length, 1, 'a Nightstand target keeps the journal drop-in');
     });
     it('leaves the rollback and revert units on the root-owned copy after a rollback to another fork', () => {
         const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');

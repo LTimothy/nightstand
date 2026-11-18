@@ -142,6 +142,11 @@ function pod(opts = {}) {
         + `if [ "$1" = show ]; then [ -f "${runtimeWatchdog}" ] && echo "RuntimeWatchdogUSec=$(cat "${runtimeWatchdog}")"; exit 0; fi\n`
         + `case "$*" in *reboot*) [ ! -f "${file('reboot-fails')}" ] || exit 1 ;; esac\nexit 0`);
     stub('flock', 'exit 0');
+    stub('nmcli', 'exit 0');
+    const sysNet = file('net');
+    for (const iface of opts.wireless ?? ['wlan0'])
+        mkdirSync(path.join(sysNet, iface, 'wireless'), { recursive: true });
+    mkdirSync(path.join(sysNet, 'lo'), { recursive: true });
     const proc = path.join(dir, 'proc');
     const setProcesses = (extra) => {
         rmSync(proc, { recursive: true, force: true });
@@ -171,6 +176,7 @@ function pod(opts = {}) {
         NIGHTSTAND_PROC: proc,
         NIGHTSTAND_OPERATION_LOCK: lock,
         NIGHTSTAND_PROC_LOCKS: locks,
+        NIGHTSTAND_SYS_NET: sysNet,
         ...extra,
     });
     const run = (args = [], extra = {}) => spawnSync('bash', [SCRIPT, ...args], { env: env(extra), encoding: 'utf8' });
@@ -193,13 +199,14 @@ function pod(opts = {}) {
     const failReboot = () => writeFileSync(file('reboot-fails'), '');
     const writeState = (text) => writeFileSync(state, text);
     return {
-        run, minutes, log, set, setUnits, setProcesses, failReboot, state, readState, writeState,
+        run, minutes, log, set, setUnits, setProcesses, failReboot, state, readState, writeState, stub, dir,
         cleanup: () => rmSync(dir, { recursive: true, force: true }),
     };
 }
 // The network has been down since boot, an hour before the default uptime.
 const DOWN_AN_HOUR = `boot=${BOOT}\ndown_since=0\nscan_failing_since=\nrestarts=\nlast_restart=\n`;
 const rebooted = (log) => /^systemctl .*reboot/m.test(log);
+const reconnects = (log) => log.match(/^nmcli -w 30 device connect wlan0$/gm)?.length ?? 0;
 const count = (text, pattern) => text.match(new RegExp(pattern.source, 'g'))?.length ?? 0;
 describe('network_watchdog.sh', () => {
     it('parses and carries the exec bit', () => {
@@ -311,7 +318,7 @@ describe('network_watchdog.sh', () => {
     });
     it('counts the Pod\'s own scan failure lines, with or without the journal prefix', () => {
         for (const lines of [POD_SCANS, POD_SCANS.map(message)]) {
-            const t = pod({ state: `boot=${BOOT}\ndown_since=0\nscan_failing_since=0\n` });
+            const t = pod({ state: `boot=${BOOT}\ndown_since=0\nscan_failing_since=0\nreconnected_episode=0\n` });
             writeFileSync(path.join(path.dirname(t.state), 'journal.log'), `${lines.join('\n')}\n`);
             const r = t.run(['--dry-run']);
             assert.match(r.stdout, /^scan failures in the last 3 minutes: 3$/m);
@@ -357,6 +364,25 @@ describe('network_watchdog.sh', () => {
         assert.match(back, /the network is back after 90 minutes/);
         assert.doesNotMatch(t.readState(), /^down_since=\d/m);
         t.cleanup();
+    });
+    it('remembers a driver crash for the boot after the journal loses it', () => {
+        const t = pod({ kernel: WLAN_OOPS });
+        t.run();
+        assert.match(t.readState(), new RegExp(`^oops=${BOOT}$`, 'm'));
+        t.set.kernel('');
+        t.minutes(4);
+        assert.equal(rebooted(t.log()), false, 'not before 5 minutes');
+        const out = t.minutes(1);
+        assert.equal(rebooted(t.log()), true);
+        assert.match(out, /restarting the Pod: the Wi-Fi driver crashed this boot/);
+        assert.match(t.readState(), new RegExp(`^oops=${BOOT}$`, 'm'), 'kept across writes');
+        t.cleanup();
+        const other = 'bbbbbbbb-0000-4000-8000-000000000002';
+        const next = pod({ kernel: '', state: `boot=${other}\ndown_since=0\nscan_failing_since=\nrestarts=\nlast_restart=\noops=${other}\n` });
+        next.minutes(10);
+        assert.equal(rebooted(next.log()), false, 'a crash from another boot does not count');
+        assert.match(next.readState(), /^oops=$/m);
+        next.cleanup();
     });
     it('forgets an outage seen in an earlier boot', () => {
         const t = pod({ kernel: WLAN_OOPS, uptime: 700,
@@ -636,6 +662,8 @@ describe('network_watchdog.sh', () => {
         assert.match(r.stdout, /^decision: would restart the Pod: the Wi-Fi driver crashed this boot and the network has been down for 10 minutes/m);
         assert.equal(rebooted(t.log()), false);
         assert.equal(t.readState(), '');
+        // Already reconnected for this outage, so the scan rule decides.
+        t.writeState(`boot=${BOOT}\ndown_since=0\nreconnected_episode=0\n`);
         const scans = t.run(['--dry-run'], {
             NIGHTSTAND_NETWATCH_NETWORK: 'down', NIGHTSTAND_NETWATCH_SCAN_FAILING_FOR: '1200', NIGHTSTAND_NETWATCH_DOWN_FOR: '1200',
         });
@@ -647,6 +675,113 @@ describe('network_watchdog.sh', () => {
         assert.equal(rebooted(t.log()), false);
         t.cleanup();
     });
+    it('reconnects once after 3 minutes down with no driver crash', () => {
+        const t = pod();
+        t.minutes(2);
+        assert.equal(reconnects(t.log()), 0, 'not before 3 minutes');
+        const out = t.minutes(1);
+        assert.equal(reconnects(t.log()), 1);
+        assert.match(out, /Network watchdog: the network has been down for 3 minutes; reconnecting Wi-Fi on wlan0/);
+        const state = t.readState();
+        assert.match(state, new RegExp(`^reconnects=${NOW + 180},${BOOT}$`, 'm'));
+        assert.match(state, /^reconnected_episode=3600$/m);
+        t.minutes(30, 5);
+        assert.equal(reconnects(t.log()), 1, 'once per outage');
+        assert.equal(rebooted(t.log()), false);
+        t.set.ping(true);
+        t.minutes(0);
+        t.set.ping(false);
+        t.minutes(3);
+        assert.equal(reconnects(t.log()), 2, 'a new outage gets its own reconnect');
+        t.cleanup();
+    });
+    it('dry run says it would reconnect', () => {
+        const t = pod({ state: `boot=${BOOT}\ndown_since=3420\n` });
+        const r = t.run(['--dry-run']);
+        assert.match(r.stdout, /^decision: would reconnect Wi-Fi on wlan0: the network has been down for 3 minutes$/m);
+        assert.equal(reconnects(t.log()), 0);
+        assert.equal(t.readState(), `boot=${BOOT}\ndown_since=3420\n`);
+        t.cleanup();
+    });
+    it('does not reconnect after a driver crash', () => {
+        const t = pod({ kernel: WLAN_OOPS });
+        t.minutes(5);
+        assert.equal(reconnects(t.log()), 0);
+        assert.equal(rebooted(t.log()), true, 'the crash rule still restarts');
+        t.cleanup();
+    });
+    it('does not reconnect while an update holds the lock', () => {
+        const t = pod({ lockHeld: true });
+        t.minutes(10);
+        assert.equal(reconnects(t.log()), 0);
+        t.cleanup();
+        const u = pod({ units: { 'free-sleep-update.service': 'active' } });
+        u.minutes(10);
+        assert.equal(reconnects(u.log()), 0);
+        u.cleanup();
+        const p = pod({ processes: [['bash', 'install.sh']] });
+        p.minutes(10);
+        assert.equal(reconnects(p.log()), 0);
+        p.cleanup();
+    });
+    it('does not reconnect a fourth time in 24 hours', () => {
+        const other = 'bbbbbbbb-0000-4000-8000-000000000002';
+        const three = `boot=${BOOT}\ndown_since=0\nreconnects=${NOW - 20 * 3600},${other} ${NOW - 13 * 3600},${other} ${NOW - 600},${BOOT}\n`;
+        const t = pod({ state: three });
+        t.minutes(10);
+        assert.equal(reconnects(t.log()), 0);
+        t.cleanup();
+        const aged = `boot=${BOOT}\ndown_since=0\nreconnects=${NOW - 25 * 3600},${other} ${NOW - 13 * 3600},${other} ${NOW - 600},${BOOT}\n`;
+        const later = pod({ state: aged });
+        later.run();
+        assert.equal(reconnects(later.log()), 1);
+        assert.doesNotMatch(later.readState(), new RegExp(String(NOW - 25 * 3600)), 'reconnects older than a day are dropped');
+        later.cleanup();
+    });
+    it('gives up on a wedged nmcli within PROBE_SECONDS and exits', () => {
+        const t = pod({ state: `boot=${BOOT}\ndown_since=0\n` });
+        const pid = path.join(t.dir, 'nmcli.pid');
+        t.stub('nmcli', `echo $$ > "${pid}"\nexec sleep 600`);
+        const started = Date.now();
+        const r = t.run([], { NIGHTSTAND_NETWATCH_PROBE_SECONDS: '1' });
+        const took = Date.now() - started;
+        try {
+            process.kill(Number(readFileSync(pid, 'utf8')), 'SIGKILL');
+        }
+        catch { /* already gone */ }
+        assert.ok(took < 6_000, `took ${took} ms`);
+        assert.equal(r.status, 0, r.stderr);
+        assert.equal(reconnects(t.log()), 1);
+        assert.match(t.readState(), /^reconnected_episode=0$/m, 'recorded before the attempt');
+        t.cleanup();
+    });
+    it('reconnects without the hardware watchdog', () => {
+        const t = pod({ watchdog: null, state: `boot=${BOOT}\ndown_since=0\n` });
+        t.run();
+        assert.equal(reconnects(t.log()), 1);
+        t.cleanup();
+    });
+    it('finds the Wi-Fi interface without a default route', () => {
+        const t = pod({ routes: NO_DEFAULT_ROUTE, state: `boot=${BOOT}\ndown_since=0\n` });
+        t.run();
+        assert.equal(reconnects(t.log()), 1);
+        t.cleanup();
+        const none = pod({ wireless: [], routes: NO_DEFAULT_ROUTE, state: `boot=${BOOT}\ndown_since=0\n` });
+        none.run();
+        assert.doesNotMatch(none.log(), /^nmcli/m, 'no Wi-Fi interface, no reconnect');
+        none.cleanup();
+    });
+    it('prefers wlan0 over the driver\'s other wireless interfaces', () => {
+        const t = pod({ wireless: ['ap0', 'p2p0', 'wlan0'], state: `boot=${BOOT}\ndown_since=0\n` });
+        t.run();
+        assert.equal(reconnects(t.log()), 1);
+        assert.doesNotMatch(t.log(), /device connect (ap0|p2p0)/);
+        t.cleanup();
+        const other = pod({ wireless: ['p2p0', 'wlan1'], state: `boot=${BOOT}\ndown_since=0\n` });
+        other.run();
+        assert.match(other.log(), /^nmcli -w 30 device connect p2p0$/m, 'otherwise the first one');
+        other.cleanup();
+    });
     it('rejects unknown arguments', () => {
         const t = pod({ kernel: WLAN_OOPS });
         const r = t.run(['--now']);
@@ -654,7 +789,7 @@ describe('network_watchdog.sh', () => {
         assert.equal(rebooted(t.log()), false);
         t.cleanup();
     });
-    it('touches nothing but its own state, the journal and the gateway', () => {
+    it('touches nothing but its own state, the journal, nmcli and the gateway', () => {
         const src = readFileSync(SCRIPT, 'utf8');
         assert.doesNotMatch(src, /iptables|sshd|dropbear|\/opt\/eight|frank|capybara/i);
         assert.match(src, /^if \[ -z "\$\{BASH_VERSION:-\}" \]; then exec bash "\$0" "\$@"; fi$/m, 'bash re-exec guard');

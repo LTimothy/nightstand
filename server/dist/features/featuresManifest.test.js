@@ -100,7 +100,7 @@ describe('FEATURES_MANIFEST', () => {
         assert.doesNotMatch(entry.description, /records no new result/);
     });
     it('points update, biometrics, alarm tap, tap gesture and cover button entries at files that exist', () => {
-        for (const id of ['agent', 'biometrics', 'tap-alarm', 'tap-gestures', 'cover-buttons']) {
+        for (const id of ['agent', 'biometrics', 'tap-alarm', 'tap-gestures', 'cover-buttons', 'journal-in-memory']) {
             const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === id);
             assert.ok(entry, `${id} has no featuresManifest entry`);
             for (const file of [...entry.touchpoints, ...entry.tests]) {

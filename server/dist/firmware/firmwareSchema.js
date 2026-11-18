@@ -17,7 +17,7 @@ export const ThermostatSchema = z.object({
     power: z.number().finite().min(-100).max(100).nullable(), valid: z.boolean(), enabled: z.boolean(),
 }).strict();
 export const HEALTH_MESSAGES = {
-    moisture: 'Moisture conditions updated.',
+    moisture: 'Moisture reading',
     'pump-interlock': 'Temperature control paused while the pump is stopped.',
     'pump-running': 'Water pump running',
     'pump-stopped': 'Water pump stopped',

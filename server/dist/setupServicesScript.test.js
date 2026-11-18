@@ -270,6 +270,8 @@ describe('setup_services.sh', () => {
             'dac ALL=(root) NOPASSWD: /bin/systemctl start free-sleep-revert.service --no-block',
             'dac ALL=(ALL) NOPASSWD: /bin/sh /usr/local/lib/nightstand/live/scripts/disable_biometrics.sh',
             'dac ALL=(root) NOPASSWD: /bin/systemctl enable --now free-sleep-stream.service',
+            'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh memory',
+            'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh disk',
         ]);
         assert.ok(rules.every((rule) => !/[*?[\]]/.test(rule.split('NOPASSWD:')[1])), 'no wildcards');
     });

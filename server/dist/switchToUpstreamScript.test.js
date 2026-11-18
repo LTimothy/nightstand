@@ -78,6 +78,7 @@ describe('switch-to-upstream.sh', () => {
         assert.match(rest, /free-sleep\.service\.d\/10-nightstand-limits\.conf/);
         assert.match(rest, /free-sleep-stream\.service\.d\/10-nightstand-limits\.conf/);
         assert.match(rest, /free-sleep\.service\.d\/20-nightstand-restart\.conf/);
+        assert.match(rest, /\/etc\/systemd\/journald\.conf\.d\/10-nightstand-memory\.conf/);
         assert.match(rest, /systemctl disable --now free-sleep-health\.timer/);
         assert.match(rest, /\/etc\/systemd\/system\/free-sleep-health\.service/);
         assert.match(rest, /\/etc\/systemd\/system\/free-sleep-health\.timer/);

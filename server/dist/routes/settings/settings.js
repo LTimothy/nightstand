@@ -9,6 +9,7 @@ import settingsDB, { updateSettings } from '../../db/settings.js';
 import { SettingsSchema } from '../../db/settingsSchema.js';
 import { changesRhythmsFlag, pauseRejection, wouldOrphanLevelFormat } from './settingsGuards.js';
 import { syncRawArchiveConf } from '../../jobs/rawArchiveConf.js';
+import { syncJournalStorage } from '../../jobs/journalStorage.js';
 router.get('/settings', async (req, res) => {
     await settingsDB.read();
     res.json(settingsDB.data);
@@ -69,6 +70,9 @@ router.post('/settings', async (req, res) => {
     }, async (draft) => {
         if (validatedUpdate.rawArchiveRetentionDays !== undefined) {
             await syncRawArchiveConf(draft.rawArchiveRetentionDays);
+        }
+        if (validatedUpdate.features?.journalInMemory !== undefined) {
+            await syncJournalStorage(draft.features.journalInMemory);
         }
     });
     if (conflict) {

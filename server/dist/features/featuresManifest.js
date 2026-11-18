@@ -711,21 +711,23 @@ export const FEATURES_MANIFEST = [
         title: 'Hardware watchdog',
         description: 'After a successful install or update, sets systemd\'s RuntimeWatchdogSec to 30 seconds through a drop-in, '
             + 'after a one-minute trial from /run, so a frozen kernel or PID 1 resets the Pod. Pod 5 only (mtk-wdt, 31 s '
-            + 'maximum, hub revision G53 or later); skipped where the device, systemd or the driver\'s timeout limits cannot '
-            + 'hold it, after a trial that did not finish, and after the owner turned it off with --remove.',
+            + 'maximum, hub revision G43 or later; checked on a G53 hub, not on G43 to G52); skipped where the device, '
+            + 'systemd or the driver\'s timeout limits cannot hold it, after a trial that did not finish, and after the owner '
+            + 'turned it off with --remove.',
         category: 'safety',
         version: 'n/a',
         flag: null,
         default: true,
         touchpoints: [
             'scripts/setup_watchdog.sh', 'scripts/update.sh', 'scripts/install.sh', 'scripts/migrate/pod-installer.sh',
-            'scripts/switch-to-upstream.sh', 'scripts/rollback_pod.sh', 'scripts/reset.sh',
+            'scripts/switch-to-upstream.sh', 'scripts/rollback_pod.sh', 'scripts/reset.sh', 'server/src/hardwareWatchdog.ts',
         ],
         depends_on: ['agent'],
         reversible: true,
         tests: [
             'server/src/watchdogScript.test.ts', 'server/src/updaterScripts.test.ts', 'server/src/migrationScripts.test.ts',
             'server/src/rollbackScript.test.ts', 'server/src/switchToUpstreamScript.test.ts', 'server/src/resetScript.test.ts',
+            'server/src/hardwareWatchdog.test.ts',
         ],
         upstream_offer: false,
         rationale: 'Safety: a frozen system otherwise leaves the Pod with no server and no cooling until it is unplugged. '
@@ -733,8 +735,10 @@ export const FEATURES_MANIFEST = [
     },
     {
         id: 'network-watchdog',
-        title: 'Restart the Pod when its Wi-Fi driver has died',
-        description: 'Where the stock Wi-Fi driver is loaded and the hardware watchdog is on, a one-minute timer restarts '
+        title: 'Reconnect Wi-Fi, then restart the Pod when its Wi-Fi driver has died',
+        description: 'Where the stock Wi-Fi driver is loaded, a one-minute timer first tries one Wi-Fi reconnect after the '
+            + 'gateway has not answered for 3 minutes, before any restart, unless that driver crashed this boot; at most 3 '
+            + 'reconnects in 24 hours. With the hardware watchdog on, it then restarts '
             + 'the Pod when the gateway has not answered for 5 minutes after a crash of that driver, or for 20 minutes '
             + 'while its scans fail with the error the crashed driver gives. A router that is away while scans work never '
             + 'counts. Not in the first 10 minutes after boot or while an update, rollback, switch, install, reset or '
@@ -1127,6 +1131,25 @@ export const FEATURES_MANIFEST = [
         tests: ['server/src/routes/storage/parseFlashWear.test.ts', 'app/src/pages/StatusPage/FlashHealthPanel.test.tsx'],
         upstream_offer: false,
         rationale: 'Always on: it only reads three kernel files and changes nothing, so there is nothing to turn off.',
+    },
+    {
+        id: 'journal-in-memory',
+        title: 'Keep the system log in memory',
+        description: 'Keeps the systemd journal in RAM instead of on flash, from the next restart of the Pod. Off by default.',
+        category: 'platform',
+        version: '3.9.0',
+        flag: 'journalInMemory',
+        default: false,
+        touchpoints: [
+            'scripts/journal_storage.sh', 'scripts/record_stock.sh', 'scripts/setup_services.sh',
+            'server/src/jobs/journalStorage.ts', 'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: ['server/src/journalStorageScript.test.ts', 'server/src/jobs/journalStorage.test.ts'],
+        upstream_offer: false,
+        rationale: 'Optional: it cuts flash writes but loses the system log from before each restart, which is what '
+            + 'explains a crash or a watchdog reset. Nightstand\'s own logs stay on flash.',
     },
 ];
 //# sourceMappingURL=featuresManifest.js.map

@@ -1,6 +1,7 @@
 import settingsDB from './db/settings.js';
 import { firmwareHealthSummary } from './firmware/firmwareRuntime.js';
 import { bootRescueStatus, readBootSettings } from './bootRescue.js';
+import { hardwareWatchdogStatus, readWatchdogDropin, readWatchdogMark } from './hardwareWatchdog.js';
 import { isSystemDateValid } from './jobs/isSystemDateValid.js';
 import servicesDB, { updateServices } from './db/services.js';
 import { prisma } from './db/prisma.js';
@@ -29,6 +30,11 @@ class ServerStatus {
                 status: 'not_started',
                 description: 'Whether serial rescue still works',
                 message: 'Boot settings not read yet.',
+            },
+            hardwareWatchdog: {
+                name: 'Hardware watchdog',
+                description: 'Restarts the Pod within about 30 seconds if its system freezes.',
+                ...hardwareWatchdogStatus(readWatchdogDropin(), readWatchdogMark()),
             },
             database: {
                 name: 'Database',
@@ -214,6 +220,7 @@ class ServerStatus {
         await this.updateServices();
         this.updateSystemDate();
         Object.assign(this.status.bootRescue, bootRescueStatus(readBootSettings()));
+        Object.assign(this.status.hardwareWatchdog, hardwareWatchdogStatus(readWatchdogDropin(), readWatchdogMark()));
         await settingsDB.read();
         const firmwareHealth = firmwareHealthSummary(settingsDB.data.features, servicesDB.data.biometrics.enabled);
         if (firmwareHealth)
