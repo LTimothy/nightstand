@@ -66,4 +66,31 @@ describe('attachRequestCompletionLogging', () => {
       { level: 'warn', message: 'GET /api/deviceStatus - client disconnected after 5000ms with no response sent' },
     ]);
   });
+
+  describe('service heartbeat', () => {
+    function logAt(method: string, url: string, status: number, ms: number) {
+      const { lines, sink } = makeSink();
+      const res = makeRes(status);
+      let t = 0;
+      attachRequestCompletionLogging({ method, originalUrl: url }, res, sink, () => {
+        const v = t;
+        t += ms;
+        return v;
+      });
+      res.emit('finish');
+      return lines.map((l) => l.level);
+    }
+
+    it('logs a slow successful POST /api/services at debug', () => {
+      assert.deepStrictEqual(logAt('POST', '/api/services', 200, 300), ['debug']);
+    });
+
+    it('still logs a failed POST /api/services at info', () => {
+      assert.deepStrictEqual(logAt('POST', '/api/services', 500, 300), ['info']);
+    });
+
+    it('still logs another slow route at info', () => {
+      assert.deepStrictEqual(logAt('POST', '/api/settings', 200, 300), ['info']);
+    });
+  });
 });

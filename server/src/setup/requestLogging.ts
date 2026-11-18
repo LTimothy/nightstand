@@ -36,7 +36,9 @@ export function attachRequestCompletionLogging(
     const duration = now() - startTime;
     const isError = res.statusCode >= 400;
     const isSlow = duration >= SLOW_REQUEST_MS;
-    if (isError || isSlow) {
+    // The stream posts this heartbeat every ~21s and it runs over the slow threshold.
+    const isHeartbeat = req.method === 'POST' && req.originalUrl.split('?')[0] === '/api/services';
+    if (isError || (isSlow && !isHeartbeat)) {
       log.info(`${req.method} ${req.originalUrl} - ${res.statusCode} - ${duration}ms`);
     } else {
       log.debug(`${req.method} ${req.originalUrl} - ${res.statusCode} - ${duration}ms`);
