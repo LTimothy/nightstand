@@ -72,12 +72,24 @@ const decodeSettings = (rawSettings) => {
     const renamedDecoded = _.mapKeys(decoded, (value, key) => SETTINGS_KEY_MAPPING[key] || key);
     return renamedDecoded;
 };
+// A hardware revision is one capital letter and two digits; anything else is unknown.
+const REVISION = /^[A-Z][0-9]{2}$/;
+let coverOutOfRangeLogged = false;
 const detectCoverVersion = (sensorLabel) => {
     try {
         if (!sensorLabel)
             return Version.NotFound;
         const hwRev = sensorLabel.split('-')[2];
-        if (hwRev >= 'J00') {
+        if (!REVISION.test(hwRev ?? ''))
+            return Version.NotFound;
+        if (hwRev >= 'K00') {
+            if (!coverOutOfRangeLogged) {
+                coverOutOfRangeLogged = true;
+                logger.info(`Cover revision ${hwRev} is outside the range checked so far, reading the cover model as unknown`);
+            }
+            return Version.NotFound;
+        }
+        else if (hwRev >= 'J00') {
             // Guessing Pod 5 here, based off Discord
             // https://discord.com/channels/1326539919467745361/1430959872408686775/1431033889924579419
             return Version.Pod5;
@@ -113,14 +125,25 @@ const loadDeviceLabel = async () => {
     logger.info('Device label not found');
     return undefined;
 };
-// The lowest Pod 5 hub reported is G43; no Pod 4 hub revision has been reported.
-export const hubVersionFromRevision = (hwRev) => hwRev >= 'G43' ? Version.Pod5 : hwRev >= 'G00' ? Version.Pod4 : undefined;
+// Pod 5 hubs have reported G43, G45 and G55. A hub at I00 or later is a
+// generation not checked yet, so it reads as unknown rather than as a Pod 5.
+export const hubVersionFromRevision = (hwRev) => {
+    if (!hwRev || !REVISION.test(hwRev))
+        return undefined;
+    if (hwRev >= 'I00')
+        return Version.NotFound;
+    return hwRev >= 'G43' ? Version.Pod5 : hwRev >= 'G00' ? Version.Pod4 : undefined;
+};
 const detectHubVersion = async () => {
     try {
         const label = await loadDeviceLabel();
         if (!label)
             return Version.NotFound;
-        const fromRevision = hubVersionFromRevision(label.split('-')[2]);
+        const revision = label.split('-')[2];
+        const fromRevision = hubVersionFromRevision(revision);
+        if (fromRevision === Version.NotFound) {
+            logger.info(`Hub revision ${revision} is outside the range checked so far, reading the hub model as unknown`);
+        }
         if (fromRevision) {
             return fromRevision;
         }

@@ -6,6 +6,44 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [3.9.0] - 2026-11-17
+
+Lets other Pods opt in to capacitance presence, quiets System status, and adds a Wi-Fi reconnect and an option to keep the system log in memory.
+
+### Features
+
+- Settings > Features > Capacitance presence on other Pods (beta), off by
+  default: on a Pod other than a Pod 5, presence follows the capacitance
+  sensors of New sleep tracking once the nightly analysis has learned both
+  sides. Checked against recorded nights from one Pod 3. By @Ali-Al1.
+- Settings > Features > Keep the system log in memory, off by default, keeps
+  the systemd journal in RAM from the next restart to save flash wear. It
+  keeps only the most recent 64 MB and clears when the Pod restarts;
+  Nightstand's own logs are kept. Turning it off puts the log back on flash
+  at the next restart.
+- The network watchdog tries one Wi-Fi reconnect after 3 minutes offline,
+  before any restart: once per outage, at most 3 a day, and not after a
+  driver crash or while an update runs. It runs on any Pod with the stock
+  Wi-Fi driver.
+- The hardware watchdog turns on for Pod 5 hubs from revision G43 up to, but
+  not including, I00, and System status shows whether it is on. The network
+  watchdog remembers a Wi-Fi driver crash until the next restart.
+
+### Fixes
+
+- Firmware health lists firmware events instead of the Pod's routine
+  reprints, and a paused stream shows "No recent readings" unless the
+  firmware reports a fault.
+- System status says "Off" for a firmware target that is off and "Side is
+  off." for a side that is off, and hides the Cover buttons row on a Pod 5
+  hub, where it does nothing.
+- A hub or cover revision past the range seen on a Pod 5 is no longer treated
+  as a Pod 5.
+- The biometrics stream's routine status check no longer fills the server
+  log.
+
+Checked on: Pod 5, deployed from this code: System status, firmware health across sensor resets, the hardware and network watchdogs (dry run), and the log switch turned on and off; the log in memory across one restart; Wi-Fi reconnect after one deliberate disconnect; not on other Pod 5 hub revisions, a real Wi-Fi outage, or other Pods; capacitance presence replayed on Pod 3 nights only; no nights yet.
+
 ## [3.8.2] - 2026-11-17
 
 Reads the firmware socket path on Pods without frank.sh and reports more Pod 5 hubs correctly.
