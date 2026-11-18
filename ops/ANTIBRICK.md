@@ -307,9 +307,9 @@ auto-off switch.
 - **Hardware watchdog.** Install, update and the fork switch run
   `scripts/setup_watchdog.sh --auto` once they have succeeded. It turns on
   systemd's runtime watchdog (30 seconds), so a frozen system restarts the
-  Pod. It does so only on a Pod 5 like the one it was checked on: the
-  `mtk-wdt` driver with a 31 second maximum and a hub revision of G53 or
-  later. It first tries the setting for 60 seconds from `/run`, so a
+  Pod. It does so only on a Pod 5: the `mtk-wdt` driver with a 31 second
+  maximum and a hub revision of G43 or later. It was checked on a G53 hub,
+  not on G43 to G52. It first tries the setting for 60 seconds from `/run`, so a
   watchdog that does not work resets the Pod once rather than at every boot,
   and a failed trial is recorded so later runs do not try again. A deploy
   does not run it.

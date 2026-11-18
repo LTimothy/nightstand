@@ -82,17 +82,20 @@ S_SCAN=$(state_get scan_failing_since)
 S_RESTARTS=$(state_get restarts)
 S_LAST=$(state_get last_restart)
 S_WAIT=$(state_get waiting)
-[ "$S_BOOT" = "$BOOT" ] || S_WAIT=
+# The boot id of a driver crash seen in the journal, which can rotate it out.
+S_OOPS=$(state_get oops)
+[ "$S_BOOT" = "$BOOT" ] || { S_WAIT=; S_OOPS=; }
 if [ "$S_BOOT" != "$BOOT" ] || ! number "$S_DOWN"; then S_DOWN=; S_SCAN=; fi
 number "$S_SCAN" || S_SCAN=
 
 # Replaces the state file at once through a new file, so a link planted in
 # the data folder is never followed. Fails when it could not be written.
+# Fields after waiting come from their S_ globals.
 write_state() {
   local tmp
   tmp=$(mktemp "$STATE.XXXXXX" 2>/dev/null) || return 1
-  if ! printf 'boot=%s\ndown_since=%s\nscan_failing_since=%s\nrestarts=%s\nlast_restart=%s\nwaiting=%s\n' \
-    "$BOOT" "$1" "$2" "$3" "$4" "$5" > "$tmp" 2>/dev/null || ! mv -f "$tmp" "$STATE" 2>/dev/null; then
+  if ! printf 'boot=%s\ndown_since=%s\nscan_failing_since=%s\nrestarts=%s\nlast_restart=%s\nwaiting=%s\noops=%s\n' \
+    "$BOOT" "$1" "$2" "$3" "$4" "$5" "$S_OOPS" > "$tmp" 2>/dev/null || ! mv -f "$tmp" "$STATE" 2>/dev/null; then
     rm -f "$tmp" 2>/dev/null
     return 1
   fi
@@ -149,7 +152,7 @@ oops_in() {
     END { exit !found }'
 }
 driver_crashed() {
-  journalctl -k -b --no-pager -o cat 2>/dev/null | oops_in || dmesg 2>/dev/null | oops_in
+  { [ -n "$BOOT" ] && [ "$S_OOPS" = "$BOOT" ]; } || journalctl -k -b --no-pager -o cat 2>/dev/null | oops_in || dmesg 2>/dev/null | oops_in
 }
 # Only the code the dead driver gives. -16 (busy) is an ordinary driver
 # turning down a scan while another runs.
@@ -190,6 +193,8 @@ elif driver_crashed; then
 fi
 SCANS=$(scan_failures)
 number "$SCANS" || SCANS=0
+OOPS_NEW=no
+if [ "$OOPS" = yes ] && [ "$S_OOPS" != "$BOOT" ]; then S_OOPS=$BOOT; OOPS_NEW=yes; fi
 
 DOWN_SINCE=
 SCAN_SINCE=
@@ -199,7 +204,7 @@ case "$NETWORK" in
   down*)
     DOWN_SINCE=${S_DOWN:-$UP}
     [ "$SCANS" -lt "$SCAN_FAILURES" ] || SCAN_SINCE=${S_SCAN:-$UP}
-    if [ "$DRY" = no ] && { [ "$DOWN_SINCE" != "$S_DOWN" ] || [ "$SCAN_SINCE" != "$S_SCAN" ]; }; then
+    if [ "$DRY" = no ] && { [ "$DOWN_SINCE" != "$S_DOWN" ] || [ "$SCAN_SINCE" != "$S_SCAN" ] || [ "$OOPS_NEW" = yes ]; }; then
       [ -n "$S_DOWN" ] || say "the network is $NETWORK"
       write_state "$DOWN_SINCE" "$SCAN_SINCE" "$S_RESTARTS" "$S_LAST" "$S_WAIT"
     fi

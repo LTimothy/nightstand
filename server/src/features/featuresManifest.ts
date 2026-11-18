@@ -738,21 +738,23 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     title: 'Hardware watchdog',
     description: 'After a successful install or update, sets systemd\'s RuntimeWatchdogSec to 30 seconds through a drop-in, '
       + 'after a one-minute trial from /run, so a frozen kernel or PID 1 resets the Pod. Pod 5 only (mtk-wdt, 31 s '
-      + 'maximum, hub revision G53 or later); skipped where the device, systemd or the driver\'s timeout limits cannot '
-      + 'hold it, after a trial that did not finish, and after the owner turned it off with --remove.',
+      + 'maximum, hub revision G43 or later; checked on a G53 hub, not on G43 to G52); skipped where the device, '
+      + 'systemd or the driver\'s timeout limits cannot hold it, after a trial that did not finish, and after the owner '
+      + 'turned it off with --remove.',
     category: 'safety',
     version: 'n/a',
     flag: null,
     default: true,
     touchpoints: [
       'scripts/setup_watchdog.sh', 'scripts/update.sh', 'scripts/install.sh', 'scripts/migrate/pod-installer.sh',
-      'scripts/switch-to-upstream.sh', 'scripts/rollback_pod.sh', 'scripts/reset.sh',
+      'scripts/switch-to-upstream.sh', 'scripts/rollback_pod.sh', 'scripts/reset.sh', 'server/src/hardwareWatchdog.ts',
     ],
     depends_on: ['agent'],
     reversible: true,
     tests: [
       'server/src/watchdogScript.test.ts', 'server/src/updaterScripts.test.ts', 'server/src/migrationScripts.test.ts',
       'server/src/rollbackScript.test.ts', 'server/src/switchToUpstreamScript.test.ts', 'server/src/resetScript.test.ts',
+      'server/src/hardwareWatchdog.test.ts',
     ],
     upstream_offer: false,
     rationale: 'Safety: a frozen system otherwise leaves the Pod with no server and no cooling until it is unplugged. '

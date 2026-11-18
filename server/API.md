@@ -1459,6 +1459,9 @@ the biometrics service; `/api/deviceStatus` converts them.
   `bootdelay` is -2 or below or the boot slots differ (both
   messages when both hold), and `not_started` when the file is missing or
   the settings could not be read.
+- `hardwareWatchdog` is always `healthy`; its message says whether the
+  watchdog is on (30 s), off on this Pod, turned off by hand, or off
+  because its first try did not finish.
 
 #### Response
 
@@ -1472,6 +1475,7 @@ the biometrics service; `/api/deviceStatus` converts them.
   "buttonMonitor": { "name": "Cover buttons", "status": "healthy", "description": "Reads ignored cover clicks from the RAW files", "message": "Off in Settings > Bed and sides > Cover buttons", "timestamp": "2026-09-20T18:04:11-07:00" },
   "jobs": { "name": "Job scheduler", "status": "healthy", "description": "Scheduling service for temperature changes, alarms, and maintenance", "message": "" },
   "bootRescue": { "name": "Boot rescue", "status": "healthy", "description": "Whether serial rescue still works", "message": "Serial rescue is available (bootdelay 2)." },
+  "hardwareWatchdog": { "name": "Hardware watchdog", "status": "healthy", "description": "Restarts the Pod within about 30 seconds if its system freezes.", "message": "Hardware watchdog on (30 s)." },
   "logger": { "name": "Logger", "status": "healthy", "description": "Logging service", "message": "" },
   "powerSchedule": { "name": "Power schedule", "status": "healthy", "description": "Power on/off schedule", "message": "" },
   "primeSchedule": { "name": "Prime schedule", "status": "healthy", "description": "Daily prime job", "message": "" },

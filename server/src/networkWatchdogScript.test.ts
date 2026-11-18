@@ -407,6 +407,27 @@ describe('network_watchdog.sh', () => {
     t.cleanup();
   });
 
+  it('remembers a driver crash for the boot after the journal loses it', () => {
+    const t = pod({ kernel: WLAN_OOPS });
+    t.run();
+    assert.match(t.readState(), new RegExp(`^oops=${BOOT}$`, 'm'));
+    t.set.kernel('');
+    t.minutes(4);
+    assert.equal(rebooted(t.log()), false, 'not before 5 minutes');
+    const out = t.minutes(1);
+    assert.equal(rebooted(t.log()), true);
+    assert.match(out, /restarting the Pod: the Wi-Fi driver crashed this boot/);
+    assert.match(t.readState(), new RegExp(`^oops=${BOOT}$`, 'm'), 'kept across writes');
+    t.cleanup();
+
+    const other = 'bbbbbbbb-0000-4000-8000-000000000002';
+    const next = pod({ kernel: '', state: `boot=${other}\ndown_since=0\nscan_failing_since=\nrestarts=\nlast_restart=\noops=${other}\n` });
+    next.minutes(10);
+    assert.equal(rebooted(next.log()), false, 'a crash from another boot does not count');
+    assert.match(next.readState(), /^oops=$/m);
+    next.cleanup();
+  });
+
   it('forgets an outage seen in an earlier boot', () => {
     const t = pod({ kernel: WLAN_OOPS, uptime: 700,
       state: 'boot=bbbbbbbb-0000-4000-8000-000000000002\ndown_since=100\nscan_failing_since=100\nrestarts=\nlast_restart=\n' });

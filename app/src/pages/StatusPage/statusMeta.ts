@@ -162,6 +162,11 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
     group: 'core',
     blurb: 'Whether serial rescue still works',
   },
+  hardwareWatchdog: {
+    group: 'core',
+    blurb: 'Restarts the Pod within about 30 seconds if its system freezes.',
+    meaning: { healthy: 'Shows whether the watchdog is on for this Pod.' },
+  },
   database: {
     group: 'core',
     blurb: 'Local storage for your settings, schedules, and sleep history.',

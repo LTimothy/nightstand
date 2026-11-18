@@ -96,9 +96,10 @@ is paused). One turned on by hand goes off after 12 hours. Temperature
 changes and alarms stop until Nightstand is back.
 
 Nightstand restarts itself if it crashes or stops answering. On a Pod 5 whose
-hub label shows revision G53 or later, it also sets up watchdogs that restart the Pod if its system freezes, or if the
+hub label shows revision G43 or later, it also sets up watchdogs that restart the Pod if its system freezes, or if the
 stock Wi-Fi driver has crashed and the network stays down
 ([how and how often](INSTALLATION.md#13-install-the-nightstand-server)).
+The hardware watchdog was checked on a G53 hub, not yet on G43 to G52.
 Whether a restart brings Wi-Fi back isn't confirmed yet. Other models are
 left as they are.
 

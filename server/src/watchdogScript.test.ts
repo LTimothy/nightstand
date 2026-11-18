@@ -213,11 +213,22 @@ describe('setup_watchdog.sh', () => {
       } finally { p.cleanup(); }
     });
 
+    for (const revision of ['G43', 'G52']) {
+      it(`arms on a ${revision} label`, () => {
+        const p = pod({ ...checked, label: `20500-0005-${revision}-00012345\n` });
+        try {
+          const result = p.run('--auto');
+          assert.equal(result.status, 0, result.stdout + result.stderr);
+          assert.match(p.dropin() ?? '', /RuntimeWatchdogSec=30s/);
+        } finally { p.cleanup(); }
+      });
+    }
+
     const unsupported: Array<[string, Pod, RegExp]> = [
       ['another driver', { driver: 'omap_wdt' }, /driver omap_wdt/],
       ['another compatible', { compatible: ['mediatek,mt6589-wdt'] }, /compatible mediatek,mt6589-wdt/],
       ['a compatible with only a matching prefix', { compatible: ['mediatek,mt8365-wdt-other'] }, /compatible mediatek,mt8365-wdt-other/],
-      ['an older revision', { label: '20500-0005-G52-00012345\n' }, /revision G52/],
+      ['a G42 label', { label: '20500-0005-G42-00012345\n' }, /revision G42/],
     ];
     for (const [why, opts, found] of unsupported) {
       it(`skips ${why} and reports what it found`, () => {
@@ -386,8 +397,8 @@ describe('setup_watchdog.sh', () => {
     p.cleanup();
   });
 
-  it('is turned on only on the Pod 5 it was checked on, and tries again at the next update', () => {
-    // A Pod 4 with a G-revision label older than G53, or a driver other than
+  it('is left off on a hub older than G43 or an unchecked driver, and tries again at the next update', () => {
+    // A hub with a G-revision label older than G43, or a driver other than
     // mtk-wdt with its 31 second maximum, has not been checked.
     const other: Array<[string, Pod]> = [
       ['an older hub revision', { label: '20500-0004-G00-00012345\n' }],
@@ -404,6 +415,7 @@ describe('setup_watchdog.sh', () => {
       const result = p.run();
       assert.equal(result.status, 0, why);
       assert.match(result.stdout, /Hardware watchdog left off: .*Pod 5/, why);
+      if (why === 'no device label' || why === 'a label without dashes') assert.match(result.stdout, /revision unknown/, why);
       assert.equal(p.dropin(), null, why);
       assert.equal(p.reexecs(), 0, why);
       assert.equal(p.mark(), null, `${why}: a skipped Pod is not marked, so it tries again`);

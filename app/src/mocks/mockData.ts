@@ -445,6 +445,12 @@ const createServerStatus = (): ServerStatus => ({
     description: 'Whether serial rescue still works',
     message: 'Serial rescue is available (bootdelay 2).',
   },
+  hardwareWatchdog: {
+    name: 'Hardware watchdog',
+    status: 'healthy',
+    description: 'Restarts the Pod within about 30 seconds if its system freezes.',
+    message: 'Hardware watchdog on (30 s).',
+  },
   database: {
     name: 'Database',
     status: 'healthy',

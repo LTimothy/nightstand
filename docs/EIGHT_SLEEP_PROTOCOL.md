@@ -253,8 +253,8 @@ Nightstand's `detectCoverVersion` and `detectHubVersion` in
 guess Pod 5 from cover revision `J00` and up and hub revision `G43` and up.
 Pod 5 hubs have reported G43, G45 and G53; no Pod 4 hub revision has been
 reported, so G43 is the lowest revision seen rather than a known boundary.
-The hardware watchdog keeps a stricter G53 rule, since it was checked on one
-G53 hub. ❓ Both thresholds are unconfirmed.
+The hardware watchdog uses the same G43 rule. It was checked on a G53 hub,
+not on G43 to G52. ❓ The threshold is unconfirmed.
 
 📖 [Geczy's hardware page](https://github.com/Geczy/free-sleep/commit/39e2b25e631299e26a175f375b7914336e364b80)
 instead uses cover `J50` and up and hub `G40` and up for Pod 5. Its comments
