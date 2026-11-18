@@ -1,5 +1,5 @@
 [Unit]
-Description=Restart the Pod if its Wi-Fi driver has died
+Description=Reconnect Wi-Fi, then restart the Pod if its Wi-Fi driver has died
 
 [Service]
 Type=oneshot

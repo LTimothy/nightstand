@@ -1,8 +1,13 @@
 #!/bin/bash
-# Restarts the Pod when its Wi-Fi has died and cannot come back by itself.
+# Reconnects Wi-Fi, then restarts the Pod, when its Wi-Fi has died and
+# cannot come back by itself.
 # The stock Wi-Fi driver can crash and leave the Pod running but unreachable
 # until it is unplugged. Runs every minute from
 # free-sleep-network-watchdog.timer, and only where that driver is loaded.
+#
+# After 3 minutes down it asks NetworkManager to reconnect once per outage,
+# at most 3 times in 24 hours, unless the driver crashed this boot or an
+# operation below runs.
 #
 # It restarts when the driver crashed this boot and the network has been down
 # for 5 minutes, or when the network has been down for 20 minutes and Wi-Fi
@@ -33,6 +38,8 @@ MIN_GAP=21600      # at most one restart in 6 hours
 DAY=86400
 DAY_LIMIT=3        # and 3 in 24 hours
 WAIT_LOG=1800      # while a restart waits, log it again every 30 minutes
+RECONNECT_DOWN=180 # one Wi-Fi reconnect after 3 minutes without network
+RECONNECT_DAILY=3  # and at most 3 in 24 hours
 
 STATE="${NIGHTSTAND_NETWATCH_STATE:-/persistent/free-sleep-data/network-watchdog}"
 MODULE="${NIGHTSTAND_NETWATCH_MODULE:-/sys/module/$DRIVER}"
@@ -44,6 +51,7 @@ PROC="${NIGHTSTAND_PROC:-/proc}"
 LOCK="${NIGHTSTAND_OPERATION_LOCK:-/run/lock/free-sleep-operation.lock}"
 [ -n "${NIGHTSTAND_OPERATION_LOCK:-}" ] || [ -d /run/lock ] || LOCK=/tmp/free-sleep-operation.lock
 PROC_LOCKS="${NIGHTSTAND_PROC_LOCKS:-/proc/locks}"
+SYS_NET="${NIGHTSTAND_SYS_NET:-/sys/class/net}"
 OPERATION_UNITS="free-sleep-update.service free-sleep-rollback.service free-sleep-revert.service free-sleep-migrate.service"
 # Scripts that install, reset or replace Nightstand. install.sh run from curl
 # shows up as bash -c with its source, recognized by its first setting.
@@ -84,7 +92,10 @@ S_LAST=$(state_get last_restart)
 S_WAIT=$(state_get waiting)
 # The boot id of a driver crash seen in the journal, which can rotate it out.
 S_OOPS=$(state_get oops)
-[ "$S_BOOT" = "$BOOT" ] || { S_WAIT=; S_OOPS=; }
+S_RECONNECTS=$(state_get reconnects)
+# The down_since of the outage already reconnected for.
+S_EPISODE=$(state_get reconnected_episode)
+[ "$S_BOOT" = "$BOOT" ] || { S_WAIT=; S_OOPS=; S_EPISODE=; }
 if [ "$S_BOOT" != "$BOOT" ] || ! number "$S_DOWN"; then S_DOWN=; S_SCAN=; fi
 number "$S_SCAN" || S_SCAN=
 
@@ -94,8 +105,8 @@ number "$S_SCAN" || S_SCAN=
 write_state() {
   local tmp
   tmp=$(mktemp "$STATE.XXXXXX" 2>/dev/null) || return 1
-  if ! printf 'boot=%s\ndown_since=%s\nscan_failing_since=%s\nrestarts=%s\nlast_restart=%s\nwaiting=%s\noops=%s\n' \
-    "$BOOT" "$1" "$2" "$3" "$4" "$5" "$S_OOPS" > "$tmp" 2>/dev/null || ! mv -f "$tmp" "$STATE" 2>/dev/null; then
+  if ! printf 'boot=%s\ndown_since=%s\nscan_failing_since=%s\nrestarts=%s\nlast_restart=%s\nwaiting=%s\noops=%s\nreconnects=%s\nreconnected_episode=%s\n' \
+    "$BOOT" "$1" "$2" "$3" "$4" "$5" "$S_OOPS" "$S_RECONNECTS" "$S_EPISODE" > "$tmp" 2>/dev/null || ! mv -f "$tmp" "$STATE" 2>/dev/null; then
     rm -f "$tmp" 2>/dev/null
     return 1
   fi
@@ -177,6 +188,7 @@ case "$NETWORK" in
     if [ "$DRY" = no ]; then
       if [ -n "$S_DOWN" ]; then
         case "$NETWORK" in up*) say "the network is back after $(((UP - S_DOWN) / 60)) minutes" ;; esac
+        S_EPISODE=
         write_state "" "" "$S_RESTARTS" "$S_LAST" ""
       fi
       exit 0
@@ -228,38 +240,6 @@ watchdog_on() {
   case "$WATCHDOG" in '' | 0 | 0s | infinity) return 1 ;; esac
 }
 
-show "driver: $DRIVER loaded"
-show "uptime: $UP s"
-show "network: $NETWORK"
-show "driver crash this boot: $OOPS"
-show "scan failures in the last $SCAN_WINDOW minutes: $SCANS"
-show "down for: $DOWN_FOR s; scans failing for: $SCAN_FOR s"
-if [ "$DRY" = yes ]; then
-  if watchdog_on; then
-    echo "hardware watchdog: on ($WATCHDOG)"
-  else
-    echo "hardware watchdog: off${WATCHDOG:+ ($WATCHDOG)}"
-  fi
-fi
-
-REASON=
-RULE=
-case "$NETWORK" in
-  down*)
-    if [ "$OOPS" = yes ] && [ "$DOWN_FOR" -ge "$OOPS_DOWN" ]; then
-      RULE=crash
-      REASON="the Wi-Fi driver crashed this boot and the network has been down for $((DOWN_FOR / 60)) minutes"
-    elif [ "$DOWN_FOR" -ge "$SCAN_DOWN" ] && [ "$SCAN_FOR" -ge "$SCAN_DOWN" ]; then
-      RULE=scans
-      REASON="Wi-Fi scans have failed and the network has been down for $((DOWN_FOR / 60)) minutes"
-    fi
-    ;;
-esac
-if [ -z "$REASON" ]; then
-  show "decision: no action"
-  exit 0
-fi
-
 # Reads /proc/locks rather than taking the lock, which for that moment would
 # make an update starting at the same time refuse to run. Keep in step with
 # health_check.sh.
@@ -302,15 +282,95 @@ operation_process() {
 
 NOW=$(date +%s)
 number "$NOW" || NOW=0
-# Seconds since a restart saved as epoch,boot. One from an earlier boot came
-# before this boot began, so at least the uptime has passed, even while the
-# clock still reads years behind after a restart.
+# Seconds since a restart or reconnect saved as epoch,boot. One from an
+# earlier boot came before this boot began, so at least the uptime has
+# passed, even while the clock still reads years behind after a restart.
 since() {
   local s=$((NOW - ${1%%,*}))
   if [ "${1#*,}" != "$BOOT" ] && [ "$s" -lt "$UP" ]; then s=$UP; fi
   [ "$s" -ge 0 ] || s=0
   echo "$s"
 }
+
+show "driver: $DRIVER loaded"
+show "uptime: $UP s"
+show "network: $NETWORK"
+show "driver crash this boot: $OOPS"
+show "scan failures in the last $SCAN_WINDOW minutes: $SCANS"
+show "down for: $DOWN_FOR s; scans failing for: $SCAN_FOR s"
+if [ "$DRY" = yes ]; then
+  if watchdog_on; then
+    echo "hardware watchdog: on ($WATCHDOG)"
+  else
+    echo "hardware watchdog: off${WATCHDOG:+ ($WATCHDOG)}"
+  fi
+fi
+
+BLOCK=
+KEY=
+if [ "$DOWN_FOR" -ge "$RECONNECT_DOWN" ]; then
+  UNIT=$(busy_unit)
+  if lock_held; then
+    BLOCK="an update, rollback or switch is running"; KEY=lock
+  elif [ -n "$UNIT" ]; then
+    BLOCK="$UNIT is running"; KEY="unit $UNIT"
+  elif operation_process; then
+    BLOCK="an install, reset or biometrics install is running"; KEY=process
+  fi
+fi
+
+IFACE=
+for dir in "$SYS_NET"/*/wireless; do
+  [ -d "$dir" ] || continue
+  IFACE=${dir%/wireless}; IFACE=${IFACE##*/}
+  break
+done
+RECENT=
+RECENT_COUNT=0
+for entry in $S_RECONNECTS; do
+  number "${entry%%,*}" || continue
+  [ "$(since "$entry")" -lt "$DAY" ] || continue
+  RECENT="${RECENT:+$RECENT }$entry"
+  RECENT_COUNT=$((RECENT_COUNT + 1))
+done
+case "$NETWORK" in
+  down*)
+    if [ "$DOWN_FOR" -ge "$RECONNECT_DOWN" ] && [ "$OOPS" = no ] && [ -z "$BLOCK" ] && [ -n "$IFACE" ] \
+      && [ "$S_EPISODE" != "$DOWN_SINCE" ] && [ "$RECENT_COUNT" -lt "$RECONNECT_DAILY" ]; then
+      WHY="the network has been down for $((DOWN_FOR / 60)) minutes"
+      if [ "$DRY" = yes ]; then
+        echo "decision: would reconnect Wi-Fi on $IFACE: $WHY"
+        exit 0
+      fi
+      # Recorded first, so a wedged nmcli cannot turn this into a loop.
+      S_RECONNECTS="${RECENT:+$RECENT }$NOW,$BOOT"
+      S_EPISODE=$DOWN_SINCE
+      if write_state "$DOWN_SINCE" "$SCAN_SINCE" "$S_RESTARTS" "$S_LAST" "$S_WAIT"; then
+        say "$WHY; reconnecting Wi-Fi on $IFACE"
+        probe nmcli -w 30 device connect "$IFACE"
+        exit 0
+      fi
+    fi
+    ;;
+esac
+
+REASON=
+RULE=
+case "$NETWORK" in
+  down*)
+    if [ "$OOPS" = yes ] && [ "$DOWN_FOR" -ge "$OOPS_DOWN" ]; then
+      RULE=crash
+      REASON="the Wi-Fi driver crashed this boot and the network has been down for $((DOWN_FOR / 60)) minutes"
+    elif [ "$DOWN_FOR" -ge "$SCAN_DOWN" ] && [ "$SCAN_FOR" -ge "$SCAN_DOWN" ]; then
+      RULE=scans
+      REASON="Wi-Fi scans have failed and the network has been down for $((DOWN_FOR / 60)) minutes"
+    fi
+    ;;
+esac
+if [ -z "$REASON" ]; then
+  show "decision: no action"
+  exit 0
+fi
 
 RATE=
 RATE_KEY=
@@ -332,15 +392,8 @@ if [ -z "$RATE" ] && [ "$COUNT" -ge "$DAY_LIMIT" ]; then
   RATE_KEY=day
 fi
 
-BLOCK=
-KEY=
-UNIT=$(busy_unit)
-if lock_held; then
-  BLOCK="an update, rollback or switch is running"; KEY=lock
-elif [ -n "$UNIT" ]; then
-  BLOCK="$UNIT is running"; KEY="unit $UNIT"
-elif operation_process; then
-  BLOCK="an install, reset or biometrics install is running"; KEY=process
+if [ -n "$BLOCK" ]; then
+  :
 elif ! watchdog_on; then
   BLOCK="the hardware watchdog is off"; KEY=watchdog
 elif [ -n "$RATE" ]; then

@@ -408,8 +408,12 @@ persistence across a reboot and recovery from a deliberate freeze on my
 Pod 5.
 
 With the watchdog on, and where the Pod uses the stock MT7663 Wi-Fi driver
-(my Pod 5 does), a timer also checks the network every minute. If that
-driver has crashed this boot and the network has been down for 5 minutes, or
+(my Pod 5 does), a timer also checks the network every minute. After 3
+minutes down, before any restart, it asks NetworkManager to reconnect Wi-Fi
+once for that outage, at most three times a day. It skips this after a
+driver crash and during an install, update, rollback, reset or fork switch.
+If that driver has crashed this boot and the network has been down for 5
+minutes, or
 the network has been down for 20 minutes with Wi-Fi scans failing throughout,
 it restarts the Pod: at most once in 6 hours and three times a day, never in
 the first 10 minutes after boot or during an install, update, rollback, reset

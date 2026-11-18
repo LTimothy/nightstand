@@ -762,8 +762,10 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   },
   {
     id: 'network-watchdog',
-    title: 'Restart the Pod when its Wi-Fi driver has died',
-    description: 'Where the stock Wi-Fi driver is loaded and the hardware watchdog is on, a one-minute timer restarts '
+    title: 'Reconnect Wi-Fi, then restart the Pod when its Wi-Fi driver has died',
+    description: 'Where the stock Wi-Fi driver is loaded, a one-minute timer first tries one Wi-Fi reconnect after the '
+      + 'gateway has not answered for 3 minutes, before any restart, unless that driver crashed this boot; at most 3 '
+      + 'reconnects in 24 hours. With the hardware watchdog on, it then restarts '
       + 'the Pod when the gateway has not answered for 5 minutes after a crash of that driver, or for 20 minutes '
       + 'while its scans fail with the error the crashed driver gives. A router that is away while scans work never '
       + 'counts. Not in the first 10 minutes after boot or while an update, rollback, switch, install, reset or '

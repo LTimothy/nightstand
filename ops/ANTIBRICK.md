@@ -323,10 +323,13 @@ auto-off switch.
   Wi-Fi driver is loaded. It restarts the Pod, with a normal reboot, when
   the driver has crashed this boot and the network has been down for 5
   minutes, or when the network has been down for 20 minutes and Wi-Fi scans
-  have failed throughout. It does nothing while the hardware watchdog is
-  off, in the first 10 minutes after boot, or while an install, update,
-  rollback, switch, reset or biometrics install runs, and it restarts the
-  Pod at most once in 6 hours and three times in 24. Its state is in
+  have failed throughout. Separately, after the network has been down for 3
+  minutes it tries one Wi-Fi reconnect, once per outage, at most 3 a day,
+  skipped after a driver crash or while an update or install runs, with or
+  without the hardware watchdog. It restarts nothing while the hardware
+  watchdog is off, in the first 10 minutes after boot, or while an install,
+  update, rollback, switch, reset or biometrics install runs, and it restarts
+  the Pod at most once in 6 hours and three times in 24. Its state is in
   `/persistent/free-sleep-data/network-watchdog`, and
   `network_watchdog.sh --dry-run` prints what it would decide. Whether a
   restart brings Wi-Fi back has not been confirmed.
