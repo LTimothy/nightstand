@@ -16,8 +16,9 @@
 # the hardware keeps its own timeout while PID 1 pets at half the longer one,
 # which resets the Pod over and over.
 #
-# It is turned on only for Pod 5 hubs (revision G43 or later, the lowest Pod 5
-# revision reported, read from the device label as the server does) with the
+# It is turned on only for Pod 5 hubs (revision G43 up to, not including, I00,
+# read from the device label as the server does; Pod 5 hubs have reported G43,
+# G45 and G55, and a newer generation is left alone until one is checked) with the
 # mtk-wdt driver and its 31 second maximum. The first arming can reset the
 # Pod, so callers run it only after they succeed. It is also left off where
 # there is no watchdog device, where systemd is older than 230, where
@@ -59,6 +60,7 @@ RUNTIME=30
 POD5_IDENTITY=mtk-wdt
 POD5_MAX_TIMEOUT=31
 POD5_REVISION=G43
+POD5_REVISION_END=I00
 
 skip() { echo "Hardware watchdog left off: $*."; exit 0; }
 ours() { [ -f "$DROPIN" ] && head -n 1 "$DROPIN" | grep -qF "$MARKER"; }
@@ -107,9 +109,17 @@ hub_revision() {
     fi
   done
 }
-# True when revision $1 sorts at or after POD5_REVISION, as the server compares.
+# True when revision $1 sorts at or after $2.
+sorts_from() {
+  [ "$(printf '%s\n%s\n' "$2" "$1" | LC_ALL=C sort | head -n 1)" = "$2" ]
+}
+# True when revision $1 is from POD5_REVISION up to POD5_REVISION_END, as the server compares.
 pod5_revision() {
-  [ -n "$1" ] && [ "$(printf '%s\n%s\n' "$POD5_REVISION" "$1" | LC_ALL=C sort | head -n 1)" = "$POD5_REVISION" ]
+  [ -n "$1" ] && sorts_from "$1" "$POD5_REVISION" && ! sorts_from "$1" "$POD5_REVISION_END"
+}
+# Says when revision $1 is past the range checked so far.
+range_note() {
+  if [ -n "$1" ] && sorts_from "$1" "$POD5_REVISION_END"; then echo " is outside the range checked so far"; fi
 }
 
 # The trial file sits in the server user's folder, so root replaces it with
@@ -264,7 +274,7 @@ if [ ! -e "$SYSFS/identity" ] && [ ! -e "$SYSFS/timeout" ] \
   if [ "$IDENTITY" != "$POD5_IDENTITY" ] \
     || [ "$COMPATIBLE_MATCH" != 1 ] \
     || ! pod5_revision "$REVISION"; then
-    skip "it is only turned on for Pod 5 hubs (revision $POD5_REVISION or later, the lowest Pod 5 revision reported) with driver $POD5_IDENTITY and compatible mediatek,mt8365-wdt, and this Pod has driver ${IDENTITY:-unknown}, compatible $(printf '%s' "${COMPATIBLE:-unknown}" | tr '\n' ' '), revision ${REVISION:-unknown} (watchdog timeout attributes absent)"
+    skip "it is only turned on for Pod 5 hubs (revision $POD5_REVISION up to $POD5_REVISION_END, the range checked so far) with driver $POD5_IDENTITY and compatible mediatek,mt8365-wdt, and this Pod has driver ${IDENTITY:-unknown}, compatible $(printf '%s' "${COMPATIBLE:-unknown}" | tr '\n' ' '), revision ${REVISION:-unknown}$(range_note "$REVISION") (watchdog timeout attributes absent)"
   fi
   # mtk_wdt.c fixes MT8365's hardware maximum at 31 seconds.
   MAX=$POD5_MAX_TIMEOUT
@@ -286,7 +296,7 @@ else
   IDENTITY=$(sysfs identity)
   REVISION=$(hub_revision)
   if [ "$IDENTITY" != "$POD5_IDENTITY" ] || [ "$MAX" != "$POD5_MAX_TIMEOUT" ] || ! pod5_revision "$REVISION"; then
-    skip "it is only turned on for Pod 5 hubs (revision $POD5_REVISION or later, the lowest Pod 5 revision reported) with driver $POD5_IDENTITY and a ${POD5_MAX_TIMEOUT}s maximum, and this Pod has driver ${IDENTITY:-unknown}, maximum ${MAX:-unknown}s, revision ${REVISION:-unknown}"
+    skip "it is only turned on for Pod 5 hubs (revision $POD5_REVISION up to $POD5_REVISION_END, the range checked so far) with driver $POD5_IDENTITY and a ${POD5_MAX_TIMEOUT}s maximum, and this Pod has driver ${IDENTITY:-unknown}, maximum ${MAX:-unknown}s, revision ${REVISION:-unknown}$(range_note "$REVISION")"
   fi
 fi
 OTHERS=$(holders | grep -vx 1 | tr '\n' ' ')

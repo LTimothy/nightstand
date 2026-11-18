@@ -59,6 +59,10 @@ describe('loadDeviceStatus', () => {
     assert.equal(await version('20500-0001-I05-0000'), 'Pod 4');
     assert.equal(await version('20500-0001-H12-0000'), 'Pod 3');
     assert.equal(await version('test'), 'Version not found');
+    assert.equal(await version('20500-0001-J55-0000'), 'Pod 5');
+    assert.equal(await version('20500-0001-K60-0000'), 'Version not found');
+    assert.equal(await version('20500-0001-K00-0000'), 'Version not found');
+    assert.equal(await version('20500-0001-j55-0000'), 'Version not found');
   });
 
   it('leaves gestures out unless asked, and tolerates a reply without them', async () => {
@@ -109,10 +113,20 @@ describe('loadDeviceStatus', () => {
 });
 
 describe('hubVersionFromRevision', () => {
-  it('reads G43 and later as Pod 5, earlier G revisions as Pod 4', () => {
-    for (const [revision, expected] of [['G53', 'Pod 5'], ['G45', 'Pod 5'], ['G43', 'Pod 5'], ['G42', 'Pod 4'], ['G00', 'Pod 4']]) {
+  it('reads G43 up to I00 as Pod 5, earlier G revisions as Pod 4', () => {
+    const cases = [['G55', 'Pod 5'], ['G45', 'Pod 5'], ['G43', 'Pod 5'], ['H50', 'Pod 5'], ['G42', 'Pod 4'], ['G00', 'Pod 4']];
+    for (const [revision, expected] of cases) {
       assert.equal(mod.hubVersionFromRevision(revision), expected, revision);
     }
     assert.equal(mod.hubVersionFromRevision('F99'), undefined);
+  });
+
+  it('reads a revision outside the checked range, or a malformed one, as unknown', () => {
+    for (const revision of ['I00', 'I35', 'K00']) {
+      assert.equal(mod.hubVersionFromRevision(revision), 'Version not found', revision);
+    }
+    for (const revision of ['G4', 'g43', 'G430', 'zzz']) {
+      assert.equal(mod.hubVersionFromRevision(revision), undefined, revision);
+    }
   });
 });

@@ -36,9 +36,19 @@ class ModelTestCase(unittest.TestCase):
 
 class IsPod5Test(ModelTestCase):
     def test_the_hub_revision_decides_as_on_the_server(self):
-        for revision, expected in (('G53', True), ('G45', True), ('G43', True), ('H10', True), ('G42', False), ('G00', False), ('F99', False)):
+        for revision, expected in (('G55', True), ('G45', True), ('G43', True), ('H10', True), ('H50', True), ('G42', False), ('G00', False), ('F99', False)):
             with self.subTest(revision=revision):
                 self.assertIs(is_pod5([self.label(f'AAAA-BB-{revision}-CCCC\n')]), expected)
+
+    def test_a_revision_outside_the_checked_range_is_unknown(self):
+        for revision in ('I00', 'I35', 'K00'):
+            with self.subTest(revision=revision):
+                self.assertIsNone(is_pod5([self.label(f'AAAA-BB-{revision}-CCCC\n')]))
+
+    def test_a_malformed_revision_is_unknown(self):
+        for revision in ('G4', 'g43', 'G430', 'zzz'):
+            with self.subTest(revision=revision):
+                self.assertIsNone(is_pod5([self.label(f'AAAA-BB-{revision}-CCCC\n')]))
 
     def test_the_first_label_found_is_read(self):
         self.assertIs(is_pod5([self.missing(), self.label('AAAA-BB-G53-CCCC')]), True)
@@ -80,6 +90,17 @@ class OnThisPodTest(ModelTestCase):
             self.assertIs(on_this_pod(CAPSENSE2, LOGGER, [self.missing()]), CAPSENSE2)
         self.assertEqual(len(logs.output), 1)
         self.assertIn('Could not read the Pod model', logs.output[0])
+
+    def test_a_hub_outside_the_checked_range_is_unchecked_and_says_so_once(self):
+        label = [self.label('AAAA-BB-I35-CCCC')]
+        with self.assertLogs(LOGGER, level='INFO') as logs:
+            self.assertFalse(on_this_pod(CAPSENSE2, LOGGER, label).validated)
+            self.assertFalse(on_this_pod(CAPSENSE2, LOGGER, label).validated)
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn('revision I35 is outside the range checked so far', logs.output[0])
+
+    def test_a_malformed_revision_keeps_capsense2_checked(self):
+        self.assertIs(on_this_pod(CAPSENSE2, LOGGER, [self.label('AAAA-BB-g43-CCCC')]), CAPSENSE2)
 
 
 if __name__ == '__main__':

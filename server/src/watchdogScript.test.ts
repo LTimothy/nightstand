@@ -196,7 +196,7 @@ describe('setup_watchdog.sh', () => {
       sysfs: null,
       driver: 'mtk-wdt',
       compatible: ['mediatek,mt8365-wdt', 'mediatek,mt6589-wdt'],
-      label: '20500-0006-H08-00000000\n',
+      label: '20500-0005-G55-00000000\n',
     };
 
     it('arms the checked Pod 5 through the trial', () => {
@@ -213,7 +213,7 @@ describe('setup_watchdog.sh', () => {
       } finally { p.cleanup(); }
     });
 
-    for (const revision of ['G43', 'G52']) {
+    for (const revision of ['G43', 'G52', 'G55', 'H50']) {
       it(`arms on a ${revision} label`, () => {
         const p = pod({ ...checked, label: `20500-0005-${revision}-00012345\n` });
         try {
@@ -229,6 +229,10 @@ describe('setup_watchdog.sh', () => {
       ['another compatible', { compatible: ['mediatek,mt6589-wdt'] }, /compatible mediatek,mt6589-wdt/],
       ['a compatible with only a matching prefix', { compatible: ['mediatek,mt8365-wdt-other'] }, /compatible mediatek,mt8365-wdt-other/],
       ['a G42 label', { label: '20500-0005-G42-00012345\n' }, /revision G42/],
+      ['an I35 label', { label: '20500-0006-I35-00012345\n' }, /revision I35 is outside the range checked so far/],
+      ['a K00 label', { label: '20500-0006-K00-00012345\n' }, /revision K00 is outside the range checked so far/],
+      ['a G4 label', { label: '20500-0005-G4-00012345\n' }, /revision unknown/],
+      ['a g43 label', { label: '20500-0005-g43-00012345\n' }, /revision unknown/],
     ];
     for (const [why, opts, found] of unsupported) {
       it(`skips ${why} and reports what it found`, () => {
@@ -397,11 +401,13 @@ describe('setup_watchdog.sh', () => {
     p.cleanup();
   });
 
-  it('is left off on a hub older than G43 or an unchecked driver, and tries again at the next update', () => {
-    // A hub with a G-revision label older than G43, or a driver other than
+  it('is left off on a hub outside G43 to I00 or an unchecked driver, and tries again at the next update', () => {
+    // A hub with a revision outside G43 to I00, or a driver other than
     // mtk-wdt with its 31 second maximum, has not been checked.
     const other: Array<[string, Pod]> = [
       ['an older hub revision', { label: '20500-0004-G00-00012345\n' }],
+      ['a hub revision past the checked range', { label: '20500-0006-I35-00012345\n' }],
+      ['a K00 hub revision', { label: '20500-0006-K00-00012345\n' }],
       ['no device label', { label: null }],
       // The server reads these as no revision at all, so not a Pod 5.
       ['a label without dashes', { label: 'garbage\n' }],
@@ -416,6 +422,7 @@ describe('setup_watchdog.sh', () => {
       assert.equal(result.status, 0, why);
       assert.match(result.stdout, /Hardware watchdog left off: .*Pod 5/, why);
       if (why === 'no device label' || why === 'a label without dashes') assert.match(result.stdout, /revision unknown/, why);
+      if (why === 'a hub revision past the checked range') assert.match(result.stdout, /revision I35 is outside the range checked so far/, why);
       assert.equal(p.dropin(), null, why);
       assert.equal(p.reexecs(), 0, why);
       assert.equal(p.mark(), null, `${why}: a skipped Pod is not marked, so it tries again`);
