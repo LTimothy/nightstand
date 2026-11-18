@@ -32,12 +32,13 @@ export default function FirmwarePanel() {
     { settings?.features.firmwareHealth && query.data.availability !== 'Monitoring unavailable' && <Paper variant="outlined" sx={ { p: 2 } }>
       <Typography component="h2" variant="h6">Firmware health details</Typography>
       <Typography>{ query.data.sensorFresh ? 'Recent sensor readings received.' : 'No recent readings' }</Typography>
-      { query.data.incidents.map(item => <Stack key={ `${item.code}-${item.side}` } sx={ { mt: 1 } }>
+      { query.data.incidents.filter(item => item.severity !== 'diagnostic').map(item => <Stack
+        key={ `${item.code}-${item.side}-${item.details.bus ?? item.details.port ?? ''}` }
+        sx={ { mt: 1 } }>
         <Typography>{ item.side ? `${item.side === 'left' ? 'Left' : 'Right'}: ` : '' }{ item.message } ({ item.count })</Typography>
         <Typography variant="body2" color="text.secondary">
           { item.freshness }, first { new Date(item.firstSeen * 1000).toLocaleString() },
           last { new Date(item.lastSeen * 1000).toLocaleString() }
-          { item.recoveredAt ? `, pump running observed at ${new Date(item.recoveredAt * 1000).toLocaleString()}` : '' }
         </Typography>
         { Object.entries(item.details).length > 0 && <Typography variant="body2">
           { Object.entries(item.details).map(([key, value]) => `${key}: ${value}`).join(', ') }

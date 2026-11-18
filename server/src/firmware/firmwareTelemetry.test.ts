@@ -143,9 +143,21 @@ it('does not let logs refresh missing sensor telemetry and emits the corroborate
   ingestLog(store, log('sensor-reset', 110, 2));
   // A reset message is not evidence that samples resumed.
   assert.equal(store.snapshot(healthFeatures, true, 171).sensorFresh, false);
-  ingestLog(store, log('bus-timeout', 230, 3));
+  ingestLog(store, log('moisture', 230, 3));
   assert.equal(store.summary(healthFeatures, true, 230)?.message, 'Bed sensor readings are interrupted.');
   assert.equal(store.summary(healthFeatures, false, 230), undefined);
+});
+
+it('reports waiting, not failed, when sensor records stop with no firmware fault', () => {
+  const store = new FirmwareTelemetry();
+  store.ingest(FirmwareBatchSchema.parse({ session: 'a'.repeat(32), records: [{
+    kind: 'sensor', timestamp: 100, receivedAt: 100, source: 'RAW', sequence: 1, index: 0,
+  }] }), healthFeatures, 100);
+  ingestLog(store, log('bus-timeout', 215, 2));
+  assert.equal(store.snapshot(healthFeatures, true, 221).interrupted, false);
+  const summary = store.summary(healthFeatures, true, 221);
+  assert.equal(summary?.status, 'waiting_for_data');
+  assert.equal(summary?.message, 'No recent readings');
 });
 
 it('preserves cooling history across thirty-second delivery batches and out-of-order records', () => {

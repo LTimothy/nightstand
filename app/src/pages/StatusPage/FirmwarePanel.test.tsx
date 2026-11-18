@@ -81,6 +81,24 @@ it.each([
   expect(screen.queryByRole('heading', { name: 'Cooling warning', level: 2 }) !== null).toBe(cooling);
 });
 
+it('lists only non-diagnostic firmware messages', async () => {
+  const settings = getSettings();
+  const incident = (code: string, message: string, severity: string) => ({ code, message, severity, side: null, source: 'RAW',
+    count: 2, firstSeen: 100, lastSeen: 200, receivedAt: 200, details: {}, freshness: 'Recent' });
+  server.use(
+    http.get('*/api/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features,
+      firmwareHealth: true, firmwareTargetReadout: false, tapDiagnostics: false, coolingWarning: false } })),
+    http.get('*/api/services/firmware', () => HttpResponse.json({ ...snapshot('Monitoring active', true,
+      { left: { state: 'unavailable' }, right: { state: 'unavailable' } }), incidents: [
+      incident('sensor-reset', 'Bed sensor restarted.', 'diagnostic'),
+      incident('moisture', 'Moisture reading', 'info'),
+    ] })),
+  );
+  renderWithProviders(<FirmwarePanel/>);
+  expect(await screen.findByText('Moisture reading (2)')).toBeInTheDocument();
+  expect(screen.queryByText(/Bed sensor restarted/)).not.toBeInTheDocument();
+});
+
 it('shows neither readout while the firmware readings are still loading', async () => {
   const settings = getSettings();
   let release!: () => void;
