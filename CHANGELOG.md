@@ -31,6 +31,8 @@ is a hard fork; for the history of the projects it descends from, see
 - A saved one-time alarm now shows on the Bed tab and in the Schedule header,
   and its editor says it rings only if the side is on at that time. Requested
   by [Tony-1132](https://github.com/Tony-1132).
+- On the Bed tab you can drag the target dot around the dial. It snaps to the
+  same steps as Cooler and Warmer, which stay.
 
 ### Changed
 

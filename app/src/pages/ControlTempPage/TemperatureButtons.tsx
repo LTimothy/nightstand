@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, type MutableRefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { media, palette, weight } from '@design/tokens';
 import { Button, Box } from '@mui/material';
@@ -16,10 +16,12 @@ type TemperatureButtonsProps = {
   refetch: any;
   currentTargetTemp: number;
   statusUnavailable?: boolean;
+  // Filled with this stepper's step, so a drag on the dial takes the same path as a click.
+  stepRef?: MutableRefObject<((direction: 1 | -1) => void) | null>;
 }
 
 const DEBOUNCE_MS = 400;
-export default function TemperatureButtons({ refetch, currentTargetTemp, statusUnavailable = false }: TemperatureButtonsProps) {
+export default function TemperatureButtons({ refetch, currentTargetTemp, statusUnavailable = false, stepRef }: TemperatureButtonsProps) {
   const queryClient = useQueryClient();
   const { side, setIsUpdating: setStoreUpdating } = useAppStore();
   // Only clear the flag this component raised; the power save shares it.
@@ -142,7 +144,15 @@ export default function TemperatureButtons({ refetch, currentTargetTemp, statusU
     };
   }, [endEdit, setIsUpdating, sendLatest]);
 
+  const clickRef = useRef<((direction: 1 | -1) => void) | null>(null);
+  useEffect(() => {
+    if (!stepRef) return;
+    stepRef.current = direction => clickRef.current?.(direction);
+    return () => { stepRef.current = null; };
+  }, [stepRef]);
+
   const isInAwayMode = settings?.[side]?.awayMode;
+  clickRef.current = null;
   if (isInAwayMode) return null;
 
   const disabled = statusUnavailable || isInAwayMode || !Number.isFinite(deviceStatus?.[side]?.targetTemperatureF);
@@ -170,6 +180,7 @@ export default function TemperatureButtons({ refetch, currentTargetTemp, statusU
 
     scheduleUpdate();
   };
+  clickRef.current = handleClick;
 
   const stepperSx = (edge: string) => ({
     position: 'relative', overflow: 'visible', width: 64, height: 64, minWidth: 0, p: 0, borderRadius: '50%',

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Box } from '@mui/material';
 import StatusText from '@components/StatusText';
 import { useAppStore } from '@state/appStore';
@@ -9,6 +9,7 @@ import { temperatureColor } from '@lib/temperatureColor';
 import { lastKnownAt } from './bedText';
 import CaptionSlot from './CaptionSlot';
 import { useControlTempStore } from './controlTempStore.tsx';
+import DialHandle from './DialHandle';
 import DialRing from './DialRing';
 import { DIAL_HEIGHT, DIAL_WIDTH } from './dialGeometry';
 import TemperatureButtons from './TemperatureButtons.tsx';
@@ -73,6 +74,9 @@ export default function TemperatureDial({
   // An edit the Pod has not reported back yet.
   const pending = isOn && !stale && !!status && target !== status.targetTemperatureF;
   const unconfirmed = usePendingGrey(pending, target);
+  const stepRef = useRef<((direction: 1 | -1) => void) | null>(null);
+  // Drag only where the steppers show: a live side that is on and not away.
+  const adjustable = !!status && isOn && !away && !stale;
   return <Box sx={ columnSx }>
     <Box data-dial sx={ dialSx }>
       <DialRing
@@ -96,6 +100,7 @@ export default function TemperatureDial({
         currentLevel={ status.currentTemperatureLevel }
         format={ format }
         lastKnownAt={ staleSince && lastKnownAt(staleSince, settings?.timeZone) }/> }
+      { adjustable && <DialHandle key={ side } target={ target } format={ format } stepRef={ stepRef }/> }
     </Box>
     <CaptionSlot isOn={ isOn } staleSince={ staleSince } empty={ !status && !stale }/>
     <Box data-controls-row sx={ controlsRowSx }>
@@ -103,6 +108,7 @@ export default function TemperatureDial({
         ? <TemperatureButtons
           key={ side }
           statusUnavailable={ stale }
+          stepRef={ stepRef }
           refetch={ refetch }
           currentTargetTemp={ status.targetTemperatureF }/>
         : whenOff && <Box sx={ { width: '100%', height: '100%' } }>{ whenOff }</Box>) }

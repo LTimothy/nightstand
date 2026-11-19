@@ -1,5 +1,5 @@
 import {
-  fahrenheitToLevel, formatTemperature, isTargetFormat, levelToFahrenheit, MAX_TEMP_F, MIN_TEMP_F, TemperatureFormat,
+  F_PER_LEVEL, NEUTRAL_F, fahrenheitToLevel, formatTemperature, isTargetFormat, levelToFahrenheit, MAX_TEMP_F, MIN_TEMP_F, TemperatureFormat,
 } from './temperatureConversions';
 
 export type TemperatureStepState = {
@@ -31,4 +31,13 @@ export function stepTemperature(
     history: next === value ? history : reversing ? history.slice(0, -1)
       : format === 'level' ? [...history, { direction, value }] : [],
   };
+}
+
+// The step that brings a target closer to a dragged level, or 0 when no step does.
+export function stepToward(value: number, format: TemperatureFormat, level: number): 1 | -1 | 0 {
+  // Unrounded, so a 1 degree step always counts as a move.
+  const exact = (f: number) => (f - NEUTRAL_F) / F_PER_LEVEL;
+  const direction = level > exact(value) ? 1 : -1;
+  const next = stepTemperature(value, format, direction).value;
+  return Math.abs(exact(next) - level) < Math.abs(exact(value) - level) ? direction : 0;
 }

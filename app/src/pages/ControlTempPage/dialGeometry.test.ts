@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   DIAL_HEIGHT, DIAL_WIDTH, NOTCH, TRACK_RADIUS, bandSegments, clampLevel, dialPoint, endLabels, fillRange, levelAngle,
-  offArc, radialLine, ticks,
+  offArc, pointLevel, radialLine, ticks,
 } from './dialGeometry';
 
 it('spreads -10..+10 over 240 degrees with 0 at 12 o\'clock', () => {
@@ -86,4 +86,13 @@ it('marks 21 ticks outside the track, longer every 5 levels', () => {
 
 it('puts the end labels under the ends of the track', () => {
   expect(endLabels()).toEqual([{ level: -10, x: 37.81, y: 225 }, { level: 10, x: 242.19, y: 225 }]);
+});
+
+it('reads the level under a point, snapping the open bottom to the nearer end', () => {
+  for (const level of [-10, -4, 0, 3.5, 10]) {
+    const { x, y } = dialPoint(level);
+    expect(pointLevel(x, y)).toBeCloseTo(level);
+  }
+  expect(pointLevel(120, 230)).toBe(-10);
+  expect(pointLevel(160, 230)).toBe(10);
 });

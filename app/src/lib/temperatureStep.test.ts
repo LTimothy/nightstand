@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatTemperature } from './temperatureConversions';
-import { stepTemperature } from './temperatureStep';
+import { fahrenheitToLevel, formatTemperature } from './temperatureConversions';
+import { stepTemperature, stepToward } from './temperatureStep';
 
 it.each([1, -1] as const)('reverses multiple level steps exactly in direction %s', direction => {
   const first = stepTemperature(60, 'level', direction);
@@ -56,5 +56,32 @@ describe('target formats', () => {
     for (let f = 55; f < 110; f++) {
       expect(formatTemperature(stepTemperature(f, format, 1).value, format)).not.toBe(formatTemperature(f, format));
     }
+  });
+});
+
+describe('stepToward', () => {
+  it('steps toward a dragged level until another step would overshoot', () => {
+    let value = 82;
+    for (let i = 0; i < 40; i++) {
+      const direction = stepToward(value, 'level', 4.2);
+      if (!direction) break;
+      value = stepTemperature(value, 'level', direction).value;
+    }
+    expect(fahrenheitToLevel(value)).toBeCloseTo(4);
+  });
+
+  it('stops at the ends of the scale', () => {
+    expect(stepToward(55, 'fahrenheit', -10)).toBe(0);
+    expect(stepToward(110, 'fahrenheit', 10)).toBe(0);
+  });
+
+  it('walks the target label grid without stopping on a repeated label', () => {
+    let value = 82;
+    for (let i = 0; i < 60; i++) {
+      const direction = stepToward(value, 'fahrenheitTarget', -10);
+      if (!direction) break;
+      value = stepTemperature(value, 'fahrenheitTarget', direction).value;
+    }
+    expect(value).toBe(55);
   });
 });

@@ -76,3 +76,10 @@ export function endLabels(): Array<{ level: number; x: number; y: number }> {
     return { level, x: round(end.x), y: round(end.y + LABEL_DROP) };
   });
 }
+
+// The level under a point in the viewBox. Below the centre the ring is open: each half snaps to its end.
+export function pointLevel(x: number, y: number): number {
+  let angle = Math.atan2(y - CENTER, x - CENTER) * 180 / Math.PI;
+  if (angle < 90) angle += 360;
+  return clampLevel(SCALE_MIN + (angle - 150) / 12);
+}

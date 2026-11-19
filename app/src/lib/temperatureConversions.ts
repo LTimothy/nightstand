@@ -30,7 +30,7 @@ export function targetFormatOf(unit: TemperatureUnit): TemperatureFormat {
 
 export const MIN_TEMP_F = 55;
 export const MAX_TEMP_F = 110;
-const NEUTRAL_F = 82.5; // F at level 0
+export const NEUTRAL_F = 82.5; // F at level 0
 export const F_PER_LEVEL = 27.5 / 10; // 2.75°F per level step
 
 // Level-format bounds (Pod-app -10..+10 scale)

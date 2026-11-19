@@ -21,12 +21,12 @@ beforeEach(() => useControlTempStore.setState({ deviceStatus: undefined }));
 
 const on = { isOn: true, targetTemperatureF: 83, currentTemperatureF: 75 };
 
-it('shows the target and current temperature without a draggable control', () => {
+it('shows the target and current temperature, and only the target dot drags', () => {
   render(<TemperatureDial status={ on } refetch={ vi.fn() } format="level"/>);
   expect(screen.getByRole('heading', { level: 2, name: '0' })).toBeInTheDocument();
   expect(screen.getByText('Currently at \u22123')).toBeInTheDocument();
   expect(screen.getByText('Warming to')).toBeInTheDocument();
-  expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+  expect(screen.getByRole('slider', { name: 'Temperature' })).toHaveAttribute('aria-valuetext', '0');
   fireEvent.pointerDown(screen.getByText('0'));
   fireEvent.pointerUp(screen.getByText('0'));
   expect(post).not.toHaveBeenCalled();
@@ -273,3 +273,7 @@ it('titles the dial from the two numbers it shows in a target format', () => {
   expect(screen.getByText('Cooling to')).toBeInTheDocument();
 });
 
+it('has no drag handle while the side is off', () => {
+  render(<TemperatureDial status={ { ...on, isOn: false } } refetch={ vi.fn() } format="level"/>);
+  expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+});
