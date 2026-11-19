@@ -8,12 +8,14 @@ export interface ButtonEvent {
   at: number;
   // A logo click a Pod 5 hub logged as its own; it acts on no logo click itself.
   hub?: true;
+  // How many presses a Pod 5 hub counted in one logo event; absent means 1.
+  clicks?: number;
 }
 
 const CODE_TO_BUTTON: Record<number, ButtonName> = { 97: 'top', 98: 'middle', 99: 'bottom' };
 const PRESS_RE = /\[tca8418([RL])\]\s+gpi\s+(press|release)\s+(\d+)/i;
 const IGNORED_RE = /\[TTC\]\s+ignoring\s+(\d+)\s+short clicks/i;
-const HUB_LOGO_RE = /\[TTC\][^\n]*?\b(left|right)\b[^\n]*?\bmiddle button clicked/i;
+const HUB_LOGO_RE = /\[TTC\][^\n]*?\b(left|right)\b[^\n]*?\bmiddle button clicked(?:\s+(\d+)\s+times)?/i;
 const HANDLED_RE = /\[TTC\]|\[thermostat\]\s+temp_(?:up|down)/i;
 
 // Only the firmware's ignored-click result authorizes a temperature change.
@@ -37,7 +39,9 @@ export class ButtonEventMachine {
     const logo = HUB_LOGO_RE.exec(message);
     if (logo) {
       this.pending = [];
-      return [{ side: logo[1].toLowerCase() as ButtonSide, button: 'middle', kind: 'click', at: tsMs, hub: true }];
+      const event: ButtonEvent = { side: logo[1].toLowerCase() as ButtonSide, button: 'middle', kind: 'click', at: tsMs, hub: true };
+      if (logo[2]) event.clicks = Number(logo[2]);
+      return [event];
     }
     if (HANDLED_RE.test(message)) {
       this.pending = [];

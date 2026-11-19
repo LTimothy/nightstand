@@ -19,6 +19,7 @@ import { drivingSide } from '../jobs/scheduleQueries.js';
 import { lastDeviceStatus } from './lastDeviceStatus.js';
 import { activeAlarms, alarmEndedAt, hasSnooze } from '../jobs/activeAlarms.js';
 import { handleAlarmTap } from './tapAlarm.js';
+import { startBoost } from './boost.js';
 import { ButtonEventMachine, ButtonEvent, ButtonName } from './buttonEvents.js';
 
 // Where the firmware writes its rolling RAW captures. Tests point it elsewhere.
@@ -99,8 +100,9 @@ export class ButtonMonitor {
     this.pollError = null;
     try {
       await settingsDB.read();
-      // A Pod 5 hub's logo click is read here too, so a logo set to a temperature keeps the reader on.
-      const logoSetsTemperature = (['left', 'right'] as const).some(side => settingsDB.data[side].taps.quadTap.type === 'set_temperature');
+      // A Pod 5 hub's logo click is read here too, so a logo set to a temperature or a boost keeps the reader on.
+      const logoSetsTemperature = (['left', 'right'] as const).some(side => settingsDB.data[side].taps.quadTap.type === 'set_temperature'
+        || settingsDB.data[side].taps.logoDouble.minutes > 0);
       if (!settingsDB.data.features.coverButtons && !logoSetsTemperature) {
         this.tail = null;
         this.machine = new ButtonEventMachine();
@@ -301,9 +303,14 @@ export class ButtonMonitor {
           logger.info(`[buttonMonitor] ${side} logo button: stopping the alarm`);
           await handleAlarmTap(side, { type: 'alarm', behavior: 'dismiss', snoozeDuration: 60, inactiveAlarmBehavior: 'none' });
           this.logoStoppedAlarmAt[side] = event.at;
-        } else if (favoriteF !== null && Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS
+        } else if (Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS
           && (alarmEndedAt.get(side) ?? -Infinity) <= event.at) {
-          await this.setFavorite(side, favoriteF, event.at);
+          const boost = settingsDB.data[side].taps.logoDouble;
+          if (event.clicks === 2 && boost.minutes > 0) {
+            await startBoost(side, boost.temperatureF, boost.minutes, event.at);
+          } else if (favoriteF !== null) {
+            await this.setFavorite(side, favoriteF, event.at);
+          }
         }
         return;
       }

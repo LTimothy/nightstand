@@ -121,8 +121,25 @@ describe('ButtonEventMachine', () => {
     const machine = new ButtonEventMachine();
     click(machine, 'L', 98);
     assert.deepEqual(machine.push('[TTC] left middle button clicked 1 times', 1000),
-      [{ side: 'left', button: 'middle', kind: 'click', at: 1000, hub: true }]);
+      [{ side: 'left', button: 'middle', kind: 'click', at: 1000, hub: true, clicks: 1 }]);
     assert.deepEqual(machine.push('[TTC] ignoring 1 short clicks', 1000), []);
+  });
+
+  it('reads the click count of a Pod 5 hub logo double press', () => {
+    const machine = new ButtonEventMachine();
+    assert.deepEqual(machine.push('[TTC] left middle button clicked 2 times', 1000),
+      [{ side: 'left', button: 'middle', kind: 'click', at: 1000, hub: true, clicks: 2 }]);
+    // As the hub logs it, with the journal prefix.
+    assert.deepEqual(machine.push(
+      'Nov 19 17:37:20 eight-pod frank[313]: DBG:67021236 Sensor.cpp:1558 handleButtonEvent|[TTC] right middle button clicked 2 times', 2000),
+    [{ side: 'right', button: 'middle', kind: 'click', at: 2000, hub: true, clicks: 2 }]);
+  });
+
+  it('leaves the count unset for a hub logo line without one', () => {
+    const machine = new ButtonEventMachine();
+    const [event] = machine.push('[TTC] left middle button clicked', 1000);
+    assert.equal(event.hub, true);
+    assert.equal(event.clicks, undefined);
   });
 
   it('leaves firmware long presses without an ignoring result alone', () => {

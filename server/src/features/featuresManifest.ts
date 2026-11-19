@@ -540,9 +540,34 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short cover clicks. '
       + 'Reads no RAW files while off. Acts only on clicks the firmware logged as ignored, so a logo press the '
       + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the logo '
-      + 'temperature are per side, edited under the switch; on a Pod 5 hub the same options write the tap actions, '
-      + 'so only one path is ever written. Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
+      + 'temperature are per side, edited under the switch; on a Pod 5 hub the same options write the tap '
+      + 'settings, the middle button boost included, so only one path is ever written. '
+      + 'Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
       + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
+  },
+  {
+    id: 'logo-boost',
+    title: 'Middle button boost',
+    description: 'For a Pod 5 hub with a Pod 5 cover: a middle button double press sets a side to a chosen '
+      + 'temperature for 1 to 10 minutes, then returns it to the temperature from before the press. Only while the '
+      + 'side is on; changing the temperature during it ends it, and a second double press restarts it.',
+    category: 'platform',
+    version: '3.10.0',
+    flag: null,
+    default: true,
+    touchpoints: [
+      'server/src/8sleep/boost.ts', 'server/src/8sleep/buttonMonitor.ts', 'server/src/8sleep/buttonEvents.ts',
+      'server/src/db/settingsSchema.ts', 'server/src/db/settings.ts', 'server/src/routes/settings/settings.ts',
+      'server/src/server.ts',
+    ],
+    depends_on: [],
+    reversible: true,
+    tests: [
+      'server/src/8sleep/buttonEvents.test.ts', 'server/src/8sleep/boost.test.ts',
+      'server/src/8sleep/buttonMonitor.test.ts', 'server/src/db/tapCompat.test.ts',
+    ],
+    upstream_offer: false,
+    rationale: 'Opt-in by setting: a boost length of 0, the default, keeps the middle button as it was.',
   },
   {
     id: 'biometrics-v2',

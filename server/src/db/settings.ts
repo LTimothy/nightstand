@@ -52,6 +52,10 @@ export const defaultSideSettings: SideSettings = {
       type: 'base_control',
       behavior: 'toggle_preset',
     },
+    logoDouble: {
+      temperatureF: 55,
+      minutes: 0,
+    },
   },
   buttons: {
     invertButtons: false,

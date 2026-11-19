@@ -44,6 +44,7 @@ const side = () => ({
     doubleTap: { type: 'temperature', change: 'decrement', amount: 2 },
     tripleTap: { type: 'temperature', change: 'increment', amount: 2 },
     quadTap: SET,
+    logoDouble: { temperatureF: 55, minutes: 0 },
   },
   buttons: { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 },
 }) as unknown as SideSettings;
@@ -79,5 +80,32 @@ describe('a tap that sets a temperature', () => {
 
   it('is refused by 3.6.1 when a client sends it, so nothing half-valid is stored', () => {
     assert.equal(SettingsSchemaV361.deepPartial().safeParse({ left: { taps: { quadTap: SET } } }).success, false);
+  });
+});
+
+describe('a stored boost setting', () => {
+  const withBoost = () => {
+    const stored = side();
+    stored.taps.logoDouble = { temperatureF: 55, minutes: 5 };
+    return stored;
+  };
+
+  it('is a valid side setting in this release', () => {
+    assert.equal(SettingsSchema.shape.left.safeParse(withBoost()).success, true);
+  });
+
+  it('parses in the older taps shape, which drops it', () => {
+    const taps = { ...withBoost().taps, quadTap: { type: 'base_control', behavior: 'toggle_preset' } };
+    const parsed = SettingsSchemaV361.shape.left.shape.taps.safeParse(taps);
+    assert.ok(parsed.success);
+    assert.equal('logoDouble' in parsed.data, false);
+  });
+
+  it('stays stored through an older save of another setting', () => {
+    const stored = { left: withBoost() };
+    const update = SettingsSchemaV361.deepPartial().safeParse({ left: { name: 'Sam' } });
+    assert.ok(update.success);
+    _.merge(stored, update.data);
+    assert.deepEqual(stored.left.taps.logoDouble, { temperatureF: 55, minutes: 5 });
   });
 });

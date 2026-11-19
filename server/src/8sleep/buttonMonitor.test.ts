@@ -85,6 +85,16 @@ mock.module(new URL('./tapAlarm.js', import.meta.url).href, {
   },
 });
 
+let boosts: Array<[string, number, number, number]> = [];
+mock.module(new URL('./boost.js', import.meta.url).href, {
+  namedExports: {
+    startBoost: async (side: string, boostF: number, minutes: number, pressAt: number) => {
+      boosts.push([side, boostF, minutes, pressAt]);
+      return true;
+    },
+  },
+});
+
 let ButtonMonitor: typeof import('./buttonMonitor.js')['ButtonMonitor'];
 let settingsDB: typeof import('../db/settings.js')['default'];
 let serverStatus: typeof import('../serverStatus.js')['default'];
@@ -155,7 +165,7 @@ describe('ButtonMonitor', () => {
   let monitor: Internals;
 
   beforeEach(async () => {
-    updates = []; manualChanges = []; readCalls = []; alarmTaps = [];
+    updates = []; manualChanges = []; readCalls = []; alarmTaps = []; boosts = [];
     snapshot = undefined;
     activeAlarms.clear(); cancelSnooze('left'); cancelSnooze('right');
     updateRejectsWith = null;
@@ -166,6 +176,7 @@ describe('ButtonMonitor', () => {
     settingsDB.data.features.coverButtons = true;
     for (const side of ['left', 'right'] as const) {
       settingsDB.data[side].buttons = { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 };
+      settingsDB.data[side].taps.logoDouble = { temperatureF: 55, minutes: 0 };
     }
     await settingsDB.write();
 
@@ -418,6 +429,66 @@ describe('ButtonMonitor', () => {
     writeRaw('001.RAW', logRecord('[TTC] left middle button clicked 1 times'), Date.now() / 1000);
     await monitor.poll();
     assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 78 } }]);
+  });
+
+  it('sets the middle button temperature once for a double press with no boost', async () => {
+    settingsDB.data.left.taps.quadTap = { type: 'set_temperature', temperatureF: 78 };
+    await settingsDB.write();
+    writeRaw('001.RAW', logRecord('DBG:67021236 Sensor.cpp:1558 handleButtonEvent|[TTC] left middle button clicked 2 times'), Date.now() / 1000);
+    await monitor.poll();
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 78 } }]);
+    assert.deepEqual(boosts, []);
+  });
+
+  it('boosts on a double press with a boost length, without setting the middle button temperature', async () => {
+    settingsDB.data.right.taps.quadTap = { type: 'set_temperature', temperatureF: 78 };
+    settingsDB.data.right.taps.logoDouble = { temperatureF: 60, minutes: 5 };
+    await settingsDB.write();
+    const at = Date.now();
+    writeRaw('001.RAW', Buffer.concat([
+      logRecord('DBG:67021236 Sensor.cpp:1558 handleButtonEvent|[TTC] right middle button clicked 2 times', 1, at / 1000),
+      logRecord('DBG:67021236 Sensor.cpp:1558 handleGesture|[TTC] offline. thinking of a response', 1, at / 1000),
+      logRecord('DBG:67021236 Sensor.cpp:1558 handleGesture|[TTC] adj base gesture', 1, at / 1000),
+    ]), at / 1000);
+    await monitor.poll();
+    assert.deepEqual(boosts, [['right', 60, 5, at]]);
+    assert.deepEqual(updates, []);
+    assert.deepEqual(manualChanges, []);
+  });
+
+  it('takes the middle button temperature path for a triple press with a boost length', async () => {
+    settingsDB.data.left.taps.quadTap = { type: 'set_temperature', temperatureF: 78 };
+    settingsDB.data.left.taps.logoDouble = { temperatureF: 60, minutes: 5 };
+    await settingsDB.write();
+    await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at: Date.now(), hub: true, clicks: 3 });
+    assert.deepEqual(boosts, []);
+    assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 78 } }]);
+  });
+
+  it('does not boost on a double press within 30 s of a press that stopped an alarm', async () => {
+    settingsDB.data.left.taps.logoDouble = { temperatureF: 60, minutes: 5 };
+    await settingsDB.write();
+    const at = Date.now() - 20_000;
+    activeAlarms.set('left', { vibrationIntensity: 50, duration: 30, vibrationPattern: 'rise' });
+    await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at, hub: true, clicks: 1 });
+    activeAlarms.delete('left');
+    await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at: at + 10_000, hub: true, clicks: 2 });
+    assert.deepEqual(boosts, []);
+    assert.deepEqual(updates, []);
+  });
+
+  it('keeps the reader on for a boost length alone', async () => {
+    settingsDB.data.features.coverButtons = false;
+    settingsDB.data.left.taps.quadTap = { type: 'base_control', behavior: 'toggle_preset' };
+    settingsDB.data.right.taps.quadTap = { type: 'base_control', behavior: 'toggle_preset' };
+    settingsDB.data.left.taps.logoDouble = { temperatureF: 60, minutes: 5 };
+    await settingsDB.write();
+    monitor = new ButtonMonitor() as unknown as Internals;
+    await monitor.poll();
+    const at = Date.now();
+    writeRaw('001.RAW', logRecord('[TTC] left middle button clicked 2 times', 1, at / 1000), at / 1000);
+    await monitor.poll();
+    assert.deepEqual(boosts, [['left', 60, 5, at]]);
   });
 
   it('leaves a Pod 5 hub logo click alone when the quad tap sets no temperature', async () => {

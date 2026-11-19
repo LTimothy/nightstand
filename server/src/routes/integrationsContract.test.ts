@@ -188,8 +188,10 @@ const sideRead = z.object({
   currentTemperatureF: z.number(), targetTemperatureF: z.number(), currentTemperatureLevel: z.number(),
   isOn: z.boolean(), secondsRemaining: z.number(), isAlarmVibrating: z.boolean(),
 });
+// Clients read each gesture by name, so other keys under taps are free.
+const tapRead = z.object({ type: z.string() });
 const settingSideRead = z.object({
-  name: z.string(), awayMode: z.boolean(), taps: z.record(z.object({ type: z.string() })),
+  name: z.string(), awayMode: z.boolean(), taps: z.object({ doubleTap: tapRead, tripleTap: tapRead, quadTap: tapRead }),
   scheduleOverrides: z.object({ alarm: z.object({ disabled: z.boolean(), expiresAt: z.string(), timeOverride: z.string() }) }),
 });
 const reads: Record<string, z.ZodTypeAny> = {

@@ -7,6 +7,7 @@ import { FrankenMonitor } from './8sleep/frankenMonitor.js';
 import { initWaterLevel } from './8sleep/waterLevel.js';
 import { startPresenceAutoOff, stopPresenceAutoOff } from './8sleep/presenceAutoOffMonitor.js';
 import { startButtonMonitor, stopButtonMonitor } from './8sleep/buttonMonitor.js';
+import { restoreBoosts } from './8sleep/boost.js';
 import './jobs/jobScheduler.js';
 import { abortAlarmWaits } from './jobs/alarmActivity.js';
 import { setRebuilding } from './jobs/rebuildState.js';
@@ -136,6 +137,7 @@ const initFrankenMonitor = async () => {
   startPresenceAutoOff();
   // Checks settings.features.coverButtons on every poll, so it always starts.
   startButtonMonitor();
+  void restoreBoosts();
 };
 
 

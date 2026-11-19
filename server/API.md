@@ -196,7 +196,8 @@ generic message; the details go to the server log.
     "taps": {
       "doubleTap": { "type": "temperature", "change": "decrement", "amount": 2 },
       "tripleTap": { "type": "temperature", "change": "increment", "amount": 2 },
-      "quadTap": { "type": "base_control", "behavior": "toggle_preset" }
+      "quadTap": { "type": "base_control", "behavior": "toggle_preset" },
+      "logoDouble": { "temperatureF": 55, "minutes": 0 }
     },
     "buttons": { "invertButtons": false, "stepF": 1, "favoriteTemperatureF": 80 }
   },
@@ -275,6 +276,14 @@ generic message; the details go to the server log.
     tap stopped a Nightstand alarm in firmware, the `dismissAlarm` value
     rose, and Nightstand cleared its ringing state and logged the dismissal.
     Timestamp units remain unverified.
+- `taps.logoDouble` is not a gesture. On a Pod 5 hub, which logs how many
+  times the middle (logo) button was pressed, a double press with `minutes`
+  1 to 10 sets that side to `temperatureF` (55 to 110) for that long, then
+  returns it to the target from before the press. `minutes: 0`, the default,
+  leaves a double press to `quadTap`. It acts only while the side is on and
+  never turns it on; any other change to the target during it ends it, and a
+  second double press restarts it. A partial update merges, so
+  `{ "minutes": 5 }` keeps the stored `temperatureF`.
 - `buttons` is what the buttons on a Pod 5 cover do while
   `features.coverButtons` is on, and only for clicks the firmware logged as
   ignored. A plus click adds `stepF` (0 to 10, default 1) to that side's

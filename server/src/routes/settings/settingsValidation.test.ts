@@ -271,6 +271,27 @@ describe('POST /settings tap gestures', () => {
     assert.deepEqual(res.body.left.taps.quadTap, { type: 'set_temperature', temperatureF: 78 });
   });
 
+  it('keeps the stored boost temperature when a patch sends only the boost length', async () => {
+    await postSettings({ left: { taps: { logoDouble: { temperatureF: 60, minutes: 0 } } } });
+    const res = await postSettings({ left: { taps: { logoDouble: { minutes: 5 } } } });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.left.taps.logoDouble, { temperatureF: 60, minutes: 5 });
+  });
+
+  it('still replaces a gesture whole next to the boost', async () => {
+    await postSettings({ left: { taps: { quadTap: { type: 'base_control', behavior: 'toggle_preset' } } } });
+    const res = await postSettings({ left: { taps: { quadTap: { type: 'set_temperature', temperatureF: 70 } } } });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.left.taps.quadTap, { type: 'set_temperature', temperatureF: 70 });
+  });
+
+  for (const logoDouble of [{ minutes: 11 }, { minutes: 2.5 }, { temperatureF: 54 }, { temperatureF: 111 }]) {
+    it(`refuses a boost of ${JSON.stringify(logoDouble)}`, async () => {
+      const res = await postSettings({ left: { taps: { logoDouble } } });
+      assert.equal(res.status, 400);
+    });
+  }
+
   for (const temperatureF of [54, 111, 78.5, undefined]) {
     it(`refuses a set temperature of ${temperatureF}`, async () => {
       const res = await postSettings({ left: { taps: { quadTap: { type: 'set_temperature', temperatureF } } } });

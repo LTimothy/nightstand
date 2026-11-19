@@ -95,6 +95,11 @@ const SideSettingsSchema = z.object({
     doubleTap: TapConfig,
     tripleTap: TapConfig,
     quadTap: TapConfig,
+    // A Pod 5 hub's middle button double press. Not a gesture, so an older app keeps it; minutes 0 is off.
+    logoDouble: z.object({
+      temperatureF: z.number().int().min(55).max(110),
+      minutes: z.number().int().min(0).max(10),
+    }),
   }),
   buttons: ButtonsSchema,
 }).strict();
