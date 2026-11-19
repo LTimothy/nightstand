@@ -1,39 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { changesRhythmsFlag, pauseRejection, wouldOrphanLevelFormat } from './settingsGuards.js';
+import { changesRhythmsFlag, pauseRejection } from './settingsGuards.js';
 import { Settings } from '../../db/settingsSchema.js';
-
-const levelSettings = { temperatureFormat: 'level' } as Settings;
-const fahrenheitSettings = { temperatureFormat: 'fahrenheit' } as Settings;
-
-describe('wouldOrphanLevelFormat', () => {
-  it('rejects disabling when the stored format is level and the update does not touch it', () => {
-    assert.equal(wouldOrphanLevelFormat(levelSettings, { features: { levelTemps: false } }), true);
-  });
-
-  it('rejects disabling when the update explicitly keeps the format at level', () => {
-    assert.equal(
-      wouldOrphanLevelFormat(levelSettings, { features: { levelTemps: false }, temperatureFormat: 'level' }),
-      true,
-    );
-  });
-
-  it('allows disabling when the same update also moves the format away from level', () => {
-    assert.equal(
-      wouldOrphanLevelFormat(levelSettings, { features: { levelTemps: false }, temperatureFormat: 'fahrenheit' }),
-      false,
-    );
-  });
-
-  it('allows disabling when the stored format is not level', () => {
-    assert.equal(wouldOrphanLevelFormat(fahrenheitSettings, { features: { levelTemps: false } }), false);
-  });
-
-  it('allows any update that does not touch the flag, regardless of format', () => {
-    assert.equal(wouldOrphanLevelFormat(levelSettings, { temperatureFormat: 'level' }), false);
-    assert.equal(wouldOrphanLevelFormat(levelSettings, {}), false);
-  });
-});
 
 describe('pauseRejection', () => {
   const now = new Date('2026-09-28T20:00:00Z');

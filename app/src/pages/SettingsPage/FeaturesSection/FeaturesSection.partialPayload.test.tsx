@@ -33,7 +33,7 @@ describe('FeaturesSection partial payload handling', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     for (const name of ['Presence auto-off', 'New sleep tracking (beta)',
-      'Level temperature display', 'One-time alarm']) {
+      'One-time alarm']) {
       expect(screen.getByRole('switch', { name })).toBeDisabled();
     }
   });
@@ -68,7 +68,7 @@ describe('FeaturesSection partial payload handling', () => {
 it.each([
   ['presenceAutoOff', 'Presence auto-off'],
   ['biometricsV2', 'New sleep tracking (beta)'],
-  ['levelTemps', 'Level temperature display'], ['oneOffAlarms', 'One-time alarm'],
+  ['oneOffAlarms', 'One-time alarm'],
   ['targetTemperatureLabels', 'Show the Pod\'s target temperatures'],
 ])('disables only the missing feature %s', async (key, name) => {
   const settings = getSettings();

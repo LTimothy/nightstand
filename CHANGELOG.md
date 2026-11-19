@@ -11,10 +11,11 @@ is a hard fork; for the history of the projects it descends from, see
 ### Features
 
 - Settings > Features > Show the Pod's target temperatures, Pod 5 only and off
-  by default, labels each setting with the Pod 5 firmware's measured target
-  instead of the straight-line scale free-sleep has used. Your settings,
-  schedules and the API are unchanged. The curve was measured on
-  Pod 5s by [seanpassino](https://github.com/seanpassino) and
+  by default, labels each setting with the Pod 5 firmware's own target, which
+  follows a curve rather than the straight-line scale used elsewhere. It has no
+  effect in Level format. Your settings, schedules and the API are unchanged.
+  The curve was measured on Pod 5s by
+  [seanpassino](https://github.com/seanpassino) and
   [jalen-cheng](https://github.com/jalen-cheng), and matches the maintainer's
   Pod 5 logs.
 - Settings > Bed and sides > Cover buttons, Pod 5 hub with a Pod 5 cover: a
@@ -31,6 +32,12 @@ is a hard fork; for the history of the projects it descends from, see
 ### Changed
 
 - The Cover buttons card calls the logo the center button.
+- Level is always offered in Bed and sides > Temperature format, and its
+  Features switch is gone.
+- Rhythms is no longer labelled beta.
+- Clearer descriptions for One-time alarm, Capacitance presence and the system
+  log switch.
+- Prune detail after 30 days is now Delete detail after 30 days.
 
 ## [3.9.0] - 2026-11-17
 

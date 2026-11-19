@@ -79,7 +79,7 @@ another format in code doesn't mean it works on another Pod.
 On any other Pod, capacitance decides only when vitals are taken, and the
 presence the server hears (schedules, presence auto-off, the in-bed
 indicator) stays on the vibration sensor, unless the owner turns on
-Capacitance presence on other Pods (`uncheckedCapPresence`). That switch was
+Capacitance presence (`uncheckedCapPresence`). That switch was
 checked on one Pod 3 writing `capSense`, over six nights replayed from RAW
 files: both sides used learned levels near 1,000 counts, and capacitance
 never put an empty side in bed beside an occupied one.

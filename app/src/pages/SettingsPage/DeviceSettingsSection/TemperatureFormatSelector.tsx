@@ -28,7 +28,7 @@ export default function TemperatureFormatSelector({ settings, updateSettings }: 
       >
         <ToggleButton value="fahrenheit">Fahrenheit</ToggleButton>
         <ToggleButton value="celsius">Celsius</ToggleButton>
-        { settings?.features?.levelTemps && <ToggleButton value="level">Level</ToggleButton> }
+        <ToggleButton value="level">Level</ToggleButton>
       </ToggleButtonGroup>
     </Box>
   );

@@ -402,22 +402,20 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   {
     id: 'level-temperature-display',
     title: 'Level temperature display',
-    description: 'The -10 to +10 level option in the temperature format picker.',
+    description: 'No longer read since 3.10.0: Level is always offered in the temperature format picker.',
     category: 'ui',
     version: '3.0.1',
     flag: 'levelTemps',
     default: true,
     touchpoints: [
       'app/src/pages/SettingsPage/DeviceSettingsSection/TemperatureFormatSelector.tsx',
-      'server/src/routes/settings/settingsGuards.ts',
     ],
     depends_on: ['agent'],
     reversible: true,
-    tests: ['server/src/routes/settings/settingsGuards.test.ts'],
+    tests: ['app/src/pages/SettingsPage/DeviceSettingsSection/TemperatureFormatSelector.test.tsx'],
     upstream_offer: false,
-    rationale: 'Real toggle, not just a display preference: the temperatureFormat setting '
-      + 'already existed, this gates whether level is offered as a legal choice at all, '
-      + 'with a server precondition against disabling it while a pod is actively using it.',
+    rationale: 'The key stays so stored settings still validate and older versions keep their picker. '
+      + 'Nothing reads it any more.',
   },
   {
     id: 'one-off-alarms',
@@ -645,7 +643,7 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   },
   {
     id: 'unchecked-cap-presence',
-    title: 'Capacitance presence on other Pods (beta)',
+    title: 'Capacitance presence (beta)',
     description: 'On a Pod other than a Pod 5, lets Smart Schedule, presence auto-off and the in-bed indicator '
       + 'follow the capacitance presence of New sleep tracking instead of the vibration sensor, once the nightly '
       + 'analysis has learned both sides. A Pod 5 does this whenever New sleep tracking is on.',
@@ -1231,8 +1229,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   {
     id: 'target-temperature-labels',
     title: 'Show the Pod\'s target temperatures',
-    description: 'Labels each temperature with the target the Pod 5 firmware reports for it. Stored settings, schedules and '
-      + 'the API are unchanged. Off by default.',
+    description: 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
+      + 'Schedules are unchanged. No effect in Level format.',
     category: 'ui',
     version: '3.10.0',
     flag: 'targetTemperatureLabels',

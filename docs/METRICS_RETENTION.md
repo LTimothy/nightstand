@@ -18,7 +18,7 @@ even when Biometrics is off:
   Once no detailed vitals are left to delete, it deletes movement older than
   that protected window for nights whose saved summary has sleep stages, in
   the same bounded batches. Those nights keep their stages.
-- Prune detail after 30 days is off by default and requires opt-in. It
+- Delete detail after 30 days is off by default and requires opt-in. It
   deletes only detailed vitals older than 30 days, with the same protected
   recent nights and bounded transactions. It never deletes movement.
 

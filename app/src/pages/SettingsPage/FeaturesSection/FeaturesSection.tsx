@@ -22,9 +22,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
 const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. '
   + 'It changes the nightly sleep records and the heart rate and breathing estimates.';
-const UNCHECKED_CAP_PRESENCE = 'On a Pod other than a Pod 5, the capacitance sensors only time the heart rate '
-  + 'and breathing estimates. On, schedules, presence auto-off and the in-bed indicator follow them too, once both '
-  + 'sides are learned. Checked against recorded nights from one Pod 3. A Pod 5 always works this way.';
+const UNCHECKED_CAP_PRESENCE = 'Schedules, auto-off and the in-bed indicator follow capacitance presence once both '
+  + 'sides are learned. Checked on one Pod 3.';
 const child = { pl: 2, borderLeft: 1, borderColor: 'divider' };
 
 export default function FeaturesSection() {
@@ -112,15 +111,14 @@ export default function FeaturesSection() {
       <Section title="Everyday">
         <Box id="rhythms" tabIndex={ -1 } />
         <FeatureToggleRow
-          label="Rhythms (beta)"
-          ariaLabel="Rhythms"
+          label="Rhythms"
           disabled={ isUpdating || !features }
           checked={ features?.rhythms ?? false }
           onChange={ (next) => {
             setRhythmsMessage(undefined);
             setRhythmsDialog(next ? 'enable' : 'disable');
           } }
-          description="Plan sleep by day and date, with an optional smart temperature curve. Your weekly schedule is kept."
+          description="Plan sleep by day and date, with an optional Smart Schedule temperature curve. Your weekly schedule is kept."
         />
         <Box sx={ child }>
           <FeatureToggleRow
@@ -144,21 +142,15 @@ export default function FeaturesSection() {
           disabled={ isUpdating || features?.oneOffAlarms === undefined }
           checked={ features?.oneOffAlarms ?? false }
           onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
-          description="Adds a one-time alarm to Schedule, separate from the daily wake-up."
-        />
-        <FeatureToggleRow
-          label="Level temperature display"
-          disabled={ isUpdating || features?.levelTemps === undefined }
-          checked={ features?.levelTemps ?? false }
-          onChange={ (next) => updateFeature({ levelTemps: next }) }
-          description="Show the -10 to +10 scale as a temperature option."
+          description="Adds a one-time alarm to Schedule, separate from the daily wake-up. Off, a set one-time alarm does not ring."
         />
         { deviceStatus?.hubVersion === Version.Pod5 && <FeatureToggleRow
           label="Show the Pod's target temperatures"
           disabled={ isUpdating || features?.targetTemperatureLabels === undefined }
           checked={ features?.targetTemperatureLabels ?? false }
           onChange={ (next) => updateFeature({ targetTemperatureLabels: next }) }
-          description="Uses the Pod 5 firmware's measured targets instead of the usual straight-line scale. Settings are unchanged."
+          description={ 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
+            + 'Schedules are unchanged. No effect in Level format.' }
         /> }
       </Section>
       <Section title="Sleep tracking">
@@ -208,7 +200,7 @@ export default function FeaturesSection() {
           />
           { showCapPresence && <Box sx={ child }>
             <FeatureToggleRow
-              label="Capacitance presence on other Pods (beta)"
+              label="Capacitance presence (beta)"
               disabled={ isUpdating || features?.uncheckedCapPresence === undefined || !biometricsEnabled
                 || !features?.biometricsV2 }
               checked={ !!features?.biometricsV2 && !!features?.uncheckedCapPresence }
@@ -239,7 +231,7 @@ export default function FeaturesSection() {
             + 'Keeps 2 nights of detail and every nightly summary.' }
         />
         <FeatureToggleRow
-          label="Prune detail after 30 days"
+          label="Delete detail after 30 days"
           disabled={ isUpdating || features?.metricsRetention === undefined }
           checked={ features?.metricsRetention ?? false }
           onChange={ (next) => updateFeature({ metricsRetention: next }) }
@@ -250,7 +242,8 @@ export default function FeaturesSection() {
           disabled={ isUpdating || features?.journalInMemory === undefined }
           checked={ features?.journalInMemory ?? false }
           onChange={ (next) => updateFeature({ journalInMemory: next }) }
-          description="Saves flash wear. Keeps only the most recent 64 MB, and clears when the Pod restarts. Nightstand's own logs are kept."
+          description={ 'Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
+            + 'Nightstand\'s logs are kept.' }
         />
       </Section>
       { rhythmsDialog === 'enable' && <EnableRhythmsDialog

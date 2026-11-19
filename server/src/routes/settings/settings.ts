@@ -10,7 +10,7 @@ const router = express.Router();
 
 import settingsDB, { updateSettings } from '../../db/settings.js';
 import { GestureSchema, SettingsSchema, type TapAction } from '../../db/settingsSchema.js';
-import { changesRhythmsFlag, pauseRejection, wouldOrphanLevelFormat } from './settingsGuards.js';
+import { changesRhythmsFlag, pauseRejection } from './settingsGuards.js';
 import { syncRawArchiveConf } from '../../jobs/rawArchiveConf.js';
 import { syncJournalStorage } from '../../jobs/journalStorage.js';
 
@@ -45,10 +45,6 @@ router.post('/settings', async (req: Request, res: Response) => {
   const saved = await updateSettings(draft => {
     if (changesRhythmsFlag(draft, validatedUpdate)) {
       conflict = 'Use /rhythms/enable or /rhythms/disable to turn Rhythms on or off';
-      return false;
-    }
-    if (wouldOrphanLevelFormat(draft, validatedUpdate)) {
-      conflict = 'Set temperature display away from Level before disabling this feature';
       return false;
     }
     const pauseError = pauseRejection(draft, validatedUpdate, new Date());

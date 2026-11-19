@@ -289,7 +289,7 @@ the firmware's own uploads are covered under
 
 Settings > Features > Storage has Low-disk protection (on by default), which
 deletes old detailed vitals below 150 MiB free, then movement for nights
-already summarized, and Prune detail after 30 days (off by default). Both
+already summarized, and Delete detail after 30 days (off by default). Both
 keep at least the last two nights of detail, nightly summaries, sleep
 records and scores. Pruning makes
 database pages reusable; it does not shrink the file, and deleted detail

@@ -24,8 +24,8 @@ it('shows why the Pod refused to turn Rhythms on', async () => {
 it('describes Rhythms and starts off', async () => {
   renderWithProviders(<FeaturesSection/>);
   expect(await screen.findByRole('switch', { name: 'Rhythms' })).not.toBeChecked();
-  expect(screen.getByText('Rhythms (beta)')).toBeInTheDocument();
-  expect(screen.getByText('Plan sleep by day and date, with an optional smart temperature curve. '
+  expect(screen.queryByText('Rhythms (beta)')).not.toBeInTheDocument();
+  expect(screen.getByText('Plan sleep by day and date, with an optional Smart Schedule temperature curve. '
     + 'Your weekly schedule is kept.')).toBeInTheDocument();
 });
 

@@ -9,10 +9,9 @@ import FeaturesSection from './FeaturesSection';
 const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
 const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. '
   + 'It changes the nightly sleep records and the heart rate and breathing estimates.';
-const CAP_PRESENCE = 'Capacitance presence on other Pods (beta)';
-const UNCHECKED_CAP_PRESENCE = 'On a Pod other than a Pod 5, the capacitance sensors only time the heart rate '
-  + 'and breathing estimates. On, schedules, presence auto-off and the in-bed indicator follow them too, once both '
-  + 'sides are learned. Checked against recorded nights from one Pod 3. A Pod 5 always works this way.';
+const CAP_PRESENCE = 'Capacitance presence (beta)';
+const UNCHECKED_CAP_PRESENCE = 'Schedules, auto-off and the in-bed indicator follow capacitance presence once both sides are learned. '
+  + 'Checked on one Pod 3.';
 const biometricsOff = () => {
   const services = getServices();
   server.use(http.get('*/api/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));
@@ -30,17 +29,17 @@ describe('FeaturesSection', () => {
     const storage = screen.getByRole('region', { name: 'Storage' });
     expect(screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
       .toEqual(['Everyday', 'Sleep tracking', 'Storage']);
-    expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm', 'Level temperature display']);
+    expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm']);
     expect(within(everyday).getByRole('button', { name: 'Delete notes' })).toBeVisible();
     expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)',
-      'Capacitance presence on other Pods (beta)', 'Cooling warning']);
+      'Capacitance presence (beta)', 'Cooling warning']);
     expect(within(tracking).getByRole('combobox', { name: 'Keep raw sensor recordings' })).toBeVisible();
     expect(within(tracking).getByText('Sleep analysis reads these. About 0.4 GB a day. '
       + 'Oldest removed first if storage runs low.')).toBeVisible();
-    expect(switchNames(storage)).toEqual(['Low-disk protection', 'Prune detail after 30 days', 'Keep the system log in memory']);
+    expect(switchNames(storage)).toEqual(['Low-disk protection', 'Delete detail after 30 days', 'Keep the system log in memory']);
   });
 
-  it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Capacitance presence on other Pods (beta)'], ['Cooling warning']])(
+  it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Capacitance presence (beta)'], ['Cooling warning']])(
     'disables %s while Biometrics is off and links to it', async label => {
       onPod4();
       biometricsOff();
@@ -72,7 +71,7 @@ describe('FeaturesSection', () => {
     }));
     const { user } = renderWithProviders(<FeaturesSection />);
     const lowDisk = await screen.findByRole('switch', { name: 'Low-disk protection' });
-    const age = screen.getByRole('switch', { name: 'Prune detail after 30 days' });
+    const age = screen.getByRole('switch', { name: 'Delete detail after 30 days' });
     expect(lowDisk).toBeChecked();
     expect(age).not.toBeChecked();
     expect(screen.getByText('Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized. '
@@ -96,8 +95,8 @@ describe('FeaturesSection', () => {
     const { user } = renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: 'Keep the system log in memory' });
     expect(toggle).not.toBeChecked();
-    expect(screen.getByText('Saves flash wear. Keeps only the most recent 64 MB, and clears when the Pod restarts. '
-      + 'Nightstand\'s own logs are kept.')).toBeVisible();
+    expect(screen.getByText('Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
+      + 'Nightstand\'s logs are kept.')).toBeVisible();
     await user.click(toggle);
     expect(posted).toEqual({ features: { journalInMemory: true } });
   });
@@ -118,8 +117,19 @@ describe('FeaturesSection', () => {
   it("hides the Pod's target temperatures on a Pod 4", async () => {
     onPod4();
     renderWithProviders(<FeaturesSection />);
-    await screen.findByRole('switch', { name: 'Level temperature display' });
+    await screen.findByRole('switch', { name: 'One-time alarm' });
     expect(screen.queryByRole('switch', { name: "Show the Pod's target temperatures" })).toBeNull();
+  });
+
+  it('lists the target temperatures switch after One-time alarm on a Pod 5 and no Level switch', async () => {
+    renderWithProviders(<FeaturesSection />);
+    const everyday = await screen.findByRole('region', { name: 'Everyday' });
+    expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm',
+      "Show the Pod's target temperatures"]);
+    expect(within(everyday).getByText('Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
+      + 'Schedules are unchanged. No effect in Level format.')).toBeVisible();
+    expect(within(everyday).getByText('Adds a one-time alarm to Schedule, separate from the daily wake-up. '
+      + 'Off, a set one-time alarm does not ring.')).toBeVisible();
   });
 
   it('posts the flag change when a feature toggle is switched', async () => {
