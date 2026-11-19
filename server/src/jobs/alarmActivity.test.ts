@@ -9,7 +9,9 @@ const folder = mkdtempSync(path.join(tmpdir(), 'nightstand-alarm-activity-'));
 mkdirSync(path.join(folder, 'lowdb'));
 process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
-const { nightAlarmPending, resetAlarmActivity, rhythmNightAlarms, trackAlarm, waitForNightAlarms } = await import('./alarmActivity.js');
+const {
+  alarmActivityWithin, nightAlarmPending, resetAlarmActivity, rhythmNightAlarms, trackAlarm, waitForNightAlarms,
+} = await import('./alarmActivity.js');
 const { setRebuilding } = await import('./rebuildState.js');
 after(() => rmSync(folder, { recursive: true, force: true }));
 
@@ -78,5 +80,18 @@ describe('waitForNightAlarms', () => {
       proto.removeEventListener = removeEventListener;
     }
     assert.equal(open, 0);
+  });
+});
+
+describe('alarmActivityWithin', () => {
+  it('counts a Rhythms alarm of this side due within the window', () => {
+    schedule.scheduleJob('rhythm-left-2026-09-29-alarm-0700-0', inMinutes(10), () => {});
+    assert.equal(alarmActivityWithin('left', inMinutes(20)), true);
+    assert.equal(alarmActivityWithin('right', inMinutes(20)), false);
+  });
+
+  it('ignores an alarm due after the window', () => {
+    schedule.scheduleJob('rhythm-left-2026-09-29-alarm-0700-0', inMinutes(30), () => {});
+    assert.equal(alarmActivityWithin('left', inMinutes(20)), false);
   });
 });

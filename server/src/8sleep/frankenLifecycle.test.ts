@@ -141,3 +141,11 @@ test('a late command timeout from a retired instance leaves its replacement conn
   assert.equal(await connectFranken(), replacement);
   assert.equal(await replacement.sendMessage('14'), '14');
 });
+
+test('a failing beforeSend rejects the command and writes nothing', async () => {
+  const franken = await connectFranken();
+  const write = mock.method(socket, 'write');
+  await assert.rejects(franken.sendMessage('14', undefined, () => { throw new Error('busy'); }), /busy/);
+  assert.equal(write.mock.callCount(), 0);
+  assert.equal(await franken.sendMessage('14'), '14');
+});

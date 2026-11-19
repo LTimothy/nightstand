@@ -26,6 +26,11 @@ import { recordActiveAlarm } from './activeAlarms.js';
 import { alarmOverrideSilences } from './alarmOverrideGate.js';
 
 
+const starting = new Set<Side>();
+
+// True while a scheduled or manual alarm is being set up for this side.
+export const alarmStarting = (side: Side): boolean => starting.has(side);
+
 const alarmOccurrences = new Map<string, number>();
 // Overrides that have already run, so a rebuild cannot ring them again.
 const overrideRuns = new Map<string, number>();
@@ -48,6 +53,7 @@ export const executeAlarm = async (
   if (occurrenceKey) alarmOccurrences.set(occurrenceKey, Date.now());
   let fired = false;
   let sending = false;
+  starting.add(side);
   emitJobEvent({ jobName: `alarm-${side}`, status: 'started' });
   try {
     const min10Duration = Math.max(10, duration);
@@ -112,6 +118,7 @@ export const executeAlarm = async (
     if (options.background && !fired) noteMissedAlarm(side, new Date(due), missedReasonForError(error, sending));
     return 0;
   } finally {
+    starting.delete(side);
     if (occurrenceKey && !fired) alarmOccurrences.delete(occurrenceKey);
   }
 };

@@ -35,5 +35,5 @@ export async function executeFunction(
   logger.debug(`Executing command | command: ${command} | arg: ${typeof arg === 'string' ? arg : 'when sent'}`);
 
   const franken = await connectFrankenWithin(options, command);
-  await franken.callFunction(command, typeof arg === 'string' ? arg : arg(), options.notAfter);
+  await franken.callFunction(command, typeof arg === 'string' ? arg : arg(), options.notAfter, options.beforeSend);
 }

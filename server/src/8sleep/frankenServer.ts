@@ -94,7 +94,7 @@ export class Franken {
 
   static readonly separator = Buffer.from('\n\n');
 
-  public async sendMessage(message: string, notAfter?: number) {
+  public async sendMessage(message: string, notAfter?: number, beforeSend?: () => void) {
     logger.debug(`Sending message to sock | message: ${message}`);
     const commandNumber = message.split('\n', 1)[0] ?? '?';
     const startedAt = Date.now();
@@ -105,6 +105,7 @@ export class Franken {
       const execPromise = this.sequentialQueue.exec(async () => {
         this.lifetime.signal.throwIfAborted();
         assertBefore(notAfter);
+        beforeSend?.();
         const requestBytes = Buffer.concat([Buffer.from(message), Franken.separator]);
         await this.write(requestBytes);
         writeCompleted = true;
@@ -183,13 +184,13 @@ export class Franken {
     return arg.replace(/\n/gm, '');
   }
 
-  public async callFunction(command: FrankenCommand, arg: string, notAfter?: number) {
+  public async callFunction(command: FrankenCommand, arg: string, notAfter?: number, beforeSend?: () => void) {
     logger.debug(`Calling function | command: ${command} | arg: ${arg}`);
     const commandNumber = frankenCommands[command];
     const cleanedArg = this.tryStripNewlines(arg);
     logger.debug(`commandNumber: ${commandNumber}`);
     logger.debug(`cleanedArg: ${cleanedArg}`);
-    await this.sendMessage(`${commandNumber}\n${cleanedArg}`, notAfter);
+    await this.sendMessage(`${commandNumber}\n${cleanedArg}`, notAfter, beforeSend);
   }
 
   public async getDeviceStatus(getGestures=false): Promise<DeviceStatus> {
@@ -356,6 +357,8 @@ export type CommandOptions = {
   latest?: boolean;
   // Epoch ms after which the command must not be sent, even once connected.
   notAfter?: number;
+  // Runs inside the queue just before the write; throwing cancels the send.
+  beforeSend?: () => void;
 };
 
 // Newest waiting command per setting; older ones drop out when superseded.
