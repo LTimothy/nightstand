@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it, before, beforeEach, after, mock } from 'node:test';
+import { describe, it, before, beforeEach, afterEach, after, mock } from 'node:test';
 import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, appendFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -86,13 +86,19 @@ mock.module(new URL('./tapAlarm.js', import.meta.url).href, {
 });
 
 let boosts: Array<[string, number, number, number]> = [];
+let boostStarts = true;
 mock.module(new URL('./boost.js', import.meta.url).href, {
   namedExports: {
     startBoost: async (side: string, boostF: number, minutes: number, pressAt: number) => {
       boosts.push([side, boostF, minutes, pressAt]);
-      return true;
+      return boostStarts;
     },
   },
+});
+
+let buzzes: string[] = [];
+mock.module(new URL('./buzz.js', import.meta.url).href, {
+  namedExports: { buzz: async (side: string) => { buzzes.push(side); return true; } },
 });
 
 let ButtonMonitor: typeof import('./buttonMonitor.js')['ButtonMonitor'];
@@ -165,7 +171,7 @@ describe('ButtonMonitor', () => {
   let monitor: Internals;
 
   beforeEach(async () => {
-    updates = []; manualChanges = []; readCalls = []; alarmTaps = []; boosts = [];
+    updates = []; manualChanges = []; readCalls = []; alarmTaps = []; boosts = []; buzzes = []; boostStarts = true;
     snapshot = undefined;
     activeAlarms.clear(); cancelSnooze('left'); cancelSnooze('right');
     updateRejectsWith = null;
@@ -174,6 +180,7 @@ describe('ButtonMonitor', () => {
     for (const file of readdirSync(rawDir)) rmSync(path.join(rawDir, file));
     await settingsDB.read();
     settingsDB.data.features.coverButtons = true;
+    settingsDB.data.features.logoClickBuzz = true;
     for (const side of ['left', 'right'] as const) {
       settingsDB.data[side].buttons = { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 };
       settingsDB.data[side].taps.logoDouble = { temperatureF: 55, minutes: 0 };
@@ -183,6 +190,70 @@ describe('ButtonMonitor', () => {
     monitor = new ButtonMonitor() as unknown as Internals;
     // The first poll reads nothing: it only finds where the newest file ends.
     await monitor.poll();
+  });
+
+  describe('confirmation buzz', () => {
+    const press = (button: 'middle' | 'top' | 'bottom', clicks = 1) =>
+      monitor.dispatch({ side: 'left', button, kind: 'click', at: Date.now(), hub: true, clicks });
+    let quadTap: typeof settingsDB.data.left.taps.quadTap;
+    beforeEach(async () => {
+      quadTap = settingsDB.data.left.taps.quadTap;
+      settingsDB.data.left.taps.quadTap = { type: 'set_temperature', temperatureF: 78 };
+      settingsDB.data.left.taps.logoDouble = { temperatureF: 60, minutes: 5 };
+      await settingsDB.write();
+    });
+    afterEach(async () => {
+      settingsDB.data.left.taps.quadTap = quadTap;
+      await settingsDB.write();
+    });
+
+    it('buzzes once after a single click applies the temperature', async () => {
+      await press('middle');
+      assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 78 } }]);
+      assert.deepEqual(buzzes, ['left']);
+    });
+
+    it('buzzes once after a double click starts a boost', async () => {
+      await press('middle', 2);
+      assert.equal(boosts.length, 1);
+      assert.deepEqual(buzzes, ['left']);
+    });
+
+    it('does not buzz when the boost did not start', async () => {
+      boostStarts = false;
+      await press('middle', 2);
+      assert.deepEqual(buzzes, []);
+    });
+
+    it('does not buzz when the write failed', async () => {
+      updateRejectsWith = new Error('write failed');
+      await press('middle');
+      assert.deepEqual(buzzes, []);
+    });
+
+    it('does not buzz for a click that stopped an alarm', async () => {
+      activeAlarms.set('left', { vibrationIntensity: 50, duration: 30, vibrationPattern: 'rise' });
+      await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at: Date.now() });
+      assert.equal(alarmTaps.length, 1);
+      assert.deepEqual(buzzes, []);
+    });
+
+    it('never buzzes for plus or minus', async () => {
+      await press('top');
+      await press('bottom');
+      assert.equal(updates.length, 2);
+      assert.deepEqual(buzzes, []);
+    });
+
+    it('does not buzz with the setting off', async () => {
+      settingsDB.data.features.logoClickBuzz = false;
+      await settingsDB.write();
+      await press('middle');
+      await press('middle', 2);
+      assert.equal(updates.length, 1);
+      assert.equal(boosts.length, 1);
+      assert.deepEqual(buzzes, []);
+    });
   });
 
   it('drops an emitted click that expired before dispatch', async () => {

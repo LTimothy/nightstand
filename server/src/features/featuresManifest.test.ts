@@ -20,6 +20,18 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const releasesManifest = JSON.parse(readFileSync(path.join(repoRoot, 'releases.json'), 'utf8'));
 
 describe('FEATURES_MANIFEST', () => {
+  it('lists the confirmation buzz off by default, needing Cover buttons', () => {
+    const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === 'logo-click-buzz');
+    assert.ok(entry, 'logo-click-buzz has no featuresManifest entry');
+    assert.equal(entry.flag, 'logoClickBuzz');
+    assert.equal(entry.default, false);
+    assert.equal(entry.version, '3.10.0');
+    assert.deepEqual(entry.depends_on, ['cover-buttons']);
+    for (const file of [...entry.touchpoints, ...entry.tests]) {
+      assert.ok(existsSync(path.join(repoRoot, file)), `${file} does not exist`);
+    }
+  });
+
   it('lists suggestions from hand changes behind their own flag, needing Rhythms', () => {
     const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === 'rhythm-suggestions');
     assert.ok(entry, 'rhythm-suggestions has no featuresManifest entry');

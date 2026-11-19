@@ -570,6 +570,27 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'Opt-in by setting: a boost length of 0, the default, keeps the middle button as it was.',
   },
   {
+    id: 'logo-click-buzz',
+    title: 'Confirmation buzz',
+    description: 'A short vibration on the side after a middle button press is applied, so you know it worked '
+      + 'without looking. Not after plus, minus, the end of a boost or a press that stopped an alarm.',
+    category: 'platform',
+    version: '3.10.0',
+    flag: 'logoClickBuzz',
+    default: false,
+    touchpoints: [
+      'server/src/8sleep/buzz.ts', 'server/src/8sleep/buttonMonitor.ts', 'server/src/jobs/alarmScheduler.ts',
+      'server/src/jobs/alarmActivity.ts', 'server/src/8sleep/frankenServer.ts',
+      'app/src/pages/SettingsPage/CoverButtonsCard.tsx',
+    ],
+    depends_on: ['cover-buttons'],
+    reversible: true,
+    tests: ['server/src/8sleep/buttonMonitor.test.ts', 'server/src/features/featuresManifest.test.ts'],
+    upstream_offer: false,
+    rationale: 'Off by default: it vibrates the bed with a 1 s alarm command, so it ships only after a hardware check, '
+      + 'and it is skipped near any alarm.',
+  },
+  {
     id: 'biometrics-v2',
     title: 'New sleep tracking (beta)',
     description: 'Tells the two sides apart with the bed\'s capacitance sensors, in live presence and the '

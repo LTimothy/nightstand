@@ -20,6 +20,7 @@ import { lastDeviceStatus } from './lastDeviceStatus.js';
 import { activeAlarms, alarmEndedAt, hasSnooze } from '../jobs/activeAlarms.js';
 import { handleAlarmTap } from './tapAlarm.js';
 import { startBoost } from './boost.js';
+import { buzz } from './buzz.js';
 import { ButtonEventMachine, ButtonEvent, ButtonName } from './buttonEvents.js';
 
 // Where the firmware writes its rolling RAW captures. Tests point it elsewhere.
@@ -306,11 +307,13 @@ export class ButtonMonitor {
         } else if (Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS
           && (alarmEndedAt.get(side) ?? -Infinity) <= event.at) {
           const boost = settingsDB.data[side].taps.logoDouble;
+          let applied = false;
           if (event.clicks === 2 && boost.minutes > 0) {
-            await startBoost(side, boost.temperatureF, boost.minutes, event.at);
+            applied = await startBoost(side, boost.temperatureF, boost.minutes, event.at);
           } else if (favoriteF !== null) {
-            await this.setFavorite(side, favoriteF, event.at);
+            applied = await this.setFavorite(side, favoriteF, event.at);
           }
+          if (applied && settingsDB.data.features.logoClickBuzz) void buzz(side);
         }
         return;
       }
@@ -341,7 +344,7 @@ export class ButtonMonitor {
   }
 
   // The logo with no alarm: an absolute target, so pressing it again changes nothing.
-  private async setFavorite(side: Side, favoriteF: number, at: number): Promise<void> {
+  private async setFavorite(side: Side, favoriteF: number, at: number): Promise<boolean> {
     logger.info(`[buttonMonitor] ${side} logo button: ${favoriteF} F and on`);
     const before = lastDeviceStatus()?.[drivingSide(settingsDB.data, side) ?? side];
     const update = { [side]: { isOn: true, targetTemperatureF: favoriteF } } as DeepPartial<DeviceStatus>;
@@ -349,6 +352,7 @@ export class ButtonMonitor {
     await markManualTempChange(side, {
       targetF: favoriteF, fromF: before?.targetTemperatureF ?? null, on: true, setsOn: before?.isOn === false, source: 'tap',
     });
+    return true;
   }
 }
 
