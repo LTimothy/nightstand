@@ -108,6 +108,8 @@ level. Posting it is accepted but ignored. `targetTemperatureLevel` is not
 accepted. A float `targetTemperatureF` is accepted, but firmware scale
 rounding means it may read back as a nearby whole Fahrenheit value.
 
+The optional Pod 5 target labels change only what the app shows; the API stays on the 55 to 110 scale, so it can report 83 where the app shows 81°F.
+
 A complete weekly alarm write looks like this:
 
 ```json

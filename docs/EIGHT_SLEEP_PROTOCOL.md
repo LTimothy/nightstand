@@ -90,11 +90,25 @@ generations or firmware versions.
 
 The eleven sampled levels from -71 through -9 fit `27 + 0.12 * level` °C;
 the two positive sampled levels fit `27 + 0.18 * level` °C. Interpolation,
-the breakpoint and the cold-end transition remain inferred. Levels -99
-through -72 and above 27 are undetermined. Do not extrapolate these fits
-into command conversions. At -100 the observed target is 50°F, while the
+the breakpoint and the cold-end transition remain inferred. The
+maintainer's Pod 5 logs do not cover levels -99 to -72 or above 27. For
+those, the optional target labels use the five points below, and commands
+still use the legacy formula. At -100 the observed target is 50°F, while the
 legacy display shows 55°F. The worst observed difference is 5°F; the
 whole-range error is unknown.
+
+The target labels interpolate linearly between these points:
+
+| Firmware level | Target °C | Source |
+|---:|---:|---|
+| -100 | 10 | The maintainer's Pod 5 logs and two other Pod 5s |
+| -99 | 15.12 | The 0.12 °C per level slope below 0 measured by [seanpassino](https://github.com/seanpassino), which the maintainer's Pod 5 entries from -71 to -9 fit |
+| 0 | 27 | seanpassino's commit daeee8c and [jalen-cheng](https://github.com/jalen-cheng)'s upstream [pull request](https://github.com/throwaway31265/free-sleep/pull/72); the maintainer's Pod 5 entries fit up to level 27 |
+| 50 | 36 | The same two sources |
+| 100 | 42 | The same two sources |
+
+"Currently at" is labelled from the raw level through the same points.
+Whether the current level follows the target curve is not yet checked.
 
 Telemetry corroborates targets through level 2, except that -60 reports
 19.790001°C rather than the logged 19.80°C. Its cause is unknown. All four

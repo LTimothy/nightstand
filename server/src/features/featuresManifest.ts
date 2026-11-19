@@ -1195,6 +1195,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
       'app/src/pages/ControlTempPage/UpcomingNight.tsx', 'app/src/pages/ControlTempPage/SmartPhaseLine.tsx',
       'app/src/pages/ControlTempPage/TemperatureButtons.tsx', 'app/src/pages/SchedulePage/ScheduleChart.tsx',
+      'app/src/pages/ControlTempPage/TemperatureLabel.tsx', 'app/src/pages/SchedulePage/TemperatureStepper.tsx',
+      'app/src/pages/SchedulePage/rhythms/SmartCurveChart.tsx', 'app/src/pages/StatusPage/FirmwareReadout.tsx',
       'app/src/pages/SettingsPage/TapGestures.tsx', 'app/src/pages/SettingsPage/CoverButtonOptions.tsx',
       'app/src/pages/SettingsPage/FeaturesSection/EnableRhythmsDialog.tsx', 'app/src/pages/StatusPage/FirmwarePanel.tsx',
       'app/src/pages/SchedulePage/rhythms/suggestionsCopy.ts', 'app/src/pages/SettingsPage/TemperatureChangeSelect.tsx',
