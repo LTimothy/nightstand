@@ -108,3 +108,10 @@ describe('Save while the alarm is off', () => {
     expect(screen.getByRole('button', { name: 'Save one-time alarm' })).toBeEnabled();
   });
 });
+
+it('says it rings only if the side is on at that time', async () => {
+  renderWithProviders(<OneOffAlarmSection/>);
+  expect(await screen.findByText(/Rings once for/)).toHaveTextContent(
+    'Rings once for Alex, then turns off. Rings only if this side is on at that time. Saved separately from this schedule.',
+  );
+});

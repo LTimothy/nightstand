@@ -32,3 +32,15 @@ it('keeps schedule accordion labels out of nested headings', async () => {
     expect(within(button).queryByRole('heading')).not.toBeInTheDocument();
   }
 });
+
+it('names the pending one-time alarm in the accordion header and keeps it collapsed', async () => {
+  const settings = structuredClone(getSettings());
+  settings.features.oneOffAlarms = true;
+  settings.left.oneOffAlarm.enabled = true;
+  settings.left.oneOffAlarm.fireAt = '2099-01-02T07:00:00Z';
+  settings.timeZone = 'UTC';
+  server.use(http.get('*/settings', () => HttpResponse.json(settings)));
+  renderWithProviders(<SchedulePage/>);
+  const button = await screen.findByRole('button', { name: 'One-time alarm: Fri, Jan 2 at 7:00 AM' });
+  expect(button).toHaveAttribute('aria-expanded', 'false');
+});

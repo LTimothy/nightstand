@@ -118,7 +118,8 @@ export default function OneOffAlarmSection() {
         One-time alarm saved for <bdi>{ settings[side]?.name || `${side} side` }</bdi>.
       </Typography> }
       <Typography variant="body2" color="text.secondary" sx={ { mb: 2 } }>
-        Rings once for <bdi>{ settings[side]?.name || `${side} side` }</bdi>, then turns off. Saved separately from this schedule.
+        Rings once for <bdi>{ settings[side]?.name || `${side} side` }</bdi>, then turns off. Rings only if this side is on at that time.
+        { ' ' }Saved separately from this schedule.
       </Typography>
 
       <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 } }>

@@ -12,6 +12,7 @@ import { palette, sx as shared } from '@design/tokens';
 import { displayTemperature } from '@lib/temperatureConversions.ts';
 import { nextBedEvent } from './bedEvents';
 import AlarmNotification from './AlarmNotification';
+import OneOffAlarmLine from './OneOffAlarmLine';
 import PauseScheduleSheet from './PauseScheduleSheet';
 import { MAX_PAUSE_DAYS, pauseResumeAt } from './pauseTimes';
 import SchedulePauseNotice from './SchedulePauseNotice';
@@ -155,6 +156,7 @@ export default function UpcomingNight() {
         { smartSleep && <SmartPhaseLine sleep={ smartSleep } side={ side }/> }
         <AlarmNotification />
       </> }
+      <OneOffAlarmLine/>
       { pauseOpen && <PauseScheduleSheet
         open
         onPaused={ () => setFocusWhenPaused(true) }

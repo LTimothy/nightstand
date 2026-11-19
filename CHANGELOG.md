@@ -28,6 +28,9 @@ is a hard fork; for the history of the projects it descends from, see
   switch, off by default, gives one short vibration on that side when a center
   button press is applied. Requested by
   [Tony-1132](https://github.com/Tony-1132).
+- A saved one-time alarm now shows on the Bed tab and in the Schedule header,
+  and its editor says it rings only if the side is on at that time. Requested
+  by [Tony-1132](https://github.com/Tony-1132).
 
 ### Changed
 

@@ -19,6 +19,7 @@ import { useSettings } from '@api/settings';
 import { useAppStore } from '@state/appStore';
 import PageContainer from '../../PageContainer';
 import OneOffAlarmSection from '../OneOffAlarmSection';
+import { pendingOneOffText } from '../oneOffAlarm';
 import SchedulePauseNotice from '../../ControlTempPage/SchedulePauseNotice';
 import ComingUp from './ComingUp';
 import DateChanges from './DateChanges';
@@ -52,6 +53,7 @@ type Undo = { message: string; focus: () => HTMLElement | null } & (
 export default function RhythmsPage({ db }: { db: RhythmsDB }) {
   const { side, isUpdating, setIsUpdating } = useAppStore();
   const { data: settings } = useSettings();
+  const oneOffText = settings ? pendingOneOffText(settings, side, new Date()) : null;
   const { data: services } = useServices();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<{ id: string | null }>();
@@ -432,7 +434,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
         } }/> }
       { settings?.features?.oneOffAlarms && <Accordion sx={ { width: '100%' } } slotProps={ { transition: { unmountOnExit: true } } }>
         <AccordionSummary expandIcon={ <ExpandMore/> }>
-          <Typography component="h2" variant="inherit">Add one-time alarm</Typography>
+          <Typography component="h2" variant="inherit">{ oneOffText ? `One-time alarm: ${oneOffText}` : 'Add one-time alarm' }</Typography>
         </AccordionSummary>
         <AccordionDetails><OneOffAlarmSection/></AccordionDetails>
       </Accordion> }

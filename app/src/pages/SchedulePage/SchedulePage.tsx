@@ -9,6 +9,7 @@ import { DeepPartial } from 'ts-essentials';
 import moment from 'moment-timezone';
 
 import OneOffAlarmSection from './OneOffAlarmSection.tsx';
+import { pendingOneOffText } from './oneOffAlarm';
 import ApplyToOtherDaysAccordion from './ApplyToOtherDaysAccordion.tsx';
 import DayTabs from './DayTabs.tsx';
 import DraftBar from './DraftBar.tsx';
@@ -70,6 +71,7 @@ export default function SchedulePage({ notice: noticeProp }: { notice?: Notice }
     selectDay,
   } = useScheduleStore();
   const { data: settings, refetch: refetchSettings, isError: settingsError } = useSettings();
+  const oneOffText = settings ? pendingOneOffText(settings, side, new Date()) : null;
   const { data: deviceStatus } = useDeviceStatus();
   const risePattern = supportsRisePattern(deviceStatus?.hubVersion, deviceStatus?.coverVersion);
   const format = useTemperatureFormat();
@@ -282,7 +284,7 @@ export default function SchedulePage({ notice: noticeProp }: { notice?: Notice }
       { !firstRun && <ApplyToOtherDaysAccordion/> }
       { settings?.features?.oneOffAlarms && <Accordion sx={ { width: '100%' } } slotProps={ { transition: { unmountOnExit: true } } }>
         <AccordionSummary expandIcon={ <ExpandMore/> }>
-          <Typography component="span" variant="inherit">Add one-time alarm</Typography>
+          <Typography component="span" variant="inherit">{ oneOffText ? `One-time alarm: ${oneOffText}` : 'Add one-time alarm' }</Typography>
         </AccordionSummary>
         <AccordionDetails><OneOffAlarmSection/></AccordionDetails>
       </Accordion> }
