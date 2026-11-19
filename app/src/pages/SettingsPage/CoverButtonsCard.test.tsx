@@ -34,9 +34,10 @@ describe('Cover buttons options', () => {
     renderWithProviders(ui);
     expect(await screen.findByRole('heading', { level: 2, name: 'Cover buttons' })).toBeVisible();
     const toggle = screen.getByRole('switch', { name: 'Read cover buttons' });
-    expect(screen.getByText('Your Pod 4 hub ignores short clicks on the Pod 5 cover. '
+    expect(screen.getByText('Your Pod 4 hub ignores short clicks on the Pod 5 cover\'s plus, minus and center (logo) buttons. '
       + 'Nightstand reads them from the Pod\'s log, 15 to 25 s late.')).toBeVisible();
     expect(screen.queryByRole('group', { name: 'Left side buttons' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Buzz when a center button press is applied' })).not.toBeInTheDocument();
     await userEvent.click(toggle);
     expect(posted).toEqual([{ features: { coverButtons: true } }]);
   });
@@ -46,12 +47,12 @@ describe('Cover buttons options', () => {
     renderWithProviders(ui);
     const group = await leftButtons();
     expect(screen.getByRole('group', { name: 'Right side buttons' })).toBeVisible();
-    expect(within(group).queryByRole('switch', { name: 'Left logo sets a temperature' })).not.toBeInTheDocument();
-    expect(within(group).getByText('When no alarm is ringing, the logo sets this and turns the side on.')).toBeVisible();
+    expect(within(group).queryByRole('switch', { name: 'Left center button sets a temperature' })).not.toBeInTheDocument();
+    expect(within(group).getByText('When no alarm is ringing, the center button sets this and turns the side on.')).toBeVisible();
     await userEvent.click(within(group).getByRole('combobox', { name: 'Left Step per click' }));
     await userEvent.click(screen.getByRole('option', { name: '3°F' }));
     await userEvent.click(await within(await leftButtons()).findByRole('switch', { name: 'Left swap plus and minus' }));
-    fireEvent.click(within(await leftButtons()).getByRole('button', { name: 'Increase left logo temperature' }));
+    fireEvent.click(within(await leftButtons()).getByRole('button', { name: 'Increase left center button temperature' }));
     expect(screen.getByRole('switch', { name: 'Read cover buttons' })).toBeChecked();
     expect(posted).toEqual([
       { left: { buttons: { stepF: 3 } } },
@@ -67,12 +68,12 @@ describe('Cover buttons options', () => {
     expect(screen.queryByRole('switch', { name: /cover buttons/i })).not.toBeInTheDocument();
     expect(screen.getByText(
       'Your Pod 5 hub turns plus into a triple tap and minus into a double tap. '
-      + 'Nightstand reads logo clicks from the Pod\'s log, 15 to 25 s late. Set what each click does here.',
+      + 'Nightstand reads center (logo) button clicks from the Pod\'s log, 15 to 25 s late. Set what each click does here.',
     )).toBeVisible();
     const group = await leftButtons();
     await userEvent.click(within(group).getByRole('combobox', { name: 'Left Step per click' }));
     await userEvent.click(screen.getByRole('option', { name: '2°F' }));
-    await userEvent.click(await within(await leftButtons()).findByRole('switch', { name: 'Left logo sets a temperature' }));
+    await userEvent.click(await within(await leftButtons()).findByRole('switch', { name: 'Left center button sets a temperature' }));
     expect(posted).toEqual([
       { left: { taps: {
         tripleTap: { type: 'temperature', change: 'increment', amount: 2 },
@@ -88,10 +89,58 @@ describe('Cover buttons options', () => {
     }));
     renderWithProviders(ui);
     const group = await leftButtons();
-    expect(within(group).getByRole('spinbutton', { name: 'Left logo temperature' })).toBeVisible();
+    expect(within(group).getByRole('spinbutton', { name: 'Left center button temperature' })).toBeVisible();
     expect(within(group).getByText('Also turns the side on.')).toBeVisible();
-    await userEvent.click(within(group).getByRole('switch', { name: 'Left logo sets a temperature' }));
+    await userEvent.click(within(group).getByRole('switch', { name: 'Left center button sets a temperature' }));
     expect(posted).toEqual([{ left: { taps: { quadTap: { type: 'base_control', behavior: 'toggle_preset' } } } }]);
+  });
+
+  it('on a Pod 5 hub, sets the center button boost and the buzz', async () => {
+    const { posted, ui } = pod('Pod 5', 'Pod 5');
+    const { unmount } = renderWithProviders(ui);
+    const group = await leftButtons();
+    const toggle = within(group).getByRole('switch', { name: 'Left double press for a boost' });
+    expect(toggle).not.toBeChecked();
+    expect(within(group).queryByRole('spinbutton', { name: 'Left boost temperature' })).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(posted).toEqual([{ left: { taps: { logoDouble: { temperatureF: 55, minutes: 10 } } } }]);
+    unmount();
+    const second = pod('Pod 5', 'Pod 5', fahrenheit(settings => { settings.left.taps.logoDouble = { temperatureF: 55, minutes: 5 }; }));
+    renderWithProviders(second.ui);
+    const shown = await leftButtons();
+    expect(within(shown).getByRole('spinbutton', { name: 'Left boost temperature' })).toBeVisible();
+    expect(within(shown).getByText('Sets this for 5 min, then returns to the temperature from before the press. '
+      + 'Only while the side is on. Changing the temperature ends it.')).toBeVisible();
+    await userEvent.click(within(shown).getByRole('combobox', { name: 'Left Boost length' }));
+    expect(screen.getAllByRole('option').map(option => option.textContent))
+      .toEqual(Array.from({ length: 10 }, (_, i) => `${i + 1} min`));
+    await userEvent.click(screen.getByRole('option', { name: '10 min' }));
+    expect(second.posted).toEqual([{ left: { taps: { logoDouble: { temperatureF: 55, minutes: 10 } } } }]);
+    await userEvent.click(screen.getByRole('switch', { name: 'Buzz when a center button press is applied' }));
+    expect(second.posted[1]).toEqual({ features: { logoClickBuzz: true } });
+    await userEvent.click(within(shown).getByRole('switch', { name: 'Left double press for a boost' }));
+    expect(second.posted[2]).toEqual({ left: { taps: { logoDouble: { temperatureF: 55, minutes: 0 } } } });
+  });
+
+  it('says center (logo) button once and logo nowhere else on either hub', async () => {
+    for (const hub of ['Pod 5', 'Pod 4']) {
+      const { ui } = pod(hub, 'Pod 5', fahrenheit(settings => { settings.features.coverButtons = true; }));
+      const { container, unmount } = renderWithProviders(ui);
+      await leftButtons();
+      const text = container.textContent ?? '';
+      expect(text.match(/center \(logo\) button/g)).toHaveLength(1);
+      expect(text.replace('center (logo) button', '')).not.toMatch(/logo/i);
+      unmount();
+    }
+  });
+
+  it('shows the boost temperature as the firmware target in the Pod target format', async () => {
+    const { ui } = pod('Pod 5', 'Pod 5', fahrenheit(settings => {
+      settings.features.targetTemperatureLabels = true;
+      settings.left.taps.logoDouble = { temperatureF: 55, minutes: 5 };
+    }));
+    renderWithProviders(ui);
+    expect(within(await leftButtons()).getByText('50°F')).toBeVisible();
   });
 
   it('on a Pod 5 hub, points to Tap gestures when plus and minus do something else', async () => {
@@ -122,9 +171,9 @@ describe('Cover buttons options', () => {
     renderWithProviders(ui);
     const group = await leftButtons();
     expect(within(group).getByText(
-      'The quad tap is set to another action under Bed and sides > Tap gestures, so the logo only stops alarms.',
+      'The quad tap is set to another action under Bed and sides > Tap gestures, so a single press only stops alarms.',
     )).toBeVisible();
-    await userEvent.click(within(group).getByRole('switch', { name: 'Left logo sets a temperature' }));
+    await userEvent.click(within(group).getByRole('switch', { name: 'Left center button sets a temperature' }));
     expect(posted).toEqual([{ left: { taps: { quadTap: { type: 'set_temperature', temperatureF: 80 } } } }]);
   });
 
@@ -135,8 +184,8 @@ describe('Cover buttons options', () => {
     }));
     renderWithProviders(ui);
     const group = await leftButtons();
-    for (let i = 0; i < 3; i++) fireEvent.click(within(group).getByRole('button', { name: 'Increase left logo temperature' }));
-    for (let i = 0; i < 3; i++) fireEvent.click(within(group).getByRole('button', { name: 'Decrease left logo temperature' }));
+    for (let i = 0; i < 3; i++) fireEvent.click(within(group).getByRole('button', { name: 'Increase left center button temperature' }));
+    for (let i = 0; i < 3; i++) fireEvent.click(within(group).getByRole('button', { name: 'Decrease left center button temperature' }));
     await waitFor(() => expect(posted.length).toBeGreaterThan(0));
     const values = posted.map(body => (body as { left: { taps: { quadTap: { temperatureF: number } } } }).left.taps.quadTap.temperatureF);
     expect(values.length).toBeGreaterThan(0);

@@ -546,6 +546,7 @@ describe('ButtonMonitor', () => {
     await monitor.dispatch({ side: 'left', button: 'middle', kind: 'click', at: at + 10_000, hub: true, clicks: 2 });
     assert.deepEqual(boosts, []);
     assert.deepEqual(updates, []);
+    assert.deepEqual(buzzes, []);
   });
 
   it('keeps the reader on for a boost length alone', async () => {

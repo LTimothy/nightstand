@@ -8,6 +8,7 @@ const pod5HubSide = () => ({
     doubleTap: { type: 'temperature', change: 'decrement', amount: 2 },
     tripleTap: { type: 'temperature', change: 'increment', amount: 2 },
     quadTap: { type: 'base_control', behavior: 'toggle_preset' },
+    logoDouble: { temperatureF: 55, minutes: 0 },
   },
 } as ReturnType<typeof getSettings>['left']);
 
@@ -30,19 +31,21 @@ describe('cover buttons', () => {
   it('reads and saves the buttons settings on a Pod 4 hub', () => {
     const side = getSettings().left;
     const values = readCoverButtons('buttons', side)!;
-    expect(values).toEqual({ stepF: 1, swapped: false, logoF: 80, logoOther: false });
+    expect(values).toEqual({ stepF: 1, swapped: false, logoF: 80, logoOther: false, boostF: 55, boostMinutes: 0 });
     expect(coverButtonsPatch('buttons', values, { stepF: 3 })).toEqual({ buttons: { stepF: 3 } });
     expect(coverButtonsPatch('buttons', values, { swapped: true })).toEqual({ buttons: { invertButtons: true } });
     expect(coverButtonsPatch('buttons', values, { logoF: 76 })).toEqual({ buttons: { favoriteTemperatureF: 76 } });
   });
 
   it('reads the tap actions on a Pod 5 hub', () => {
-    expect(readCoverButtons('taps', pod5HubSide())).toEqual({ stepF: 2, swapped: false, logoF: null, logoOther: false });
+    expect(readCoverButtons('taps', pod5HubSide())).toEqual({
+      stepF: 2, swapped: false, logoF: null, logoOther: false, boostF: 55, boostMinutes: 0,
+    });
     const swapped = pod5HubSide();
     swapped.taps.tripleTap = { type: 'temperature', change: 'decrement', amount: 2 };
     swapped.taps.doubleTap = { type: 'temperature', change: 'increment', amount: 2 };
     swapped.taps.quadTap = { type: 'set_temperature', temperatureF: 77 };
-    expect(readCoverButtons('taps', swapped)).toEqual({ stepF: 2, swapped: true, logoF: 77, logoOther: false });
+    expect(readCoverButtons('taps', swapped)).toEqual({ stepF: 2, swapped: true, logoF: 77, logoOther: false, boostF: 55, boostMinutes: 0 });
     const other = pod5HubSide();
     other.taps.doubleTap = { type: 'alarm', behavior: 'dismiss', snoozeDuration: 300, inactiveAlarmBehavior: 'none' };
     expect(readCoverButtons('taps', other)?.stepF).toBeNull();
@@ -55,7 +58,7 @@ describe('cover buttons', () => {
   });
 
   it('saves whole tap actions on a Pod 5 hub', () => {
-    const values = { stepF: 2, swapped: false, logoF: null, logoOther: false };
+    const values = { stepF: 2, swapped: false, logoF: null, logoOther: false, boostF: 55, boostMinutes: 0 };
     expect(coverButtonsPatch('taps', values, { stepF: 3 })).toEqual({ taps: {
       tripleTap: { type: 'temperature', change: 'increment', amount: 3 },
       doubleTap: { type: 'temperature', change: 'decrement', amount: 3 },
@@ -68,6 +71,18 @@ describe('cover buttons', () => {
     expect(coverButtonsPatch('taps', { ...values, logoF: 80 }, { logoF: null })).toEqual({
       taps: { quadTap: { type: 'base_control', behavior: 'toggle_preset' } },
     });
+  });
+
+  it('reads and saves the boost on a Pod 5 hub and ignores it on a Pod 4 hub', () => {
+    const side = pod5HubSide();
+    side.taps.logoDouble = { temperatureF: 60, minutes: 3 };
+    const values = readCoverButtons('taps', side)!;
+    expect(values).toMatchObject({ boostF: 60, boostMinutes: 3 });
+    expect(coverButtonsPatch('taps', values, { boostMinutes: 5 })).toEqual({ taps: { logoDouble: { temperatureF: 60, minutes: 5 } } });
+    expect(coverButtonsPatch('taps', values, { boostF: 70 })).toEqual({ taps: { logoDouble: { temperatureF: 70, minutes: 3 } } });
+    const buttons = readCoverButtons('buttons', getSettings().left)!;
+    expect(coverButtonsPatch('buttons', buttons, { boostMinutes: 5 })).toEqual({});
+    expect(coverButtonsPatch('buttons', buttons, { boostF: 60 })).toEqual({});
   });
 
   it('reads nothing from settings the app could not read', () => {

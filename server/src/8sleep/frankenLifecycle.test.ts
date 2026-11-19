@@ -149,3 +149,13 @@ test('a failing beforeSend rejects the command and writes nothing', async () => 
   assert.equal(write.mock.callCount(), 0);
   assert.equal(await franken.sendMessage('14'), '14');
 });
+
+test('beforeSend runs when the command reaches the front of the queue', async () => {
+  const franken = await connectFranken();
+  let ran = false;
+  const first = franken.sendMessage('14');
+  const second = franken.sendMessage('14', undefined, () => { ran = true; });
+  assert.equal(ran, false);
+  await Promise.all([first, second]);
+  assert.equal(ran, true);
+});

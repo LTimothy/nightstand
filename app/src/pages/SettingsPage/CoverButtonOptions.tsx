@@ -1,6 +1,6 @@
 /* eslint-disable react/no-multi-comp */ // SideButtons is only used here.
 import { useId } from 'react';
-import { Box, Stack, Typography } from '@mui/material';
+import { Box, FormControl, InputLabel, MenuItem, Select, Stack, Typography } from '@mui/material';
 import { DeepPartial } from 'ts-essentials';
 import type { Settings, SideSettings } from '@api/settingsSchema.ts';
 import type { TemperatureFormat } from '@lib/temperatureConversions';
@@ -11,6 +11,8 @@ import FeatureToggleRow from './FeaturesSection/FeatureToggleRow';
 import { coverButtonsPatch, DEFAULT_LOGO_F, readCoverButtons, type CoverButtonsPath, type CoverButtonValues } from './coverButtons';
 import useTemperatureFormat from '@lib/useTemperatureFormat';
 
+const DEFAULT_BOOST_MINUTES = 10;
+const BOOST_MINUTES = Array.from({ length: 10 }, (_, i) => i + 1);
 const SIDES = [['left', 'Left'], ['right', 'Right']] as const;
 
 function SideButtons({ title, side, path, format, disabled, save }: {
@@ -18,6 +20,7 @@ function SideButtons({ title, side, path, format, disabled, save }: {
   save: (patch: DeepPartial<SideSettings>) => void;
 }) {
   const titleId = useId();
+  const lengthId = useId();
   const values = side ? readCoverButtons(path, side) : null;
   const change = (next: Partial<CoverButtonValues>) => { if (values) save(coverButtonsPatch(path, values, next)); };
   return <Stack
@@ -52,29 +55,68 @@ function SideButtons({ title, side, path, format, disabled, save }: {
           onChange={ swapped => change({ swapped }) }/>
       </> }
       { path === 'taps' && <FeatureToggleRow
-        label="Logo sets a temperature"
-        ariaLabel={ `${title} logo sets a temperature` }
+        label="Center button sets a temperature"
+        ariaLabel={ `${title} center button sets a temperature` }
         checked={ values.logoF !== null }
         disabled={ disabled }
         onChange={ on => change({ logoF: on ? DEFAULT_LOGO_F : null }) }/> }
       { values.logoOther && <Typography
         variant="body2"
         color="text.secondary">The quad tap is set to another action under Bed and sides &gt; Tap gestures,
-        so the logo only stops alarms.</Typography> }
+        so a single press only stops alarms.</Typography> }
       { values.logoF !== null && <Box>
-        <Typography variant="body2">Logo temperature</Typography>
+        <Typography variant="body2">Center button temperature</Typography>
         <TemperatureStepper
           value={ values.logoF }
           format={ format }
-          label={ `${title} logo temperature` }
+          label={ `${title} center button temperature` }
           disabled={ disabled }
           onChange={ logoF => change({ logoF }) }/>
         <Typography
           variant="body2"
           color="text.secondary">
-          { path === 'taps' ? 'Also turns the side on.' : 'When no alarm is ringing, the logo sets this and turns the side on.' }
+          { path === 'taps' ? 'Also turns the side on.' : 'When no alarm is ringing, the center button sets this and turns the side on.' }
         </Typography>
       </Box> }
+      { path === 'taps' && <>
+        <FeatureToggleRow
+          label="Double press for a boost"
+          ariaLabel={ `${title} double press for a boost` }
+          checked={ values.boostMinutes > 0 }
+          disabled={ disabled }
+          onChange={ on => change({ boostMinutes: on ? DEFAULT_BOOST_MINUTES : 0 }) }/>
+        { values.boostMinutes > 0 && <Stack spacing={ 1.5 }>
+          <Box>
+            <Typography variant="body2">Boost temperature</Typography>
+            <TemperatureStepper
+              value={ values.boostF }
+              format={ format }
+              label={ `${title} boost temperature` }
+              disabled={ disabled }
+              onChange={ boostF => change({ boostF }) }/>
+          </Box>
+          <FormControl sx={ { minWidth: 140 } }>
+            <InputLabel id={ lengthId }>Boost length</InputLabel>
+            <Select
+              labelId={ lengthId }
+              label="Boost length"
+              value={ values.boostMinutes }
+              disabled={ disabled }
+              SelectDisplayProps={ { 'aria-labelledby': `${titleId} ${lengthId}` } }
+              onChange={ event => change({ boostMinutes: Number(event.target.value) }) }>
+              { BOOST_MINUTES.map(minutes => <MenuItem
+                key={ minutes }
+                value={ minutes }>{ minutes } min</MenuItem>) }
+            </Select>
+          </FormControl>
+          <Typography
+            variant="body2"
+            color="text.secondary">
+            Sets this for { values.boostMinutes } min, then returns to the temperature from before the press.
+            Only while the side is on. Changing the temperature ends it.
+          </Typography>
+        </Stack> }
+      </> }
     </> }
   </Stack>;
 }

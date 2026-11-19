@@ -18,11 +18,19 @@ is a hard fork; for the history of the projects it descends from, see
   [jalen-cheng](https://github.com/jalen-cheng), and matches the maintainer's
   Pod 5 logs.
 - Settings > Bed and sides > Cover buttons, Pod 5 hub with a Pod 5 cover: a
-  middle button double press can cool or warm a side for 1 to 10 minutes, then
+  center button double press can cool or warm a side for 1 to 10 minutes, then
   return to the temperature from before the press. Off by default. It acts
   only while the side is on, changing the temperature during it ends it, and a
   second double press restarts it. Requested by
   [Tony-1132](https://github.com/Tony-1132).
+- Settings > Bed and sides > Cover buttons, Pod 5 hub with a Pod 5 cover: a
+  switch, off by default, gives one short vibration on that side when a center
+  button press is applied. Requested by
+  [Tony-1132](https://github.com/Tony-1132).
+
+### Changed
+
+- The Cover buttons card calls the logo the center button.
 
 ## [3.9.0] - 2026-11-17
 

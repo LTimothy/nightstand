@@ -430,7 +430,7 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     touchpoints: ['app/src/pages/SchedulePage/OneOffAlarmSection.tsx', 'server/src/jobs/jobScheduler.ts', 'server/src/jobs/alarmScheduler.ts'],
     depends_on: ['agent'],
     reversible: true,
-    tests: [],
+    tests: ['app/src/pages/SchedulePage/oneOffAlarm.test.ts'],
     upstream_offer: false,
     rationale: 'Turning it off hides the section and stops scheduling new checks; a '
       + 'previously-armed alarm\'s stored data is untouched, so re-enabling re-arms it '
@@ -541,14 +541,14 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       + 'Reads no RAW files while off. Acts only on clicks the firmware logged as ignored, so a logo press the '
       + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the logo '
       + 'temperature are per side, edited under the switch; on a Pod 5 hub the same options write the tap '
-      + 'settings, the middle button boost included, so only one path is ever written. '
+      + 'settings, the center button boost included, so only one path is ever written. '
       + 'Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
       + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
   },
   {
     id: 'logo-boost',
-    title: 'Middle button boost',
-    description: 'For a Pod 5 hub with a Pod 5 cover: a middle button double press sets a side to a chosen '
+    title: 'Center button boost',
+    description: 'For a Pod 5 hub with a Pod 5 cover: a center button double press sets a side to a chosen '
       + 'temperature for 1 to 10 minutes, then returns it to the temperature from before the press. Only while the '
       + 'side is on; changing the temperature during it ends it, and a second double press restarts it.',
     category: 'platform',
@@ -567,12 +567,12 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       'server/src/8sleep/buttonMonitor.test.ts', 'server/src/db/tapCompat.test.ts',
     ],
     upstream_offer: false,
-    rationale: 'Opt-in by setting: a boost length of 0, the default, keeps the middle button as it was.',
+    rationale: 'Opt-in by setting: a boost length of 0, the default, keeps the center button as it was.',
   },
   {
     id: 'logo-click-buzz',
     title: 'Confirmation buzz',
-    description: 'A short vibration on the side after a middle button press is applied, so you know it worked '
+    description: 'A short vibration on the side after a center button press is applied, so you know it worked '
       + 'without looking. Not after plus, minus, the end of a boost or a press that stopped an alarm.',
     category: 'platform',
     version: '3.10.0',
@@ -585,7 +585,10 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     ],
     depends_on: ['cover-buttons'],
     reversible: true,
-    tests: ['server/src/8sleep/buttonMonitor.test.ts', 'server/src/features/featuresManifest.test.ts'],
+    tests: [
+      'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/buzz.test.ts', 'server/src/jobs/alarmActivity.test.ts',
+      'server/src/8sleep/frankenLifecycle.test.ts', 'server/src/features/featuresManifest.test.ts',
+    ],
     upstream_offer: false,
     rationale: 'Off by default: it vibrates the bed with a 1 s alarm command, so it ships only after a hardware check, '
       + 'and it is skipped near any alarm.',

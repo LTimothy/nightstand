@@ -29,7 +29,7 @@ const franken = {
   },
 };
 mock.module('./frankenServer.js', { namedExports: { connectFrankenWithin: async () => franken } });
-const { BUZZ_POWER, buzz, resetBuzz } = await import('./buzz.js');
+const { BUZZ_POWER, alarmBusy, buzz, resetBuzz } = await import('./buzz.js');
 const { activeAlarms, setSnooze, forgetActiveAlarm } = await import('../jobs/activeAlarms.js');
 const { alarmStarting, executeAlarm } = await import('../jobs/alarmScheduler.js');
 const { setRebuilding } = await import('../jobs/rebuildState.js');
@@ -69,7 +69,7 @@ describe('buzz', () => {
 
   it('skips while an alarm is starting', async () => {
     let busy = false;
-    statusProbe = () => { busy = alarmStarting('left'); };
+    statusProbe = () => { busy = alarmBusy('left', Date.now()); };
     await executeAlarm({ ...ring, side: 'left', force: true });
     assert.equal(busy, true);
     assert.equal(alarmStarting('left'), false);

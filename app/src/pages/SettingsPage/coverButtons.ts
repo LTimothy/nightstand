@@ -25,12 +25,17 @@ export type CoverButtonValues = {
   logoF: number | null;
   // True when the logo is set to an action other than a temperature or the default toggle.
   logoOther: boolean;
+  // The middle button double press boost; zero minutes is off. Pod 5 hub only.
+  boostF: number;
+  boostMinutes: number;
 };
 
 export function readCoverButtons(path: CoverButtonsPath, side: SideSettings): CoverButtonValues | null {
   if (path === 'buttons') {
     const buttons = side.buttons;
-    return buttons ? { stepF: buttons.stepF, swapped: buttons.invertButtons, logoF: buttons.favoriteTemperatureF, logoOther: false } : null;
+    return buttons ? {
+      stepF: buttons.stepF, swapped: buttons.invertButtons, logoF: buttons.favoriteTemperatureF, logoOther: false, boostF: 55, boostMinutes: 0,
+    } : null;
   }
   if (!side.taps) return null;
   const plus = side.taps[POD5_HUB_GESTURES.plus];
@@ -42,6 +47,8 @@ export function readCoverButtons(path: CoverButtonsPath, side: SideSettings): Co
     swapped: paired && plus.change === 'decrement',
     logoF: logo.type === 'set_temperature' ? logo.temperatureF : null,
     logoOther: logo.type !== 'set_temperature' && !(logo.type === 'base_control' && logo.behavior === 'toggle_preset'),
+    boostF: side.taps.logoDouble.temperatureF,
+    boostMinutes: side.taps.logoDouble.minutes,
   };
 }
 
@@ -50,12 +57,16 @@ export function coverButtonsPatch(
   path: CoverButtonsPath, current: CoverButtonValues, change: Partial<CoverButtonValues>,
 ): DeepPartial<SideSettings> {
   const next = { ...current, ...change };
+  if (('boostF' in change || 'boostMinutes' in change) && path === 'buttons') return {};
   if (path === 'buttons') {
     if ('stepF' in change) return { buttons: { stepF: next.stepF ?? 1 } };
     if ('swapped' in change) return { buttons: { invertButtons: next.swapped } };
     return { buttons: { favoriteTemperatureF: next.logoF ?? DEFAULT_LOGO_F } };
   }
   const { plus, minus, logo } = POD5_HUB_GESTURES;
+  if ('boostF' in change || 'boostMinutes' in change) {
+    return { taps: { logoDouble: { temperatureF: next.boostF, minutes: next.boostMinutes } } };
+  }
   if ('logoF' in change) {
     return { taps: { [logo]: next.logoF === null ? DEFAULT_QUAD_TAP : { type: 'set_temperature', temperatureF: next.logoF } } };
   }

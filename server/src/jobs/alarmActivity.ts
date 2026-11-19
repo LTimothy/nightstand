@@ -139,7 +139,7 @@ export function nightAlarmPending(side: Side, until: Date, endsThisNight: (name:
 export function alarmActivityWithin(side: Side, until: Date): boolean {
   // A dismissed alarm still counts until its ring time ends: erring toward no buzz over a buzz that replaces an alarm.
   if (isRebuilding() || (ringing.get(side)?.size ?? 0) > 0) return true;
-  const mine = (name: string) => isAlarmJob(side, name) || name === `${side}-one-off-alarm`
+  const mine = (name: string) => isAlarmJob(side, name)
     || (name.startsWith(`rhythm-${side}-`) && name.includes('-alarm-'));
   return dueJobs(mine, Date.now(), until.getTime() + 1).length > 0;
 }

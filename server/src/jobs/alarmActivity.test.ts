@@ -90,6 +90,12 @@ describe('alarmActivityWithin', () => {
     assert.equal(alarmActivityWithin('right', inMinutes(20)), false);
   });
 
+  it('counts an alarm job that fired and has not started ringing yet', () => {
+    void trackAlarm('left', 'left-one-off-alarm', () => new Promise<number>(() => {}));
+    assert.equal(alarmActivityWithin('left', new Date()), true);
+    assert.equal(alarmActivityWithin('right', new Date()), false);
+  });
+
   it('ignores an alarm due after the window', () => {
     schedule.scheduleJob('rhythm-left-2026-09-29-alarm-0700-0', inMinutes(30), () => {});
     assert.equal(alarmActivityWithin('left', inMinutes(20)), false);
