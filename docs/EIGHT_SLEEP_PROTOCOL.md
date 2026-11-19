@@ -103,7 +103,7 @@ The target labels interpolate linearly between these points:
 |---:|---:|---|
 | -100 | 10 | The maintainer's Pod 5 logs and two other Pod 5s |
 | -99 | 15.12 | The 0.12 °C per level slope below 0 measured by [seanpassino](https://github.com/seanpassino), which the maintainer's Pod 5 entries from -71 to -9 fit |
-| 0 | 27 | seanpassino's commit daeee8c and [jalen-cheng](https://github.com/jalen-cheng)'s upstream [pull request](https://github.com/throwaway31265/free-sleep/pull/72); the maintainer's Pod 5 entries fit up to level 27 |
+| 0 | 27 | seanpassino's [commit daeee8c](https://github.com/seanpassino/free-sleep/commit/daeee8c) and [jalen-cheng](https://github.com/jalen-cheng)'s upstream [pull request](https://github.com/throwaway31265/free-sleep/pull/72); the maintainer's Pod 5 entries fit up to level 27 |
 | 50 | 36 | The same two sources |
 | 100 | 42 | The same two sources |
 

@@ -219,7 +219,11 @@ scheduled off timer with a new 12-hour timer.
   its buttons itself, so there is no switch there; the step, a plus and minus
   swap and a center button temperature are set per side under the switch, and on a
   Pod 5 hub with a Pod 5 cover the same card changes the tap actions and
-  Nightstand reads center button clicks from the Pod's log
+  Nightstand reads center button clicks from the Pod's log. There, a center
+  button double press can also set a side to another temperature for 1 to
+  10 minutes and then return it to the earlier temperature; it is off until
+  minutes are set, and changing the temperature ends it. A switch, off by
+  default, adds one short vibration when a center button press is applied
 - Three themes under Settings > Bed and sides > Theme, saved on each device:
   lamp (the default), free-sleep classic and jmew. The last two
   follow the original free-sleep app by throwaway31265 and jmew's fork of it

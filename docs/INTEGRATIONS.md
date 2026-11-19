@@ -108,7 +108,8 @@ level. Posting it is accepted but ignored. `targetTemperatureLevel` is not
 accepted. A float `targetTemperatureF` is accepted, but firmware scale
 rounding means it may read back as a nearby whole Fahrenheit value.
 
-The optional Pod 5 target labels change only what the app shows; the API stays on the 55 to 110 scale, so it can report 83 where the app shows 81°F.
+The optional Pod 5 target labels change only what the app shows; the API
+stays on the 55 to 110 scale, so it can report 83 where the app shows 81°F.
 
 A complete weekly alarm write looks like this:
 
@@ -166,7 +167,7 @@ ignored by clients.
 |---|---|
 | `POST /api/deviceStatus` | `secondsRemaining` is a whole number from 0 to 43200; LED brightness is whole 0 to 100; settings `v`, `gainLeft`, `gainRight` are whole 0 to 2147483647. Read-only status fields are tolerated and ignored. |
 | Temperature display | Settings adds `temperatureFormat: "level"`. It is display only; `targetTemperatureF` stays Fahrenheit. `targetTemperatureLevel` gets `400`, also on current upstream after its revert. |
-| `POST /api/settings` | Strict deep partial. Adds `alarmsEnabled`, `oneOffAlarm`, `scheduleOverrides.pause`, `rawArchiveRetentionDays`, `updateChannel`, `features`, and tap types `base_control` and `set_temperature`. Invalid or past pauses get `400`. Changing `features.rhythms` here or disabling `levelTemps` while format is `level` gets `409`. |
+| `POST /api/settings` | Strict deep partial. Adds `alarmsEnabled`, `oneOffAlarm`, `scheduleOverrides.pause`, `rawArchiveRetentionDays`, `updateChannel`, `features`, and tap types `base_control` and `set_temperature`. `taps.logoDouble` is a boost setting, not a gesture: it has no type. Invalid or past pauses get `400`. Changing `features.rhythms` here gets `409`. |
 | `POST /api/schedules` | An alarm must have all six fields. Up to 10 alarms and 48 temperature entries per day, with stored oversized days allowed to shrink. Alarm duration is 1 to 300 seconds. Legacy writes preserve later alarms. |
 | `POST /api/alarm` | Duration is 1 to 300 seconds. Waits for the start command. An off or away side without `force: true` does not start and returns `503` with `error.message`, rather than upstream's silent `200`. Hardware start failures also return `503`. |
 | `POST /api/execute` | `TEMP_LEVEL_*` takes a plain whole number from -100 to 100; `*_TEMP_DURATION` takes 0 to 43200. Other supplied arguments must be strings. Use the validated device-status route for normal controls. |

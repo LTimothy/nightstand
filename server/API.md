@@ -216,6 +216,7 @@ generic message; the details go to the server log.
     "biometricsV2": false,
     "uncheckedCapPresence": false,
     "coverButtons": false,
+    "logoClickBuzz": false,
     "journalInMemory": false,
     "targetTemperatureLabels": false
   }
@@ -306,6 +307,10 @@ generic message; the details go to the server log.
   for the logo. The plus and minus mapping comes from the Pod's logs; the
   logo is not yet checked on a Pod. While off, the server opens no RAW files
   for buttons.
+  `logoClickBuzz` is the Cover buttons buzz switch, off by default: one 1 s
+  vibration on a side after a middle button press set its temperature or
+  started a boost, skipped while an alarm is ringing, snoozed, starting or
+  due within seconds.
   `journalInMemory` is Keep the system log in memory, off by default. Saving
   it runs `scripts/journal_storage.sh` through sudo, which writes or removes a
   journald drop-in; the change applies at the next restart of the Pod.
@@ -332,10 +337,9 @@ generic message; the details go to the server log.
 - Returns `400` if the body does not match the schema, if a pause would end
   in the past or more than 14 days ahead, or if a pause is turned on while
   that side is in away mode.
-- Returns `409` if the update would turn off `levelTemps` while
-  `temperatureFormat` is still `level`, or if it would change
-  `features.rhythms` (use `/api/rhythms/enable` or `/api/rhythms/disable`;
-  sending the value it already has is fine).
+- Returns `409` if it would change `features.rhythms` (use
+  `/api/rhythms/enable` or `/api/rhythms/disable`; sending the value it
+  already has is fine).
 
 #### Request body
 
