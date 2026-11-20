@@ -73,9 +73,23 @@ it('moves one inferred warm-up without dropping other changes', () => {
 it('opens vibration settings for the selected alarm and edits its strength', () => {
   renderWithProviders(<ScheduleTimeline format="level"/>);
   fireEvent.click(screen.getByRole('button', { name: /Vibrate/ }));
-  const sheet = screen.getByRole('dialog', { name: 'Wake-up vibration' });
+  const sheet = screen.getByRole('dialog', { name: 'Alarm vibration' });
   fireEvent.change(within(sheet).getByRole('slider', { name: /Strength/ }), { target: { value: '42' } });
   expect(useScheduleStore.getState().getEditedAlarms()[0].vibrationIntensity).toBe(42);
+});
+
+it('edits only the alarm whose vibration button was pressed', () => {
+  const store = useScheduleStore.getState();
+  store.updateSelectedAlarm({ vibrationIntensity: 50 });
+  store.addAlarm();
+  expect(useScheduleStore.getState().getEditedAlarms()).toHaveLength(2);
+  renderWithProviders(<ScheduleTimeline format="level"/>);
+  fireEvent.click(screen.getAllByRole('button', { name: /^Vibrate:/ })[1]);
+  const sheet = screen.getByRole('dialog', { name: 'Alarm vibration' });
+  fireEvent.change(within(sheet).getByRole('slider', { name: /Strength/ }), { target: { value: '42' } });
+  const [first, second] = useScheduleStore.getState().getEditedAlarms();
+  expect(second.vibrationIntensity).toBe(42);
+  expect(first.vibrationIntensity).toBe(50);
 });
 
 it('steps by levels with keyboard access and stores snapped Fahrenheit', () => {

@@ -5,7 +5,6 @@ import {
   Alert, Box, Button, FormControlLabel, IconButton, ListItemText, MenuItem, Paper, Stack, Switch, TextField, Typography,
 } from '@mui/material';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
-import ChevronRight from '@mui/icons-material/ChevronRight';
 import { useAppStore } from '@state/appStore';
 import { TemperatureFormat } from '@lib/temperatureConversions';
 import { AlarmSchedule, MAX_ALARMS_PER_DAY, MAX_TEMPERATURES_PER_DAY } from '@api/schedulesSchema';
@@ -14,7 +13,7 @@ import { minutesSincePowerOn, temperatureInPowerWindow, timeInPowerWindow } from
 import { addMinutes, canFollowWake, nextTemperatureChange, relativeOffDelay, wakeTemperatureTimes } from './scheduleRoutine';
 import TemperatureStepper from './TemperatureStepper';
 import { PRESENCE_NOTE } from './rhythms/presenceNote';
-import WakeVibrationSheet from './AlarmSection/WakeVibrationSheet';
+import WakeVibration from './AlarmSection/WakeVibrationSheet';
 
 // A rhythm passes `wake`: its own wake time, kept whether or not an alarm rings, which anchors the warm-up and the turn-off.
 // `bedtimeNote` is set for Smart Schedule, where power.on is the bedtime and the bed turns on before it.
@@ -28,7 +27,6 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
   const schedule = store.selectedSchedule;
   const isUpdating = useAppStore(state => state.isUpdating);
   const [error, setError] = useState('');
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [customOff, setCustomOff] = useState(false);
   const [offWarning, setOffWarning] = useState(false);
   const [rejectedDelay, setRejectedDelay] = useState<number>();
@@ -374,19 +372,11 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
               onClick={ () => { store.removeAlarm(index); refollowLastAlarm(); } }><DeleteOutline/></IconButton> }
           </Box>
           { invalid && <Typography color="error" variant="caption">{ alarmHint(alarm.time) }</Typography> }
-          { alarm.enabled && <Button
-            fullWidth
+          { alarm.enabled && <WakeVibration
+            alarm={ alarm }
+            risePattern={ risePattern }
             disabled={ disabled }
-            aria-label={ `Vibrate: ${risePattern && alarm.vibrationPattern === 'rise' ? 'Builds up' : 'Double pulse'}, `
-              + `strength ${alarm.vibrationIntensity}, ${alarm.duration} seconds` }
-            endIcon={ <ChevronRight/> }
-            sx={ { justifyContent: 'space-between', textAlign: 'left', minHeight: 44, mt: 1, px: 0 } }
-            onClick={ () => { store.selectAlarm(index); setSheetOpen(true); } }>
-            <Typography component="span" variant="body2" color="text.secondary">
-              { risePattern && alarm.vibrationPattern === 'rise' ? 'Builds up' : 'Double pulse' }, strength { alarm.vibrationIntensity },
-              { ' ' }<Box component="span" sx={ { whiteSpace: 'nowrap' } }>{ alarm.duration } s</Box>
-            </Typography>
-          </Button> }
+            onChange={ patch => { store.selectAlarm(index); store.updateSelectedAlarm(patch); } }/> }
         </Paper>, ...(hideTemperatures || wake ? [] : times).filter(time => isAfterWake(time)
           && wakeOffset(time) >= minutesSincePowerOn(alarm.time, schedule.power.on)
           && (!nextAlarm || wakeOffset(time) < minutesSincePowerOn(nextAlarm.time, schedule.power.on))).map(renderTemperature)];
@@ -488,6 +478,5 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
         disabled={ disabled || alarms.length >= MAX_ALARMS_PER_DAY }
         sx={ { alignSelf: 'flex-start', px: 0 } }>Add alarm</Button>
     </Stack>
-    <WakeVibrationSheet open={ sheetOpen } onClose={ () => setSheetOpen(false) } risePattern={ risePattern }/>
   </Stack>;
 }
