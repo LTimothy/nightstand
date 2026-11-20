@@ -11,7 +11,7 @@ import { GESTURE_LABELS } from './tapActions.ts';
 
 const gestureName = (gesture: keyof typeof GESTURE_LABELS) => GESTURE_LABELS[gesture].toLowerCase();
 const POD5_HUB = `Your Pod 5 hub turns plus into a ${gestureName(POD5_HUB_GESTURES.plus)} and minus into a `
-  + `${gestureName(POD5_HUB_GESTURES.minus)}. Nightstand reads center (logo) button clicks from the Pod's log, 15 to 25 s late. `
+  + `${gestureName(POD5_HUB_GESTURES.minus)}. Nightstand reads center (logo) button clicks from the Pod's log, 3 to 25 s late. `
   + 'Set what each click does here.';
 const POD4_HUB = 'Your Pod 4 hub ignores short clicks on the Pod 5 cover\'s plus, minus and center (logo) buttons. '
   + 'Nightstand reads them from the Pod\'s log, 15 to 25 s late.';
@@ -40,8 +40,8 @@ export default function CoverButtonsCard({ settings, updateSettings }: Props) {
         disabled={ isUpdating || settings.features?.logoClickBuzz === undefined }
         checked={ settings.features?.logoClickBuzz ?? false }
         onChange={ next => save({ features: { logoClickBuzz: next } }) }
-        description={ 'One short vibration on that side when Nightstand sets the center button temperature or starts a boost, '
-          + '15 to 25 s after the press.' }/>
+        description={ 'A 3 s vibration when Nightstand sets the center button temperature or starts a boost, '
+          + '3 to 25 s after the press.' }/>
       <Typography
         variant="body2"
         color="text.secondary">{ POD5_HUB }</Typography>

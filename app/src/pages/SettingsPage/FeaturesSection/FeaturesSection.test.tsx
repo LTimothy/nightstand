@@ -29,7 +29,7 @@ describe('FeaturesSection', () => {
     const storage = screen.getByRole('region', { name: 'Storage' });
     expect(screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
       .toEqual(['Everyday', 'Sleep tracking', 'Storage']);
-    expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm']);
+    expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm', 'Ring alarms when the side is off']);
     expect(within(everyday).getByRole('button', { name: 'Delete notes' })).toBeVisible();
     expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)',
       'Capacitance presence (beta)', 'Cooling warning']);
@@ -125,7 +125,7 @@ describe('FeaturesSection', () => {
     renderWithProviders(<FeaturesSection />);
     const everyday = await screen.findByRole('region', { name: 'Everyday' });
     expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm',
-      "Show the Pod's target temperatures"]);
+      'Ring alarms when the side is off', "Show the Pod's target temperatures"]);
     expect(within(everyday).getByText('Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
       + 'Schedules are unchanged. No effect in Level format.')).toBeVisible();
     expect(within(everyday).getByText('Adds a one-time alarm to Schedule, separate from the daily wake-up. '
@@ -148,6 +148,21 @@ describe('FeaturesSection', () => {
 
     // Default mock oneOffAlarms is true, so the first click posts false.
     expect(posted).toEqual({ features: { oneOffAlarms: false } });
+  });
+
+  it('offers ringing alarms on an off side, off by default, on every Pod', async () => {
+    onPod4();
+    let posted: unknown;
+    server.use(http.post('*/settings', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({});
+    }));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: 'Ring alarms when the side is off' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText('Alarms vibrate even if the side is off.')).toBeVisible();
+    await user.click(toggle);
+    expect(posted).toEqual({ features: { alarmsWhenOff: true } });
   });
 
   it('does not offer a sleep score switch', async () => {

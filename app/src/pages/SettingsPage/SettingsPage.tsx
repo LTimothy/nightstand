@@ -55,7 +55,7 @@ export default function SettingsPage() {
     ...(device && device.hubVersion !== Version.Pod5
       ? [biometricsEnabled && settings?.features?.biometricsV2 && settings?.features?.uncheckedCapPresence] : []),
     ...(device?.hubVersion === Version.Pod5 ? [settings?.features?.targetTemperatureLabels] : []),
-    settings?.features?.oneOffAlarms, biometricsInstalled && biometricsEnabled,
+    settings?.features?.oneOffAlarms, settings?.features?.alarmsWhenOff, biometricsInstalled && biometricsEnabled,
     settings?.features?.rhythms,
     settings?.features?.rhythms && settings?.features?.rhythmSuggestions,
     settings?.features?.metricsRetention, settings?.features?.metricsLowDiskProtection, settings?.features?.journalInMemory,

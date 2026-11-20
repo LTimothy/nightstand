@@ -144,6 +144,13 @@ export default function FeaturesSection() {
           onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
           description="Adds a one-time alarm to Schedule, separate from the daily wake-up. Off, a set one-time alarm does not ring."
         />
+        <FeatureToggleRow
+          label="Ring alarms when the side is off"
+          disabled={ isUpdating || features?.alarmsWhenOff === undefined }
+          checked={ features?.alarmsWhenOff ?? false }
+          onChange={ (next) => updateFeature({ alarmsWhenOff: next }) }
+          description="Alarms vibrate even if the side is off."
+        />
         { deviceStatus?.hubVersion === Version.Pod5 && <FeatureToggleRow
           label="Show the Pod's target temperatures"
           disabled={ isUpdating || features?.targetTemperatureLabels === undefined }
@@ -179,7 +186,7 @@ export default function FeaturesSection() {
           </AccordionDetails>
         </Accordion> }
         <Box sx={ child }>
-          { biometricsEnabled && <Box sx={ { my: 2 } }>
+          { biometricsEnabled && <Box sx={ { mt: 2, mb: 1 } }>
             <RawArchiveRetention
               settings={ settings }
               updateSettings={ saveSettings } />

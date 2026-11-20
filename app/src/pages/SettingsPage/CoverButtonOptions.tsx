@@ -74,7 +74,8 @@ function SideButtons({ title, side, path, format, disabled, save }: {
           onChange={ logoF => change({ logoF }) }/>
         <Typography
           variant="body2"
-          color="text.secondary">
+          color="text.secondary"
+          sx={ { mt: 1.5 } }>
           { path === 'taps' ? 'Also turns the side on.' : 'When no alarm is ringing, the center button sets this and turns the side on.' }
         </Typography>
       </Box> }

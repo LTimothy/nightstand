@@ -68,7 +68,7 @@ describe('Cover buttons options', () => {
     expect(screen.queryByRole('switch', { name: /cover buttons/i })).not.toBeInTheDocument();
     expect(screen.getByText(
       'Your Pod 5 hub turns plus into a triple tap and minus into a double tap. '
-      + 'Nightstand reads center (logo) button clicks from the Pod\'s log, 15 to 25 s late. Set what each click does here.',
+      + 'Nightstand reads center (logo) button clicks from the Pod\'s log, 3 to 25 s late. Set what each click does here.',
     )).toBeVisible();
     const group = await leftButtons();
     await userEvent.click(within(group).getByRole('combobox', { name: 'Left Step per click' }));
