@@ -17,7 +17,7 @@ test('one-time alarm Save is disabled until a future fire-at time is set', async
   // Enabling with no fire-at set yet must disable Save.
   await expect(save).toBeDisabled();
 
-  await page.locator('input[type="datetime-local"]').fill('2027-01-01T08:00');
+  await page.locator('input[type="datetime-local"]').fill('2099-01-02T07:30');
 
   // A non-empty future fire-at makes Save enabled.
   await expect(save).toBeEnabled();
