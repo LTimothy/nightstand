@@ -140,6 +140,8 @@ export const defaultFeatures = {
   // The systemd journal in RAM (scripts/journal_storage.sh), from the next restart.
   journalInMemory: false,
   targetTemperatureLabels: false,
+  // Alarms ring on a side that is off (alarmScheduler.ts).
+  alarmsWhenOff: false,
 } as const;
 const FeaturesSchema = z.object({
   sleepScore: z.boolean(),
@@ -161,6 +163,7 @@ const FeaturesSchema = z.object({
   logoClickBuzz: z.boolean(),
   journalInMemory: z.boolean(),
   targetTemperatureLabels: z.boolean(),
+  alarmsWhenOff: z.boolean(),
 }).strict();
 
 export const SettingsSchema = z.object({

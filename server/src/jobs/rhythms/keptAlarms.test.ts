@@ -70,6 +70,7 @@ async function ringAt(name: string, at: string) {
 beforeEach(async () => {
   mock.timers.enable({ apis: ['Date'], now: NOW });
   settingsDB.data.timeZone = 'UTC';
+  settingsDB.data.features.alarmsWhenOff = false;
   for (const side of ['left', 'right'] as const) {
     settingsDB.data[side].awayMode = false;
     settingsDB.data[side].alarmsEnabled = true;
@@ -155,6 +156,18 @@ describe('kept alarms', () => {
     assert.deepEqual(commands, []);
     assert.deepEqual(alarmJobs(), []);
     assert.equal(scheduleKeptAlarms(new Date(NOW)), 0);
+  });
+
+  it('rings on a side that is off when alarms ring with the side off', async () => {
+    settingsDB.data.features.alarmsWhenOff = true;
+    await settingsDB.write();
+    ledger.startAlarmLedger(new Date(NOW));
+    keepSleepAlarms('left', sleep, new Date(NOW), 'UTC');
+    scheduleKeptAlarms(new Date(NOW));
+    deviceStatus.left.isOn = false;
+    await ringAt(SECOND, '2026-09-29T06:00:00Z');
+    assert.equal(commands.filter(([name]) => name === 'ALARM_LEFT').length, 1);
+    assert.deepEqual(ledger.listMissedAlarms(new Date(NOW)), []);
   });
 
   it('rings anyway when the Pod cannot be read', async () => {

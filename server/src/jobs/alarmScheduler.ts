@@ -66,10 +66,10 @@ export const executeAlarm = async (
       }
     }
 
-    // Exit if side is off
+    // Exit if side is off, unless alarms ring on an off side
     const franken = await connectFrankenWithin(options);
     const resp = await franken.getDeviceStatus();
-    if (!resp[side].isOn && !force) {
+    if (!resp[side].isOn && !force && !settingsDB.data.features.alarmsWhenOff) {
       logger.debug('Not executing alarm, side is off!');
       if (options.background) noteMissedAlarm(side, new Date(due), 'side-off');
       return 0;
@@ -298,7 +298,7 @@ export function scheduleAlarmOverride(
 
 export const scheduleAlarm = (settingsData: Settings, side: Side, day: DayOfWeek, dailySchedule: DailySchedule) => {
   // Recurring alarms stay coupled to the day's power schedule; the runtime
-  // isOn check inside executeAlarm still skips a manually-off pod.
+  // isOn check inside executeAlarm still skips a manually-off side unless alarmsWhenOff is on.
   if (!dailySchedule.power.enabled) return;
   if (!settingsData[side].alarmsEnabled) return;
   if (settingsData[side].awayMode) return;

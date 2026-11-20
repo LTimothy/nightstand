@@ -70,6 +70,7 @@ beforeEach(async () => {
   leftOn = true;
   analyses.length = 0;
   settings.data.timeZone = 'UTC';
+  settings.data.features.alarmsWhenOff = false;
   settings.data.left.awayMode = false;
   settings.data.left.alarmsEnabled = true;
   settings.data.left.scheduleOverrides = {
@@ -146,6 +147,28 @@ test('a scheduled alarm on a side that is off is reported as missed, a manual on
   assert.equal(missed.reason, 'side-off');
   assert.equal(missed.side, 'left');
   assert.equal(missed.at, new Date(now).toISOString());
+  assert.equal(commands.length, 0);
+});
+
+test('with alarms ringing when the side is off, a scheduled alarm rings on an off side', async (t) => {
+  t.mock.method(Date, 'now', () => now);
+  t.mock.method(globalThis, 'setTimeout', () => ({ unref() {} }) as NodeJS.Timeout);
+  ledger.startAlarmLedger(new Date(now));
+  settings.data.features.alarmsWhenOff = true;
+  await settings.write();
+  leftOn = false;
+  assert.equal(await executeAlarm({ side: 'left', ...alarm }, undefined, { background: true, dueAt: now }), 10_000);
+  assert.equal(commands.length, 1);
+  assert.deepEqual(ledger.listMissedAlarms(new Date(now)), []);
+});
+
+test('with alarms ringing when the side is off, an away side stays quiet', async (t) => {
+  t.mock.method(Date, 'now', () => now);
+  settings.data.features.alarmsWhenOff = true;
+  settings.data.left.awayMode = true;
+  await settings.write();
+  leftOn = false;
+  assert.equal(await executeAlarm({ side: 'left', ...alarm }, undefined, { background: true, dueAt: now }), 0);
   assert.equal(commands.length, 0);
 });
 

@@ -52,10 +52,12 @@ export function planHandoff(input: {
   const timeZone = settings.timeZone || 'UTC';
   return SCHEDULE_SIDES.map((side): HandoffPlan => {
     const driver = drivingSide(settings, side);
-    if (!driver || !isOn(side)) return { side, action: 'none' };
+    // An off side changes nothing, but with alarms ringing when off it still needs the alarm override.
+    const off = !isOn(side);
+    if (!driver || (off && !settings.features.alarmsWhenOff)) return { side, action: 'none' };
     const sleep = sleepAt(resolveSleeps({ db, side: driver, timeZone, from: now, to: now, powerOffFor }), now);
     if (!sleep) return { side, action: 'none' };
-    if (powerOffNow) return { side, action: 'powered-off' };
+    if (powerOffNow && !off) return { side, action: 'powered-off' };
     let legacy = sleepAt(resolveLegacySleeps({ schedules, side: driver, timeZone, from: now, to: now }), now);
     // A Smart Schedule sleep turns on before its bedtime; during that time the
     // weekly night that starts by the bedtime takes over.
@@ -66,6 +68,7 @@ export function planHandoff(input: {
     }
     // Alarms ring only on the present side.
     if (!legacy) {
+      if (off) return { side, action: 'none' };
       const rearm = turnsOffWhenUp(sleep);
       return {
         side, action: 'kept-on-until', until: sleep.end,
@@ -73,7 +76,7 @@ export function planHandoff(input: {
         ...(side === driver ? { keptSleep: sleep } : {}),
       };
     }
-    const plan: HandoffPlan = { side, action: 'legacy-takes-over', until: legacy.end };
+    const plan: HandoffPlan = off ? { side, action: 'none' } : { side, action: 'legacy-takes-over', until: legacy.end };
     const rhythmAlarmRang = sleep.events.some(event => event.kind === 'alarm'
       && event.at.getTime() <= now.getTime()
       && alarmRang(driver, alarmOccurrenceId(driver, sleep, event.at, timeZone)));

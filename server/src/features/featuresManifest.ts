@@ -436,6 +436,23 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       + 'without any migration.',
   },
   {
+    id: 'alarms-when-off',
+    title: 'Ring alarms when the side is off',
+    description: 'Alarms vibrate even if the side is off.',
+    category: 'ui',
+    version: '3.10.0',
+    flag: 'alarmsWhenOff',
+    default: false,
+    touchpoints: ['server/src/jobs/alarmScheduler.ts', 'server/src/jobs/rhythms/scheduleRhythms.ts',
+      'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx', 'app/src/pages/SchedulePage/OneOffAlarmSection.tsx'],
+    depends_on: [],
+    reversible: true,
+    tests: ['server/src/jobs/schedulingRegression.test.ts', 'server/src/jobs/rhythms/keptAlarms.test.ts'],
+    upstream_offer: false,
+    rationale: 'Off by default: an alarm on an off side has always been skipped and reported as missed. '
+      + 'Away mode and a day without a power schedule still keep alarms quiet.',
+  },
+  {
     id: 'design-system',
     title: 'Design system',
     description: 'Three themes, chosen per device in Settings > Bed and sides: lamp (the default), free-sleep classic and jmew. '
@@ -571,7 +588,7 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   {
     id: 'logo-click-buzz',
     title: 'Confirmation buzz',
-    description: 'A 3 s vibration on the side after a center button press is applied, so you know it worked '
+    description: 'A 3 s vibration after a center button press is applied, so you know it worked '
       + 'without looking. Not after plus, minus, the end of a boost or a press that stopped an alarm.',
     category: 'platform',
     version: '3.10.0',
@@ -904,7 +921,7 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   {
     id: 'bed-side-tiles',
     title: 'Named bed controls',
-    description: 'Named side tiles, read-only temperature gauge and large stepper controls.',
+    description: 'Named side tiles, temperature dial and large stepper controls.',
     category: 'ui',
     version: 'n/a',
     flag: null,
@@ -918,6 +935,27 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     ],
     upstream_offer: false,
     rationale: 'Side identity and readable controls are required for operating the bed.',
+  },
+  {
+    id: 'dial-drag',
+    title: 'Drag the dial',
+    description: 'On the Bed tab the target dot can be dragged around the dial. It snaps to the same steps as '
+      + 'Cooler and Warmer, which stay.',
+    category: 'ui',
+    version: '3.10.0',
+    flag: null,
+    default: true,
+    touchpoints: [
+      'app/src/pages/ControlTempPage/DialHandle.tsx', 'app/src/pages/ControlTempPage/dialGeometry.ts',
+      'app/src/pages/ControlTempPage/TemperatureDial.tsx', 'app/src/lib/temperatureStep.ts',
+    ],
+    depends_on: [],
+    reversible: true,
+    tests: [
+      'app/src/pages/ControlTempPage/DialHandle.test.tsx', 'app/src/pages/ControlTempPage/dialGeometry.test.ts',
+    ],
+    upstream_offer: false,
+    rationale: 'Adds a way to set the same target the buttons already set, through the same send path.',
   },
   {
     id: 'grouped-night-schedule',
