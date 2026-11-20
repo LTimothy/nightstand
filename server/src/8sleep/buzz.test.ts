@@ -30,6 +30,8 @@ const franken = {
 };
 mock.module('./frankenServer.js', { namedExports: { connectFrankenWithin: async () => franken } });
 const { BUZZ_POWER, alarmBusy, buzz, resetBuzz } = await import('./buzz.js');
+const { executeFunction } = await import('./deviceApi.js');
+const { dismissAlarm } = await import('./dismissAlarm.js');
 const { activeAlarms, setSnooze, forgetActiveAlarm } = await import('../jobs/activeAlarms.js');
 const { alarmStarting, executeAlarm } = await import('../jobs/alarmScheduler.js');
 const { setRebuilding } = await import('../jobs/rebuildState.js');
@@ -46,12 +48,72 @@ afterEach(() => {
 });
 
 describe('buzz', () => {
-  it('sends one short double pulse', async () => {
+  it('sends one 3 s double pulse at full power', async () => {
     assert.equal(await buzz('left'), true);
     assert.equal(sends.length, 1);
     assert.equal(sends[0].command, 'ALARM_LEFT');
     const payload = cbor.decodeFirstSync(Buffer.from(sends[0].hex, 'hex'));
-    assert.deepEqual({ ...payload, tt: typeof payload.tt }, { pl: BUZZ_POWER, du: 1, pi: 'double', tt: 'number' });
+    assert.equal(BUZZ_POWER, 100);
+    assert.deepEqual({ ...payload, tt: typeof payload.tt }, { pl: 100, du: 3, pi: 'double', tt: 'number' });
+  });
+
+  describe('alarm hold', () => {
+    beforeEach(() => mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() }));
+    afterEach(() => mock.timers.reset());
+    const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve)); };
+
+    it('holds the same-side alarm until the buzz ends', async () => {
+      assert.equal(await buzz('left'), true);
+      const sent = executeFunction('ALARM_LEFT', 'aa');
+      await settle();
+      mock.timers.tick(3_999);
+      await settle();
+      assert.equal(sends.length, 1);
+      mock.timers.tick(1);
+      await sent;
+      assert.deepEqual(sends.map(send => send.command), ['ALARM_LEFT', 'ALARM_LEFT']);
+    });
+
+    it('never holds the other side', async () => {
+      assert.equal(await buzz('left'), true);
+      await executeFunction('ALARM_RIGHT', 'aa');
+      assert.deepEqual(sends.map(send => send.command), ['ALARM_LEFT', 'ALARM_RIGHT']);
+    });
+
+    it('delays nothing after a skipped buzz', async () => {
+      activeAlarms.set('left', ring);
+      assert.equal(await buzz('left'), false);
+      activeAlarms.delete('left');
+      await executeFunction('ALARM_RIGHT', 'aa');
+      await executeFunction('ALARM_LEFT', 'aa');
+      assert.equal(sends.length, 2);
+    });
+
+    it('drops a second press inside the hold', async () => {
+      assert.equal(await buzz('left'), true);
+      mock.timers.tick(3_000);
+      assert.equal(await buzz('left'), false);
+      assert.equal(sends.length, 1);
+    });
+
+    it('rings an alarm sent during a buzz once the buzz ends', async () => {
+      assert.equal(await buzz('left'), true);
+      const ringing = executeAlarm({ ...ring, side: 'left', force: true });
+      await settle();
+      assert.equal(sends.length, 1);
+      mock.timers.tick(4_000);
+      assert.equal(await ringing, 30_000);
+      assert.deepEqual(sends.map(send => send.command), ['ALARM_LEFT', 'ALARM_LEFT']);
+      assert.equal(cbor.decodeFirstSync(Buffer.from(sends[1].hex, 'hex')).tt, Math.floor(Date.now() / 1_000));
+      assert.equal(activeAlarms.has('left'), true);
+    });
+
+    it('never delays a dismissal behind a buzz', async () => {
+      assert.equal(await buzz('left'), true);
+      activeAlarms.set('right', ring);
+      await dismissAlarm('right');
+      assert.deepEqual(sends.map(send => send.command), ['ALARM_LEFT', 'ALARM_RIGHT']);
+    });
   });
 
   it('skips while a ringing alarm is recorded', async () => {
@@ -124,7 +186,8 @@ describe('buzz', () => {
     assert.equal(sends.length, 0);
   });
 
-  it('allows one buzz per side at a time', async () => {
+  it('allows one buzz per side at a time', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
     let open = () => {};
     release = new Promise<void>(resolve => { open = resolve; });
     const first = buzz('left');

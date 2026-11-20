@@ -5,10 +5,12 @@ import { activeAlarms, hasSnooze } from '../jobs/activeAlarms.js';
 import { alarmStarting } from '../jobs/alarmScheduler.js';
 import { alarmActivityWithin } from '../jobs/alarmActivity.js';
 import { isRebuilding, rebuildSettled } from '../jobs/rebuildState.js';
-import { executeFunction } from './deviceApi.js';
+import { executeFunction, holdCommand } from './deviceApi.js';
 
-export const BUZZ_POWER = 50;
-const BUZZ_HOLD_MS = 2_000;
+export const BUZZ_POWER = 100;
+const BUZZ_SECONDS = 3;
+// The Pod drops a same-side alarm sent 2 s into a buzz, so that side's alarm waits this long.
+const BUZZ_HOLD_MS = 4_000;
 const GUARD_WINDOW_MS = 7_000;
 // Past this a confirmation means nothing, so a long re-plan skips the buzz.
 const REBUILD_WAIT_MS = 5_000;
@@ -22,13 +24,18 @@ const inFlight = new Set<Side>();
 export const alarmBusy = (side: Side, untilMs: number): boolean =>
   activeAlarms.has(side) || hasSnooze(side) || alarmStarting(side) || alarmActivityWithin(side, new Date(untilMs));
 
-// A 1 s pulse that never replaces an alarm; false when skipped or failed.
+// A 3 s pulse that never replaces an alarm; false when skipped or failed.
 export async function buzz(side: Side): Promise<boolean> {
   if (inFlight.has(side)) return false;
   inFlight.add(side);
-  const send = () => executeFunction(side === 'left' ? 'ALARM_LEFT' : 'ALARM_RIGHT',
-    cbor.encode({ pl: BUZZ_POWER, du: 1, pi: 'double', tt: Math.floor(Date.now() / 1_000) }).toString('hex'),
-    { beforeSend: () => { if (alarmBusy(side, Date.now() + GUARD_WINDOW_MS)) throw new BuzzSkipped(isRebuilding()); } });
+  const command = side === 'left' ? 'ALARM_LEFT' : 'ALARM_RIGHT';
+  const send = () => executeFunction(command,
+    cbor.encode({ pl: BUZZ_POWER, du: BUZZ_SECONDS, pi: 'double', tt: Math.floor(Date.now() / 1_000) }).toString('hex'),
+    { beforeSend: () => {
+      if (alarmBusy(side, Date.now() + GUARD_WINDOW_MS)) throw new BuzzSkipped(isRebuilding());
+      // Only this side: an alarm on the other side starts during a buzz.
+      holdCommand(command, BUZZ_HOLD_MS);
+    } });
   try {
     try {
       await send();
@@ -49,7 +56,9 @@ export async function buzz(side: Side): Promise<boolean> {
   }
 }
 
-// Test isolation only: forget the held sides.
+// Test isolation only: forget the held sides and alarm holds.
 export function resetBuzz() {
   inFlight.clear();
+  holdCommand('ALARM_LEFT', 0);
+  holdCommand('ALARM_RIGHT', 0);
 }

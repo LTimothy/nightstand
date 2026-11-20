@@ -14,7 +14,9 @@ const commands: unknown[][] = [];
 let hubVersion = 'Pod 5';
 let coverVersion: string | undefined = 'Pod 5';
 mock.module(new URL('../8sleep/deviceApi.js', import.meta.url).href, {
-  namedExports: { executeFunction: async (...args: unknown[]) => { commands.push(args); } },
+  namedExports: { executeFunction: async (command: string, arg?: string | (() => string), ...rest: unknown[]) => {
+    commands.push([command, typeof arg === 'function' ? arg() : arg, ...rest]);
+  } },
 });
 mock.module(new URL('../8sleep/frankenServer.js', import.meta.url).href, {
   namedExports: { connectFrankenWithin: async () => ({

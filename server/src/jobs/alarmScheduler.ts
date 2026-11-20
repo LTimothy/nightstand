@@ -75,18 +75,13 @@ export const executeAlarm = async (
       return 0;
     }
 
-    const currentTime = moment.tz(settingsDB.data.timeZone);
-    const alarmTimeEpoch = currentTime.unix();
-
     const alarmPayload = {
       pl: vibrationIntensity,
       du: min10Duration,
       pi: alarmPatternFor(resp.hubVersion, resp.coverVersion, vibrationPattern),
-      tt: alarmTimeEpoch,
     };
-
-    const cborPayload = cbor.encode(alarmPayload);
-    const hexPayload = cborPayload.toString('hex');
+    // tt is taken at send time, which a buzz hold can delay.
+    const hexPayload = () => cbor.encode({ ...alarmPayload, tt: moment.tz(settingsDB.data.timeZone).unix() }).toString('hex');
     const command = side === 'left' ? 'ALARM_LEFT' : 'ALARM_RIGHT';
 
     const lateMs = Date.now() - due;

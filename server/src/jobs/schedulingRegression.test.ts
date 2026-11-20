@@ -16,9 +16,9 @@ let sendError: Error | undefined;
 const updates: unknown[] = [];
 const analyses: string[][] = [];
 mock.module(new URL('../8sleep/deviceApi.js', import.meta.url).href, {
-  namedExports: { executeFunction: async (...args: unknown[]) => {
+  namedExports: { executeFunction: async (command: string, arg?: string | (() => string), ...rest: unknown[]) => {
     if (sendError) throw sendError;
-    commands.push(args);
+    commands.push([command, typeof arg === 'function' ? arg() : arg, ...rest]);
   } },
 });
 let leftOn = true;

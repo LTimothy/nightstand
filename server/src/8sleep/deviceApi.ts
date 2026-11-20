@@ -26,6 +26,14 @@ export const frankenCommands = {
 // eslint-disable-next-line @typescript-eslint/no-type-alias
 export type FrankenCommand = keyof typeof frankenCommands;
 
+const holdUntil = new Map<FrankenCommand, number>();
+
+// Delays later sends of a command, so a pulse the Pod would swallow waits for the one playing; 0 clears.
+export function holdCommand(command: FrankenCommand, ms: number): void {
+  if (ms > 0) holdUntil.set(command, Date.now() + ms);
+  else holdUntil.delete(command);
+}
+
 
 // A function arg is worked out once the Pod is reachable, for values that
 // depend on when the command is sent.
@@ -35,5 +43,8 @@ export async function executeFunction(
   logger.debug(`Executing command | command: ${command} | arg: ${typeof arg === 'string' ? arg : 'when sent'}`);
 
   const franken = await connectFrankenWithin(options, command);
+  // Capped so a forward clock jump cannot stall a command.
+  const wait = Math.min((holdUntil.get(command) ?? 0) - Date.now(), 5_000);
+  if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
   await franken.callFunction(command, typeof arg === 'string' ? arg : arg(), options.notAfter, options.beforeSend);
 }

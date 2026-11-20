@@ -18,6 +18,7 @@ let sendDelayMs = 0;
 let tick: (ms: number) => void = () => {};
 mock.module(new URL('../8sleep/deviceApi.js', import.meta.url).href, {
   namedExports: {
+    holdCommand: () => {},
     executeFunction: async (command: string, arg: string | (() => string) = 'empty', options: { notAfter?: number } = {}) => {
       if (sendDelayMs) tick(sendDelayMs);
       sent.push({ command, arg: typeof arg === 'function' ? arg() : arg, notAfter: options.notAfter });

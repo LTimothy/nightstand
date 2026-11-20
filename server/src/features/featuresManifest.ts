@@ -571,7 +571,7 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   {
     id: 'logo-click-buzz',
     title: 'Confirmation buzz',
-    description: 'A short vibration on the side after a center button press is applied, so you know it worked '
+    description: 'A 3 s vibration on the side after a center button press is applied, so you know it worked '
       + 'without looking. Not after plus, minus, the end of a boost or a press that stopped an alarm.',
     category: 'platform',
     version: '3.10.0',
@@ -589,7 +589,7 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       'server/src/8sleep/frankenLifecycle.test.ts', 'server/src/features/featuresManifest.test.ts',
     ],
     upstream_offer: false,
-    rationale: 'Off by default: it vibrates the bed with a 1 s alarm command, so it ships only after a hardware check, '
+    rationale: 'Off by default: it vibrates the bed with a 3 s alarm command, so it ships only after a hardware check, '
       + 'and it is skipped near any alarm.',
   },
   {

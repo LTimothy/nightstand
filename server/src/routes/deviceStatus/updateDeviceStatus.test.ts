@@ -19,7 +19,7 @@ process.env.ENV = 'local';
 // Keep firmware commands local to the test.
 const executeFunctionMock = mock.fn(async (...args: [string, (string | (() => string))?, object?]) => { void args; });
 mock.module('../../8sleep/deviceApi.js', {
-  namedExports: { executeFunction: executeFunctionMock },
+  namedExports: { executeFunction: executeFunctionMock, holdCommand: () => {} },
 });
 const alarmCommandMock = mock.fn(async (command: string, arg: string) => { void command; void arg; });
 const alarmConnectionMock = mock.fn(async (options?: { background?: boolean; latest?: boolean }, key?: string) => {

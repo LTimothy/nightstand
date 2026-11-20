@@ -135,7 +135,7 @@ export const defaultFeatures = {
   rhythmSuggestions: true,
   // The buttons on a Pod 5 cover (buttonMonitor.ts). Off: no RAW file is read.
   coverButtons: false,
-  // A short buzz that confirms a middle button press was applied (buzz.ts).
+  // A 3 s buzz that confirms a middle button press was applied (buzz.ts).
   logoClickBuzz: false,
   // The systemd journal in RAM (scripts/journal_storage.sh), from the next restart.
   journalInMemory: false,
