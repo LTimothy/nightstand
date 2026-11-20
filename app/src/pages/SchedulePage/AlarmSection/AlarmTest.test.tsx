@@ -4,8 +4,6 @@ import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
 import { useAppStore } from '@state/appStore';
-import { getSchedules } from '../../../mocks/mockData';
-import { useScheduleStore } from '../scheduleStore';
 import AlarmTest from './AlarmTest';
 
 let posts: unknown[];
@@ -18,10 +16,6 @@ beforeEach(() => {
   vi.setSystemTime(clock);
   posts = [];
   useAppStore.setState({ side: 'left', isUpdating: false });
-  const store = useScheduleStore.getState();
-  store.setOriginalSchedules(structuredClone(getSchedules()));
-  store.selectDay(1);
-  store.selectAlarm(0);
   server.use(http.post('*/alarm', async ({ request }) => {
     posts.push(await request.json());
     return HttpResponse.json({});
@@ -29,8 +23,18 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+const Test = () => <AlarmTest vibrationIntensity={ 70 } vibrationPattern="double"/>;
+
+it('sends the vibration it was given for 10 s, even with the side off', async () => {
+  renderWithProviders(<AlarmTest vibrationIntensity={ 42 } vibrationPattern="rise"/>);
+  fireEvent.click(screen.getByRole('button', { name: /^Test on/ }));
+  await waitFor(() => expect(posts).toEqual([
+    { side: 'left', vibrationIntensity: 42, vibrationPattern: 'rise', duration: 10, force: true },
+  ]));
+});
+
 it('sends one alarm command for a double tap', async () => {
-  renderWithProviders(<AlarmTest/>);
+  renderWithProviders(<Test/>);
   const button = screen.getByRole('button', { name: /^Test on/ });
   fireEvent.click(button);
   fireEvent.click(button);
@@ -40,11 +44,11 @@ it('sends one alarm command for a double tap', async () => {
 });
 
 it('keeps the test locked when the sheet is closed and reopened', async () => {
-  const first = renderWithProviders(<AlarmTest/>);
+  const first = renderWithProviders(<Test/>);
   fireEvent.click(screen.getByRole('button', { name: /^Test on/ }));
   await waitFor(() => expect(posts).toHaveLength(1));
   first.unmount();
-  renderWithProviders(<AlarmTest/>);
+  renderWithProviders(<Test/>);
   expect(screen.getByRole('button', { name: /^Test on/ })).toBeDisabled();
   expect(screen.getByText('Alarm running now...')).toBeInTheDocument();
   expect(posts).toHaveLength(1);
@@ -60,12 +64,12 @@ it('ignores a late failure from an earlier press once a newer test is running', 
     await gate;
     return HttpResponse.json({ error: 'busy' }, { status: 500 });
   }));
-  const first = renderWithProviders(<AlarmTest/>);
+  const first = renderWithProviders(<Test/>);
   fireEvent.click(screen.getByRole('button', { name: /^Test on/ }));
   await waitFor(() => expect(calls).toBe(1));
   first.unmount();
   vi.setSystemTime(clock + 11_000);
-  const second = renderWithProviders(<AlarmTest/>);
+  const second = renderWithProviders(<Test/>);
   fireEvent.click(screen.getByRole('button', { name: /^Test on/ }));
   await waitFor(() => expect(calls).toBe(2));
   release();
@@ -73,13 +77,13 @@ it('ignores a late failure from an earlier press once a newer test is running', 
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /^Test on/ })).toBeDisabled();
   second.unmount();
-  renderWithProviders(<AlarmTest/>);
+  renderWithProviders(<Test/>);
   expect(screen.getByRole('button', { name: /^Test on/ })).toBeDisabled();
 });
 
 it('reports a failed test and allows another try', async () => {
   server.use(http.post('*/alarm', () => HttpResponse.json({ error: 'busy' }, { status: 500 })));
-  renderWithProviders(<AlarmTest/>);
+  renderWithProviders(<Test/>);
   fireEvent.click(screen.getByRole('button', { name: /^Test on/ }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not start the test. Try again.');
   expect(screen.getByRole('button', { name: /^Test on/ })).toBeEnabled();

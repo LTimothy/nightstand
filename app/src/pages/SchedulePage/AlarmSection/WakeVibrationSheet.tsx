@@ -54,7 +54,7 @@ export default function WakeVibrationSheet({ open, onClose, risePattern = false 
           ? `${duration / 60} ${duration === 60 ? 'minute' : 'minutes'}` : `${duration} seconds` }</MenuItem>) }
       </TextField>
       <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 } }>
-        <AlarmTest/>
+        <AlarmTest vibrationIntensity={ alarm.vibrationIntensity } vibrationPattern={ alarm.vibrationPattern }/>
         <Button onClick={ onClose }>Done</Button>
       </Box>
     </Stack></DialogContent>

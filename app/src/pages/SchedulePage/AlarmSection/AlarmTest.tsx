@@ -1,9 +1,9 @@
 import { Box, Button, CircularProgress, Typography } from '@mui/material';
-import { useScheduleStore } from '../scheduleStore.tsx';
 import { useAppStore } from '@state/appStore.tsx';
 import { postAlarm } from '@api/alarm.ts';
 import { useEffect, useState } from 'react';
 import { useSettings } from '@api/settings';
+import type { Alarm } from '@api/schedulesSchema';
 
 const TEST_DURATION_SECONDS = 10;
 
@@ -13,12 +13,10 @@ const remainingMs = (side: string) => Math.max(0, (testEndsAt[side] ?? 0) - Date
 // Only the latest press may report a failure; an older request must not clear a newer test.
 const latestPress: Partial<Record<string, number>> = {};
 
-export default function AlarmTest() {
+export default function AlarmTest({ vibrationIntensity, vibrationPattern }: Pick<Alarm, 'vibrationIntensity' | 'vibrationPattern'>) {
   const { side } = useAppStore();
   const { data: settings } = useSettings();
   const sleeper = settings?.[side]?.name;
-  const { selectedAlarmIndex, getEditedAlarms } = useScheduleStore();
-  const alarm = getEditedAlarms()[selectedAlarmIndex];
   const [isTesting, setIsTesting] = useState(() => remainingMs(side) > 0);
   const [error, setError] = useState('');
 
@@ -30,7 +28,7 @@ export default function AlarmTest() {
   }, [side, isTesting]);
 
   const onTestAlarm = () => {
-    if (!alarm || remainingMs(side) > 0) return;
+    if (remainingMs(side) > 0) return;
     setError('');
     const press = (latestPress[side] ?? 0) + 1;
     latestPress[side] = press;
@@ -39,9 +37,9 @@ export default function AlarmTest() {
 
     postAlarm({
       side,
-      vibrationIntensity: alarm.vibrationIntensity,
+      vibrationIntensity,
       duration: TEST_DURATION_SECONDS,
-      vibrationPattern: alarm.vibrationPattern,
+      vibrationPattern,
       force: true,
     }).catch(failure => {
       console.error(failure);
