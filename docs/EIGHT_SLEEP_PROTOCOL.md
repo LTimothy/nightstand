@@ -33,7 +33,7 @@ appends the blank-line separator after the command and optional argument.
 |---|------|------|--------|-------|
 | 0 | `HELLO` | none | ✅ | Returns `ok`. Used as a liveness check. |
 | 1 | `SET_TEMP` | ? | ❓ | Named by position only; free-sleep doesn't use it: temperature is set via `TEMP_LEVEL_LEFT`/`TEMP_LEVEL_RIGHT` (11/12) instead. |
-| 2 | `SET_ALARM` | ? | ❓ | Named by position only; free-sleep uses `ALARM_LEFT`/`ALARM_RIGHT` (5/6) instead. |
+| 2 | `SET_ALARM` | ? | ❓ | Named by position only; free-sleep uses `ALARM_LEFT`/`ALARM_RIGHT` (5/6) instead. Had no effect on a Pod 5, see [alarm commands on a Pod 5](#alarm-commands-on-a-pod-5). |
 | 3 | `REBOOT` | none | 📖 (8rp) | Reboots the device. Free-sleep has this commented out as `RESET` and doesn't call it: the pod's daily reboot schedule reboots at the OS level instead, not through this socket. |
 | 4 | `FORCE_RESET` | ? | ❓ | Commented out, never used or tested. |
 | 5 | `ALARM_LEFT` | CBOR alarm string | ✅ | Free-sleep uses this actively. Encodes target time (unix ts), duration (seconds), vibration pattern (`double` or `rise`), power level (0-100). Nightstand sends `rise` only when both hub and cover are reported as Pod 5, otherwise `double`, see [other Pod generations](#other-pod-generations). |
@@ -131,6 +131,36 @@ Cancellation has not been demonstrated on the tested Pod 5:
 On the tested Pod 5, "Prime now" and daily priming run to completion.
 Other models and firmware may behave differently.
 Open a PR if you find a working cancel command.
+
+### Alarm commands on a Pod 5
+
+Checked by hand on a Pod 5:
+
+- `SET_ALARM` (2) with `{side, pow, patt, pcnt}` had no effect.
+- The alarm `pi` field accepts only `double` and `rise`. Any other text is
+  logged as invalid and rings `double`; a number is dropped. The hub's own
+  500 ms haptic (pattern 7) cannot be reached this way.
+- A 1 s alarm was not felt at any power, and `double` takes over a second to
+  start.
+- A second alarm command sent 2 s into a 3 s alarm on the same side is
+  logged but not started. One sent 3, 3.5 or 4 s after it started rings
+  normally. Nightstand holds that side's alarm command for 4 s after its
+  confirmation buzz.
+- An alarm on one side does not stop an alarm command for the other side:
+  a left alarm sent 1 s into a right alarm started.
+- A dismissal (a 1 s, power 1 replacement alarm) is logged as off with no
+  start, and an alarm sent 0.5 s after it starts normally.
+- The firmware counts an alarm's duration from its `tt`: a 10 s alarm whose
+  `tt` was 1 s old ran 9000 ms. Nightstand sets `tt` when the command is
+  sent.
+- An alarm rings on a side that is off, and the side stays off. A one-time
+  alarm saved for a side that is off rang its full 30 s.
+- A 30 s `double` alarm at power 100 feels like it builds up over the run,
+  though the firmware logs a flat power and pattern 0.
+- The other side faintly feels a full power pulse.
+- The hub counts a fast triple press as 4 and counts doubles exactly.
+- Device status has no tap counters on this Pod, so center button presses
+  read from the logs stay 15 to 25 s late.
 
 ### `DEVICE_STATUS` response fields
 

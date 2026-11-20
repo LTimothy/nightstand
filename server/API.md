@@ -218,7 +218,8 @@ generic message; the details go to the server log.
     "coverButtons": false,
     "logoClickBuzz": false,
     "journalInMemory": false,
-    "targetTemperatureLabels": false
+    "targetTemperatureLabels": false,
+    "alarmsWhenOff": false
   }
 }
 ```
@@ -241,7 +242,8 @@ generic message; the details go to the server log.
 - `scheduleOverrides.pause` pauses one side's schedule. While `active`, that
   side's scheduled power, temperature and weekly alarm jobs are skipped when
   they come due, and presence auto-off leaves the side alone. The one-time
-  alarm is not affected by the pause, so it rings if the side is on.
+  alarm is not affected by the pause, so it rings if the side is on, or with
+  `features.alarmsWhenOff` even if it is off.
   `expiresAt` is an ISO 8601 date and time with offset, at most 14 days
   ahead, or `""` to pause until the side is resumed. When `expiresAt`
   passes, the server clears the pause after one minute. Ending a pause,
@@ -307,15 +309,20 @@ generic message; the details go to the server log.
   for the logo. The plus and minus mapping comes from the Pod's logs; the
   logo is not yet checked on a Pod. While off, the server opens no RAW files
   for buttons.
-  `logoClickBuzz` is the Cover buttons buzz switch, off by default: one 1 s
-  vibration on a side after a middle button press set its temperature or
-  started a boost, skipped while an alarm is ringing, snoozed, starting or
-  due within seconds.
+  `logoClickBuzz` is the Cover buttons buzz switch, off by default: one 3 s
+  vibration at full power on a side after a middle button press set its
+  temperature or started a boost, skipped while an alarm is ringing, snoozed,
+  starting or due within seconds. An alarm due on that side during the buzz is
+  sent once it has ended.
   `journalInMemory` is Keep the system log in memory, off by default. Saving
   it runs `scripts/journal_storage.sh` through sudo, which writes or removes a
   journald drop-in; the change applies at the next restart of the Pod.
   `targetTemperatureLabels` is Show the Pod's target temperatures, off by default,
   for a Pod 5. It only changes how the app labels temperatures.
+  `alarmsWhenOff` is Ring alarms when the side is off, off by default. With it
+  on, weekly, one-time, replacement and Rhythms alarms ring on a side that is
+  off and are not reported as missed. Away mode still keeps alarms quiet,
+  and a pause or a day whose power schedule is off still skips weekly alarms.
   `nightstandTheme` is no longer read and stays so stored settings keep
   validating. `features.rhythms` is the Rhythms switch (see `/api/rhythms`
   below); it changes only through `POST /api/rhythms/enable` and
@@ -925,7 +932,8 @@ in away mode does not start either.
 - `unconfirmed`: the Pod did not answer, or the server stopped while the
   alarm was being sent, so it may or may not have rung.
 - `error`: the server failed before it asked the Pod to ring.
-- `side-off`: the side was off, so the alarm does not ring.
+- `side-off`: the side was off and `features.alarmsWhenOff` is off, so the
+  alarm does not ring.
 
 Alarms on a side in away mode, or paused, are not listed: they are not meant
 to ring.

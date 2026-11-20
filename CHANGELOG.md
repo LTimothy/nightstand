@@ -25,17 +25,27 @@ is a hard fork; for the history of the projects it descends from, see
   second double press restarts it. Requested by
   [Tony-1132](https://github.com/Tony-1132).
 - Settings > Bed and sides > Cover buttons, Pod 5 hub with a Pod 5 cover: a
-  switch, off by default, gives one short vibration on that side when a center
-  button press is applied. Requested by
-  [Tony-1132](https://github.com/Tony-1132).
+  switch, off by default, gives a 3 s vibration on that side when a center
+  button press is applied. An alarm due during it rings once it ends.
+  Requested by [Tony-1132](https://github.com/Tony-1132).
+- Settings > Features > Ring alarms when the side is off, off by default:
+  weekly, one-time, replacement and Rhythms alarms vibrate even if the side
+  is off, and are no longer reported as missed for that reason. Checked on a
+  Pod 5, where the side stays off. Away mode still keeps alarms quiet. A day
+  with its schedule off still has no weekly alarm.
 - A saved one-time alarm now shows on the Bed tab and in the Schedule header,
-  and its editor says it rings only if the side is on at that time. Requested
-  by [Tony-1132](https://github.com/Tony-1132).
+  and its editor says it rings only if the side is on at that time, unless
+  Ring alarms when the side is off is on. Requested by
+  [Tony-1132](https://github.com/Tony-1132).
 - On the Bed tab you can drag the target dot around the dial. It snaps to the
   same steps as Cooler and Warmer, which stay.
 
 ### Changed
 
+- The one-time alarm uses the same vibration sheet as the other alarms,
+  including Test. The sheet is now called Alarm vibration.
+- New alarms start with Double pulse at strength 100 for 30 s. Saved alarms
+  keep their settings.
 - The Cover buttons card calls the logo the center button.
 - Level is always offered in Bed and sides > Temperature format, and its
   Features switch is gone.
