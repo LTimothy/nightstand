@@ -146,7 +146,9 @@ export function newRhythmId(name: string, existing: string[]): string {
 export const DEFAULT_WAKE = '07:00';
 
 export function defaultNight(): DailySchedule {
-  const alarm = { time: '07:00', vibrationIntensity: 30, vibrationPattern: 'rise' as const, duration: 10, enabled: true, alarmTemperature: 83 };
+  const alarm = {
+    time: '07:00', vibrationIntensity: 100, vibrationPattern: 'double' as const, duration: 30, enabled: true, alarmTemperature: 83,
+  };
   return { power: { enabled: true, on: '22:00', off: '07:00', onTemperature: 83 }, temperatures: {}, alarm, alarms: [alarm] };
 }
 

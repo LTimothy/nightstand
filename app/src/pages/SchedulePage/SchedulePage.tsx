@@ -117,7 +117,7 @@ export default function SchedulePage({ notice: noticeProp }: { notice?: Notice }
     const store = useScheduleStore.getState();
     store.updateSelectedSchedule({ power: { enabled: true } });
     store.selectAlarm(0);
-    store.updateSelectedAlarm({ enabled: true });
+    store.updateSelectedAlarm({ enabled: true, vibrationIntensity: 100, vibrationPattern: 'double', duration: 30 });
   };
 
   const initializedSide = useRef<typeof side | undefined>(undefined);

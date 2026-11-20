@@ -155,7 +155,7 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
     const selectedScheduleCopy = _.cloneDeep(selectedSchedule ?? {
       power: { enabled: true, on: '21:00', off: '07:30', onTemperature: 83 },
       temperatures: {},
-      alarm: { enabled: true, time: '07:00', vibrationIntensity: 30, vibrationPattern: 'rise' as const, duration: 10, alarmTemperature: 83 },
+      alarm: { enabled: true, time: '07:00', vibrationIntensity: 100, vibrationPattern: 'double' as const, duration: 30, alarmTemperature: 83 },
       alarms: [],
     });
     _.merge(selectedScheduleCopy, newSelectedSchedule);

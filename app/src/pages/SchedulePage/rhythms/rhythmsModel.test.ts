@@ -9,7 +9,7 @@ import {
   newRhythmId, rhythmDetail, rhythmOptions, rhythmsNotice, rhythmTimes, rhythmUsage, setDateChange, setWeekDays,
   MAX_CHANGE_DAYS_AHEAD, MAX_NAME_LENGTH, MAX_RHYTHMS_PER_SIDE, conversionDifference, datePickMessage, datesPickMessage,
   deleteMessage, restoreDates, restoreDeleted, restoreWeekDays, rhythmName, setDateChanges, upcomingChanges, usageSubject,
-  weekLabel, weekPickMessage, weekRuns, withOffWhenUp, applySuggestion, restoreRhythm, suggestionStart, withRows,
+  weekLabel, weekPickMessage, weekRuns, withOffWhenUp, applySuggestion, restoreRhythm, suggestionStart, withRows, defaultNight,
 } from './rhythmsModel';
 
 const left = createDemoRhythms(new Date('2026-09-28T19:00:00Z')).left;
@@ -307,4 +307,9 @@ it('waits for a pause the change would fall in', () => {
   expect(startWith(null)).toEqual({ kind: 'paused' });
   expect(startWith(new Date('2026-10-17T02:00:00Z'))).toEqual({ kind: 'tonight' });
   expect(startWith()).toEqual({ kind: 'tonight' });
+});
+
+it('starts a new night with a double pulse at full strength for 30 s', () => {
+  const { vibrationIntensity, vibrationPattern, duration } = defaultNight().alarms[0];
+  expect({ vibrationIntensity, vibrationPattern, duration }).toEqual({ vibrationIntensity: 100, vibrationPattern: 'double', duration: 30 });
 });
