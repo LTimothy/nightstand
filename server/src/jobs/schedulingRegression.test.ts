@@ -301,6 +301,23 @@ test('an overnight replacement inherits the enabled alarm from the starting nigh
   assert.equal(payload.du, 20);
 });
 
+test('a replacement with no alarm on its night rings at full strength for 30 s with a double pulse', async t => {
+  t.mock.method(Date, 'now', () => now);
+  t.mock.method(globalThis, 'setTimeout', () => ({ unref() {} }) as NodeJS.Timeout);
+  schedules.data.left.monday = { ...structuredClone(night), alarm: { ...alarm, enabled: false }, alarms: [] };
+  await schedules.write();
+  settings.data.left.scheduleOverrides.alarm = {
+    disabled: false, timeOverride: '05:00', expiresAt: '2026-09-29T09:00:00Z',
+  };
+  await settings.write();
+  scheduleAlarmOverride(settings.data, 'left');
+  now = Date.parse('2026-09-29T05:00:00Z');
+  await schedule.scheduledJobs['left-alarm-override-05:00'].invoke();
+  const { default: cbor } = await import('cbor');
+  const payload = cbor.decodeFirstSync(Buffer.from(commands[0][1] as string, 'hex'));
+  assert.deepEqual([payload.pl, payload.du, payload.pi], [100, 30, 'double']);
+});
+
 test('overlapping alarms retain dismissal until the latest alarm finishes', async t => {
   const timers: (() => Promise<void>)[] = [];
   t.mock.method(globalThis, 'setTimeout', (callback: () => Promise<void>) => {

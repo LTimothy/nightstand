@@ -34,7 +34,7 @@ export const defaultSideSettings: SideSettings = {
     enabled: false,
     fireAt: '',
     vibrationIntensity: 100,
-    vibrationPattern: 'rise',
+    vibrationPattern: 'double',
     duration: 30,
   },
   taps: {

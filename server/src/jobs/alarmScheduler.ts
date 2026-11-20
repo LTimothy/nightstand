@@ -282,8 +282,8 @@ export function scheduleAlarmOverride(
     }
     const { vibrationIntensity, duration, vibrationPattern } = sourceAlarm ?? {
       vibrationIntensity: 100,
-      duration: 60,
-      vibrationPattern: 'rise',
+      duration: 30,
+      vibrationPattern: 'double',
     };
 
     return executeAlarm({
