@@ -84,8 +84,11 @@ it.each(['Pod 4', 'Pod 5'])('leaves cover buttons out of the count on a %s hub',
 const featureCount = async (features: Record<string, boolean>) => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, ...features } })));
-  const { unmount } = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  const text = (await screen.findByText(/^\d+ of \d+ on$/)).textContent!;
+  const { unmount, queryClient } = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
+  await screen.findByText(/^\d+ of \d+ on$/);
+  // Pod-specific rows count only once device status has loaded.
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+  const text = screen.getByText(/^\d+ of \d+ on$/).textContent!;
   unmount();
   return Number(text.split(' ')[0]);
 };
