@@ -83,6 +83,11 @@ const SideSettingsSchema = z.object({
         doubleTap: TapConfig,
         tripleTap: TapConfig,
         quadTap: TapConfig,
+        // A Pod 5 hub's middle button double press. Not a gesture, so an older app keeps it; minutes 0 is off.
+        logoDouble: z.object({
+            temperatureF: z.number().int().min(55).max(110),
+            minutes: z.number().int().min(0).max(10),
+        }),
     }),
     buttons: ButtonsSchema,
 }).strict();
@@ -116,8 +121,13 @@ export const defaultFeatures = {
     rhythmSuggestions: true,
     // The buttons on a Pod 5 cover (buttonMonitor.ts). Off: no RAW file is read.
     coverButtons: false,
+    // A 3 s buzz that confirms a middle button press was applied (buzz.ts).
+    logoClickBuzz: false,
     // The systemd journal in RAM (scripts/journal_storage.sh), from the next restart.
     journalInMemory: false,
+    targetTemperatureLabels: false,
+    // Alarms ring on a side that is off (alarmScheduler.ts).
+    alarmsWhenOff: false,
 };
 const FeaturesSchema = z.object({
     sleepScore: z.boolean(),
@@ -136,7 +146,10 @@ const FeaturesSchema = z.object({
     metricsLowDiskProtection: z.boolean(),
     rhythmSuggestions: z.boolean(),
     coverButtons: z.boolean(),
+    logoClickBuzz: z.boolean(),
     journalInMemory: z.boolean(),
+    targetTemperatureLabels: z.boolean(),
+    alarmsWhenOff: z.boolean(),
 }).strict();
 export const SettingsSchema = z.object({
     id: z.string(),

@@ -6,8 +6,8 @@ import express from 'express';
 import logger from '../../logger.js';
 const router = express.Router();
 import settingsDB, { updateSettings } from '../../db/settings.js';
-import { SettingsSchema } from '../../db/settingsSchema.js';
-import { changesRhythmsFlag, pauseRejection, wouldOrphanLevelFormat } from './settingsGuards.js';
+import { GestureSchema, SettingsSchema } from '../../db/settingsSchema.js';
+import { changesRhythmsFlag, pauseRejection } from './settingsGuards.js';
 import { syncRawArchiveConf } from '../../jobs/rawArchiveConf.js';
 import { syncJournalStorage } from '../../jobs/journalStorage.js';
 router.get('/settings', async (req, res) => {
@@ -41,10 +41,6 @@ router.post('/settings', async (req, res) => {
             conflict = 'Use /rhythms/enable or /rhythms/disable to turn Rhythms on or off';
             return false;
         }
-        if (wouldOrphanLevelFormat(draft, validatedUpdate)) {
-            conflict = 'Set temperature display away from Level before disabling this feature';
-            return false;
-        }
         const pauseError = pauseRejection(draft, validatedUpdate, new Date());
         if (pauseError) {
             rejected.error = pauseError;
@@ -62,7 +58,8 @@ router.post('/settings', async (req, res) => {
         }
         // A gesture is replaced whole, so no field of its previous action stays behind.
         for (const side of SCHEDULE_SIDES) {
-            for (const [gesture, tap] of Object.entries(validatedUpdate[side]?.taps ?? {})) {
+            for (const gesture of GestureSchema.options) {
+                const tap = validatedUpdate[side]?.taps?.[gesture];
                 if (tap)
                     draft[side].taps[gesture] = tap;
             }

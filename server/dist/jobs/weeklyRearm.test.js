@@ -15,6 +15,7 @@ process.env.ENV = 'local';
 const sent = [];
 mock.module(new URL('../8sleep/deviceApi.js', import.meta.url).href, {
     namedExports: {
+        holdCommand: () => { },
         executeFunction: async (command, arg = 'empty', options = {}) => {
             if (options.notAfter !== undefined && Date.now() > options.notAfter)
                 throw new Error('Pod hardware became available too late');

@@ -12,6 +12,7 @@ process.env.ENV = 'local';
 const sent = [];
 mock.module(new URL('../../8sleep/deviceApi.js', import.meta.url).href, {
     namedExports: {
+        holdCommand: () => { },
         executeFunction: async (command, arg = 'empty') => {
             sent.push([command, typeof arg === 'function' ? arg() : arg]);
         },

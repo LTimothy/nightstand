@@ -375,22 +375,20 @@ export const FEATURES_MANIFEST = [
     {
         id: 'level-temperature-display',
         title: 'Level temperature display',
-        description: 'The -10 to +10 level option in the temperature format picker.',
+        description: 'No longer read since 3.10.0: Level is always offered in the temperature format picker.',
         category: 'ui',
         version: '3.0.1',
         flag: 'levelTemps',
         default: true,
         touchpoints: [
             'app/src/pages/SettingsPage/DeviceSettingsSection/TemperatureFormatSelector.tsx',
-            'server/src/routes/settings/settingsGuards.ts',
         ],
         depends_on: ['agent'],
         reversible: true,
-        tests: ['server/src/routes/settings/settingsGuards.test.ts'],
+        tests: ['app/src/pages/SettingsPage/DeviceSettingsSection/TemperatureFormatSelector.test.tsx'],
         upstream_offer: false,
-        rationale: 'Real toggle, not just a display preference: the temperatureFormat setting '
-            + 'already existed, this gates whether level is offered as a legal choice at all, '
-            + 'with a server precondition against disabling it while a pod is actively using it.',
+        rationale: 'The key stays so stored settings still validate and older versions keep their picker. '
+            + 'Nothing reads it any more.',
     },
     {
         id: 'one-off-alarms',
@@ -400,14 +398,32 @@ export const FEATURES_MANIFEST = [
         version: '3.0.1',
         flag: 'oneOffAlarms',
         default: true,
-        touchpoints: ['app/src/pages/SchedulePage/OneOffAlarmSection.tsx', 'server/src/jobs/jobScheduler.ts', 'server/src/jobs/alarmScheduler.ts'],
+        touchpoints: ['app/src/pages/SchedulePage/OneOffAlarmSection.tsx', 'app/src/pages/SchedulePage/oneOffAlarm.ts',
+            'app/src/pages/ControlTempPage/OneOffAlarmLine.tsx', 'server/src/jobs/jobScheduler.ts', 'server/src/jobs/alarmScheduler.ts'],
         depends_on: ['agent'],
         reversible: true,
-        tests: [],
+        tests: ['app/src/pages/SchedulePage/oneOffAlarm.test.ts'],
         upstream_offer: false,
         rationale: 'Turning it off hides the section and stops scheduling new checks; a '
             + 'previously-armed alarm\'s stored data is untouched, so re-enabling re-arms it '
             + 'without any migration.',
+    },
+    {
+        id: 'alarms-when-off',
+        title: 'Ring alarms when the side is off',
+        description: 'Alarms vibrate even if the side is off.',
+        category: 'ui',
+        version: '3.10.0',
+        flag: 'alarmsWhenOff',
+        default: false,
+        touchpoints: ['server/src/jobs/alarmScheduler.ts', 'server/src/jobs/rhythms/scheduleRhythms.ts',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx', 'app/src/pages/SchedulePage/OneOffAlarmSection.tsx'],
+        depends_on: [],
+        reversible: true,
+        tests: ['server/src/jobs/schedulingRegression.test.ts', 'server/src/jobs/rhythms/keptAlarms.test.ts'],
+        upstream_offer: false,
+        rationale: 'Off by default: an alarm on an off side has always been skipped and reported as missed. '
+            + 'Away mode and a day without a power schedule still keep alarms quiet.',
     },
     {
         id: 'design-system',
@@ -513,9 +529,58 @@ export const FEATURES_MANIFEST = [
         rationale: 'Off by default, for a Pod 4 hub with a Pod 5 cover that ignores short cover clicks. '
             + 'Reads no RAW files while off. Acts only on clicks the firmware logged as ignored, so a logo press the '
             + 'firmware reports as a tap stays with the tap settings. The step, a plus and minus swap and the logo '
-            + 'temperature are per side, edited under the switch; on a Pod 5 hub the same options write the tap actions, '
-            + 'so only one path is ever written. Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
+            + 'temperature are per side, edited under the switch; on a Pod 5 hub the same options write the tap '
+            + 'settings, the center button boost included, so only one path is ever written. '
+            + 'Clicks apply 15 to 25 s late because the firmware writes its log in batches. '
             + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
+    },
+    {
+        id: 'logo-boost',
+        title: 'Center button boost',
+        description: 'For a Pod 5 hub with a Pod 5 cover: a center button double press sets a side to a chosen '
+            + 'temperature for 1 to 10 minutes, then returns it to the temperature from before the press. Only while the '
+            + 'side is on; changing the temperature during it ends it, and a second double press restarts it.',
+        category: 'platform',
+        version: '3.10.0',
+        flag: null,
+        default: true,
+        touchpoints: [
+            'server/src/8sleep/boost.ts', 'server/src/8sleep/buttonMonitor.ts', 'server/src/8sleep/buttonEvents.ts',
+            'server/src/db/settingsSchema.ts', 'server/src/db/settings.ts', 'server/src/routes/settings/settings.ts',
+            'server/src/server.ts',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: [
+            'server/src/8sleep/buttonEvents.test.ts', 'server/src/8sleep/boost.test.ts',
+            'server/src/8sleep/buttonMonitor.test.ts', 'server/src/db/tapCompat.test.ts',
+        ],
+        upstream_offer: false,
+        rationale: 'Opt-in by setting: a boost length of 0, the default, keeps the center button as it was.',
+    },
+    {
+        id: 'logo-click-buzz',
+        title: 'Confirmation buzz',
+        description: 'A 3 s vibration after a center button press is applied, so you know it worked '
+            + 'without looking. Not after plus, minus, the end of a boost or a press that stopped an alarm.',
+        category: 'platform',
+        version: '3.10.0',
+        flag: 'logoClickBuzz',
+        default: false,
+        touchpoints: [
+            'server/src/8sleep/buzz.ts', 'server/src/8sleep/buttonMonitor.ts', 'server/src/jobs/alarmScheduler.ts',
+            'server/src/jobs/alarmActivity.ts', 'server/src/8sleep/frankenServer.ts',
+            'app/src/pages/SettingsPage/CoverButtonsCard.tsx',
+        ],
+        depends_on: ['cover-buttons'],
+        reversible: true,
+        tests: [
+            'server/src/8sleep/buttonMonitor.test.ts', 'server/src/8sleep/buzz.test.ts', 'server/src/jobs/alarmActivity.test.ts',
+            'server/src/8sleep/frankenLifecycle.test.ts', 'server/src/features/featuresManifest.test.ts',
+        ],
+        upstream_offer: false,
+        rationale: 'Off by default: it vibrates the bed with a 3 s alarm command, so it ships only after a hardware check, '
+            + 'and it is skipped near any alarm.',
     },
     {
         id: 'biometrics-v2',
@@ -569,7 +634,7 @@ export const FEATURES_MANIFEST = [
     },
     {
         id: 'unchecked-cap-presence',
-        title: 'Capacitance presence on other Pods (beta)',
+        title: 'Capacitance presence (beta)',
         description: 'On a Pod other than a Pod 5, lets Smart Schedule, presence auto-off and the in-bed indicator '
             + 'follow the capacitance presence of New sleep tracking instead of the vibration sensor, once the nightly '
             + 'analysis has learned both sides. A Pod 5 does this whenever New sleep tracking is on.',
@@ -828,7 +893,7 @@ export const FEATURES_MANIFEST = [
     {
         id: 'bed-side-tiles',
         title: 'Named bed controls',
-        description: 'Named side tiles, read-only temperature gauge and large stepper controls.',
+        description: 'Named side tiles, temperature dial and large stepper controls.',
         category: 'ui',
         version: 'n/a',
         flag: null,
@@ -842,6 +907,27 @@ export const FEATURES_MANIFEST = [
         ],
         upstream_offer: false,
         rationale: 'Side identity and readable controls are required for operating the bed.',
+    },
+    {
+        id: 'dial-drag',
+        title: 'Drag the dial',
+        description: 'On the Bed tab the target dot can be dragged around the dial. It snaps to the same steps as '
+            + 'Cooler and Warmer, which stay.',
+        category: 'ui',
+        version: '3.10.0',
+        flag: null,
+        default: true,
+        touchpoints: [
+            'app/src/pages/ControlTempPage/DialHandle.tsx', 'app/src/pages/ControlTempPage/dialGeometry.ts',
+            'app/src/pages/ControlTempPage/TemperatureDial.tsx', 'app/src/lib/temperatureStep.ts',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: [
+            'app/src/pages/ControlTempPage/DialHandle.test.tsx', 'app/src/pages/ControlTempPage/dialGeometry.test.ts',
+        ],
+        upstream_offer: false,
+        rationale: 'Adds a way to set the same target the buttons already set, through the same send path.',
     },
     {
         id: 'grouped-night-schedule',
@@ -1150,6 +1236,39 @@ export const FEATURES_MANIFEST = [
         upstream_offer: false,
         rationale: 'Optional: it cuts flash writes but loses the system log from before each restart, which is what '
             + 'explains a crash or a watchdog reset. Nightstand\'s own logs stay on flash.',
+    },
+    {
+        id: 'target-temperature-labels',
+        title: 'Show the Pod\'s target temperatures',
+        description: 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
+            + 'Schedules are unchanged. No effect in Level format.',
+        category: 'ui',
+        version: '3.10.0',
+        flag: 'targetTemperatureLabels',
+        default: false,
+        touchpoints: [
+            'app/src/lib/temperatureConversions.ts', 'app/src/lib/temperatureStep.ts', 'app/src/lib/useTemperatureFormat.ts',
+            'app/src/components/SideControl.tsx', 'app/src/pages/ControlTempPage/ControlTempPage.tsx',
+            'app/src/pages/SchedulePage/SchedulePage.tsx', 'app/src/pages/SchedulePage/rhythms/RhythmsPage.tsx',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+            'app/src/pages/ControlTempPage/UpcomingNight.tsx', 'app/src/pages/ControlTempPage/SmartPhaseLine.tsx',
+            'app/src/pages/ControlTempPage/TemperatureButtons.tsx', 'app/src/pages/SchedulePage/ScheduleChart.tsx',
+            'app/src/pages/ControlTempPage/TemperatureLabel.tsx', 'app/src/pages/SchedulePage/TemperatureStepper.tsx',
+            'app/src/pages/SchedulePage/rhythms/SmartCurveChart.tsx', 'app/src/pages/StatusPage/FirmwareReadout.tsx',
+            'app/src/pages/SettingsPage/TapGestures.tsx', 'app/src/pages/SettingsPage/CoverButtonOptions.tsx',
+            'app/src/pages/SettingsPage/FeaturesSection/EnableRhythmsDialog.tsx', 'app/src/pages/StatusPage/FirmwarePanel.tsx',
+            'app/src/pages/SchedulePage/rhythms/suggestionsCopy.ts', 'app/src/pages/SettingsPage/TemperatureChangeSelect.tsx',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: [
+            'app/src/lib/temperatureConversions.test.ts', 'app/src/lib/temperatureStep.test.ts', 'app/src/lib/useTemperatureFormat.test.tsx',
+            'app/src/components/SideControl.test.tsx',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.test.tsx',
+        ],
+        upstream_offer: false,
+        rationale: 'Optional: every temperature shows a new number, which is confusing without warning. '
+            + 'Settings and schedules are unchanged.',
     },
 ];
 //# sourceMappingURL=featuresManifest.js.map

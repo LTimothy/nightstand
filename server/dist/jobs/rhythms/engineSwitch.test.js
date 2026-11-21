@@ -20,7 +20,9 @@ mock.module(new URL('../../routes/deviceStatus/updateDeviceStatus.js', import.me
     namedExports: { updateDeviceStatus: async () => { } },
 });
 mock.module(new URL('../../8sleep/deviceApi.js', import.meta.url).href, {
-    namedExports: { executeFunction: async (...args) => { commands.push(args); } },
+    namedExports: { executeFunction: async (command, arg, ...rest) => {
+            commands.push([command, typeof arg === 'function' ? arg() : arg, ...rest]);
+        } },
 });
 mock.module(new URL('../../8sleep/frankenServer.js', import.meta.url).href, {
     namedExports: {

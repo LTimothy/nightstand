@@ -19,6 +19,9 @@ import { alarmPatternFor } from './alarmPattern.js';
 import { missedReasonForError, noteMissedAlarm, setAlarmSuppression } from './alarmLedger.js';
 import { recordActiveAlarm } from './activeAlarms.js';
 import { alarmOverrideSilences } from './alarmOverrideGate.js';
+const starting = new Set();
+// True while a scheduled or manual alarm is being set up for this side.
+export const alarmStarting = (side) => starting.has(side);
 const alarmOccurrences = new Map();
 // Overrides that have already run, so a rebuild cannot ring them again.
 const overrideRuns = new Map();
@@ -39,6 +42,7 @@ export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPatt
         alarmOccurrences.set(occurrenceKey, Date.now());
     let fired = false;
     let sending = false;
+    starting.add(side);
     emitJobEvent({ jobName: `alarm-${side}`, status: 'started' });
     try {
         const min10Duration = Math.max(10, duration);
@@ -50,25 +54,22 @@ export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPatt
                 return 0;
             }
         }
-        // Exit if side is off
+        // Exit if side is off, unless alarms ring on an off side
         const franken = await connectFrankenWithin(options);
         const resp = await franken.getDeviceStatus();
-        if (!resp[side].isOn && !force) {
+        if (!resp[side].isOn && !force && !settingsDB.data.features.alarmsWhenOff) {
             logger.debug('Not executing alarm, side is off!');
             if (options.background)
                 noteMissedAlarm(side, new Date(due), 'side-off');
             return 0;
         }
-        const currentTime = moment.tz(settingsDB.data.timeZone);
-        const alarmTimeEpoch = currentTime.unix();
         const alarmPayload = {
             pl: vibrationIntensity,
             du: min10Duration,
             pi: alarmPatternFor(resp.hubVersion, resp.coverVersion, vibrationPattern),
-            tt: alarmTimeEpoch,
         };
-        const cborPayload = cbor.encode(alarmPayload);
-        const hexPayload = cborPayload.toString('hex');
+        // tt is taken at send time, which a buzz hold can delay.
+        const hexPayload = () => cbor.encode({ ...alarmPayload, tt: moment.tz(settingsDB.data.timeZone).unix() }).toString('hex');
         const command = side === 'left' ? 'ALARM_LEFT' : 'ALARM_RIGHT';
         const lateMs = Date.now() - due;
         const notAfter = options.background ? due + ALARM_LATE_LIMIT_MS : undefined;
@@ -101,6 +102,7 @@ export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPatt
         return 0;
     }
     finally {
+        starting.delete(side);
         if (occurrenceKey && !fired)
             alarmOccurrences.delete(occurrenceKey);
     }
@@ -273,8 +275,8 @@ export function scheduleAlarmOverride(settingsData, side, rhythmSleepAt) {
         }
         const { vibrationIntensity, duration, vibrationPattern } = sourceAlarm ?? {
             vibrationIntensity: 100,
-            duration: 60,
-            vibrationPattern: 'rise',
+            duration: 30,
+            vibrationPattern: 'double',
         };
         return executeAlarm({
             side,
@@ -286,7 +288,7 @@ export function scheduleAlarmOverride(settingsData, side, rhythmSleepAt) {
 }
 export const scheduleAlarm = (settingsData, side, day, dailySchedule) => {
     // Recurring alarms stay coupled to the day's power schedule; the runtime
-    // isOn check inside executeAlarm still skips a manually-off pod.
+    // isOn check inside executeAlarm still skips a manually-off side unless alarmsWhenOff is on.
     if (!dailySchedule.power.enabled)
         return;
     if (!settingsData[side].alarmsEnabled)

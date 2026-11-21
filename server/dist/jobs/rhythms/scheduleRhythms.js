@@ -126,7 +126,7 @@ async function ringKeptAlarm(side, sleep, event) {
         return runRhythmEvent(side, sleep, event);
     try {
         const status = await getDeviceStatusCoalesced();
-        if (!status[side].isOn) {
+        if (!status[side].isOn && !settingsDB.data.features.alarmsWhenOff) {
             logger.info(`Skipping the kept alarm for ${side}: the side is off`);
             if (!rhythmSkipReason(settingsDB.data, side, sleep, 'alarm', new Date(), event.at))
                 noteMissedAlarm(side, event.at, 'side-off');

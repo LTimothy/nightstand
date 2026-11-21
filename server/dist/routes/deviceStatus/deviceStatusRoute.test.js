@@ -10,7 +10,7 @@ process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
 const sent = [];
 mock.module(new URL('../../8sleep/deviceApi.js', import.meta.url).href, {
-    namedExports: { executeFunction: async (command, arg) => { sent.push([command, arg]); } },
+    namedExports: { holdCommand: () => { }, executeFunction: async (command, arg) => { sent.push([command, arg]); } },
 });
 mock.module(new URL('../../8sleep/frankenServer.js', import.meta.url).href, {
     namedExports: {

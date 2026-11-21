@@ -32,7 +32,7 @@ export const defaultSideSettings = {
         enabled: false,
         fireAt: '',
         vibrationIntensity: 100,
-        vibrationPattern: 'rise',
+        vibrationPattern: 'double',
         duration: 30,
     },
     taps: {
@@ -49,6 +49,10 @@ export const defaultSideSettings = {
         quadTap: {
             type: 'base_control',
             behavior: 'toggle_preset',
+        },
+        logoDouble: {
+            temperatureF: 55,
+            minutes: 0,
         },
     },
     buttons: {

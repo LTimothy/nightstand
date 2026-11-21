@@ -179,8 +179,10 @@ const sideRead = z.object({
     currentTemperatureF: z.number(), targetTemperatureF: z.number(), currentTemperatureLevel: z.number(),
     isOn: z.boolean(), secondsRemaining: z.number(), isAlarmVibrating: z.boolean(),
 });
+// Clients read each gesture by name, so other keys under taps are free.
+const tapRead = z.object({ type: z.string() });
 const settingSideRead = z.object({
-    name: z.string(), awayMode: z.boolean(), taps: z.record(z.object({ type: z.string() })),
+    name: z.string(), awayMode: z.boolean(), taps: z.object({ doubleTap: tapRead, tripleTap: tapRead, quadTap: tapRead }),
     scheduleOverrides: z.object({ alarm: z.object({ disabled: z.boolean(), expiresAt: z.string(), timeOverride: z.string() }) }),
 });
 const reads = {
@@ -268,7 +270,7 @@ it('keeps level display separate from writable Fahrenheit targets', async () => 
     assert.equal((await request('deviceStatus', { left: { targetTemperatureLevel: 0 } })).status, 400);
     assert.equal((await request('deviceStatus', { left: { currentTemperatureLevel: 0 } })).status, 204);
     assert.deepEqual(deviceWrites.at(-1), { left: { currentTemperatureLevel: 0 } });
-    assert.equal((await request('settings', { features: { levelTemps: false } })).status, 409);
+    assert.equal((await request('settings', { features: { levelTemps: false } })).status, 200);
 });
 it('pins update refusal and verifies that side effects used only local stubs', async () => {
     setInUseCheck(async () => ['left-on']);

@@ -14,6 +14,8 @@ import { drivingSide } from '../jobs/scheduleQueries.js';
 import { lastDeviceStatus } from './lastDeviceStatus.js';
 import { activeAlarms, alarmEndedAt, hasSnooze } from '../jobs/activeAlarms.js';
 import { handleAlarmTap } from './tapAlarm.js';
+import { startBoost } from './boost.js';
+import { buzz } from './buzz.js';
 import { ButtonEventMachine } from './buttonEvents.js';
 // Where the firmware writes its rolling RAW captures. Tests point it elsewhere.
 const RAW_DIR = process.env.POD_RAW_DIR || '/persistent';
@@ -81,8 +83,9 @@ export class ButtonMonitor {
         this.pollError = null;
         try {
             await settingsDB.read();
-            // A Pod 5 hub's logo click is read here too, so a logo set to a temperature keeps the reader on.
-            const logoSetsTemperature = ['left', 'right'].some(side => settingsDB.data[side].taps.quadTap.type === 'set_temperature');
+            // A Pod 5 hub's logo click is read here too, so a logo set to a temperature or a boost keeps the reader on.
+            const logoSetsTemperature = ['left', 'right'].some(side => settingsDB.data[side].taps.quadTap.type === 'set_temperature'
+                || settingsDB.data[side].taps.logoDouble.minutes > 0);
             if (!settingsDB.data.features.coverButtons && !logoSetsTemperature) {
                 this.tail = null;
                 this.machine = new ButtonEventMachine();
@@ -295,9 +298,18 @@ export class ButtonMonitor {
                     await handleAlarmTap(side, { type: 'alarm', behavior: 'dismiss', snoozeDuration: 60, inactiveAlarmBehavior: 'none' });
                     this.logoStoppedAlarmAt[side] = event.at;
                 }
-                else if (favoriteF !== null && Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS
+                else if (Math.abs(event.at - (this.logoStoppedAlarmAt[side] ?? -Infinity)) > MAX_PRESS_AGE_MS
                     && (alarmEndedAt.get(side) ?? -Infinity) <= event.at) {
-                    await this.setFavorite(side, favoriteF, event.at);
+                    const boost = settingsDB.data[side].taps.logoDouble;
+                    let applied = false;
+                    if (event.clicks === 2 && boost.minutes > 0) {
+                        applied = await startBoost(side, boost.temperatureF, boost.minutes, event.at);
+                    }
+                    else if (favoriteF !== null) {
+                        applied = await this.setFavorite(side, favoriteF, event.at);
+                    }
+                    if (applied && settingsDB.data.features.logoClickBuzz)
+                        void buzz(side);
                 }
                 return;
             }
@@ -335,6 +347,7 @@ export class ButtonMonitor {
         await markManualTempChange(side, {
             targetF: favoriteF, fromF: before?.targetTemperatureF ?? null, on: true, setsOn: before?.isOn === false, source: 'tap',
         });
+        return true;
     }
 }
 let monitor = null;

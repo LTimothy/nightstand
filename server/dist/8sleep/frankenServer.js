@@ -82,7 +82,7 @@ export class Franken {
         });
     }
     static separator = Buffer.from('\n\n');
-    async sendMessage(message, notAfter) {
+    async sendMessage(message, notAfter, beforeSend) {
         logger.debug(`Sending message to sock | message: ${message}`);
         const commandNumber = message.split('\n', 1)[0] ?? '?';
         const startedAt = Date.now();
@@ -92,6 +92,7 @@ export class Franken {
             const execPromise = this.sequentialQueue.exec(async () => {
                 this.lifetime.signal.throwIfAborted();
                 assertBefore(notAfter);
+                beforeSend?.();
                 const requestBytes = Buffer.concat([Buffer.from(message), Franken.separator]);
                 await this.write(requestBytes);
                 writeCompleted = true;
@@ -157,13 +158,13 @@ export class Franken {
             return arg;
         return arg.replace(/\n/gm, '');
     }
-    async callFunction(command, arg, notAfter) {
+    async callFunction(command, arg, notAfter, beforeSend) {
         logger.debug(`Calling function | command: ${command} | arg: ${arg}`);
         const commandNumber = frankenCommands[command];
         const cleanedArg = this.tryStripNewlines(arg);
         logger.debug(`commandNumber: ${commandNumber}`);
         logger.debug(`cleanedArg: ${cleanedArg}`);
-        await this.sendMessage(`${commandNumber}\n${cleanedArg}`, notAfter);
+        await this.sendMessage(`${commandNumber}\n${cleanedArg}`, notAfter, beforeSend);
     }
     async getDeviceStatus(getGestures = false) {
         const command = 'DEVICE_STATUS';

@@ -18,11 +18,23 @@ export const frankenCommands = {
     DEVICE_STATUS: '14',
     ALARM_CLEAR: '16',
 };
+const holdUntil = new Map();
+// Delays later sends of a command, so a pulse the Pod would swallow waits for the one playing; 0 clears.
+export function holdCommand(command, ms) {
+    if (ms > 0)
+        holdUntil.set(command, Date.now() + ms);
+    else
+        holdUntil.delete(command);
+}
 // A function arg is worked out once the Pod is reachable, for values that
 // depend on when the command is sent.
 export async function executeFunction(command, arg = 'empty', options = {}) {
     logger.debug(`Executing command | command: ${command} | arg: ${typeof arg === 'string' ? arg : 'when sent'}`);
     const franken = await connectFrankenWithin(options, command);
-    await franken.callFunction(command, typeof arg === 'string' ? arg : arg(), options.notAfter);
+    // Capped so a forward clock jump cannot stall a command.
+    const wait = Math.min((holdUntil.get(command) ?? 0) - Date.now(), 5_000);
+    if (wait > 0)
+        await new Promise(resolve => setTimeout(resolve, wait));
+    await franken.callFunction(command, typeof arg === 'string' ? arg : arg(), options.notAfter, options.beforeSend);
 }
 //# sourceMappingURL=deviceApi.js.map

@@ -14,10 +14,10 @@ let sendError;
 const updates = [];
 const analyses = [];
 mock.module(new URL('../8sleep/deviceApi.js', import.meta.url).href, {
-    namedExports: { executeFunction: async (...args) => {
+    namedExports: { executeFunction: async (command, arg, ...rest) => {
             if (sendError)
                 throw sendError;
-            commands.push(args);
+            commands.push([command, typeof arg === 'function' ? arg() : arg, ...rest]);
         } },
 });
 let leftOn = true;
@@ -69,6 +69,7 @@ beforeEach(async () => {
     leftOn = true;
     analyses.length = 0;
     settings.data.timeZone = 'UTC';
+    settings.data.features.alarmsWhenOff = false;
     settings.data.left.awayMode = false;
     settings.data.left.alarmsEnabled = true;
     settings.data.left.scheduleOverrides = {
@@ -141,6 +142,26 @@ test('a scheduled alarm on a side that is off is reported as missed, a manual on
     assert.equal(missed.reason, 'side-off');
     assert.equal(missed.side, 'left');
     assert.equal(missed.at, new Date(now).toISOString());
+    assert.equal(commands.length, 0);
+});
+test('with alarms ringing when the side is off, a scheduled alarm rings on an off side', async (t) => {
+    t.mock.method(Date, 'now', () => now);
+    t.mock.method(globalThis, 'setTimeout', () => ({ unref() { } }));
+    ledger.startAlarmLedger(new Date(now));
+    settings.data.features.alarmsWhenOff = true;
+    await settings.write();
+    leftOn = false;
+    assert.equal(await executeAlarm({ side: 'left', ...alarm }, undefined, { background: true, dueAt: now }), 10_000);
+    assert.equal(commands.length, 1);
+    assert.deepEqual(ledger.listMissedAlarms(new Date(now)), []);
+});
+test('with alarms ringing when the side is off, an away side stays quiet', async (t) => {
+    t.mock.method(Date, 'now', () => now);
+    settings.data.features.alarmsWhenOff = true;
+    settings.data.left.awayMode = true;
+    await settings.write();
+    leftOn = false;
+    assert.equal(await executeAlarm({ side: 'left', ...alarm }, undefined, { background: true, dueAt: now }), 0);
     assert.equal(commands.length, 0);
 });
 const missedReasons = () => ledger.listMissedAlarms(new Date(now)).map(item => item.reason);
@@ -259,6 +280,22 @@ test('an overnight replacement inherits the enabled alarm from the starting nigh
     const payload = cbor.decodeFirstSync(Buffer.from(commands[0][1], 'hex'));
     assert.equal(payload.pl, 70);
     assert.equal(payload.du, 20);
+});
+test('a replacement with no alarm on its night rings at full strength for 30 s with a double pulse', async (t) => {
+    t.mock.method(Date, 'now', () => now);
+    t.mock.method(globalThis, 'setTimeout', () => ({ unref() { } }));
+    schedules.data.left.monday = { ...structuredClone(night), alarm: { ...alarm, enabled: false }, alarms: [] };
+    await schedules.write();
+    settings.data.left.scheduleOverrides.alarm = {
+        disabled: false, timeOverride: '05:00', expiresAt: '2026-09-29T09:00:00Z',
+    };
+    await settings.write();
+    scheduleAlarmOverride(settings.data, 'left');
+    now = Date.parse('2026-09-29T05:00:00Z');
+    await schedule.scheduledJobs['left-alarm-override-05:00'].invoke();
+    const { default: cbor } = await import('cbor');
+    const payload = cbor.decodeFirstSync(Buffer.from(commands[0][1], 'hex'));
+    assert.deepEqual([payload.pl, payload.du, payload.pi], [100, 30, 'double']);
 });
 test('overlapping alarms retain dismissal until the latest alarm finishes', async (t) => {
     const timers = [];

@@ -17,8 +17,8 @@ const defaultDailySchedule = {
     alarm: {
         time: '09:00',
         vibrationIntensity: 100,
-        vibrationPattern: 'rise',
-        duration: 10,
+        vibrationPattern: 'double',
+        duration: 30,
         enabled: false,
         alarmTemperature: 82,
     },

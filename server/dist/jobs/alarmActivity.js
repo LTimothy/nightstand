@@ -120,6 +120,16 @@ export function nightAlarmPending(side, until, endsThisNight) {
         return true;
     return dueJobs(endsThisNight, -Infinity, until.getTime() + 1).length > 0;
 }
+// Whether this side has a ringing alarm or any alarm job, Rhythms included,
+// due by `until`. A re-plan in progress counts, since the job list is empty.
+export function alarmActivityWithin(side, until) {
+    // A dismissed alarm still counts until its ring time ends: erring toward no buzz over a buzz that replaces an alarm.
+    if (isRebuilding() || (ringing.get(side)?.size ?? 0) > 0)
+        return true;
+    const mine = (name) => isAlarmJob(side, name)
+        || (name.startsWith(`rhythm-${side}-`) && name.includes('-alarm-'));
+    return dueJobs(mine, Date.now(), until.getTime() + 1).length > 0;
+}
 // Ends every wait in progress, so the power-offs behind them go out at once.
 export function abortAlarmWaits() {
     pendingWaits.abort();

@@ -31,6 +31,10 @@ describe('settingsDB defaultData merge', () => {
         for (const [key, value] of Object.entries(defaultFeatures))
             assert.equal(value, on.includes(key), key);
     });
+    it('gives a never-saved one-time alarm a double pulse at full strength for 30 s', () => {
+        const { vibrationIntensity, vibrationPattern, duration } = settingsDB.data.left.oneOffAlarm;
+        assert.deepEqual({ vibrationIntensity, vibrationPattern, duration }, { vibrationIntensity: 100, vibrationPattern: 'double', duration: 30 });
+    });
     it('backfills an inactive schedule pause for both sides', () => {
         for (const side of ['left', 'right']) {
             assert.deepEqual(settingsDB.data[side].scheduleOverrides.pause, { active: false, expiresAt: '' });

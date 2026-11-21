@@ -122,6 +122,18 @@ describe('planHandoff', () => {
     it('does nothing for a side that is already off', () => {
         assert.deepEqual(plan({ on: false })[0], { side: 'left', action: 'none' });
     });
+    it('still skips the weekly alarm after a rhythm alarm rang on an off side when alarms ring when off', () => {
+        const configure = (settings) => { settings.features.alarmsWhenOff = true; };
+        assert.deepEqual(plan({ legacy: LEGACY, rang: true, on: false, configure }), [
+            { side: 'left', action: 'none', alarmOverrideExpiresAt: '2026-09-29T07:30:00Z' },
+            { side: 'right', action: 'none' },
+        ]);
+        assert.deepEqual(plan({ legacy: LEGACY, on: false, configure })[0], { side: 'left', action: 'none' });
+        assert.deepEqual(plan({ on: false, configure })[0], { side: 'left', action: 'none' });
+        const poweringOff = plan({ legacy: LEGACY, rang: true, on: false, powerOffNow: true, configure })[0];
+        assert.equal(poweringOff.alarmOverrideExpiresAt, '2026-09-29T07:30:00Z');
+        assert.deepEqual(plan({ legacy: LEGACY, rang: true, on: false })[0], { side: 'left', action: 'none' });
+    });
     it('does nothing outside a rhythm sleep', () => {
         assert.deepEqual(plan({ rhythm: testNight('08:00', '16:00') })[0], { side: 'left', action: 'none' });
     });

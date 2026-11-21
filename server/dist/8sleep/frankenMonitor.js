@@ -4,7 +4,7 @@ import settingsDB from '../db/settings.js';
 import memoryDB from '../db/memoryDB.js';
 import { connectFranken, FrankenCommandTimeoutError } from './frankenServer.js';
 import { wait } from './promises.js';
-import { MIN_TEMPERATURE_F, MAX_TEMPERATURE_F } from '../routes/deviceStatus/deviceStatusSchema.js';
+import { MIN_TEMPERATURE_F, MAX_TEMPERATURE_F, Version } from '../routes/deviceStatus/deviceStatusSchema.js';
 import { GestureSchema } from '../db/settingsSchema.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import { markManualTempChange } from '../jobs/scheduleOverride.js';
@@ -105,6 +105,12 @@ export class FrankenMonitor {
     }
     // `readTarget` is the target of the read that carried the gesture.
     async processGesture(side, gesture, readTarget) {
+        // On a Pod 5 hub only a center double press ticks quadTap, and with the boost on the boost owns it.
+        if (gesture === 'quadTap' && this.deviceStatus?.hubVersion === Version.Pod5
+            && (settingsDB.data[side]?.taps?.logoDouble?.minutes ?? 0) > 0) {
+            logger.debug(`[processGesture] ${side} quadTap left to the boost`);
+            return;
+        }
         const behavior = settingsDB.data[side]?.taps?.[gesture];
         if (!behavior) {
             logger.info(`[processGesture] No ${gesture} action set for the ${side} side`);
