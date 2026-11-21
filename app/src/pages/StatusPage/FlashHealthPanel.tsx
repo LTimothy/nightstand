@@ -31,7 +31,9 @@ export default function FlashHealthPanel() {
     <Typography>Fast area: { lifeText(flash.lifeTimeA) }</Typography>
     <Typography>Spare blocks: { flash.preEolInfo === null ? NOT_GIVEN : SPARE[flash.preEolInfo] ?? NOT_GIVEN }</Typography>
     { flash.writtenBytesPerDay !== null && <Typography>
-      Writes since the last restart: about { formatBytes(flash.writtenBytesPerDay) } a day
+      { flash.writtenOverSeconds
+        ? `Writes over the last ${Math.round(flash.writtenOverSeconds / 60)} minutes`
+        : 'Writes since the last restart' }: about { formatBytes(flash.writtenBytesPerDay) } a day
     </Typography> }
   </Paper>;
 }

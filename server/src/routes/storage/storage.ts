@@ -6,7 +6,7 @@ import path from 'path';
 import logger from '../../logger.js';
 import config from '../../config.js';
 import { parseDfOutput, parseDuOutput } from './parseDiskUsage.js';
-import { parseFlashWear, FlashWear } from './parseFlashWear.js';
+import { addWriteSample, parseFlashWear, parseWriteSample, recentWriteRate, FlashWear, WriteSample } from './parseFlashWear.js';
 import { StorageInfo } from './storageSchema.js';
 
 const router = express.Router();
@@ -45,12 +45,33 @@ async function dbBytes(): Promise<number> {
 }
 
 const FLASH = '/sys/block/mmcblk0';
+const SAMPLE_MS = 5 * 60_000;
+let writeSamples: WriteSample[] = [];
+
+async function readWriteSample(): Promise<WriteSample | null> {
+  try {
+    const [stat, uptime] = await Promise.all([`${FLASH}/stat`, '/proc/uptime'].map(file => fs.promises.readFile(file, 'utf8')));
+    return parseWriteSample(stat, uptime);
+  } catch {
+    return null;
+  }
+}
+
+async function recordWriteSample() {
+  const sample = await readWriteSample();
+  if (sample) writeSamples = addWriteSample(writeSamples, sample);
+}
+void recordWriteSample();
+setInterval(() => void recordWriteSample(), SAMPLE_MS).unref();
 
 async function readFlash(): Promise<FlashWear | undefined> {
   try {
-    const files = [`${FLASH}/device/life_time`, `${FLASH}/device/pre_eol_info`, `${FLASH}/stat`, '/proc/uptime'];
-    const [lifeTime, preEol, stat, uptime] = await Promise.all(files.map(file => fs.promises.readFile(file, 'utf8')));
-    return parseFlashWear(lifeTime, preEol, stat, uptime) ?? undefined;
+    const files = [`${FLASH}/device/life_time`, `${FLASH}/device/pre_eol_info`];
+    const [[lifeTime, preEol], now] = await Promise.all([
+      Promise.all(files.map(file => fs.promises.readFile(file, 'utf8'))),
+      readWriteSample(),
+    ]);
+    return parseFlashWear(lifeTime, preEol, now ? recentWriteRate(writeSamples, now) : null) ?? undefined;
   } catch {
     // No eMMC here, such as on a Mac in development.
     return undefined;

@@ -18,6 +18,8 @@ export const StorageInfoSchema = z.object({
     lifeTimeB: z.number().nullable(),
     preEolInfo: z.number().nullable(),
     writtenBytesPerDay: z.number().nullable(),
+    // Missing before 3.10.0, when writtenBytesPerDay was a since-boot average.
+    writtenOverSeconds: z.number().nullable().optional(),
   }).optional(),
 });
 

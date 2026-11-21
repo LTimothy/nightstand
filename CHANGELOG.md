@@ -25,13 +25,13 @@ is a hard fork; for the history of the projects it descends from, see
   second double press restarts it. Requested by
   [Tony-1132](https://github.com/Tony-1132).
 - Settings > Bed and sides > Cover buttons, Pod 5 hub with a Pod 5 cover: a
-  switch, off by default, gives a 3 s vibration on that side when a center
-  button press is applied. An alarm due during it rings once it ends.
+  switch, off by default, gives a 3 s vibration when a center button press
+  is applied. An alarm due during it rings once it ends.
   Requested by [Tony-1132](https://github.com/Tony-1132).
 - Settings > Features > Ring alarms when the side is off, off by default:
   weekly, one-time, replacement and Rhythms alarms vibrate even if the side
-  is off, and are no longer reported as missed for that reason. Checked on a
-  Pod 5, where the side stays off. Away mode still keeps alarms quiet. A day
+  is off, and are no longer reported as missed for that reason. Checked with a
+  one-time alarm on a Pod 5, where the side stays off. Away mode still keeps alarms quiet. A day
   with its schedule off still has no weekly alarm.
 - A saved one-time alarm now shows on the Bed tab and in the Schedule header,
   and its editor says it rings only if the side is on at that time, unless
@@ -53,6 +53,11 @@ is a hard fork; for the history of the projects it descends from, see
 - Clearer descriptions for One-time alarm, Capacitance presence and the system
   log switch.
 - Prune detail after 30 days is now Delete detail after 30 days.
+- System status > Flash memory now shows the write rate over the last hour
+  instead of an average since the last restart. An update or deploy writes
+  about a gigabyte once, and the average spread that over the rest of the day,
+  so it read high until the nightly restart. The rate appears 30 minutes after
+  the server starts.
 
 ## [3.9.0] - 2026-11-17
 

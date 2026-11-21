@@ -1563,9 +1563,12 @@ the biometrics service; `/api/deviceStatus` converts them.
   `lifeTimeA` (fast area) and `lifeTimeB` (main area) are 1 to 10 for 0 to
   10% up to 90 to 100% of rated life used, and 11 past it. `preEolInfo` is
   1 normal, 2 warning (80% of spare blocks used), 3 urgent (90%).
-  `writtenBytesPerDay` averages the kernel's write counter since boot, and
-  is null in the first hour. A value the chip does not give is null. Missing
-  before 3.7.0.
+  `writtenBytesPerDay` is the whole chip's write rate over the last hour,
+  from the kernel's write counter sampled every 5 minutes, and
+  `writtenOverSeconds` is the window it covers. Both are null until the
+  server has 30 minutes of samples. A value the chip does not give is null.
+  `flash` is missing before 3.7.0; before 3.10.0 `writtenBytesPerDay` was an
+  average since boot and `writtenOverSeconds` was missing.
 
 #### Response
 
@@ -1581,7 +1584,7 @@ the biometrics service; `/api/deviceStatus` converts them.
     "biometricsArchiveBytes": 4194304000,
     "databaseBytes": 52428800
   },
-  "flash": { "lifeTimeA": 1, "lifeTimeB": 1, "preEolInfo": 1, "writtenBytesPerDay": 3560000000 }
+  "flash": { "lifeTimeA": 1, "lifeTimeB": 1, "preEolInfo": 1, "writtenBytesPerDay": 1430000000, "writtenOverSeconds": 3600 }
 }
 ```
 

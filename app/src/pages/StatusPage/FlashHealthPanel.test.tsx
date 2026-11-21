@@ -25,6 +25,14 @@ describe('FlashHealthPanel', () => {
     expect(screen.getByRole('heading', { name: 'Flash memory', level: 2 })).toBeInTheDocument();
   });
 
+  it('names the window of a recent write rate', async () => {
+    server.use(http.get('*/api/storage', () => HttpResponse.json(storage({
+      lifeTimeA: 1, lifeTimeB: 1, preEolInfo: 1, writtenBytesPerDay: 1.5 * 1024 ** 3, writtenOverSeconds: 3600,
+    }))));
+    renderWithProviders(<FlashHealthPanel />);
+    expect(await screen.findByText('Writes over the last 60 minutes: about 1.5 GB a day')).toBeInTheDocument();
+  });
+
   it('warns when the chip is near the end of its life', async () => {
     server.use(http.get('*/api/storage', () => HttpResponse.json(storage({
       lifeTimeA: 3, lifeTimeB: 1, preEolInfo: 2, writtenBytesPerDay: null,
