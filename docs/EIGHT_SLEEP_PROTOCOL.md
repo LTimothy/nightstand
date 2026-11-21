@@ -159,8 +159,8 @@ Checked by hand on a Pod 5:
   though the firmware logs a flat power and pattern 0.
 - The other side faintly feels a full power pulse.
 - The hub counts a fast triple press as 4 and counts doubles exactly.
-- Device status has no tap counters on this Pod, so center button presses
-  read from the logs stay 15 to 25 s late.
+- Nightstand's `/api/deviceStatus` does not expose the tap counters, so a
+  center press is read from the logs, 3 to 25 s after the press.
 
 ### `DEVICE_STATUS` response fields
 
@@ -228,6 +228,10 @@ so Nightstand's tap action runs as well; Nightstand steps from the target
 before the firmware's change and replaces it. A logo click is logged as
 `[TTC] left middle button clicked 1 times` and changes no target and no
 tap counter; the firmware uses it only to stop an alarm.
+A center double press does tick the `quadTap` counter and shows in the log
+3 to 10 s after the press, while a single press waits for the regular 15 to
+25 s batch. The hub steps plus and minus from its own last target, not from
+a target Nightstand wrote.
 The Pod 4 hub with a Pod 5 cover instead logs `[TTC] ignoring N short clicks`
 for plus and minus. My Pod 5 also logs a stray `gpi press 105` with
 `invalid gpi->row 105->255` every five minutes.
