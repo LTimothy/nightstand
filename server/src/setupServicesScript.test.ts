@@ -294,6 +294,17 @@ describe('setup_services.sh', () => {
     }
   });
 
+  it('runs every script a sudo rule allows with a fixed PATH, since sudo here keeps the caller\'s', () => {
+    const rules = readFileSync(path.join(repoRoot, 'scripts/setup_services.sh'), 'utf8');
+    const sudoLines = rules.split('\n').filter(line => /NOPASSWD: \/bin\/(ba)?sh \S*live\/scripts\//.test(line));
+    const scripts = [...new Set(sudoLines.map(line => line.match(/live\/scripts\/([\w.-]+\.sh)/)?.[1]).filter(Boolean))] as string[];
+    assert.ok(scripts.length >= 4, scripts.join(' '));
+    for (const name of scripts) {
+      const text = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
+      assert.match(text, /^export PATH="\/usr\/sbin:\/sbin:\/usr\/bin:\/bin"$/m, name);
+    }
+  });
+
   it('grants exactly these rules, and only enable --now on the stream unit', () => {
     // The Biometrics switch turns the stream on through one fixed command.
     // A broader grant (a wildcard, another verb or unit) would let the server

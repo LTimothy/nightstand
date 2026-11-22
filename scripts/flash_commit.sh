@@ -6,6 +6,7 @@
 # Usage: flash_commit.sh long|default   (run as root)
 # To undo now: bash /usr/local/lib/nightstand/live/scripts/flash_commit.sh default
 set -u
+export PATH="/usr/sbin:/sbin:/usr/bin:/bin"
 MOUNT_POINT="${NIGHTSTAND_PERSISTENT:-/persistent}"
 MOUNTS="${NIGHTSTAND_PROC_MOUNTS:-/proc/mounts}"
 MOUNT_BIN="${NIGHTSTAND_MOUNT_BIN:-mount}"

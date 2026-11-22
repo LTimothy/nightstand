@@ -10,6 +10,7 @@
 # bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh disk
 # (the server rewrites the drop-in at startup while the switch is on).
 set -u
+export PATH="/usr/sbin:/sbin:/usr/bin:/bin"
 DIR="${NIGHTSTAND_JOURNALD_DIR:-/etc/systemd/journald.conf.d}"
 DROPIN="$DIR/10-nightstand-memory.conf"
 JOURNAL="${NIGHTSTAND_JOURNAL_DIR:-/var/log/journal}"
@@ -49,7 +50,8 @@ case "$1" in
     fi
     [ -d "$JOURNAL" ] && [ ! -L "$JOURNAL" ] || exit 0
     [ -n "$(find "$JOURNAL" -maxdepth 0 -user "$OWNER" -print)" ] || exit 0
-    [ -z "$(find "$JOURNAL" -xdev -type f -mmin -60 -print -quit)" ] || exit 0
+    recent=$(find "$JOURNAL" -xdev -type f -mmin -60 -print -quit) || exit 0
+    [ -z "$recent" ] || exit 0
     count=$(find "$JOURNAL" -xdev -type f \( -name '*.journal' -o -name '*.journal~' \) -print -delete | wc -l)
     echo "Removed $((count)) old system log files from flash."
     ;;

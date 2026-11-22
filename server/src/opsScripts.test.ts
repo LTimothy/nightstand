@@ -49,8 +49,8 @@ describe('this repo\'s own tooling (not part of the agent overlay)', () => {
 
   it('disable_biometrics.sh actually stops and disables the stream service', () => {
     const src = readFileSync(path.join(repoRoot, 'scripts/disable_biometrics.sh'), 'utf8');
-    assert.match(src, /systemctl stop free-sleep-stream/);
-    assert.match(src, /systemctl disable free-sleep-stream/);
+    assert.match(src, /"\$SYSTEMCTL" stop free-sleep-stream/);
+    assert.match(src, /"\$SYSTEMCTL" disable free-sleep-stream/);
   });
 });
 
