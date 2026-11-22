@@ -97,6 +97,7 @@ export function buildCurve(input: CurveInput): CurvePoint[] {
   const bounds = curveBounds(base);
   const clamp = (level: number) => Math.min(bounds.max, Math.max(bounds.min, level));
   const prewarmStart = bedtime - prewarmMinutes(smart) * MINUTE;
+  const toBase = smart.warmUp && smart.warmUpTo === 'base';
 
   const points: CurvePoint[] = [];
   const push = (at: number, level: number, phase: CurvePhase) => {
@@ -104,15 +105,16 @@ export function buildCurve(input: CurveInput): CurvePoint[] {
   };
   const afterWake = wake + CURVE.afterWakeMinutes * MINUTE;
   // A sleep that turns off when the person gets up holds the wake level to the end.
+  // A warm-up to the base is already there, so it needs no step back.
   const after = () => {
-    if (!smart.offWhenUp) push(afterWake, base, 'after');
+    if (!smart.offWhenUp && !toBase) push(afterWake, base, 'after');
   };
 
   if (windowMinutes < CURVE.veryShortWindowMinutes) {
     push(prewarmStart, base, 'prewarm');
     push(bedtime, base, 'bedtime');
     const warmAt = wake - CURVE.leadMinutes.veryShort * MINUTE;
-    const wakeLevel = smart.warmUp && warmAt > bedtime ? clamp(base + 1) : base;
+    const wakeLevel = smart.warmUp && !toBase && warmAt > bedtime ? clamp(base + 1) : base;
     if (wakeLevel !== base) push(warmAt, wakeLevel, 'warmup');
     push(wake, wakeLevel, 'wake');
     after();
@@ -123,7 +125,7 @@ export function buildCurve(input: CurveInput): CurvePoint[] {
   const warmBump = gentle ? 1 : 2;
   const onLevel = clamp(short || day || !smart.warmStart ? base : base + warmBump);
   const holdLevel = clamp(short ? base - 1 : base - (gentle ? 1 : 2));
-  const wakeLevel = clamp(short || day ? base + 1 : base + warmBump);
+  const wakeLevel = toBase ? base : clamp(short || day ? base + 1 : base + warmBump);
   const lead = short ? CURVE.leadMinutes.short
     : day ? CURVE.leadMinutes.day
       : gentle ? CURVE.leadMinutes.gentle
@@ -159,17 +161,19 @@ export function buildCurve(input: CurveInput): CurvePoint[] {
   const warmStep = CURVE.warmStepMinutes;
   const stepTimes: number[] = [];
   // Spread the steps over the lead, or pack them 10 minutes apart ending at wake.
+  // A warm-up to the base reaches it one step before wake instead of at it.
+  const slots = toBase ? steps + 1 : steps;
   for (let k = 1; k <= steps; k++) {
-    stepTimes.push(lead / steps >= warmStep
-      ? holdEnd + Math.floor((k * lead) / steps) * MINUTE
-      : wake - (steps - k) * warmStep * MINUTE);
+    stepTimes.push(lead / slots >= warmStep
+      ? holdEnd + Math.floor((k * lead) / slots) * MINUTE
+      : wake - (slots - k) * warmStep * MINUTE);
   }
   if (steps === 0 || stepTimes[0] > holdEnd) push(holdEnd, level, 'warmup');
   stepTimes.forEach((at, index) => {
     const next = level + index + 1;
     push(at, next, at === wake ? 'wake' : 'warmup');
   });
-  if (steps === 0) push(wake, level, 'wake');
+  if (steps === 0 || stepTimes[steps - 1] < wake) push(wake, level + steps, 'wake');
   after();
   return points;
 }

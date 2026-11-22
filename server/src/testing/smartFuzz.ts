@@ -48,7 +48,8 @@ export const clock = (minute: number) => `${String(Math.floor((minute % 1440) / 
 
 export function options(next: ReturnType<typeof random>): SmartSchedule {
   return { ...DEFAULT_SMART, baseLevel: next(-10, 10), intensity: choose(['gentle', 'standard'] as const, next),
-    warmStart: !!next(0, 1), warmUp: !!next(0, 1), upEarly: !!next(0, 1), ...(next(0, 1) ? { offWhenUp: true } : {}) };
+    warmStart: !!next(0, 1), warmUp: !!next(0, 1), upEarly: !!next(0, 1), ...(next(0, 1) ? { offWhenUp: true } : {}),
+    ...(next(0, 1) ? { warmUpTo: 'base' as const } : {}) };
 }
 
 export function curveInput(next: ReturnType<typeof random>): CurveInput {
@@ -78,6 +79,9 @@ export function assertCurve(points: CurvePoint[], input: CurveInput) {
     check(Number.isInteger(point.level) && point.level >= -10 && point.level <= 10
       && point.level >= bounds.min && point.level <= bounds.max, 'invalid level');
     check(input.smart.warmUp || point.phase !== 'warmup', 'warm-up with switch off');
+    const warming = index > 0 && point.level > points[index - 1].level && ['warmup', 'wake'].includes(point.phase);
+    check(!(input.smart.warmUp && input.smart.warmUpTo === 'base' && warming) || point.level <= input.smart.baseLevel,
+      'warm-up to base goes above the base');
     if (points[index + 1]?.at.getTime() !== time) {
       check(levelAt(points, point.at) === point.level && phaseAt(points, point.at) === point.phase, 'lookup disagrees at point');
     }

@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
-import { DEFAULT_SMART } from '@api/rhythmsSchema';
+import { DEFAULT_SMART, type SmartSchedule } from '@api/rhythmsSchema';
 import SmartScheduleControls from './SmartScheduleControls';
 
 it('changes intensity, switches and the base level', async () => {
@@ -51,4 +51,30 @@ it('explains a short sleep and locks Warm start', () => {
   expect(screen.getByRole('switch', { name: 'Warm start' })).toBeDisabled();
   expect(screen.getByRole('switch', { name: 'Warm start' })).not.toBeChecked();
   expect(screen.getByText('Off for this rhythm, because its sleep is shorter than 3 hours.')).toBeInTheDocument();
+});
+
+it('chooses where the warm-up ends, or turns it off', async () => {
+  const onChange = vi.fn();
+  const show = (value: SmartSchedule) => renderWithProviders(<SmartScheduleControls
+    value={ value }
+    onChange={ onChange }
+    format="level"
+    trackingOn
+    daySleep={ false }
+    disabled={ false }/>);
+  const first = show(DEFAULT_SMART);
+  let group = screen.getByRole('group', { name: 'Warm-up before wake' });
+  expect(within(group).getByRole('button', { name: 'Above base' })).toHaveAttribute('aria-pressed', 'true');
+  await first.user.click(within(group).getByRole('button', { name: 'To base' }));
+  expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_SMART, warmUp: true, warmUpTo: 'base' });
+  await first.user.click(within(group).getByRole('button', { name: 'Off' }));
+  expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_SMART, warmUp: false });
+  first.unmount();
+
+  const second = show({ ...DEFAULT_SMART, warmUp: true, warmUpTo: 'base' });
+  group = screen.getByRole('group', { name: 'Warm-up before wake' });
+  expect(screen.getByText('Warms back to your base temperature by your wake time.')).toBeInTheDocument();
+  await second.user.click(within(group).getByRole('button', { name: 'Above base' }));
+  expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_SMART, warmUp: true });
+  expect(onChange.mock.lastCall?.[0]).not.toHaveProperty('warmUpTo');
 });

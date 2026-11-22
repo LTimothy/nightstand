@@ -100,6 +100,50 @@ describe('buildCurve worked examples', () => {
   });
 });
 
+describe('buildCurve warm-up to base', () => {
+  it('standard night warms back to the base by wake and has no drop after it', () => {
+    const points = buildCurve(input({ warmUpTo: 'base' }, '2026-09-29 22:45', '2026-09-29 23:00', '2026-09-30 06:30', '2026-09-30 07:30'));
+    assert.deepEqual(asLocal(points).slice(6), [
+      ['2026-09-30 00:10', -2, 'hold'],
+      ['2026-09-30 05:45', -2, 'warmup'],
+      ['2026-09-30 06:00', -1, 'warmup'],
+      ['2026-09-30 06:15', 0, 'warmup'],
+      ['2026-09-30 06:30', 0, 'wake'],
+    ]);
+  });
+
+  it('gentle night takes one step halfway through the lead', () => {
+    const points = buildCurve(input({ warmUpTo: 'base', intensity: 'gentle' },
+      '2026-09-29 22:45', '2026-09-29 23:00', '2026-09-30 06:30', '2026-09-30 07:30'));
+    assert.deepEqual(asLocal(points).slice(-3), [
+      ['2026-09-30 06:00', -1, 'warmup'],
+      ['2026-09-30 06:15', 0, 'warmup'],
+      ['2026-09-30 06:30', 0, 'wake'],
+    ]);
+  });
+
+  it('day sleep packs the steps 10 minutes apart and ends at the base before wake', () => {
+    const points = buildCurve(input({ baseLevel: -1, warmUpTo: 'base' },
+      '2026-09-30 08:30', '2026-09-30 08:30', '2026-09-30 15:00', '2026-09-30 16:00'));
+    assert.deepEqual(asLocal(points).slice(-4), [
+      ['2026-09-30 14:35', -3, 'warmup'],
+      ['2026-09-30 14:40', -2, 'warmup'],
+      ['2026-09-30 14:50', -1, 'warmup'],
+      ['2026-09-30 15:00', -1, 'wake'],
+    ]);
+  });
+
+  it('a window under 90 minutes stays flat at the base', () => {
+    const points = buildCurve(input({ warmUpTo: 'base' }, '2026-09-30 01:00', '2026-09-30 01:00', '2026-09-30 02:00', '2026-09-30 03:00'));
+    assert.ok(points.every(point => point.level === 0 && point.phase !== 'warmup' && point.phase !== 'after'));
+  });
+
+  it('is ignored while the warm-up is off', () => {
+    const args = ['2026-09-29 22:45', '2026-09-29 23:00', '2026-09-30 06:30', '2026-09-30 07:30'] as const;
+    assert.deepEqual(buildCurve(input({ warmUp: false, warmUpTo: 'base' }, ...args)), buildCurve(input({ warmUp: false }, ...args)));
+  });
+});
+
 describe('buildCurve variants', () => {
   it('starts the cool-down at bedtime on the clock trigger', () => {
     const points = buildCurve(input({}, '2026-09-29 22:45', '2026-09-29 22:45', '2026-09-30 06:30', '2026-09-30 07:30'));

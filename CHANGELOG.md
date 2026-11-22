@@ -36,6 +36,10 @@ is a hard fork; for the history of the projects it descends from, see
   the log to memory, once nothing has written to them for an hour. On the
   maintainer's Pod 5 they took 1.1 GB. They cannot be restored; the folders
   are kept. The update adds one sudoers rule.
+- Smart Schedule > Warm-up before wake now offers Off, To base and Above
+  base. To base warms back only to your base temperature by your wake time,
+  for a gentler morning; Above base is the warm-up as before, and saved
+  rhythms keep it.
 
 ### Changed
 

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { useAppStore } from '@state/appStore';
 import { RhythmSchema, SideRhythmsSchema, type SideRhythms } from '@api/rhythmsSchema';
@@ -51,18 +51,26 @@ it(`fuzzes editor conversion, toggles and reload (${FUZZ_EDITOR_RUNS} runs, seed
       verify();
       for (let step = 0; step < 10; step++) {
         const action = next(0, 6);
-        const label = ['Warm start', 'Warm-up before wake', 'Skip the warm-up if I get up early', 'Gentle', 'Standard',
+        const warmUpChoice = (['Off', 'To base', 'Above base'] as const)[next(0, 2)];
+        const label = ['Warm start', `Warm-up ${warmUpChoice}`, 'Skip the warm-up if I get up early', 'Gentle', 'Standard',
           'Increase base temperature', 'Decrease base temperature'][action];
         actions.push(label);
-        const control = screen.getByRole(action < 3 ? 'switch' : 'button', { name: label });
+        const control = action === 1
+          ? within(screen.getByRole('group', { name: 'Warm-up before wake' })).getByRole('button', { name: warmUpChoice })
+          : screen.getByRole(action < 3 ? 'switch' : 'button', { name: label });
         const baseBefore = saved[saved.length - 1].rhythms.generated.smart.baseLevel;
         const enabled = !(control as HTMLButtonElement).disabled;
         const checked = (control as HTMLInputElement).checked;
         if (enabled) fireEvent.click(control);
         verify();
-        if (enabled && action < 3) {
-          const key = (['warmStart', 'warmUp', 'upEarly'] as const)[action];
+        if (enabled && (action === 0 || action === 2)) {
+          const key = action === 0 ? 'warmStart' : 'upEarly';
           expect(saved[saved.length - 1].rhythms.generated.smart[key]).toBe(!checked);
+        }
+        if (enabled && action === 1) {
+          const smart = saved[saved.length - 1].rhythms.generated.smart;
+          expect(smart.warmUp).toBe(warmUpChoice !== 'Off');
+          expect(smart.warmUpTo).toBe(warmUpChoice === 'To base' ? 'base' : undefined);
         }
         if (enabled && action >= 5) {
           expect(saved[saved.length - 1].rhythms.generated.smart.baseLevel).toBe(baseBefore + (action === 5 ? 1 : -1));

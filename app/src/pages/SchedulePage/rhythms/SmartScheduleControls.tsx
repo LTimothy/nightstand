@@ -13,7 +13,14 @@ type Props = {
   disabled: boolean;
 };
 
-type SwitchKey = 'warmStart' | 'warmUp' | 'upEarly';
+type SwitchKey = 'warmStart' | 'upEarly';
+type WarmUp = 'off' | 'base' | 'above';
+
+const WARM_UP_NOTE: Record<WarmUp, string> = {
+  off: 'The bed stays at its night temperature until you wake.',
+  base: 'Warms back to your base temperature by your wake time.',
+  above: 'Warms to a little above your base temperature by your wake time.',
+};
 
 export default function SmartScheduleControls({ value, onChange, format, trackingOn, daySleep, shortSleep = false, disabled }: Props) {
   const toggle = (key: SwitchKey, label: string, description: string, blocked = false) => <Box key={ key }>
@@ -32,6 +39,13 @@ export default function SmartScheduleControls({ value, onChange, format, trackin
         } }/> }/>
     <Typography variant="body2" color="text.secondary">{ description }</Typography>
   </Box>;
+  const warmUp: WarmUp = !value.warmUp ? 'off' : value.warmUpTo === 'base' ? 'base' : 'above';
+  const chooseWarmUp = (next: WarmUp) => {
+    const rest = { ...value };
+    delete rest.warmUpTo;
+    onChange(next === 'off' ? { ...rest, warmUp: false }
+      : next === 'base' ? { ...rest, warmUp: true, warmUpTo: 'base' } : { ...rest, warmUp: true });
+  };
   return <Stack spacing={ 2 } sx={ { width: '100%' } }>
     { daySleep && <Typography variant="body2" role="note">
       This sleep is mostly during the day, so there is no warm start and the cool-down is a little quicker.
@@ -68,7 +82,21 @@ export default function SmartScheduleControls({ value, onChange, format, trackin
       : shortSleep ? 'Off for this rhythm, because its sleep is shorter than 3 hours.'
         : 'A little warmer when you get into bed. Off for a sleep that is mostly during the day or shorter than 3 hours.',
     daySleep || shortSleep) }
-    { toggle('warmUp', 'Warm-up before wake', 'Warms gently before your wake time, so you wake to a comfortable bed.') }
+    <Box>
+      <Typography id="smart-warmup-label" sx={ { mb: 1 } }>Warm-up before wake</Typography>
+      <ToggleButtonGroup
+        exclusive
+        color="primary"
+        aria-labelledby="smart-warmup-label"
+        value={ warmUp }
+        disabled={ disabled }
+        onChange={ (_event, next: WarmUp | null) => { if (next) chooseWarmUp(next); } }>
+        <ToggleButton value="off">Off</ToggleButton>
+        <ToggleButton value="base">To base</ToggleButton>
+        <ToggleButton value="above">Above base</ToggleButton>
+      </ToggleButtonGroup>
+      <Typography variant="body2" color="text.secondary" sx={ { mt: 1 } }>{ WARM_UP_NOTE[warmUp] }</Typography>
+    </Box>
     { toggle('upEarly', 'Skip the warm-up if I get up early', trackingOn
       ? 'If you are out of bed for 30 minutes in the last 90 before your wake time, the bed goes back to your base.'
       : 'Needs Biometrics.', !trackingOn || !value.warmUp) }

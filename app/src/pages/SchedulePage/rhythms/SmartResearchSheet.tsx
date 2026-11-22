@@ -66,8 +66,9 @@ const PHASES: Phase[] = [
   },
   {
     heading: 'Before you wake',
-    does: 'With Warm-up on, the bed warms gently over the last 30 to 45 minutes before your wake time (less for a short or '
-      + 'daytime sleep), then goes back to your base 30 minutes after it. This happens with or without an alarm.',
+    does: 'With Warm-up on, the bed warms over the last 30 to 45 minutes before your wake time (less for a short or '
+      + 'daytime sleep). To base ends at your base. Above base ends a little above it, then goes back to your base 30 '
+      + 'minutes after your wake time. This happens with or without an alarm.',
     why: 'This step is there so you wake to a comfortable bed. Studies have not shown that it makes waking easier. It is kept '
       + 'short because warming the bed for much of the night made sleep more broken in one study.',
     sources: [

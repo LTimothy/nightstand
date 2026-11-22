@@ -18,6 +18,9 @@ export const SmartScheduleSchema = z.object({
   warmStart: z.boolean(),
   warmUp: z.boolean(),
   upEarly: z.boolean(),
+  // Warm-up ends at the base instead of above it. Stored only when set; older
+  // releases drop it on read and warm above the base.
+  warmUpTo: z.literal('base').optional(),
   // Turn off when the person gets up. Stored only when on; 3.5.0 drops it on
   // read and turns off at the set time.
   offWhenUp: z.boolean().optional(),

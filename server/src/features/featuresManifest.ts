@@ -1319,6 +1319,23 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'Always on: a save is a few bytes, and a setting you just changed should survive a power cut.',
   },
   {
+    id: 'warm-up-to-base',
+    title: 'Warm-up to base',
+    description: 'Smart Schedule\'s Warm-up before wake can end at the base temperature instead of above it.',
+    category: 'platform',
+    version: '3.11.0',
+    flag: null,
+    default: 'n/a',
+    touchpoints: [
+      'server/src/db/smartCurve.ts', 'server/src/db/rhythmsSchema.ts', 'app/src/pages/SchedulePage/rhythms/SmartScheduleControls.tsx',
+    ],
+    depends_on: ['rhythms'],
+    reversible: true,
+    tests: ['server/src/db/smartCurve.test.ts', 'app/src/pages/SchedulePage/rhythms/SmartScheduleControls.test.tsx'],
+    upstream_offer: false,
+    rationale: 'A choice inside each rhythm, not a switch: saved rhythms keep warming above the base until someone picks To base.',
+  },
+  {
     id: 'long-flash-commit',
     title: 'Write flash less often',
     description: 'Remounts /persistent so ext4 commits its journal every 60 s instead of 5 s. Off by default.',
