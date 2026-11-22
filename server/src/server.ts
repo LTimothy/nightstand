@@ -7,6 +7,7 @@ import { FrankenMonitor } from './8sleep/frankenMonitor.js';
 import { initWaterLevel } from './8sleep/waterLevel.js';
 import { startPresenceAutoOff, stopPresenceAutoOff } from './8sleep/presenceAutoOffMonitor.js';
 import { startButtonMonitor, stopButtonMonitor } from './8sleep/buttonMonitor.js';
+import { startCoverHealthMonitor, stopCoverHealthMonitor } from './8sleep/coverHealth.js';
 import { restoreBoosts } from './8sleep/boost.js';
 import './jobs/jobScheduler.js';
 import { abortAlarmWaits } from './jobs/alarmActivity.js';
@@ -99,6 +100,7 @@ async function gracefulShutdown(signal: string) {
     if (!config.remoteDevMode) {
       stopPresenceAutoOff();
       stopButtonMonitor();
+      stopCoverHealthMonitor();
       frankenMonitor?.stop();
       await disconnectFranken();
       logger.debug('Successfully closed Franken components.');
@@ -137,6 +139,7 @@ const initFrankenMonitor = async () => {
   startPresenceAutoOff();
   // Checks settings.features.coverButtons on every poll, so it always starts.
   startButtonMonitor();
+  startCoverHealthMonitor();
   void restoreBoosts();
 };
 
