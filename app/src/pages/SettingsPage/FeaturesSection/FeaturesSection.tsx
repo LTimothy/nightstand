@@ -258,7 +258,7 @@ export default function FeaturesSection() {
           checked={ features?.journalInMemory ?? false }
           onChange={ (next) => updateFeature({ journalInMemory: next }) }
           description={ 'Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
-            + 'Nightstand\'s logs are kept.' }
+            + 'Nightstand\'s logs are kept. Older system log files on flash are removed after that restart.' }
         />
         <FeatureToggleRow
           label="Write flash less often"

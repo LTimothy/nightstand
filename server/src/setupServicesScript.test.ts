@@ -310,6 +310,7 @@ describe('setup_services.sh', () => {
       'dac ALL=(root) NOPASSWD: /bin/systemctl enable --now free-sleep-stream.service',
       'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh memory',
       'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh disk',
+      'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh tidy',
       'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/flash_commit.sh long',
       'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/flash_commit.sh default',
       'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/cover_restore.sh',

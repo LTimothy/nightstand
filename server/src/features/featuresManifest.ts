@@ -1251,7 +1251,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   {
     id: 'journal-in-memory',
     title: 'Keep the system log in memory',
-    description: 'Keeps the systemd journal in RAM instead of on flash, from the next restart of the Pod. Off by default.',
+    description: 'Keeps the systemd journal in RAM instead of on flash, from the next restart of the Pod, then removes the old '
+      + 'journal files on flash. Off by default.',
     category: 'platform',
     version: '3.9.0',
     flag: 'journalInMemory',

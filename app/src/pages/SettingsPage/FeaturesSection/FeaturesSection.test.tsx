@@ -98,7 +98,7 @@ describe('FeaturesSection', () => {
     const toggle = await screen.findByRole('switch', { name: 'Keep the system log in memory' });
     expect(toggle).not.toBeChecked();
     expect(screen.getByText('Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
-      + 'Nightstand\'s logs are kept.')).toBeVisible();
+      + 'Nightstand\'s logs are kept. Older system log files on flash are removed after that restart.')).toBeVisible();
     await user.click(toggle);
     expect(posted).toEqual({ features: { journalInMemory: true } });
   });

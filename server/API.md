@@ -321,7 +321,9 @@ generic message; the details go to the server log.
   silent side, under the same limits.
   `journalInMemory` is Keep the system log in memory, off by default. Saving
   it runs `scripts/journal_storage.sh` through sudo, which writes or removes a
-  journald drop-in; the change applies at the next restart of the Pod.
+  journald drop-in; the change applies at the next restart of the Pod. While
+  the log is in memory and old journal files are left on flash, the server
+  runs `journal_storage.sh tidy` at startup and then hourly to remove them.
   `longFlashCommit` is Write flash less often, off by default. Saving it runs
   `scripts/flash_commit.sh` through sudo, which remounts `/persistent` with
   `commit=60` (on) or `commit=5` (off) at once. Nothing is saved on the Pod;

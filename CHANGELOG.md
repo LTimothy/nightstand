@@ -31,6 +31,11 @@ is a hard fork; for the history of the projects it descends from, see
   from about 1.0 to 0.6 GB a day, over two pairs of 60 minute windows with the
   bed idle. A power cut can lose up to the last minute of sensor recordings
   and logs.
+- With Settings > Features > Keep the system log in memory on, the old
+  system log files left on flash are removed after the restart that moves
+  the log to memory, once nothing has written to them for an hour. On the
+  maintainer's Pod 5 they took 1.1 GB. They cannot be restored; the folders
+  are kept. The update adds one sudoers rule.
 
 ### Changed
 
