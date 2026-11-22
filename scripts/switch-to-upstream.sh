@@ -508,6 +508,8 @@ if [ "$HEALTHY" = yes ]; then
     /etc/systemd/system/free-sleep-stream.service.d/10-nightstand-limits.conf \
     /etc/systemd/journald.conf.d/10-nightstand-memory.conf
   systemctl daemon-reload >/dev/null 2>&1 || true
+  # Upstream never changes the flash commit interval; 5 s is ext4's default.
+  mount -o remount,commit=5 /persistent 2>/dev/null || true
   # Upstream never turns on the hardware watchdog; take Nightstand's setting out.
   if [ -f "$NIGHTSTAND_SCRIPTS/setup_watchdog.sh" ]; then
     bash "$NIGHTSTAND_SCRIPTS/setup_watchdog.sh" --remove --switching || say "WARNING: could not remove the hardware watchdog setting"

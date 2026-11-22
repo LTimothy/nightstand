@@ -151,6 +151,7 @@ cleanup_nightstand_services() {
     "$SYSTEMD_DIR/free-sleep-stream.service.d/10-nightstand-limits.conf" \
     "$SYSTEMD_DIR/../journald.conf.d/10-nightstand-memory.conf"
   systemctl daemon-reload >/dev/null 2>&1 || true
+  mount -o remount,commit=5 /persistent 2>/dev/null || true
 }
 
 # Their stream comes back only if their Pod had it enabled. The migration

@@ -227,6 +227,8 @@ if [ "$HEALTHY" = yes ]; then
       bash "$NIGHTSTAND_SCRIPTS/setup_watchdog.sh" --remove --switching || say "WARNING: could not remove the hardware watchdog setting"
     fi
   fi
+  # A target with the flash switch reapplies its own setting at server start.
+  [ -f "$LIVE/scripts/flash_commit.sh" ] || mount -o remount,commit=5 /persistent 2>/dev/null || true
   follow_scripts
   say "SUCCESS: pod is serving v$TARGET_VERSION (rolled back from v$CUR_VERSION)"
   exit 0

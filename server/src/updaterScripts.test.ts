@@ -24,6 +24,14 @@ const SCRIPTS = [
 ];
 
 describe('updater shell scripts', () => {
+  it('update.sh puts the stock flash commit interval back after a healthy install of a release without the switch', () => {
+    const src = readFileSync(path.join(repoRoot, 'scripts/update.sh'), 'utf8');
+    const healthy = src.slice(src.indexOf('if [ "$HEALTHY" = yes ]; then'));
+    assert.match(healthy.slice(0, 400),
+      /\[ -f "\$LIVE\/scripts\/flash_commit\.sh" \] \|\| mount -o remount,commit=5 \/persistent 2>\/dev\/null \|\| true\n/);
+    assert.equal(src.match(/commit=5/g)?.length, 1, 'only after the health check passed');
+  });
+
   for (const script of SCRIPTS) {
     it(`${script} exists and parses (bash -n)`, () => {
       const full = path.join(repoRoot, script);

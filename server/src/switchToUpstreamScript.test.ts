@@ -80,6 +80,14 @@ describe('switch-to-upstream.sh', () => {
     assert.match(rest, /systemctl start free-sleep\b/);
   });
 
+  it('puts the stock flash commit interval back after a successful revert', () => {
+    const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
+    const successIdx = src.indexOf('if [ "$HEALTHY" = yes ]; then');
+    const rest = src.slice(successIdx, src.indexOf('  exit 0', successIdx));
+    assert.match(rest, /^ {2}mount -o remount,commit=5 \/persistent 2>\/dev\/null \|\| true$/m);
+    assert.equal(src.match(/commit=5/g)?.length, 1, 'only after the health check passed');
+  });
+
   it('removes fork-only systemd units after a successful revert', () => {
     const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
     const successIdx = src.indexOf('if [ "$HEALTHY" = yes ]; then');
