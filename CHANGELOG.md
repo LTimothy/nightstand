@@ -40,6 +40,10 @@ is a hard fork; for the history of the projects it descends from, see
   base. To base warms back only to your base temperature by your wake time,
   for a gentler morning; Above base is the warm-up as before, and saved
   rhythms keep it.
+- Bed > Tonight shows No alarm coming up, with Add one-time alarm, when
+  neither a recurring nor a one-time alarm is coming up for that side. It
+  opens the one-time alarm in a sheet on Bed, and the one-time alarm's Edit
+  opens the same sheet instead of going to Schedule.
 
 ### Changed
 

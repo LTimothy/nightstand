@@ -23,6 +23,7 @@ vi.mock('@api/schedules.ts', () => ({ useSchedules: () => ({ data: { left: { mon
   power: { enabled: true, on: fixture.on, off: '09:00', onTemperature: 82 }, temperatures: { '22:00': 70 },
 } } } }) }));
 vi.mock('./AlarmNotification', () => ({ default: () => null }));
+vi.mock('./OneOffAlarmLine', () => ({ default: () => null }));
 vi.mock('./useBedSleeps', () => ({ useBedSleeps: () => fixture.bed }));
 afterEach(() => {
   vi.restoreAllMocks();

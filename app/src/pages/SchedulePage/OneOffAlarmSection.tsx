@@ -25,7 +25,9 @@ function localInputToIso(localStr: string, tz: string): string {
   return m.isValid() ? m.format() : '';
 }
 
-export default function OneOffAlarmSection() {
+type Props = { startEnabled?: boolean; onSaved?: () => void };
+
+export default function OneOffAlarmSection({ startEnabled = false, onSaved }: Props = {}) {
   const { side } = useAppStore();
   const isUpdating = useAppStore(state => state.isUpdating);
   const { data: settings, refetch } = useSettings();
@@ -48,13 +50,13 @@ export default function OneOffAlarmSection() {
     if (!settings) return;
     const o = settings[side]?.oneOffAlarm;
     if (!o) return;
-    setEnabled(o.enabled);
+    setEnabled(startEnabled || o.enabled);
     setFireAtLocal(isoToLocalInput(o.fireAt, settings.timeZone ?? 'UTC'));
     setIntensity(o.vibrationIntensity);
     // An empty fireAt means no one-time alarm was ever saved, so its stored pattern is an old default.
     setPattern(o.fireAt ? o.vibrationPattern as Pattern : 'double');
     setDuration(o.duration);
-  }, [settings, side]);
+  }, [settings, side, startEnabled]);
 
   if (!settings) return null;
 
@@ -87,6 +89,7 @@ export default function OneOffAlarmSection() {
       });
       await refetch();
       setSaved(true);
+      onSaved?.();
     } catch (err) {
       console.error(err);
       setSaveError('Could not save the one-time alarm. Your changes are still here. Try again.');
@@ -109,7 +112,7 @@ export default function OneOffAlarmSection() {
       <Typography variant="body2" color="text.secondary">
         Rings once for <bdi>{ name }</bdi>, then turns off.
         { settings.features?.alarmsWhenOff ? '' : ' Rings only if this side is on at that time.' }
-        { ' ' }Saved separately from this schedule.
+        { ' ' }Saved separately from the schedule.
       </Typography>
 
       <FormControlLabel

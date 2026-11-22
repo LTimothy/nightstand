@@ -46,6 +46,7 @@ vi.mock('@api/schedules.ts', () => ({ useSchedules: () => ({ data: { left: { mon
   power: { enabled: true, on: '22:00', off: '07:00', onTemperature: 82 }, temperatures: {},
 } } } }) }));
 vi.mock('./AlarmNotification', () => ({ default: () => 'Alarm row' }));
+vi.mock('./OneOffAlarmLine', () => ({ default: () => null }));
 vi.mock('./useBedSleeps', () => ({ useBedSleeps: () => fixture.bed }));
 vi.mock('@api/deviceStatus.ts', () => ({
   useDeviceStatus: () => ({ data: undefined }),

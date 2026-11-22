@@ -3,20 +3,16 @@ import { Alert, Box, Button, Typography } from '@mui/material';
 import NotificationsNone from '@mui/icons-material/NotificationsNone';
 import { palette, sx as shared } from '@design/tokens';
 import { useAppStore } from '@state/appStore.tsx';
-import { useSchedules } from '@api/schedules.ts';
 import { useSettings } from '@api/settings.ts';
 import { useEffect, useState } from 'react';
 import AlarmOverride from './AlarmOverride.tsx';
 import AlarmDisabledDialog from './AlarmDisabledDialog.tsx';
-import { nextAlarmNight } from './AlarmNight';
-import { alarmNightFromSleeps } from './sleepEvents';
-import { useBedSleeps } from './useBedSleeps';
+import { useAlarmNight } from './useAlarmNight';
 
 export default function AlarmNotification() {
   const { side } = useAppStore();
-  const { data: schedules } = useSchedules();
   const { data: settings } = useSettings();
-  const bed = useBedSleeps(side);
+  const { night } = useAlarmNight(side);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [disabledOpen, setDisabledOpen] = useState(false);
   const [alarmTimeLocalOverride, setAlarmTimeLocalOverride] = useState('');
@@ -31,12 +27,8 @@ export default function AlarmNotification() {
     setDisabledOpen(false);
   }, [side]);
 
-  if (!settings || settings[side].alarmsEnabled === false || settings[side].awayMode) return null;
+  if (!settings || !night) return null;
   const override = settings[side].scheduleOverrides.alarm;
-  const searchFrom = moment.tz(settings.timeZone);
-  const night = bed.state === 'rhythms' ? alarmNightFromSleeps(bed.sleeps, settings.timeZone, searchFrom, override)
-    : bed.state === 'legacy' && schedules ? nextAlarmNight(schedules[side], settings.timeZone, searchFrom, override) : undefined;
-  if (!night) return null;
   const expires = moment(override.expiresAt);
   const hasOverride = !!override.expiresAt && expires.isBetween(night.start, night.end, undefined, '(]');
   const disabled = hasOverride && override.disabled;

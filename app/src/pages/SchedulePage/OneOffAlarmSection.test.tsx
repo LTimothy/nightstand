@@ -126,7 +126,7 @@ describe('Save while the alarm is off', () => {
 it('says it rings only if the side is on at that time', async () => {
   renderWithProviders(<OneOffAlarmSection/>);
   expect(await screen.findByText(/Rings once for/)).toHaveTextContent(
-    'Rings once for Alex, then turns off. Rings only if this side is on at that time. Saved separately from this schedule.',
+    'Rings once for Alex, then turns off. Rings only if this side is on at that time. Saved separately from the schedule.',
   );
 });
 
@@ -136,7 +136,7 @@ it('leaves out the side-on sentence while alarms ring with the side off', async 
   server.use(http.get('*/settings', () => HttpResponse.json(settings)));
   renderWithProviders(<OneOffAlarmSection/>);
   expect(await screen.findByText(/Rings once for/)).toHaveTextContent(
-    'Rings once for Alex, then turns off. Saved separately from this schedule.',
+    'Rings once for Alex, then turns off. Saved separately from the schedule.',
   );
 });
 
