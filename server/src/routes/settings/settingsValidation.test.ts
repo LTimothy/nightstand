@@ -160,6 +160,17 @@ describe('POST /settings features.journalInMemory', () => {
   });
 });
 
+describe('POST /settings features.coverAutoRestore', () => {
+  it('is off by default', () => {
+    assert.equal(defaultFeatures.coverAutoRestore, false);
+  });
+  it('accepts the switch and rejects a non-boolean', async () => {
+    assert.equal((await postSettings({ features: { coverAutoRestore: true } })).status, 200);
+    assert.equal((await postSettings({ features: { coverAutoRestore: false } })).status, 200);
+    assert.equal((await postSettings({ features: { coverAutoRestore: 'yes' } })).status, 400);
+  });
+});
+
 describe('POST /settings features.targetTemperatureLabels', () => {
   it('is off by default', () => {
     assert.equal(defaultFeatures.targetTemperatureLabels, false);

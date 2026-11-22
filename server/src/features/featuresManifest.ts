@@ -1266,6 +1266,41 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
       + 'explains a crash or a watchdog reset. Nightstand\'s own logs stay on flash.',
   },
   {
+    id: 'cover-health',
+    title: 'Cover sensors check',
+    description: 'Shows on System status when one side of a Pod 5 style cover sends no readings for 10 minutes.',
+    category: 'safety',
+    version: '3.11.0',
+    flag: null,
+    default: 'n/a',
+    touchpoints: ['server/src/8sleep/coverHealth.ts', 'server/src/8sleep/rawFiles.ts', 'app/src/pages/StatusPage/statusMeta.ts'],
+    depends_on: [],
+    reversible: true,
+    tests: ['server/src/8sleep/coverHealth.test.ts', 'app/src/pages/StatusPage/StatusRow.test.tsx'],
+    upstream_offer: true,
+    rationale: 'Always on: a read-only check of the RAW files once a minute that sends nothing to the Pod. '
+      + 'The restart button on the row only runs when you press it.',
+  },
+  {
+    id: 'cover-auto-restore',
+    title: 'Restart the cover service on its own',
+    description: 'When one side of the cover goes quiet for 10 minutes, restarts the firmware cover service, '
+      + 'at most once an hour and never near an alarm. Off by default.',
+    category: 'safety',
+    version: '3.11.0',
+    flag: 'coverAutoRestore',
+    default: false,
+    touchpoints: [
+      'scripts/cover_restore.sh', 'scripts/setup_services.sh', 'server/src/jobs/coverRestore.ts',
+      'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+    ],
+    depends_on: ['cover-health'],
+    reversible: true,
+    tests: ['server/src/coverRestoreScript.test.ts', 'server/src/jobs/coverRestore.test.ts'],
+    upstream_offer: false,
+    rationale: 'Optional: it restarts a firmware service while someone may be asleep, so it waits for an explicit opt-in.',
+  },
+  {
     id: 'target-temperature-labels',
     title: 'Show the Pod\'s target temperatures',
     description: 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '

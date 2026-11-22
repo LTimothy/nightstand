@@ -32,6 +32,22 @@ describe('FEATURES_MANIFEST', () => {
     }
   });
 
+  it('lists the cover check as always on and its automatic restart off by default, needing it', () => {
+    const check = FEATURES_MANIFEST.find((candidate) => candidate.id === 'cover-health');
+    const auto = FEATURES_MANIFEST.find((candidate) => candidate.id === 'cover-auto-restore');
+    assert.ok(check && auto, 'cover entries are missing');
+    assert.equal(check.flag, null);
+    assert.equal(auto.flag, 'coverAutoRestore');
+    assert.equal(auto.default, false);
+    assert.deepEqual(auto.depends_on, ['cover-health']);
+    for (const entry of [check, auto]) {
+      assert.equal(entry.version, '3.11.0');
+      for (const file of [...entry.touchpoints, ...entry.tests]) {
+        assert.ok(existsSync(path.join(repoRoot, file)), `${file} does not exist`);
+      }
+    }
+  });
+
   it('lists suggestions from hand changes behind their own flag, needing Rhythms', () => {
     const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === 'rhythm-suggestions');
     assert.ok(entry, 'rhythm-suggestions has no featuresManifest entry');

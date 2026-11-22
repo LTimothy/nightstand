@@ -4,6 +4,7 @@ import moment from 'moment-timezone';
 
 import config from '../config.js';
 import logger from '../logger.js';
+import settingsDB from '../db/settings.js';
 import type { Side } from '../db/schedulesSchema.js';
 import { Version } from '../routes/deviceStatus/deviceStatusSchema.js';
 import { lastDeviceStatus } from '../8sleep/lastDeviceStatus.js';
@@ -111,7 +112,11 @@ export type RestoreDeps = {
   run: () => Promise<void>;
   autoOn: () => Promise<boolean>;
 };
-const defaultDeps: RestoreDeps = { gather: gatherContext, run: runScript, autoOn: async () => false };
+const autoOn = async () => {
+  await settingsDB.read();
+  return settingsDB.data.features.coverAutoRestore;
+};
+const defaultDeps: RestoreDeps = { gather: gatherContext, run: runScript, autoOn };
 
 export async function restoreCover(source: Source, deps: Partial<RestoreDeps> = {}, verdict = coverVerdict()): Promise<void> {
   const { gather, run } = { ...defaultDeps, ...deps };
