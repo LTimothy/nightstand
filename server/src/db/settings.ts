@@ -2,7 +2,7 @@ import { createSerializedUpdate } from './serializedUpdate.js';
 // LowDB, stores the schedules in /persistent/free-sleep-data/lowdb/settingsDB.json
 import _ from 'lodash';
 import { Low } from 'lowdb';
-import { JSONFile } from 'lowdb/node';
+import { DurableJSONFile } from './durableFile.js';
 
 import { Settings, SideSettings, defaultFeatures } from './settingsSchema.js';
 import config from '../config.js';
@@ -86,7 +86,7 @@ const defaultData: Settings = {
   features: { ...defaultFeatures },
 };
 
-const file = new JSONFile<Settings>(`${config.lowDbFolder}settingsDB.json`);
+const file = new DurableJSONFile<Settings>(`${config.lowDbFolder}settingsDB.json`);
 const settingsDB = new Low<Settings>(file, defaultData);
 const stored = await file.read();
 // No file, or only the update channel install.sh and the migration installer write before the first start.

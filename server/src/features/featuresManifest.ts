@@ -1301,6 +1301,21 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'Optional: it restarts a firmware service while someone may be asleep, so it waits for an explicit opt-in.',
   },
   {
+    id: 'durable-settings-writes',
+    title: 'Saved settings survive a power cut',
+    description: 'Settings, schedules and Rhythms are flushed to flash as soon as they are saved.',
+    category: 'safety',
+    version: '3.11.0',
+    flag: null,
+    default: true,
+    touchpoints: ['server/src/db/durableFile.ts', 'server/src/db/settings.ts', 'server/src/db/schedules.ts', 'server/src/db/rhythms.ts'],
+    depends_on: [],
+    reversible: true,
+    tests: ['server/src/db/durableFile.test.ts'],
+    upstream_offer: false,
+    rationale: 'Always on: a save is a few bytes, and a setting you just changed should survive a power cut.',
+  },
+  {
     id: 'target-temperature-labels',
     title: 'Show the Pod\'s target temperatures',
     description: 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '

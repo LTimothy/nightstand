@@ -2,7 +2,7 @@ import { createSerializedUpdate } from './serializedUpdate.js';
 // LowDB, stores the schedules in /persistent/free-sleep-data/lowdb/schedulesDB.json
 import _ from 'lodash';
 import { Low } from 'lowdb';
-import { JSONFile } from 'lowdb/node';
+import { DurableJSONFile } from './durableFile.js';
 import { DailySchedule, Schedules, SideSchedule } from './schedulesSchema.js';
 import { dailyAlarmSchedules } from './scheduleAlarms.js';
 import config from '../config.js';
@@ -43,7 +43,7 @@ const defaultData: Schedules = {
   right: _.cloneDeep(defaultSideSchedule),
 };
 
-const file = new JSONFile<Schedules>(`${config.lowDbFolder}schedulesDB.json`);
+const file = new DurableJSONFile<Schedules>(`${config.lowDbFolder}schedulesDB.json`);
 const schedulesDB = new Low<Schedules>(file, defaultData);
 await schedulesDB.read();
 // Allows us to add default values to the schedules if users have existing schedulesDB.json data
