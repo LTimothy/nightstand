@@ -101,7 +101,9 @@ class FirmwareDelivery:
         for sample in records:
             if sample['kind'] == 'thermostat' and not any(self.flags.get(key) is True for key in ('firmwareTargetReadout', 'coolingWarning')):
                 continue
-            if sample['kind'] in ('water', 'pump') and self.flags.get('coolingWarning') is not True:
+            if sample['kind'] == 'water' and not any(self.flags.get(key) is True for key in ('coolingWarning', 'firmwareTargetReadout')):
+                continue
+            if sample['kind'] == 'pump' and self.flags.get('coolingWarning') is not True:
                 continue
             button = sample['kind'] == 'tap' and sample.get('origin') == 'buttonEvent'
             if sample['kind'] == 'tap' and not button and self.flags.get('tapDiagnostics') is not True:

@@ -22,6 +22,9 @@ is a hard fork; for the history of the projects it descends from, see
 - Settings > Features > Restart the cover service on its own, Pod 5 hub
   only and off by default, runs that restart by itself once per silent
   side, under the same limits.
+- System status > Firmware target now also shows each side's measured water
+  temperature, when Firmware target is on. The idea comes from
+  [jalen-cheng](https://github.com/jalen-cheng)'s SevenSleep fork.
 
 ### Changed
 

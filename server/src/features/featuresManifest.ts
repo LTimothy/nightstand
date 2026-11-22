@@ -56,9 +56,11 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
   },
   {
     id: 'firmware-target-readout', title: 'Firmware target',
-    description: 'Shows the thermostat target reported by firmware, separately from the legacy temperature controls.',
+    description: 'Shows the thermostat target reported by firmware, and the measured water temperature, separately from '
+      + 'the legacy temperature controls.',
     category: 'ui', version: '3.7.0', flag: 'firmwareTargetReadout', default: false,
-    touchpoints: ['biometrics/firmware_telemetry.py', 'server/src/firmware', 'app/src/pages/StatusPage/FirmwarePanel.tsx'],
+    touchpoints: ['biometrics/firmware_telemetry.py', 'server/src/firmware', 'app/src/pages/StatusPage/FirmwarePanel.tsx',
+      'app/src/pages/StatusPage/FirmwareReadout.tsx'],
     depends_on: ['biometrics'], reversible: true,
     tests: ['server/src/firmware/firmwareTelemetry.test.ts', 'app/src/pages/StatusPage/FirmwarePanel.test.tsx'],
     upstream_offer: true, rationale: 'Optional readout. Stored temperatures and outgoing commands keep their existing convention.',

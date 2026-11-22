@@ -10,9 +10,10 @@ import type { FirmwareSnapshot } from '@api/firmware';
 
 const cooling = { state: 'unavailable', active: false, notice: false, message: '', since: undefined };
 function snapshot(availability: string, sensorFresh: boolean, targets: FirmwareSnapshot['targets'],
-  reported = { target: true, health: true }): FirmwareSnapshot {
-  return { availability, sensorFresh, targets, interrupted: false, incidents: [], taps: [], cooling: { left: cooling, right: cooling },
-    reported };
+  reported = { target: true, health: true },
+  water: FirmwareSnapshot['water'] = { left: { state: 'unavailable' }, right: { state: 'unavailable' } }): FirmwareSnapshot {
+  return { availability, sensorFresh, targets, water, interrupted: false, incidents: [], taps: [],
+    cooling: { left: cooling, right: cooling }, reported };
 }
 
 it('shows an independent firmware target to a tenth in Fahrenheit', () => {
@@ -25,6 +26,18 @@ it('shows an independent firmware target to a tenth in Fahrenheit', () => {
   expect(screen.getByText('Left firmware target: 77.1°F')).toBeInTheDocument();
   expect(screen.getByText('Right firmware target: Off')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Firmware target', level: 2 })).toBeInTheDocument();
+});
+it('shows the measured water next to the target', () => {
+  const water: FirmwareSnapshot['water'] = { left: { state: 'available', waterC: 23.5 }, right: { state: 'unavailable' } };
+  const targets: FirmwareSnapshot['targets'] = { left: { state: 'available', targetC: 25 }, right: { state: 'unavailable' } };
+  const { unmount } = renderWithProviders(<FirmwareReadout
+    data={ snapshot('Monitoring active', true, targets, undefined, water) }
+    format="fahrenheit"/>);
+  expect(screen.getByText('Left water now: 74.3°F')).toBeInTheDocument();
+  expect(screen.getByText('Right water now: Unavailable')).toBeInTheDocument();
+  unmount();
+  renderWithProviders(<FirmwareReadout data={ snapshot('Monitoring active', true, targets, undefined, water) } format="celsius"/>);
+  expect(screen.getByText('Left water now: 23.5°C')).toBeInTheDocument();
 });
 it('distinguishes stale, unavailable and monitoring off', () => {
   renderWithProviders(<FirmwareReadout

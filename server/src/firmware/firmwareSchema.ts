@@ -85,3 +85,9 @@ export interface FirmwareTarget {
   targetC?: number;
   timestamp?: number;
 }
+
+export interface FirmwareWater {
+  state: 'available' | 'stale' | 'unavailable';
+  waterC?: number;
+  timestamp?: number;
+}

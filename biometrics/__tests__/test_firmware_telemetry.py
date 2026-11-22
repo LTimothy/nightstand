@@ -92,6 +92,15 @@ class DeliveryBoundsTest(unittest.TestCase):
         delivery.ingest({'type': 'tap-gesture', 'ts': 100, 'side': 'left', 'taps': 3}, 'RAW', 100)
         self.assertTrue(delivery.pending.empty())
 
+    def test_forwards_water_for_target_readout(self):
+        delivery = self.delivery({'firmwareTargetReadout': True})
+        delivery.ingest({'type': 'frzTemp', 'ts': 100, 'left': 2350, 'right': 2400}, 'RAW', 100)
+        kinds = [delivery.pending.get_nowait()['kind'] for _ in range(delivery.pending.qsize())]
+        self.assertEqual(kinds, ['water', 'water'])
+        off = self.delivery({})
+        off.ingest({'type': 'frzTemp', 'ts': 100, 'left': 2350}, 'RAW', 100)
+        self.assertTrue(off.pending.empty())
+
     def test_each_kind_requires_its_own_flag(self):
         delivery = self.delivery({'tapDiagnostics': True})
         delivery.ingest({'type': 'log', 'ts': 100, 'msg': 'FS_WRITE_FAIL: 1'}, 'RAW', 100)

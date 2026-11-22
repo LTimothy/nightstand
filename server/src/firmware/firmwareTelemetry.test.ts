@@ -291,3 +291,24 @@ it('reports which firmware readings this Pod sends and keeps them across stream 
   store.ingest(FirmwareBatchSchema.parse({ session: 'b'.repeat(32), records: [pump] }), flags, 110);
   assert.deepEqual(store.snapshot(flags, true, 9999).reported, { target: true, health: true });
 });
+
+const water = (timestamp = 100, waterC: number | null = 23.5) => ({ kind: 'water' as const, side: 'left' as const, waterC,
+  timestamp, receivedAt: timestamp, source: 'RAW' as const, sequence: 1, index: 0 });
+it('reports water with the target readout on', () => {
+  const store = new FirmwareTelemetry();
+  store.ingest({ session: 'a'.repeat(32), records: [water()] }, features, 100);
+  assert.deepEqual(store.snapshot(features, true, 100).water.left, { state: 'available', waterC: 23.5, timestamp: 100 });
+  assert.equal(store.snapshot({ ...features, firmwareTargetReadout: false }, true, 100).water.left.state, 'unavailable');
+  assert.equal(store.snapshot(features, false, 100).water.left.state, 'unavailable');
+});
+it('reports unavailable with no water record or no reading', () => {
+  const store = new FirmwareTelemetry();
+  assert.deepEqual(store.snapshot(features, true, 100).water.right, { state: 'unavailable' });
+  store.ingest({ session: 'a'.repeat(32), records: [water(100, null)] }, features, 100);
+  assert.deepEqual(store.snapshot(features, true, 100).water.left, { state: 'unavailable' });
+});
+it('marks an old water reading stale', () => {
+  const store = new FirmwareTelemetry();
+  store.ingest({ session: 'a'.repeat(32), records: [water()] }, features, 100);
+  assert.equal(store.snapshot(features, true, 161).water.left.state, 'stale');
+});

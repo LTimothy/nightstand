@@ -4,6 +4,7 @@ import { unitOf, type TemperatureFormat } from '@lib/temperatureConversions';
 
 export default function FirmwareReadout({ data, format }: { data: FirmwareSnapshot; format: TemperatureFormat }) {
   const celsius = unitOf(format) === 'celsius';
+  const degrees = (valueC: number) => `${(celsius ? valueC : valueC * 9 / 5 + 32).toFixed(1)}°${celsius ? 'C' : 'F'}`;
   return <Paper variant="outlined" sx={ { p: 2 } }>
     <Stack spacing={ 1 }>
       <Typography component="h2" variant="h6">Firmware target</Typography>
@@ -16,6 +17,12 @@ export default function FirmwareReadout({ data, format }: { data: FirmwareSnapsh
         const value = sample.state === 'disabled' ? 'Off' : sample.state === 'unavailable' ? 'Unavailable'
           : `${target}${sample.state === 'stale' ? ' (stale)' : ''}`;
         return <Typography key={ side }>{ side === 'left' ? 'Left' : 'Right' } firmware target: { value }</Typography>;
+      }) }
+      { (['left', 'right'] as const).map(side => {
+        const reading = data.water?.[side];
+        const value = !reading || reading.state === 'unavailable' || !Number.isFinite(reading.waterC) ? 'Unavailable'
+          : `${degrees(reading.waterC!)}${reading.state === 'stale' ? ' (stale)' : ''}`;
+        return <Typography key={ `water-${side}` }>{ side === 'left' ? 'Left' : 'Right' } water now: { value }</Typography>;
       }) }
     </Stack>
   </Paper>;
