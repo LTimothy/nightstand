@@ -1318,6 +1318,25 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'Always on: a save is a few bytes, and a setting you just changed should survive a power cut.',
   },
   {
+    id: 'long-flash-commit',
+    title: 'Write flash less often',
+    description: 'Remounts /persistent so ext4 commits its journal every 60 s instead of 5 s. Off by default.',
+    category: 'platform',
+    version: '3.11.0',
+    flag: 'longFlashCommit',
+    default: false,
+    touchpoints: [
+      'scripts/flash_commit.sh', 'scripts/setup_services.sh', 'server/src/jobs/flashCommit.ts',
+      'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+    ],
+    depends_on: [],
+    reversible: true,
+    tests: ['server/src/flashCommitScript.test.ts', 'server/src/jobs/flashCommit.test.ts'],
+    upstream_offer: false,
+    rationale: 'Optional: on a Pod 5 with the system log in memory, writes to /persistent fell from about 1.0 to '
+      + '0.6 GB a day, but a power cut can lose up to the last minute of sensor recordings and logs.',
+  },
+  {
     id: 'target-temperature-labels',
     title: 'Show the Pod\'s target temperatures',
     description: 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '

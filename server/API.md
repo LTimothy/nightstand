@@ -219,6 +219,7 @@ generic message; the details go to the server log.
     "coverAutoRestore": false,
     "logoClickBuzz": false,
     "journalInMemory": false,
+    "longFlashCommit": false,
     "targetTemperatureLabels": false,
     "alarmsWhenOff": false
   }
@@ -321,6 +322,11 @@ generic message; the details go to the server log.
   `journalInMemory` is Keep the system log in memory, off by default. Saving
   it runs `scripts/journal_storage.sh` through sudo, which writes or removes a
   journald drop-in; the change applies at the next restart of the Pod.
+  `longFlashCommit` is Write flash less often, off by default. Saving it runs
+  `scripts/flash_commit.sh` through sudo, which remounts `/persistent` with
+  `commit=60` (on) or `commit=5` (off) at once. Nothing is saved on the Pod;
+  the server applies it again when it starts. A power cut can lose up to the
+  last minute of sensor recordings and logs.
   `targetTemperatureLabels` is Show the Pod's target temperatures, off by default,
   for a Pod 5. It only changes how the app labels temperatures.
   `alarmsWhenOff` is Ring alarms when the side is off, off by default. With it

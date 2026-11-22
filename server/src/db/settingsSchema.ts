@@ -141,6 +141,8 @@ export const defaultFeatures = {
   logoClickBuzz: false,
   // The systemd journal in RAM (scripts/journal_storage.sh), from the next restart.
   journalInMemory: false,
+  // /persistent commits its ext4 journal every 60 s instead of 5 (scripts/flash_commit.sh).
+  longFlashCommit: false,
   targetTemperatureLabels: false,
   // Alarms ring on a side that is off (alarmScheduler.ts).
   alarmsWhenOff: false,
@@ -165,6 +167,7 @@ const FeaturesSchema = z.object({
   coverAutoRestore: z.boolean(),
   logoClickBuzz: z.boolean(),
   journalInMemory: z.boolean(),
+  longFlashCommit: z.boolean(),
   targetTemperatureLabels: z.boolean(),
   alarmsWhenOff: z.boolean(),
 }).strict();

@@ -68,10 +68,10 @@ it('counts new sleep tracking once it is on', async () => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, biometricsV2: true } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('5 of 13 on')).toBeVisible();
+  expect(await screen.findByText('5 of 14 on')).toBeVisible();
 });
 
-it.each([['Pod 4', 12], ['Pod 5', 13]])('leaves cover buttons out of the count on a %s hub', async (hubVersion, total) => {
+it.each([['Pod 4', 13], ['Pod 5', 14]])('leaves cover buttons out of the count on a %s hub', async (hubVersion, total) => {
   const settings = getSettings();
   server.use(
     http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion })),
@@ -114,7 +114,7 @@ it('does not count dependent feature switches while biometrics is off', async ()
   const services = getServices();
   server.use(http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('2 of 13 on')).toBeVisible();
+  expect(await screen.findByText('2 of 14 on')).toBeVisible();
 });
 
 it('counts capacitance presence on other Pods only while new sleep tracking is on', async () => {
@@ -130,7 +130,7 @@ it('leaves capacitance presence on other Pods out of the count on a Pod 5', asyn
     ...settings, features: { ...settings.features, biometricsV2: true, uncheckedCapPresence: true },
   })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('5 of 13 on')).toBeVisible();
+  expect(await screen.findByText('5 of 14 on')).toBeVisible();
 });
 
 it('counts the target temperature labels on a Pod 5 and not on a Pod 4', async () => {
@@ -158,7 +158,7 @@ it('does not count Cooling warning while Biometrics is off', async () => {
     http.get('*/services', () => HttpResponse.json({ ...services, biometrics: { ...services.biometrics, enabled: false } })),
   );
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('2 of 13 on')).toBeVisible();
+  expect(await screen.findByText('2 of 14 on')).toBeVisible();
 });
 
 it('counts retention as off when future deletions are disabled', async () => {
@@ -167,7 +167,7 @@ it('counts retention as off when future deletions are disabled', async () => {
     ...settings, features: { ...settings.features, metricsLowDiskProtection: false },
   })));
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
-  expect(await screen.findByText('3 of 13 on')).toBeVisible();
+  expect(await screen.findByText('3 of 14 on')).toBeVisible();
 });
 
 

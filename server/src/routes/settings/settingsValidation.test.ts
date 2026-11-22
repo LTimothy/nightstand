@@ -23,6 +23,10 @@ const journalSyncs: boolean[] = [];
 mock.module(new URL('../../jobs/journalStorage.js', import.meta.url).href, {
   namedExports: { syncJournalStorage: async (inMemory: boolean) => { journalSyncs.push(inMemory); } },
 });
+const commitSyncs: boolean[] = [];
+mock.module(new URL('../../jobs/flashCommit.js', import.meta.url).href, {
+  namedExports: { syncFlashCommit: async (long: boolean) => { commitSyncs.push(long); } },
+});
 
 let settingsRouter: express.Router;
 
@@ -168,6 +172,17 @@ describe('POST /settings features.coverAutoRestore', () => {
     assert.equal((await postSettings({ features: { coverAutoRestore: true } })).status, 200);
     assert.equal((await postSettings({ features: { coverAutoRestore: false } })).status, 200);
     assert.equal((await postSettings({ features: { coverAutoRestore: 'yes' } })).status, 400);
+  });
+});
+
+describe('POST /settings features.longFlashCommit', () => {
+  it('is off by default and syncs the mount only when the switch is in the update', async () => {
+    assert.equal(defaultFeatures.longFlashCommit, false);
+    commitSyncs.length = 0;
+    assert.equal((await postSettings({ features: { longFlashCommit: true } })).status, 200);
+    assert.equal((await postSettings({ features: { coverButtons: false } })).status, 200);
+    assert.equal((await postSettings({ features: { longFlashCommit: false } })).status, 200);
+    assert.deepEqual(commitSyncs, [true, false]);
   });
 });
 

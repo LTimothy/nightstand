@@ -25,6 +25,12 @@ is a hard fork; for the history of the projects it descends from, see
 - System status > Firmware target now also shows each side's measured water
   temperature, when Firmware target is on. The idea comes from
   [jalen-cheng](https://github.com/jalen-cheng)'s SevenSleep fork.
+- Settings > Features > Write flash less often, off by default, has the Pod's
+  data partition commit its file system journal every 60 seconds instead of 5.
+  On a Pod 5 with the system log kept in memory, writes to that partition fell
+  from about 1.0 to 0.6 GB a day, over two pairs of 60 minute windows with the
+  bed idle. A power cut can lose up to the last minute of sensor recordings
+  and logs.
 
 ### Changed
 

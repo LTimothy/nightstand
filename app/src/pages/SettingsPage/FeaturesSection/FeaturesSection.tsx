@@ -260,6 +260,13 @@ export default function FeaturesSection() {
           description={ 'Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
             + 'Nightstand\'s logs are kept.' }
         />
+        <FeatureToggleRow
+          label="Write flash less often"
+          disabled={ isUpdating || features?.longFlashCommit === undefined }
+          checked={ features?.longFlashCommit ?? false }
+          onChange={ (next) => updateFeature({ longFlashCommit: next }) }
+          description="Fewer flash writes. A power cut can lose up to the last minute of sensor recordings and logs."
+        />
       </Section>
       { rhythmsDialog === 'enable' && <EnableRhythmsDialog
         onClose={ () => setRhythmsDialog(undefined) }

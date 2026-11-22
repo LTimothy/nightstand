@@ -256,6 +256,9 @@ RULES=(
   # The Keep the system log in memory switch, with exactly these two arguments.
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh memory"
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh disk"
+  # The Write flash less often switch, with exactly these two arguments.
+  "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/flash_commit.sh long"
+  "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/flash_commit.sh default"
   # The Cover sensors restart on System status, with no arguments.
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/cover_restore.sh"
 )

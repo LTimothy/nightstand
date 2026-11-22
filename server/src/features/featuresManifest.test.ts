@@ -32,6 +32,14 @@ describe('FEATURES_MANIFEST', () => {
     }
   });
 
+  it('lists the longer flash commit off by default in 3.11.0', () => {
+    const entry = FEATURES_MANIFEST.find((candidate) => candidate.id === 'long-flash-commit');
+    assert.ok(entry, 'long-flash-commit has no featuresManifest entry');
+    assert.equal(entry.flag, 'longFlashCommit');
+    assert.equal(entry.default, false);
+    assert.equal(entry.version, '3.11.0');
+  });
+
   it('lists the cover check as always on and its automatic restart off by default, needing it', () => {
     const check = FEATURES_MANIFEST.find((candidate) => candidate.id === 'cover-health');
     const auto = FEATURES_MANIFEST.find((candidate) => candidate.id === 'cover-auto-restore');

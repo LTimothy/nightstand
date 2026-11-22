@@ -27,6 +27,7 @@ import settingsDB from './db/settings.js';
 import { syncRawArchiveConf } from './jobs/rawArchiveConf.js';
 import { syncBiometrics } from './jobs/biometricsSync.js';
 import { syncJournalStorage } from './jobs/journalStorage.js';
+import { syncFlashCommit } from './jobs/flashCommit.js';
 
 const port = 3000;
 const app = express();
@@ -165,6 +166,8 @@ async function startServer() {
   void syncBiometrics();
   // A reset or a hand edit can leave the drop-in out of step with the switch.
   void syncJournalStorage(settingsDB.data.features.journalInMemory);
+  // The remount does not survive a restart of the Pod.
+  void syncFlashCommit(settingsDB.data.features.longFlashCommit);
 
   // Initialize Franken once before listening
   if (!config.remoteDevMode) {

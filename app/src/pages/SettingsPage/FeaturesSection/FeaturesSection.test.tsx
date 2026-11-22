@@ -36,7 +36,9 @@ describe('FeaturesSection', () => {
     expect(within(tracking).getByRole('combobox', { name: 'Keep raw sensor recordings' })).toBeVisible();
     expect(within(tracking).getByText('Sleep analysis reads these. About 0.4 GB a day. '
       + 'Oldest removed first if storage runs low.')).toBeVisible();
-    expect(switchNames(storage)).toEqual(['Low-disk protection', 'Delete detail after 30 days', 'Keep the system log in memory']);
+    expect(switchNames(storage)).toEqual([
+      'Low-disk protection', 'Delete detail after 30 days', 'Keep the system log in memory', 'Write flash less often',
+    ]);
   });
 
   it.each([['Presence auto-off'], ['New sleep tracking (beta)'], ['Capacitance presence (beta)'], ['Cooling warning']])(
@@ -99,6 +101,20 @@ describe('FeaturesSection', () => {
       + 'Nightstand\'s logs are kept.')).toBeVisible();
     await user.click(toggle);
     expect(posted).toEqual({ features: { journalInMemory: true } });
+  });
+
+  it('commits flash at the stock interval by default and posts longFlashCommit when it is switched on', async () => {
+    let posted: unknown;
+    server.use(http.post('*/api/settings', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({});
+    }));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: 'Write flash less often' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText('Fewer flash writes. A power cut can lose up to the last minute of sensor recordings and logs.')).toBeVisible();
+    await user.click(toggle);
+    expect(posted).toEqual({ features: { longFlashCommit: true } });
   });
 
   it("offers the Pod's target temperatures on a Pod 5 only", async () => {
