@@ -7,7 +7,7 @@ import StatusChip from './StatusChip.tsx';
 import { postJobs, JobSchema, Jobs } from '@api/jobs.ts';
 import { useCalibration } from '@api/calibration.ts';
 import { Link } from 'react-router-dom';
-import { isConflict } from '@lib/requestError.ts';
+import { isConflict, serverMessage } from '@lib/requestError.ts';
 import { useId, useState } from 'react';
 import { palette, weight } from '@design/tokens';
 import { STATUS_META, GENERIC_MEANING, statusName } from './statusMeta.ts';
@@ -25,7 +25,7 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
   const meaning = meta.meaning?.[statusInfo.status] ?? GENERIC_MEANING[statusInfo.status];
   const timestamp = statusInfo.timestamp && moment(statusInfo.timestamp).format('MMM D, h:mm A');
   // @ts-expect-error - JobSchema only covers the subset of status keys that are runnable
-  const isRunnable = JobSchema.options.includes(job);
+  const isRunnable = JobSchema.options.includes(job) && (job !== 'coverHealth' || statusInfo.coverRestore?.available === true);
   const { data: calibration } = useCalibration();
   const calibrationSide = job === 'biometricsCalibrationLeft'
     ? 'left'
@@ -34,13 +34,16 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
   const [request, setRequest] = useState<'idle' | 'pending' | 'accepted' | 'queued' | 'failed'>('idle');
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [requestedTimestamp, setRequestedTimestamp] = useState<string>();
+  const [refusal, setRefusal] = useState<string>();
   const actionLabel = meta.runLabel ?? `Run ${statusInfo.name}`;
   const newStatus = statusInfo.timestamp !== undefined && statusInfo.timestamp !== requestedTimestamp;
   let feedback: string | undefined;
   if (request === 'failed') feedback = 'Could not start this job. Try again.';
   else if (request === 'pending') feedback = 'Sending request...';
-  else if (request === 'queued') feedback = 'Already queued or running.';
-  else if (request === 'accepted') {
+  else if (request === 'queued') feedback = refusal ?? 'Already queued or running.';
+  else if (request === 'accepted' && job === 'coverHealth') {
+    feedback = 'Restarted. On a Pod 5 this brought the cover back within about 2 minutes.';
+  } else if (request === 'accepted') {
     if (statusInfo.status === 'started') feedback = 'Running.';
     else if (newStatus && statusInfo.status === 'healthy') feedback = 'Completed, as reported by the server.';
     else if (newStatus && statusInfo.status === 'failed') feedback = `Job failed: ${statusInfo.message || 'Check the logs and try again.'}`;
@@ -56,6 +59,7 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
       await postJobs([job] as Jobs);
       setRequest('accepted');
     } catch (failure) {
+      setRefusal(job === 'coverHealth' ? serverMessage(failure) : undefined);
       setRequest(isConflict(failure) ? 'queued' : 'failed');
     }
   };
@@ -87,6 +91,9 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
           : (statusInfo.status === 'healthy' || job === 'bootRescue') && statusInfo.message ? statusInfo.message : meaning }
       </Typography>
 
+      { statusInfo.coverRestore?.note && (
+        <Typography sx={ { fontSize: '0.8125rem', color: palette.text.secondary, mt: 0.5 } }>{ statusInfo.coverRestore.note }</Typography>
+      ) }
       { (job === 'franken' || job === 'express') && <Typography variant="caption" color="text.secondary">{ statusInfo.name }</Typography> }
       { job === 'biometricsInstallation' && statusInfo.status === 'not_started' && (
         <Button component={ Link } to="/settings/features">Set up in Features</Button>

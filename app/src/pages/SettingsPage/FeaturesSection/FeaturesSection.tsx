@@ -159,6 +159,14 @@ export default function FeaturesSection() {
           description={ 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
             + 'Schedules are unchanged. No effect in Level format.' }
         /> }
+        { deviceStatus?.hubVersion === Version.Pod5 && <FeatureToggleRow
+          label="Restart the cover service on its own"
+          disabled={ isUpdating || features?.coverAutoRestore === undefined }
+          checked={ features?.coverAutoRestore ?? false }
+          onChange={ (next) => updateFeature({ coverAutoRestore: next }) }
+          description={ 'When one side of the cover sends no readings for 10 minutes, Nightstand restarts the Pod\'s cover service. '
+            + 'At most once an hour, never near an alarm.' }
+        /> }
       </Section>
       <Section title="Sleep tracking">
         <Box id="biometrics" tabIndex={ -1 } />

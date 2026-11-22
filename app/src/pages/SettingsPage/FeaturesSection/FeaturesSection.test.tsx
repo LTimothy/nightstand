@@ -114,6 +114,28 @@ describe('FeaturesSection', () => {
     expect(posted).toEqual({ features: { targetTemperatureLabels: true } });
   });
 
+  it('offers the automatic cover service restart on a Pod 5, off by default', async () => {
+    let posted: unknown;
+    server.use(http.post('*/api/settings', async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({});
+    }));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: 'Restart the cover service on its own' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText('When one side of the cover sends no readings for 10 minutes, Nightstand restarts the Pod\'s cover service. '
+      + 'At most once an hour, never near an alarm.')).toBeVisible();
+    await user.click(toggle);
+    expect(posted).toEqual({ features: { coverAutoRestore: true } });
+  });
+
+  it.each(['Pod 3', 'Pod 4'])('hides the automatic cover service restart on a %s hub', async model => {
+    server.use(http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: model })));
+    renderWithProviders(<FeaturesSection />);
+    await screen.findByRole('switch', { name: 'One-time alarm' });
+    expect(screen.queryByRole('switch', { name: 'Restart the cover service on its own' })).toBeNull();
+  });
+
   it("hides the Pod's target temperatures on a Pod 4", async () => {
     onPod4();
     renderWithProviders(<FeaturesSection />);
@@ -125,7 +147,7 @@ describe('FeaturesSection', () => {
     renderWithProviders(<FeaturesSection />);
     const everyday = await screen.findByRole('region', { name: 'Everyday' });
     expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm',
-      'Ring alarms when the side is off', "Show the Pod's target temperatures"]);
+      'Ring alarms when the side is off', "Show the Pod's target temperatures", 'Restart the cover service on its own']);
     expect(within(everyday).getByText('Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
       + 'Schedules are unchanged. No effect in Level format.')).toBeVisible();
     expect(within(everyday).getByText('Adds a one-time alarm to Schedule, separate from the daily wake-up. '

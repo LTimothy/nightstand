@@ -162,6 +162,13 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
     group: 'core',
     blurb: 'Whether serial rescue still works',
   },
+  coverHealth: {
+    group: 'core',
+    blurb: 'Checks once a minute that both sides of the cover are sending readings. The cover\'s buttons and bed sensors depend on them.',
+    meaning: { healthy: 'Both sides of the cover are reporting.', waiting_for_data: 'No cover readings in the last few minutes.' },
+    runLabel: 'Restart the cover service',
+    runHint: 'Restarts the Pod\'s cover service. It runs at most once an hour and never near an alarm.',
+  },
   hardwareWatchdog: {
     group: 'core',
     blurb: 'Restarts the Pod within about 30 seconds if its system freezes.',
@@ -203,9 +210,10 @@ export function usableStatusKeys(data?: ServerStatus): ServerStatusKey[] {
     .filter(key => !!STATUS_META[key] && StatusInfoSchema.safeParse(data[key]).success) : [];
 }
 
-// Boot rescue is read about five minutes after boot and is not a running service, so it never holds up readiness.
+// Boot rescue is read about five minutes after boot and is not a running service, and the cover check
+// reports the cover rather than a service, so neither holds up readiness.
 export const CORE_KEYS: ServerStatusKey[] = (Object.keys(STATUS_META) as ServerStatusKey[])
-  .filter(key => STATUS_META[key].group === 'core' && key !== 'bootRescue');
+  .filter(key => STATUS_META[key].group === 'core' && key !== 'bootRescue' && key !== 'coverHealth');
 
 export function coreServicesReady(data?: ServerStatus): boolean {
   return CORE_KEYS.every(key => StatusInfoSchema.safeParse(data?.[key]).success && data?.[key]?.status === 'healthy');
@@ -228,6 +236,7 @@ export function statusName(key: ServerStatusKey, info?: StatusInfo): string {
   if (key === 'biometricsCalibrationRight') return 'Right presence calibration';
   if (key === 'express') return 'Web server';
   if (key === 'franken') return 'Hardware link';
+  if (key === 'coverHealth') return 'Cover sensors';
   return info?.name ?? key;
 }
 
@@ -240,5 +249,6 @@ export function statusImpact(key: ServerStatusKey): string {
   if (key === 'database') return 'Settings and sleep history may be unavailable.';
   if (key === 'bootRescue') return 'Check the boot settings below before restarting the Pod.';
   if (key === 'systemDate') return 'Scheduled changes may run at the wrong time.';
+  if (key === 'coverHealth') return 'One side of the cover may not respond to buttons. Heating and cooling still work.';
   return STATUS_META[key].meaning?.failed ?? STATUS_META[key].blurb;
 }

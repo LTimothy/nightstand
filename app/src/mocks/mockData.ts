@@ -483,6 +483,12 @@ const createServerStatus = (): ServerStatus => ({
     description: 'Reads ignored cover clicks from the RAW files',
     message: 'Off in Settings > Bed and sides > Cover buttons',
   },
+  coverHealth: {
+    name: 'Cover sensors',
+    status: 'healthy',
+    description: 'Checks that both sides of the cover are sending readings',
+    message: 'Both sides of the cover are reporting.',
+  },
   jobs: {
     name: 'Job scheduler',
     status: 'healthy',

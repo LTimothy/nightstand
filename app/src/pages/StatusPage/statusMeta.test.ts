@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { getServerStatus } from '../../mocks/mockData';
-import { CORE_KEYS, STATUS_META, coreServicesReady, overdueCoreKeys } from './statusMeta';
+import { CORE_KEYS, STATUS_META, coreServicesReady, overdueCoreKeys, statusImpact, statusName } from './statusMeta';
 
 it('uses the server start time and waits two minutes before warning', () => {
   const data = getServerStatus();
@@ -18,10 +18,12 @@ it('uses the server start time and waits two minutes before warning', () => {
 
 it('requires every core service in the metadata to be ready', () => {
   expect(CORE_KEYS).toEqual(Object.keys(STATUS_META)
-    .filter(key => STATUS_META[key as keyof typeof STATUS_META].group === 'core' && key !== 'bootRescue'));
+    .filter(key => STATUS_META[key as keyof typeof STATUS_META].group === 'core' && key !== 'bootRescue' && key !== 'coverHealth'));
   const data = getServerStatus();
   expect(coreServicesReady(data)).toBe(true);
   expect(coreServicesReady({ ...data, bootRescue: { ...data.bootRescue, status: 'not_started' } })).toBe(true);
+  expect(CORE_KEYS).not.toContain('coverHealth');
+  expect(coreServicesReady({ ...data, coverHealth: { ...data.coverHealth!, status: 'failed' } })).toBe(true);
   expect(coreServicesReady({ ...data, pumpHealthLeft: { ...data.pumpHealthLeft!, status: 'not_started' } })).toBe(false);
 });
 
@@ -33,4 +35,9 @@ it('describes the biometrics add-on without naming HRV', () => {
 
 it('uses the short boot rescue subtitle', () => {
   expect(STATUS_META.bootRescue.blurb).toBe('Whether serial rescue still works');
+});
+
+it('names the cover check and its impact', () => {
+  expect(statusName('coverHealth')).toBe('Cover sensors');
+  expect(statusImpact('coverHealth')).toBe('One side of the cover may not respond to buttons. Heating and cooling still work.');
 });

@@ -70,3 +70,43 @@ describe('status text', () => {
     expect(screen.queryByText('Boot settings not read yet.')).not.toBeInTheDocument();
   });
 });
+
+describe('cover sensors', () => {
+  const silent = {
+    name: 'Cover sensors', status: 'failed', description: '', timestamp: '2026-09-28T06:00:00Z',
+    message: 'The right side of the cover has sent no readings since 1:05 AM. Its buttons and bed sensors may not respond. '
+      + 'Heating and cooling are not affected.',
+  } as const;
+
+  it('offers the restart only when the server allows it, and posts it', async () => {
+    let posted: unknown;
+    server.use(http.post('*/jobs', async ({ request }) => { posted = await request.json(); return new HttpResponse(null, { status: 204 }); }));
+    const { user } = renderWithProviders(
+      <StatusRow job="coverHealth" statusInfo={ { ...silent, coverRestore: { available: true, note: '' } } } divider={ false }/>);
+    expect(screen.getByText(/The right side of the cover has sent no readings/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Restart the cover service' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Restarted.');
+    expect(posted).toEqual(['coverHealth']);
+  });
+
+  it('shows the note without a button when the restart cannot run', () => {
+    const note = 'Not while an alarm is ringing or due in the next 10 minutes.';
+    renderWithProviders(<StatusRow job="coverHealth" statusInfo={ { ...silent, coverRestore: { available: false, note } } } divider={ false }/>);
+    expect(screen.getByText(note)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Restart the cover service' })).not.toBeInTheDocument();
+  });
+
+  it('shows no button while healthy', () => {
+    renderWithProviders(<StatusRow job="coverHealth" statusInfo={ { ...silent, status: 'healthy', message: '' } } divider={ false }/>);
+    expect(screen.getByText('Both sides of the cover are reporting.')).toBeVisible();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('shows why the server refused a restart', async () => {
+    server.use(http.post('*/jobs', () => HttpResponse.json({ message: 'Not while the Pod is priming.' }, { status: 409 })));
+    const { user } = renderWithProviders(
+      <StatusRow job="coverHealth" statusInfo={ { ...silent, coverRestore: { available: true, note: '' } } } divider={ false }/>);
+    await user.click(screen.getByRole('button', { name: 'Restart the cover service' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Not while the Pod is priming.');
+  });
+});
