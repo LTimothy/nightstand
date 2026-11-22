@@ -28,7 +28,7 @@ mock.module('child_process', { namedExports: {
     else callback((denied || (startFailed && !args.includes('-l'))) ? new Error('denied') : null, '');
   },
 } });
-const { assertOperationsIdle, OperationBusyError } = await import('./privilegedCommand.js');
+const { assertOperationsIdle, holdOperations, OperationBusyError } = await import('./privilegedCommand.js');
 const { triggerUpdateService } = await import('./update.js');
 const { triggerRollbackService } = await import('./rollback.js');
 const { triggerRevertToStockService } = await import('./revertToStock.js');
@@ -166,4 +166,24 @@ it('allows the synchronous biometrics stop longer than the systemd stop deadline
   const stopIndex = calls.findIndex(args => args[0] === 'sudo' && !args.includes('-l'));
   assert.ok(timeouts[stopIndex] > 90_000);
   assert.equal(timeouts[stopIndex], 120_000);
+});
+
+it('holds off updates and a second hold while held work runs, after checking no operation is running', async () => {
+  loadState = 'loaded'; denied = false; startFailed = false; activeUnit = '';
+  let release!: () => void;
+  const held = holdOperations(() => new Promise<void>(resolve => { release = resolve; }));
+  await new Promise(resolve => setImmediate(resolve));
+  await assert.rejects(async () => triggerUpdateService(), OperationBusyError);
+  await assert.rejects(async () => holdOperations(async () => {}), OperationBusyError);
+  release();
+  await held;
+  await assert.doesNotReject(async () => assertOperationsIdle());
+});
+
+it('does not run held work while an update unit is active', async () => {
+  activeUnit = 'free-sleep-update.service';
+  let ran = false;
+  await assert.rejects(async () => holdOperations(async () => { ran = true; }), OperationBusyError);
+  assert.equal(ran, false);
+  await assert.doesNotReject(async () => { activeUnit = ''; await holdOperations(async () => {}); });
 });

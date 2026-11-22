@@ -66,7 +66,7 @@ describe('cover health', () => {
     const end = lastReal + 10 * MIN;
     assert.deepEqual(await verdictOf(timeline(T0, end, pick), end), { kind: 'silent', side: 'right', since: lastReal });
     const early = lastReal + 10 * MIN - 1000;
-    assert.deepEqual(await verdictOf(timeline(T0, early, pick), early), { kind: 'ok' });
+    assert.deepEqual(await verdictOf(timeline(T0, early, pick), early), { kind: 'ok', stale: true });
   });
 
   it('stays ok through short placeholder runs and a minute with 11 percent of them', async () => {
@@ -96,10 +96,15 @@ describe('cover health', () => {
     const startedAt = T0 + 30 * MIN;
     const pick = (): [number[], number[]] => [REAL, NONE];
     const at9 = startedAt + 9 * MIN;
-    assert.deepEqual(await verdictOf(timeline(startedAt - MIN, at9, pick), at9, startedAt), { kind: 'ok' });
+    assert.deepEqual(await verdictOf(timeline(startedAt - MIN, at9, pick), at9, startedAt), { kind: 'ok', stale: true });
     const at10 = startedAt + 10 * MIN;
     assert.deepEqual(await verdictOf(timeline(startedAt - MIN, at10, pick), at10, startedAt),
       { kind: 'silent', side: 'right', since: startedAt });
+  });
+
+  it('calls a 2 to 5 minute gap in the records ok but stale', async () => {
+    const end = T0 + 10 * MIN;
+    assert.deepEqual(await verdictOf(timeline(T0, end, bothReal), end + 3 * MIN), { kind: 'ok', stale: true });
   });
 
   it('waits for data when records stop for 5 minutes', async () => {

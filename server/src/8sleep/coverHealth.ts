@@ -26,7 +26,8 @@ export type CapSample = { at: number; left: 'real' | 'none'; right: 'real' | 'no
 export type SideState = { lastRealAt: number | null; lastSampleAt: number | null };
 export type CoverState = { startedAt: number; left: SideState; right: SideState; format: CapFormat | null };
 export type Verdict =
-  | { kind: 'ok' }
+  // stale: a side has sent no real reading lately, so a silence may not be over.
+  | { kind: 'ok'; stale?: true }
   | { kind: 'silent'; side: Side; since: number }
   | { kind: 'bothSilent'; since: number }
   | { kind: 'noRecords' }
@@ -117,7 +118,7 @@ export function judge(state: CoverState, now: number): Verdict {
   if (state.format !== 'capSense2') return { kind: 'notApplicable' };
   const newest = Math.max(state.left.lastSampleAt ?? -Infinity, state.right.lastSampleAt ?? -Infinity);
   if (now - newest >= NO_RECORDS_MS) return { kind: 'noRecords' };
-  if (now - newest > REPORTING_MS) return { kind: 'ok' };
+  if (now - newest > REPORTING_MS) return { kind: 'ok', stale: true };
   const since = (side: Side) => state[side].lastRealAt ?? state.startedAt;
   const silent = (side: Side) => now - since(side) >= SILENT_MS;
   const reporting = (side: Side) => now - (state[side].lastRealAt ?? -Infinity) <= REPORTING_MS;
@@ -125,7 +126,7 @@ export function judge(state: CoverState, now: number): Verdict {
   for (const side of SIDES) {
     if (silent(side) && reporting(other(side))) return { kind: 'silent', side, since: since(side) };
   }
-  return { kind: 'ok' };
+  return reporting('left') && reporting('right') ? { kind: 'ok' } : { kind: 'ok', stale: true };
 }
 
 const NAME = 'Cover sensors';

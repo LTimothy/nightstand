@@ -73,6 +73,20 @@ export async function admitReboot() {
   }
 }
 
+// Keeps updates, rollbacks, switches and reboots from starting while `work`
+// runs, once no operation is running; for root work that must not overlap them.
+export async function holdOperations<T>(work: () => Promise<T>): Promise<T> {
+  if (rebootPending()) throw new OperationBusyError(POD_RESTARTING);
+  if (operationStarting) throw new OperationBusyError(OPERATION_RUNNING);
+  operationStarting = true;
+  try {
+    await assertOperationUnitsIdle();
+    return await work();
+  } finally {
+    operationStarting = false;
+  }
+}
+
 export function releaseRebootLatch() {
   rebootIssuedAt = undefined;
 }

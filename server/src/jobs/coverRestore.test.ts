@@ -82,6 +82,7 @@ function fakePod(overrides: Partial<RestoreContext> = {}, { autoOn = false, fail
         if (fails) throw new Error('restart failed');
       },
       autoOn: async () => autoOn,
+      hold: async (work: () => Promise<void>) => { await work(); },
     },
     age: (ms: number) => { if (stamp !== null) stamp -= ms; },
   };
@@ -152,4 +153,27 @@ describe('restoreCover', () => {
     await assert.rejects(restore.restoreCover('button', pod.deps, silent), /^Error: Restarted at|Restarted at/);
     assert.equal(pod.runs.length, 1);
   });
+});
+
+it('does not count a restart the operation hold refused as tried', async () => {
+  restore.resetCoverRestore();
+  const pod = fakePod();
+  const silent: Verdict = { kind: 'silent', side: 'left', since: Date.now() - 20 * 60_000 };
+  await assert.rejects(restore.restoreCover('button', { ...pod.deps, hold: async () => { throw new Error('An update is running'); } }, silent),
+    /An update is running/);
+  assert.equal(pod.runs.length, 0);
+  await restore.restoreCover('button', pod.deps, silent);
+  assert.equal(pod.runs.length, 1);
+});
+
+it('remembers a restart that did not help across a gap in the records', async () => {
+  restore.resetCoverRestore();
+  const pod = fakePod({}, { autoOn: true });
+  const silent: Verdict = { kind: 'silent', side: 'left', since: Date.now() - 20 * 60_000 };
+  await restore.evaluateRestore(silent, pod.deps);
+  assert.equal(pod.runs.length, 1);
+  await restore.evaluateRestore({ kind: 'ok', stale: true }, pod.deps);
+  pod.age(2 * 60 * 60_000);
+  await restore.evaluateRestore(silent, pod.deps);
+  assert.equal(pod.runs.length, 1, 'no second automatic restart');
 });

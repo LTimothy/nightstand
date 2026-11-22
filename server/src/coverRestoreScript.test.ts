@@ -8,15 +8,18 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = path.join(repoRoot, 'scripts/cover_restore.sh');
+const OPERATION_CHECKS = ['free-sleep-update.service', 'free-sleep-rollback.service', 'free-sleep-revert.service']
+  .map(unit => `show ${unit} --property=ActiveState --value`);
 
-// A fake systemctl that records its arguments and reports the unit as `loadState`.
-function box({ loadState = 'loaded', restartExit = 0, logDir = 'logs' } = {}) {
+// A fake systemctl that records its arguments, reports frank as `loadState` and the operation units as `operationState`.
+function box({ loadState = 'loaded', restartExit = 0, logDir = 'logs', operationState = 'inactive' } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-cover-restore-'));
   const logs = path.join(dir, logDir);
   const calls = path.join(dir, 'calls');
   const systemctl = path.join(dir, 'systemctl');
   writeFileSync(systemctl, `#!/bin/bash\necho "$*" >> "${calls}"\n`
-    + `if [ "$1" = show ]; then echo ${loadState}; exit 0; fi\nexit ${restartExit}\n`, { mode: 0o755 });
+    + `if [ "$1" = show ] && [ "$2" = frank.service ]; then echo ${loadState}; exit 0; fi\n`
+    + `if [ "$1" = show ]; then echo ${operationState}; exit 0; fi\nexit ${restartExit}\n`, { mode: 0o755 });
   const env = { ...process.env, NIGHTSTAND_OPS_LOG_DIR: logs, NIGHTSTAND_SYSTEMCTL: systemctl };
   const run = (...args: string[]) => spawnSync('bash', [SCRIPT, ...args], { env, encoding: 'utf8' });
   const read = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8') : '');
@@ -57,7 +60,7 @@ describe('cover_restore.sh', () => {
     const t = box();
     mkdirSync(t.logs);
     assert.equal(t.run().status, 0);
-    assert.deepEqual(t.calls(), ['show frank.service --property=LoadState --value', 'restart frank.service']);
+    assert.deepEqual(t.calls(), ['show frank.service --property=LoadState --value', ...OPERATION_CHECKS, 'restart frank.service']);
     assert.ok(existsSync(t.stamp));
     assert.equal(t.log().length, 2);
     assert.match(t.log()[0], /restarting frank\.service$/);
@@ -96,5 +99,27 @@ describe('cover_restore.sh', () => {
     assert.equal(linked.run().status, 1);
     assert.deepEqual(linked.calls(), []);
     assert.equal(existsSync(path.join(real, 'cover-restore.stamp')), false);
+  });
+
+  it('refuses while an update, rollback or revert is running, or when that cannot be checked', () => {
+    for (const operationState of ['activating', 'active', 'deactivating', '']) {
+      const t = box({ operationState });
+      mkdirSync(t.logs);
+      assert.equal(t.run().status, 1, operationState);
+      assert.equal(t.calls().filter(call => call.startsWith('restart')).length, 0, operationState);
+      assert.equal(existsSync(t.stamp), false);
+      assert.match(t.log().at(-1) ?? '', /refused: free-sleep-update\.service is /);
+    }
+  });
+
+  it('refuses without restarting when the stamp cannot be written', () => {
+    const t = box();
+    mkdirSync(t.logs, { mode: 0o555 });
+    assert.equal(t.run().status, 1);
+    assert.equal(t.calls().filter(call => call.startsWith('restart')).length, 0);
+  });
+
+  it('runs with a fixed PATH, not the caller\'s', () => {
+    assert.match(readFileSync(SCRIPT, 'utf8'), /^export PATH="\/usr\/sbin:\/sbin:\/usr\/bin:\/bin"$/m);
   });
 });

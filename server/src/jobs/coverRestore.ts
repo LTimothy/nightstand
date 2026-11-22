@@ -14,7 +14,7 @@ import { activeAlarms, hasSnooze } from './activeAlarms.js';
 import { alarmStarting } from './alarmScheduler.js';
 import { alarmActivityWithin } from './alarmActivity.js';
 import { alarmsDueWithin } from './alarmLedger.js';
-import { OperationBusyError, assertOperationsIdle, rebootPending, runPrivilegedCommand } from './privilegedCommand.js';
+import { OperationBusyError, assertOperationsIdle, holdOperations, rebootPending, runPrivilegedCommand } from './privilegedCommand.js';
 
 export const COVER_RESTORE_STAMP = '/persistent/nightstand-logs/cover-restore.stamp';
 export const ALARM_GUARD_MS = 10 * 60_000;
@@ -111,15 +111,16 @@ export type RestoreDeps = {
   gather: (verdict: Verdict, source: Source) => Promise<RestoreContext>;
   run: () => Promise<void>;
   autoOn: () => Promise<boolean>;
+  hold: (work: () => Promise<void>) => Promise<void>;
 };
 const autoOn = async () => {
   await settingsDB.read();
   return settingsDB.data.features.coverAutoRestore;
 };
-const defaultDeps: RestoreDeps = { gather: gatherContext, run: runScript, autoOn };
+const defaultDeps: RestoreDeps = { gather: gatherContext, run: runScript, autoOn, hold: holdOperations };
 
 export async function restoreCover(source: Source, deps: Partial<RestoreDeps> = {}, verdict = coverVerdict()): Promise<void> {
-  const { gather, run } = { ...defaultDeps, ...deps };
+  const { gather, run, hold } = { ...defaultDeps, ...deps };
   if (verdict.kind !== 'silent' && verdict.kind !== 'bothSilent') {
     throw new OperationBusyError('Both sides of the cover are reporting, so there is nothing to restart.');
   }
@@ -130,9 +131,12 @@ export async function restoreCover(source: Source, deps: Partial<RestoreDeps> = 
   }
   if (verdict.kind !== 'silent') return;
   logger.info(`[coverHealth] restarting frank (${source}): ${verdict.side} side silent since ${clock(verdict.since)}`);
-  triedAt = Date.now();
   try {
-    await run();
+    // Re-checked under the hold, so an update that started after gather cannot overlap the restart.
+    await hold(async () => {
+      triedAt = Date.now();
+      await run();
+    });
   } catch (error) {
     logger.warn(`[coverHealth] restart failed (${source}): ${error instanceof Error ? error.message : String(error)}`);
     throw error;
@@ -142,7 +146,8 @@ export async function restoreCover(source: Source, deps: Partial<RestoreDeps> = 
 // What the Cover sensors row offers, after an automatic restart when that is on and allowed.
 export async function evaluateRestore(verdict: Verdict, deps: Partial<RestoreDeps> = {}): Promise<RestoreInfo | null> {
   const all = { ...defaultDeps, ...deps };
-  if (verdict.kind === 'ok') triedAt = null;
+  // Only real readings from both sides end the episode; a gap in the records does not.
+  if (verdict.kind === 'ok' && !verdict.stale) triedAt = null;
   if (verdict.kind !== 'silent' && verdict.kind !== 'bothSilent') return null;
   let context = withEpisode(await all.gather(verdict, 'button'));
   if (verdict.kind === 'silent' && restoreBlocker({ ...context, source: 'auto' }) === null && await all.autoOn()) {
