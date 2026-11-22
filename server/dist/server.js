@@ -6,6 +6,7 @@ import { FrankenMonitor } from './8sleep/frankenMonitor.js';
 import { initWaterLevel } from './8sleep/waterLevel.js';
 import { startPresenceAutoOff, stopPresenceAutoOff } from './8sleep/presenceAutoOffMonitor.js';
 import { startButtonMonitor, stopButtonMonitor } from './8sleep/buttonMonitor.js';
+import { startCoverHealthMonitor, stopCoverHealthMonitor } from './8sleep/coverHealth.js';
 import { restoreBoosts } from './8sleep/boost.js';
 import './jobs/jobScheduler.js';
 import { abortAlarmWaits } from './jobs/alarmActivity.js';
@@ -22,7 +23,8 @@ import { wsServer } from './ws/wsServer.js';
 import settingsDB from './db/settings.js';
 import { syncRawArchiveConf } from './jobs/rawArchiveConf.js';
 import { syncBiometrics } from './jobs/biometricsSync.js';
-import { syncJournalStorage } from './jobs/journalStorage.js';
+import { startJournalTidy, syncJournalStorage } from './jobs/journalStorage.js';
+import { syncFlashCommit } from './jobs/flashCommit.js';
 const port = 3000;
 const app = express();
 let server;
@@ -91,6 +93,7 @@ async function gracefulShutdown(signal) {
         if (!config.remoteDevMode) {
             stopPresenceAutoOff();
             stopButtonMonitor();
+            stopCoverHealthMonitor();
             frankenMonitor?.stop();
             await disconnectFranken();
             logger.debug('Successfully closed Franken components.');
@@ -125,6 +128,7 @@ const initFrankenMonitor = async () => {
     startPresenceAutoOff();
     // Checks settings.features.coverButtons on every poll, so it always starts.
     startButtonMonitor();
+    startCoverHealthMonitor();
     void restoreBoosts();
 };
 // Main startup function
@@ -147,7 +151,10 @@ async function startServer() {
     void syncRawArchiveConf(settingsDB.data.rawArchiveRetentionDays);
     void syncBiometrics();
     // A reset or a hand edit can leave the drop-in out of step with the switch.
-    void syncJournalStorage(settingsDB.data.features.journalInMemory);
+    void syncJournalStorage(settingsDB.data.features.journalInMemory)
+        .then(() => startJournalTidy(() => settingsDB.data.features.journalInMemory));
+    // The remount does not survive a restart of the Pod.
+    void syncFlashCommit(settingsDB.data.features.longFlashCommit);
     // Initialize Franken once before listening
     if (!config.remoteDevMode) {
         void initFranken()

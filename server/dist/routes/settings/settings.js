@@ -10,6 +10,7 @@ import { GestureSchema, SettingsSchema } from '../../db/settingsSchema.js';
 import { changesRhythmsFlag, pauseRejection } from './settingsGuards.js';
 import { syncRawArchiveConf } from '../../jobs/rawArchiveConf.js';
 import { syncJournalStorage } from '../../jobs/journalStorage.js';
+import { syncFlashCommit } from '../../jobs/flashCommit.js';
 router.get('/settings', async (req, res) => {
     await settingsDB.read();
     res.json(settingsDB.data);
@@ -70,6 +71,9 @@ router.post('/settings', async (req, res) => {
         }
         if (validatedUpdate.features?.journalInMemory !== undefined) {
             await syncJournalStorage(draft.features.journalInMemory);
+        }
+        if (validatedUpdate.features?.longFlashCommit !== undefined) {
+            await syncFlashCommit(draft.features.longFlashCommit);
         }
     });
     if (conflict) {

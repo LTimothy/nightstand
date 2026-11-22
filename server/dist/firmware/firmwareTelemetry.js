@@ -41,7 +41,7 @@ export class FirmwareTelemetry {
                 this.reported.health = true;
             if (this.seen.size > 5000)
                 this.seen.delete(this.seen.values().next().value);
-            if (features.coolingWarning && record.kind === 'water'
+            if ((features.coolingWarning || features.firmwareTargetReadout) && record.kind === 'water'
                 && (!this.water[record.side] || record.timestamp > this.water[record.side].timestamp))
                 this.water[record.side] = record;
             if (features.coolingWarning && record.kind === 'pump'
@@ -118,9 +118,17 @@ export class FirmwareTelemetry {
                 targetC: sample.valid && sample.targetC !== null ? sample.targetC : undefined, timestamp: sample.timestamp,
             };
         }
+        const water = {};
+        for (const side of ['left', 'right']) {
+            const reading = features.firmwareTargetReadout && biometrics ? this.water[side] : undefined;
+            water[side] = !reading || reading.waterC === null ? { state: 'unavailable' } : {
+                state: now - reading.timestamp > FIRMWARE_FRESH_SECONDS ? 'stale' : 'available', waterC: reading.waterC,
+                timestamp: reading.timestamp,
+            };
+        }
         this.taps = this.taps.filter(item => now - item.timestamp <= 1800).slice(-1000);
         const health = this.health.snapshot(now);
-        return { availability: biometrics ? 'Monitoring active' : 'Monitoring unavailable', targets, cooling,
+        return { availability: biometrics ? 'Monitoring active' : 'Monitoring unavailable', targets, water, cooling,
             taps: features.tapDiagnostics ? this.taps.map(item => ({ ...item })) : [],
             incidents: features.firmwareHealth ? health.incidents : [], sensorFresh: biometrics && health.sensorFresh,
             interrupted: features.firmwareHealth && biometrics && health.interrupted, reported: { ...this.reported } };

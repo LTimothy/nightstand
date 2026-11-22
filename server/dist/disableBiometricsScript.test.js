@@ -21,7 +21,7 @@ exit 0
 `);
     chmodSync(systemctl, 0o755);
     const result = spawnSync('sh', [path.join(repoRoot, 'scripts/disable_biometrics.sh')], {
-        env: { ...process.env, PATH: `${dir}:${process.env.PATH}` }, encoding: 'utf8', timeout: 10_000,
+        env: { ...process.env, NIGHTSTAND_SYSTEMCTL: systemctl }, encoding: 'utf8', timeout: 10_000,
     });
     const log = existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n') : [];
     rmSync(dir, { recursive: true, force: true });

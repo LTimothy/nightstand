@@ -4,6 +4,7 @@ import { Low } from 'lowdb';
 import { TextFile } from 'lowdb/node';
 import config from '../config.js';
 import { createSerializedUpdate } from './serializedUpdate.js';
+import { syncToFlash } from './durableFile.js';
 import { responseSchema } from './responseSchema.js';
 import { RHYTHMS_FILE_VERSION, RhythmsDBSchema } from './rhythmsSchema.js';
 export class RhythmsStateError extends Error {
@@ -35,8 +36,9 @@ export function parseRhythms(text) {
     }
     return { state: 'ok', db: parsed.data };
 }
+const RHYTHMS_PATH = `${config.lowDbFolder}rhythmsDB.json`;
 class RhythmsFile {
-    #file = new TextFile(`${config.lowDbFolder}rhythmsDB.json`);
+    #file = new TextFile(RHYTHMS_PATH);
     async read() {
         return { text: await this.#file.read() };
     }
@@ -44,6 +46,7 @@ class RhythmsFile {
         if (data.text === null)
             throw new Error('Refusing to remove rhythmsDB.json');
         await this.#file.write(data.text);
+        await syncToFlash(RHYTHMS_PATH);
     }
 }
 const rhythmsFile = new Low(new RhythmsFile(), { text: null });

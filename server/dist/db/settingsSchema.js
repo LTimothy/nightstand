@@ -121,10 +121,14 @@ export const defaultFeatures = {
     rhythmSuggestions: true,
     // The buttons on a Pod 5 cover (buttonMonitor.ts). Off: no RAW file is read.
     coverButtons: false,
+    // Restarts the cover service when one side goes silent (jobs/coverRestore.ts).
+    coverAutoRestore: false,
     // A 3 s buzz that confirms a middle button press was applied (buzz.ts).
     logoClickBuzz: false,
     // The systemd journal in RAM (scripts/journal_storage.sh), from the next restart.
     journalInMemory: false,
+    // /persistent commits its ext4 journal every 60 s instead of 5 (scripts/flash_commit.sh).
+    longFlashCommit: false,
     targetTemperatureLabels: false,
     // Alarms ring on a side that is off (alarmScheduler.ts).
     alarmsWhenOff: false,
@@ -146,8 +150,10 @@ const FeaturesSchema = z.object({
     metricsLowDiskProtection: z.boolean(),
     rhythmSuggestions: z.boolean(),
     coverButtons: z.boolean(),
+    coverAutoRestore: z.boolean(),
     logoClickBuzz: z.boolean(),
     journalInMemory: z.boolean(),
+    longFlashCommit: z.boolean(),
     targetTemperatureLabels: z.boolean(),
     alarmsWhenOff: z.boolean(),
 }).strict();

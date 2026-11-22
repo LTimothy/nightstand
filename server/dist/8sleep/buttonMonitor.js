@@ -1,5 +1,4 @@
 import fsp from 'fs/promises';
-import path from 'path';
 import cbor from 'cbor';
 import moment from 'moment-timezone';
 import logger from '../logger.js';
@@ -17,15 +16,13 @@ import { handleAlarmTap } from './tapAlarm.js';
 import { startBoost } from './boost.js';
 import { buzz } from './buzz.js';
 import { ButtonEventMachine } from './buttonEvents.js';
-// Where the firmware writes its rolling RAW captures. Tests point it elsewhere.
-const RAW_DIR = process.env.POD_RAW_DIR || '/persistent';
+import { RAW_DIR, RECORD_START, findNewestRawFile } from './rawFiles.js';
 const POLL_MS = 1_000;
 // Avoid decoding large sensor chunks that happen to contain a matching tag.
 const MAX_TAGGED_CHUNK_BYTES = 16 * 1024;
 // Bound reads and incomplete records independently.
 const MAX_READ_CHUNK = 1 << 20;
 const MAX_CARRY_BYTES = 64 * 1024;
-const RECORD_START = Buffer.from([0xa2, 0x63, 0x73, 0x65, 0x71]);
 // Firmware batching can delay log records by 15 to 25 s.
 const MAX_PRESS_AGE_MS = 30_000;
 // A RAW file older than this is not being written: the firmware has stopped,
@@ -93,7 +90,7 @@ export class ButtonMonitor {
                 this.markStatus('healthy', 'Off in Settings > Bed and sides > Cover buttons');
                 return;
             }
-            const newest = await this.findNewestRawFile();
+            const newest = await findNewestRawFile();
             const firstPoll = this.firstPoll;
             if (firstPoll)
                 this.startedAt = Date.now();
@@ -134,37 +131,6 @@ export class ButtonMonitor {
         finally {
             this.inFlight = false;
         }
-    }
-    // The newest *.RAW by modification time. SEQNO.RAW is the firmware's
-    // sequence counter, not a capture.
-    async findNewestRawFile() {
-        let entries;
-        try {
-            entries = await fsp.readdir(RAW_DIR);
-        }
-        catch {
-            return null;
-        }
-        let newest = null;
-        let newestMtime = -Infinity;
-        for (const name of entries) {
-            if (!name.endsWith('.RAW') || name === 'SEQNO.RAW')
-                continue;
-            const full = path.join(RAW_DIR, name);
-            try {
-                const stats = await fsp.stat(full);
-                if (!stats.isFile())
-                    continue;
-                if (stats.mtimeMs > newestMtime) {
-                    newestMtime = stats.mtimeMs;
-                    newest = full;
-                }
-            }
-            catch {
-                // Rolled away between readdir and stat.
-            }
-        }
-        return newest;
     }
     // Reads the bytes appended since the last poll, parses the log records out
     // of them and acts on the button events.

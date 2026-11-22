@@ -64,6 +64,12 @@ describe('rollback_pod.sh', () => {
         assert.match(otherFork, /\/etc\/systemd\/journald\.conf\.d\/10-nightstand-memory\.conf/);
         assert.equal(success.match(/10-nightstand-memory/g)?.length, 1, 'a Nightstand target keeps the journal drop-in');
     });
+    it('puts the stock flash commit interval back after a healthy rollback to a tree without the switch', () => {
+        const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
+        const success = src.slice(src.indexOf('if [ "$HEALTHY" = yes ]; then'), src.indexOf('# --- swap back on failure'));
+        assert.match(success, /\[ -f "\$LIVE\/scripts\/flash_commit\.sh" \] \|\| mount -o remount,commit=5 \/persistent 2>\/dev\/null \|\| true\n/);
+        assert.equal(src.match(/commit=5/g)?.length, 1, 'only after the health check passed');
+    });
     it('leaves the rollback and revert units on the root-owned copy after a rollback to another fork', () => {
         const src = readFileSync(path.join(repoRoot, SCRIPT), 'utf8');
         const success = src.slice(src.indexOf('if [ "$HEALTHY" = yes ]; then'), src.indexOf('# --- swap back on failure'));

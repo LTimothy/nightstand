@@ -22,5 +22,7 @@ export const StatusInfoSchema = z.object({
     // Set on the database entry only: migrations this version ships that the
     // database never applied, which the Versions page offers to finish.
     unappliedMigrations: z.array(z.string()).optional(),
+    // Set on the Cover sensors entry only: whether its restart can run now, and why not.
+    coverRestore: z.object({ available: z.boolean(), note: z.string() }).optional(),
 });
 //# sourceMappingURL=serverStatusSchema.js.map

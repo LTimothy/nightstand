@@ -26,7 +26,7 @@ let operationStarting = false;
 // happened cannot block updates for good.
 const REBOOT_LATCH_MS = 5 * 60_000;
 let rebootIssuedAt;
-const rebootPending = () => rebootIssuedAt !== undefined && Date.now() - rebootIssuedAt < REBOOT_LATCH_MS;
+export const rebootPending = () => rebootIssuedAt !== undefined && Date.now() - rebootIssuedAt < REBOOT_LATCH_MS;
 async function assertOperationUnitsIdle() {
     for (const unit of OPERATION_UNITS) {
         let state;
@@ -68,6 +68,22 @@ export async function admitReboot() {
         if (rebootIssuedAt === issuedAt)
             rebootIssuedAt = undefined;
         throw error;
+    }
+}
+// Keeps updates, rollbacks, switches and reboots from starting while `work`
+// runs, once no operation is running; for root work that must not overlap them.
+export async function holdOperations(work) {
+    if (rebootPending())
+        throw new OperationBusyError(POD_RESTARTING);
+    if (operationStarting)
+        throw new OperationBusyError(OPERATION_RUNNING);
+    operationStarting = true;
+    try {
+        await assertOperationUnitsIdle();
+        return await work();
+    }
+    finally {
+        operationStarting = false;
     }
 }
 export function releaseRebootLatch() {

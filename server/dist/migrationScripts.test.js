@@ -324,6 +324,11 @@ echo "$STREAM_WAS_ACTIVE"`], { encoding: 'utf8' });
     });
     describe('restore-original-fork.sh idempotency', () => {
         const src = readScript('scripts/migrate/restore-original-fork.sh');
+        it('puts the stock flash commit interval back with the other Nightstand services', () => {
+            const start = src.indexOf('cleanup_nightstand_services() {');
+            const cleanup = src.slice(start, src.indexOf('\n}\n', start));
+            assert.match(cleanup, /^ {2}mount -o remount,commit=5 \/persistent 2>\/dev\/null \|\| true$/m);
+        });
         // Their stream comes back only if their Pod had it enabled. The restore
         // can run after a reboot, so it reads systemd's saved state, which the
         // migration never changes, rather than whether it was running.

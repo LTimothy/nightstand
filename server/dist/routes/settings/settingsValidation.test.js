@@ -21,6 +21,10 @@ const journalSyncs = [];
 mock.module(new URL('../../jobs/journalStorage.js', import.meta.url).href, {
     namedExports: { syncJournalStorage: async (inMemory) => { journalSyncs.push(inMemory); } },
 });
+const commitSyncs = [];
+mock.module(new URL('../../jobs/flashCommit.js', import.meta.url).href, {
+    namedExports: { syncFlashCommit: async (long) => { commitSyncs.push(long); } },
+});
 let settingsRouter;
 let server;
 let baseUrl;
@@ -132,6 +136,26 @@ describe('POST /settings features.journalInMemory', () => {
         assert.equal((await postSettings({ features: { coverButtons: false } })).status, 200);
         assert.equal((await postSettings({ features: { journalInMemory: false } })).status, 200);
         assert.deepEqual(journalSyncs, [true, false]);
+    });
+});
+describe('POST /settings features.coverAutoRestore', () => {
+    it('is off by default', () => {
+        assert.equal(defaultFeatures.coverAutoRestore, false);
+    });
+    it('accepts the switch and rejects a non-boolean', async () => {
+        assert.equal((await postSettings({ features: { coverAutoRestore: true } })).status, 200);
+        assert.equal((await postSettings({ features: { coverAutoRestore: false } })).status, 200);
+        assert.equal((await postSettings({ features: { coverAutoRestore: 'yes' } })).status, 400);
+    });
+});
+describe('POST /settings features.longFlashCommit', () => {
+    it('is off by default and syncs the mount only when the switch is in the update', async () => {
+        assert.equal(defaultFeatures.longFlashCommit, false);
+        commitSyncs.length = 0;
+        assert.equal((await postSettings({ features: { longFlashCommit: true } })).status, 200);
+        assert.equal((await postSettings({ features: { coverButtons: false } })).status, 200);
+        assert.equal((await postSettings({ features: { longFlashCommit: false } })).status, 200);
+        assert.deepEqual(commitSyncs, [true, false]);
     });
 });
 describe('POST /settings features.targetTemperatureLabels', () => {
