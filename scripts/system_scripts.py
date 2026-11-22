@@ -120,6 +120,14 @@ def digest(tree):
     return outer.hexdigest()
 
 
+def _matches(copy, expected):
+    # shortcut: file modes are not compared, add them to the digest if a mode change ever matters
+    try:
+        return digest(copy) == expected
+    except (SystemExit, OSError):
+        return False
+
+
 def publish(tree, any_owner=False):
     # Only the old updater's handoff publishes a stage the server user owns.
     scripts = _scripts(tree, None if any_owner else os.geteuid())
@@ -140,9 +148,17 @@ def publish(tree, any_owner=False):
             os.chmod(directory, 0o755)
             _sync_dir(directory)
         final = os.path.join(copies, outer.hexdigest())
-        if os.path.isdir(final):
+        if os.path.isdir(final) and _matches(final, outer.hexdigest()):
             shutil.rmtree(work)
             os.utime(final)
+        elif os.path.isdir(final):
+            # A copy changed since it was published is replaced, not trusted by its name.
+            aside = tempfile.mkdtemp(prefix='.replaced-', dir=copies)
+            os.rmdir(aside)
+            os.rename(final, aside)
+            os.rename(work, final)
+            _sync_dir(copies)
+            shutil.rmtree(aside, ignore_errors=True)
         else:
             os.rename(work, final)
             _sync_dir(copies)

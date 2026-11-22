@@ -131,6 +131,23 @@ class SystemScriptsTests(unittest.TestCase):
         self.assertEqual(self.tool('prune').returncode, 0)
         self.assertIn(copies[0].name, [path.name for path in (self.system / 'copies').iterdir()])
 
+    def test_re_publishing_replaces_a_copy_edited_by_hand(self):
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755)})
+        copy = self.publish(tree)
+        self.tool('point', copy)
+        (copy / 'scripts/update.sh').write_text('echo edited\n')
+        self.assertEqual(self.publish(tree), copy)
+        self.assertEqual((copy / 'scripts/update.sh').read_text(), 'echo a\n')
+        self.assertTrue((self.system / 'live' / 'scripts').is_dir())
+
+    def test_re_publishing_replaces_a_copy_with_an_added_file(self):
+        tree = self.tree('a', {'update.sh': ('echo a\n', 0o755)})
+        copy = self.publish(tree)
+        (copy / 'scripts/extra.sh').write_text('echo extra\n')
+        self.assertEqual(self.publish(tree), copy)
+        self.assertFalse((copy / 'scripts/extra.sh').exists())
+        self.assertEqual([path.name for path in (self.system / 'copies').iterdir()], [copy.name])
+
     def test_never_copies_what_a_symlink_points_at(self):
         secret = self.base / 'secret'
         secret.write_text('root only\n')
