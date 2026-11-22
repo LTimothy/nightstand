@@ -19,6 +19,8 @@ for (const id of THEME_IDS) {
         await page.evaluate(() => document.fonts.ready);
         await expect(page).toHaveScreenshot(`${screen.name}-${id}-${label}.png`, {
           animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.001,
+          // The version changes every release, so it is masked rather than compared.
+          mask: [page.getByText(/^v\d+\.\d+\.\d+ ·/)],
         });
       });
     }
