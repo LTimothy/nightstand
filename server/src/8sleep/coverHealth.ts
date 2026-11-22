@@ -9,6 +9,7 @@ import eventBus from '../events/eventBus.js';
 import type { Side } from '../db/schedulesSchema.js';
 import type { StatusInfo } from '../routes/serverStatus/serverStatusSchema.js';
 import { RECORD_START, findNewestRawFile } from './rawFiles.js';
+import { evaluateRestore } from '../jobs/coverRestore.js';
 
 export const POLL_MS = 60_000;
 // About 110 s of RAW at the Pod 5 record rate, so a minute's poll misses nothing.
@@ -184,7 +185,13 @@ async function poll(): Promise<void> {
     if (describe(next) !== describe(verdict)) logger.info(`[coverHealth] ${describe(verdict)} -> ${describe(next)}`);
     verdict = next;
 
-    const entry = statusFor(next, null, now);
+    let restore: RestoreInfo | null = null;
+    try {
+      restore = await evaluateRestore(next);
+    } catch (error) {
+      logger.warn(`[coverHealth] restore check failed: ${errorMessage(error)}`);
+    }
+    const entry = statusFor(next, restore, now);
     const before = serverStatus.status.coverHealth;
     const changed = before?.status !== entry?.status || before?.message !== entry?.message
       || JSON.stringify(before?.coverRestore) !== JSON.stringify(entry?.coverRestore);

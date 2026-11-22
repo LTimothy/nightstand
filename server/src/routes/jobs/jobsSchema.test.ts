@@ -6,7 +6,7 @@ describe('jobsSchema', () => {
   it('accepts every job the app can trigger', () => {
     // 'update' drives the in-app updater; removing it silently would leave
     // the Settings page Update button pointing at nothing.
-    for (const job of ['update', 'reboot', 'analyzeSleepLeft', 'analyzeSleepRight']) {
+    for (const job of ['update', 'reboot', 'analyzeSleepLeft', 'analyzeSleepRight', 'coverHealth']) {
       assert.equal(JobSchema.safeParse(job).success, true, `expected '${job}' to be a valid job`);
     }
   });

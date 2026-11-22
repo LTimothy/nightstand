@@ -256,6 +256,8 @@ RULES=(
   # The Keep the system log in memory switch, with exactly these two arguments.
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh memory"
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/journal_storage.sh disk"
+  # The Cover sensors restart on System status, with no arguments.
+  "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/cover_restore.sh"
 )
 
 # Build the new file beside the old one and check it before it goes live: a

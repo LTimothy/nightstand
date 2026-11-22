@@ -46,6 +46,7 @@ mock.module(new URL('../jobs/biometrics.js', import.meta.url).href, { namedExpor
 } });
 mock.module(new URL('../jobs/alarmScheduler.js', import.meta.url).href, { namedExports: {
   executeAlarm: async (alarm: { side: 'left' | 'right'; force?: boolean }) => device[alarm.side].isOn || alarm.force ? 10_000 : 0,
+  alarmStarting: () => false,
 } });
 mock.module(new URL('../jobs/analyzeSleep.js', import.meta.url).href, { namedExports: {
   analyzeSleepKey: (side: string) => `analyze-${side}`, executeAnalyzeSleep: async (side: string) => { jobs.push(`analyze-${side}`); },

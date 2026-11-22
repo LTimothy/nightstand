@@ -8,6 +8,7 @@ import { Job, JobKeyListSchema } from './jobsSchema.js';
 import update from '../../jobs/update.js';
 import { PrivilegedCommandError, privilegedErrorStatus } from '../../jobs/privilegedCommand.js';
 import reboot from '../../jobs/reboot.js';
+import { restoreCover } from '../../jobs/coverRestore.js';
 import { refusedWhileInUse } from '../update/update.js';
 
 const router = express.Router();
@@ -50,6 +51,7 @@ const JOB_MAP: Record<Job, () => void | Promise<void>> = {
   analyzeSleepRight,
   biometricsCalibrationLeft,
   biometricsCalibrationRight,
+  coverHealth: () => restoreCover('button'),
   reboot,
   update,
 };

@@ -25,7 +25,7 @@ let operationStarting = false;
 // happened cannot block updates for good.
 const REBOOT_LATCH_MS = 5 * 60_000;
 let rebootIssuedAt: number | undefined;
-const rebootPending = () => rebootIssuedAt !== undefined && Date.now() - rebootIssuedAt < REBOOT_LATCH_MS;
+export const rebootPending = () => rebootIssuedAt !== undefined && Date.now() - rebootIssuedAt < REBOOT_LATCH_MS;
 
 export type StartHooks = {
   beforeStart?: () => Promise<void>;
