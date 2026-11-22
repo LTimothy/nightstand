@@ -6,7 +6,9 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
-## [Unreleased]
+## [3.10.0] - 2026-11-21
+
+Adds a center button boost and a confirmation buzz on a Pod 5 hub, an option to ring alarms on a side that is off, the same alarm editor with Test for the one-time alarm, dragging on the Bed dial, and optional Pod 5 target temperature labels.
 
 ### Features
 
@@ -58,6 +60,8 @@ is a hard fork; for the history of the projects it descends from, see
   about a gigabyte once, and the average spread that over the rest of the day,
   so it read high until the nightly restart. The rate appears 30 minutes after
   the server starts.
+
+Checked on: Pod 5, deployed from this code: the center button boost (start, return, a second press, plus to cancel, a server restart during it, a side that is off), the 3 s buzz and an alarm held until it ends, one-time alarm Test and ringing with the side on and off, ringing on an off side with a one-time alarm and the missed-alarm report with the switch off, dragging the dial on a phone, and the target labels against the water sensor at two targets; not Rhythms or weekly alarms on an off side, other Pod 5 hub revisions, or other Pods; no nights yet.
 
 ## [3.9.0] - 2026-11-17
 
