@@ -216,6 +216,7 @@ generic message; the details go to the server log.
     "biometricsV2": false,
     "uncheckedCapPresence": false,
     "coverButtons": false,
+    "coverAutoRestore": false,
     "logoClickBuzz": false,
     "journalInMemory": false,
     "targetTemperatureLabels": false,
@@ -314,6 +315,9 @@ generic message; the details go to the server log.
   temperature or started a boost, skipped while an alarm is ringing, snoozed,
   starting or due within seconds. An alarm due on that side during the buzz is
   sent once it has ended.
+  `coverAutoRestore` is Restart the cover service on its own, off by default.
+  With it on, a Pod 5 hub runs the `coverHealth` job below by itself once per
+  silent side, under the same limits.
   `journalInMemory` is Keep the system log in memory, off by default. Saving
   it runs `scripts/journal_storage.sh` through sudo, which writes or removes a
   journald drop-in; the change applies at the next restart of the Pod.
@@ -1039,6 +1043,14 @@ Valid keys:
   manual run skips the occupied-bed check, so run it only with an empty bed.
   Scheduled calibration uses a separate 6-hour lookback.
 - `reboot`: restarts the Pod now (`sudo /sbin/reboot`).
+- `coverHealth`: restarts the firmware's `frank.service` through
+  `sudo /bin/bash /usr/local/lib/nightstand/live/scripts/cover_restore.sh`,
+  for a cover side that has gone silent. Refused with `409` and the reason
+  as `message` unless the hub is a Pod 5 with exactly one side silent, no
+  alarm is ringing, snoozed or due within 10 minutes, the Pod is not
+  priming, no update, rollback or restart is under way, and the last restart
+  was over an hour ago. The script keeps the same hourly limit and logs each
+  attempt to `/persistent/nightstand-logs/cover-restore.log`.
 - `update`: starts `free-sleep-update.service`, the same as `/api/update`.
   This key cannot confirm a bed in use, so it is refused with `409` while a
   side is on, an alarm is due within 15 minutes, or the bed's state cannot
@@ -1481,6 +1493,14 @@ the biometrics service; `/api/deviceStatus` converts them.
   file in `/persistent` was written in the last 15 seconds and `failed`
   with the reason otherwise: no RAW file, a file that stopped growing, or a
   click that could not be applied.
+- `coverHealth` (Cover sensors) is present once the newest RAW file has
+  held `capSense2` records, and is absent on Pods that write `capSense`.
+  Checked once a minute, it is `failed` when one side has sent only `-1`
+  values for 10 minutes while the other side reported in the last 2
+  minutes, or when both sides have; `waiting_for_data` when no records
+  arrived for 5 minutes; `healthy` otherwise. A `failed` entry carries
+  `coverRestore: { available, note }`: whether the `coverHealth` job would
+  run now, and if not, why.
 - `bootRescue` reads `/run/nightstand-boot-settings.json`, which the health
   check rewrites from `fw_printenv` when it is over an hour old. It is `healthy` while
   `bootdelay` is -1 or above and the boot slots match, `failed` when

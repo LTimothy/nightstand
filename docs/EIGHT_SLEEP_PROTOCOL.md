@@ -209,6 +209,12 @@ buffer truncates it. See `biometrics/load_raw_files.py` and
 | `buttonEvent` | `{type, ts, left/right: {top/bottom: count}}`, the temperature buttons via the TCA8418 keypad | ✅ on my Pod 5, five right-side events (three `top: 1`, two `bottom: 1`), alongside `[tca8418R]` logs; optional diagnostics |
 | `tap-gesture` | `{type, ts, side, taps}` | Optional diagnostics only. 📖 [Reported by dallonby on a Pod 3 hub with a Pod 4 cover](https://github.com/throwaway31265/free-sleep/pull/30), which reports no taps in `DEVICE_STATUS`; not seen on my Pod 5 |
 
+On my Pod 5, the right side's `capSense2` values once read -1 on all eight values
+for hours while the other side kept reporting; the firmware's `[capR]` log
+lines read the same, that side's cover buttons stopped, and restarting
+`frank` brought it back. Normal captures show such runs for a few seconds at
+most.
+
 These Pod 5 shapes are observations from my offline RAW captures. One
 envelope contained 14 `log` records; decoding only the first CBOR object
 would miss the others. The `buttonEvent` records identify top and bottom

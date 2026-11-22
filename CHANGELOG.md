@@ -6,6 +6,23 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [Unreleased]
+
+### Features
+
+- System status > Cover sensors, on Pods that write `capSense2` cover
+  readings: reports when one side of the cover has sent no readings for 10
+  minutes while the other side still reports. When this happened on the
+  maintainer's Pod 5, that side's cover buttons stopped too. The row offers
+  Restart the cover service, which restarts the firmware's `frank` service
+  at most once an hour and never while an alarm is ringing or due in the
+  next 10 minutes, while priming, or during an update or rollback. On a
+  Pod 5 a restart brought the cover back within about 2 minutes. The update
+  adds one sudoers rule for the restart script.
+- Settings > Features > Restart the cover service on its own, Pod 5 hub
+  only and off by default, runs that restart by itself once per silent
+  side, under the same limits.
+
 ## [3.10.0] - 2026-11-21
 
 Adds a center button boost and a confirmation buzz on a Pod 5 hub, an option to ring alarms on a side that is off, the same alarm editor with Test for the one-time alarm, dragging on the Bed dial, and optional Pod 5 target temperature labels.
