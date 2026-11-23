@@ -44,7 +44,8 @@ export default function CoverButtonsCard({ settings, updateSettings }: Props) {
           + '3 to 25 s after the press.' }/>
       <Typography
         variant="body2"
-        color="text.secondary">{ POD5_HUB }</Typography>
+        color="text.secondary"
+        sx={ { mt: 1 } }>{ POD5_HUB }</Typography>
       { options }
     </> : <>
       <ToggleRow

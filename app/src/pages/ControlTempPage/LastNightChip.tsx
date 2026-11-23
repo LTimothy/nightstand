@@ -2,11 +2,13 @@ import { Link } from 'react-router-dom';
 import { Box, Button, Typography } from '@mui/material';
 import { media, palette, radius, sx as shared } from '@design/tokens';
 import { lastNightText } from './lastNightText';
+import { CARD_PX } from './tonightStyles';
 import type { LastNight } from './useLastNight.ts';
 
 const chipSx = {
   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', minHeight: 52,
-  p: '0 6px 0 16px', [media.narrow]: { p: '0 4px 0 14px' }, [media.desktop]: { p: '0 12px 0 22px' },
+  p: `0 ${CARD_PX.base - 10}px 0 ${CARD_PX.base}px`, [media.narrow]: { p: `0 ${CARD_PX.narrow - 10}px 0 ${CARD_PX.narrow}px` },
+  [media.desktop]: { p: `0 ${CARD_PX.desktop - 10}px 0 ${CARD_PX.desktop}px` },
   bgcolor: palette.bg.elevated, border: 1, borderColor: 'divider', borderRadius: `${radius.base}px`,
 } as const;
 

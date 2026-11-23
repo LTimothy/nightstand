@@ -14,4 +14,11 @@ export const bannerRailSx = (wide: boolean) => ({
   ...(wide ? { [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X } } : {}),
 }) as const;
 
+// Bed and Elevation share this, so their tabs stay put when switching between the two.
+export const bedPageSx = {
+  [media.short]: { gap: 1, pt: 1 },
+  [media.tight]: { gap: 0.5, pt: 0.5 },
+  [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X, pt: '24px', pb: '40px' },
+} as const;
+
 export const isBedPath = (pathname: string) => ['/', '/temperature', '/elevation'].includes(pathname);

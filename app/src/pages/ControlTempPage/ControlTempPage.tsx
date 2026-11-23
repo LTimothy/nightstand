@@ -21,18 +21,14 @@ import { useLastNight } from './useLastNight.ts';
 import { useBedFrame } from './useBedFrame';
 import { NOT_RESPONDING } from './bedText';
 import { media } from '@design/tokens';
-import { BED_MAX_WIDTH, BED_PADDING_X } from '@components/pageRail';
+import { bedPageSx } from '@components/pageRail';
+import { cardPxSx } from './tonightStyles';
 import { useSettings } from '@api/settings.ts';
 import { isSchedulePaused } from '@api/schedulePause.ts';
 import useTemperatureFormat from '@lib/useTemperatureFormat';
 
 const STALE_TILES = { left: NOT_RESPONDING, right: NOT_RESPONDING };
 const LOADING_TILES = { left: '', right: '' };
-const pageSx = {
-  [media.short]: { gap: 1, pt: 1 },
-  [media.tight]: { gap: 0.5, pt: 0.5 },
-  [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X, pt: '24px', pb: '40px' },
-} as const;
 // One column on a phone. On a desktop the controls take 440 px and Tonight the rest, both from the top.
 const gridSx = {
   display: 'grid', width: '100%', rowGap: 2, alignItems: 'start', gridTemplateColumns: 'minmax(0, 1fr)',
@@ -81,7 +77,7 @@ export default function ControlTempPage() {
   }, [deviceStatus, dataUpdatedAt, syncFromServer]);
 
   return (
-    <PageContainer sx={ pageSx }>
+    <PageContainer sx={ bedPageSx }>
       <PageHeader
         title="Bed"
         status={ staleSince ? NOT_RESPONDING : deviceStatus?.isPriming ? 'Priming' : undefined }
@@ -110,7 +106,7 @@ export default function ControlTempPage() {
         <Box
           sx={ {
             display: 'flex', flexDirection: 'column', gap: 2, width: '100%',
-            '& > .MuiAlert-root': { px: '16px', [media.narrow]: { px: '14px' }, [media.desktop]: { px: '22px' } },
+            '& > .MuiAlert-root': cardPxSx,
           } }>
           <ErrorBoundary componentName="Schedule override banner">
             <ScheduleOverrideBanner />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { isAxiosError } from 'axios';
-import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import Section from '../Section.tsx';
 import RawArchiveRetention from '../DeviceSettingsSection/RawArchiveRetention';
 import ToggleRow from '@components/ToggleRow';
@@ -109,64 +109,66 @@ export default function FeaturesSection() {
       ) }
       <Section title="Everyday">
         <Box id="rhythms" tabIndex={ -1 } />
-        <ToggleRow
-          label="Rhythms"
-          disabled={ isUpdating || !features }
-          checked={ features?.rhythms ?? false }
-          onChange={ (next) => {
-            setRhythmsMessage(undefined);
-            setRhythmsDialog(next ? 'enable' : 'disable');
-          } }
-          description="Plan sleep by day and date, with an optional Smart Schedule temperature curve. Your weekly schedule is kept.">
+        <Stack spacing={ 1 } useFlexGap>
           <ToggleRow
-            label={ FEATURE_TITLE }
-            disabled={ isUpdating || features?.rhythmSuggestions === undefined || !features?.rhythms }
-            checked={ !!features?.rhythms && !!features?.rhythmSuggestions }
-            onChange={ next => updateFeature({ rhythmSuggestions: next }) }
-            description={ !features?.rhythms
-              ? <TurnOnFirst
-                parent="Rhythms"
-                href="#rhythms"/>
-              : featureDescription() }
+            label="Rhythms"
+            disabled={ isUpdating || !features }
+            checked={ features?.rhythms ?? false }
+            onChange={ (next) => {
+              setRhythmsMessage(undefined);
+              setRhythmsDialog(next ? 'enable' : 'disable');
+            } }
+            description="Plan sleep by day and date, with an optional Smart Schedule temperature curve. Your weekly schedule is kept.">
+            <ToggleRow
+              label={ FEATURE_TITLE }
+              disabled={ isUpdating || features?.rhythmSuggestions === undefined || !features?.rhythms }
+              checked={ !!features?.rhythms && !!features?.rhythmSuggestions }
+              onChange={ next => updateFeature({ rhythmSuggestions: next }) }
+              description={ !features?.rhythms
+                ? <TurnOnFirst
+                  parent="Rhythms"
+                  href="#rhythms"/>
+                : featureDescription() }
+            />
+            <Button onClick={ () => setDeleteNotes(true) } sx={ { minHeight: 44, px: 0, mt: 1 } }>{ DELETE_NOTES }</Button>
+          </ToggleRow>
+          { rhythmsMessage && <Alert
+            severity={ rhythmsMessage.severity }
+            onClose={ () => setRhythmsMessage(undefined) }
+            sx={ { mb: 1 } }>
+            { rhythmsMessage.text }
+          </Alert> }
+          <ToggleRow
+            label="One-time alarm"
+            disabled={ isUpdating || features?.oneOffAlarms === undefined }
+            checked={ features?.oneOffAlarms ?? false }
+            onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
+            description="Adds a one-time alarm to Schedule, separate from the daily wake-up. Off, a set one-time alarm does not ring."
           />
-          <Button onClick={ () => setDeleteNotes(true) } sx={ { minHeight: 44, px: 0 } }>{ DELETE_NOTES }</Button>
-        </ToggleRow>
-        { rhythmsMessage && <Alert
-          severity={ rhythmsMessage.severity }
-          onClose={ () => setRhythmsMessage(undefined) }
-          sx={ { mb: 2 } }>
-          { rhythmsMessage.text }
-        </Alert> }
-        <ToggleRow
-          label="One-time alarm"
-          disabled={ isUpdating || features?.oneOffAlarms === undefined }
-          checked={ features?.oneOffAlarms ?? false }
-          onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
-          description="Adds a one-time alarm to Schedule, separate from the daily wake-up. Off, a set one-time alarm does not ring."
-        />
-        <ToggleRow
-          label="Ring alarms when the side is off"
-          disabled={ isUpdating || features?.alarmsWhenOff === undefined }
-          checked={ features?.alarmsWhenOff ?? false }
-          onChange={ (next) => updateFeature({ alarmsWhenOff: next }) }
-          description="Alarms vibrate even if the side is off."
-        />
-        { deviceStatus?.hubVersion === Version.Pod5 && <ToggleRow
-          label="Show the Pod's target temperatures"
-          disabled={ isUpdating || features?.targetTemperatureLabels === undefined }
-          checked={ features?.targetTemperatureLabels ?? false }
-          onChange={ (next) => updateFeature({ targetTemperatureLabels: next }) }
-          description={ 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
-            + 'Schedules are unchanged. No effect in Level format.' }
-        /> }
-        { deviceStatus?.hubVersion === Version.Pod5 && <ToggleRow
-          label="Restart the cover service on its own"
-          disabled={ isUpdating || features?.coverAutoRestore === undefined }
-          checked={ features?.coverAutoRestore ?? false }
-          onChange={ (next) => updateFeature({ coverAutoRestore: next }) }
-          description={ 'When one side of the cover sends no readings for 10 minutes, Nightstand restarts the Pod\'s cover service. '
-            + 'At most once an hour, never near an alarm.' }
-        /> }
+          <ToggleRow
+            label="Ring alarms when the side is off"
+            disabled={ isUpdating || features?.alarmsWhenOff === undefined }
+            checked={ features?.alarmsWhenOff ?? false }
+            onChange={ (next) => updateFeature({ alarmsWhenOff: next }) }
+            description="Alarms vibrate even if the side is off."
+          />
+          { deviceStatus?.hubVersion === Version.Pod5 && <ToggleRow
+            label="Show the Pod's target temperatures"
+            disabled={ isUpdating || features?.targetTemperatureLabels === undefined }
+            checked={ features?.targetTemperatureLabels ?? false }
+            onChange={ (next) => updateFeature({ targetTemperatureLabels: next }) }
+            description={ 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
+              + 'Schedules are unchanged. No effect in Level format.' }
+          /> }
+          { deviceStatus?.hubVersion === Version.Pod5 && <ToggleRow
+            label="Restart the cover service on its own"
+            disabled={ isUpdating || features?.coverAutoRestore === undefined }
+            checked={ features?.coverAutoRestore ?? false }
+            onChange={ (next) => updateFeature({ coverAutoRestore: next }) }
+            description={ 'When one side of the cover sends no readings for 10 minutes, Nightstand restarts the Pod\'s cover service. '
+              + 'At most once an hour, never near an alarm.' }
+          /> }
+        </Stack>
       </Section>
       <Section title="Sleep tracking">
         <Box id="biometrics" tabIndex={ -1 } />
@@ -196,72 +198,76 @@ export default function FeaturesSection() {
               settings={ settings }
               updateSettings={ saveSettings } />
           </Box> }
-          <ToggleRow
-            label="Presence auto-off"
-            disabled={ isUpdating || features?.presenceAutoOff === undefined || !biometricsEnabled }
-            checked={ features?.presenceAutoOff ?? false }
-            onChange={ (next) => updateFeature({ presenceAutoOff: next }) }
-            description={ needsBiometrics || 'Turns a side off after 45 minutes with no one on it, outside scheduled hours and away mode.' }
-          />
-          <ToggleRow
-            label="New sleep tracking (beta)"
-            disabled={ isUpdating || features?.biometricsV2 === undefined || !biometricsEnabled }
-            checked={ features?.biometricsV2 ?? false }
-            onChange={ (next) => updateFeature({ biometricsV2: next }) }
-            description={ needsBiometrics || NEW_SLEEP_TRACKING }>
-            { showCapPresence && <ToggleRow
-              label="Capacitance presence (beta)"
-              disabled={ isUpdating || features?.uncheckedCapPresence === undefined || !biometricsEnabled
-                || !features?.biometricsV2 }
-              checked={ !!features?.biometricsV2 && !!features?.uncheckedCapPresence }
-              onChange={ (next) => updateFeature({ uncheckedCapPresence: next }) }
-              description={ needsBiometrics || (!features?.biometricsV2
-                ? <TurnOnFirst
-                  parent="New sleep tracking"
-                  href="#biometrics"/>
-                : UNCHECKED_CAP_PRESENCE) }
-            /> }
-          </ToggleRow>
-          <ToggleRow
-            label="Cooling warning"
-            disabled={ isUpdating || features?.coolingWarning === undefined || !biometricsEnabled }
-            checked={ features?.coolingWarning ?? false }
-            onChange={ next => updateFeature({ coolingWarning: next }) }
-            description={ needsBiometrics || 'Warns when the water keeps warming while cooling. Changes nothing on the bed.' }
-          />
+          <Stack spacing={ 1 } useFlexGap>
+            <ToggleRow
+              label="Presence auto-off"
+              disabled={ isUpdating || features?.presenceAutoOff === undefined || !biometricsEnabled }
+              checked={ features?.presenceAutoOff ?? false }
+              onChange={ (next) => updateFeature({ presenceAutoOff: next }) }
+              description={ needsBiometrics || 'Turns a side off after 45 minutes with no one on it, outside scheduled hours and away mode.' }
+            />
+            <ToggleRow
+              label="New sleep tracking (beta)"
+              disabled={ isUpdating || features?.biometricsV2 === undefined || !biometricsEnabled }
+              checked={ features?.biometricsV2 ?? false }
+              onChange={ (next) => updateFeature({ biometricsV2: next }) }
+              description={ needsBiometrics || NEW_SLEEP_TRACKING }>
+              { showCapPresence && <ToggleRow
+                label="Capacitance presence (beta)"
+                disabled={ isUpdating || features?.uncheckedCapPresence === undefined || !biometricsEnabled
+                  || !features?.biometricsV2 }
+                checked={ !!features?.biometricsV2 && !!features?.uncheckedCapPresence }
+                onChange={ (next) => updateFeature({ uncheckedCapPresence: next }) }
+                description={ needsBiometrics || (!features?.biometricsV2
+                  ? <TurnOnFirst
+                    parent="New sleep tracking"
+                    href="#biometrics"/>
+                  : UNCHECKED_CAP_PRESENCE) }
+              /> }
+            </ToggleRow>
+            <ToggleRow
+              label="Cooling warning"
+              disabled={ isUpdating || features?.coolingWarning === undefined || !biometricsEnabled }
+              checked={ features?.coolingWarning ?? false }
+              onChange={ next => updateFeature({ coolingWarning: next }) }
+              description={ needsBiometrics || 'Warns when the water keeps warming while cooling. Changes nothing on the bed.' }
+            />
+          </Stack>
         </ToggleRow>
       </Section>
       <Section title="Storage">
-        <ToggleRow
-          label="Low-disk protection"
-          disabled={ isUpdating || features?.metricsLowDiskProtection === undefined }
-          checked={ features?.metricsLowDiskProtection ?? true }
-          onChange={ (next) => updateFeature({ metricsLowDiskProtection: next }) }
-          description={ 'Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized. '
-            + 'Keeps 2 nights of detail and every nightly summary.' }
-        />
-        <ToggleRow
-          label="Delete detail after 30 days"
-          disabled={ isUpdating || features?.metricsRetention === undefined }
-          checked={ features?.metricsRetention ?? false }
-          onChange={ (next) => updateFeature({ metricsRetention: next }) }
-          description="Deletes detailed vitals older than 30 days. Summaries, scores and movement stay. Cannot be undone."
-        />
-        <ToggleRow
-          label="Keep the system log in memory"
-          disabled={ isUpdating || features?.journalInMemory === undefined }
-          checked={ features?.journalInMemory ?? false }
-          onChange={ (next) => updateFeature({ journalInMemory: next }) }
-          description={ 'Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
-            + 'Nightstand\'s logs are kept. Older system log files on flash are removed after that restart.' }
-        />
-        <ToggleRow
-          label="Write flash less often"
-          disabled={ isUpdating || features?.longFlashCommit === undefined }
-          checked={ features?.longFlashCommit ?? false }
-          onChange={ (next) => updateFeature({ longFlashCommit: next }) }
-          description="Fewer flash writes. A power cut can lose up to the last minute of sensor recordings and logs."
-        />
+        <Stack spacing={ 1 } useFlexGap>
+          <ToggleRow
+            label="Low-disk protection"
+            disabled={ isUpdating || features?.metricsLowDiskProtection === undefined }
+            checked={ features?.metricsLowDiskProtection ?? true }
+            onChange={ (next) => updateFeature({ metricsLowDiskProtection: next }) }
+            description={ 'Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized. '
+              + 'Keeps 2 nights of detail and every nightly summary.' }
+          />
+          <ToggleRow
+            label="Delete detail after 30 days"
+            disabled={ isUpdating || features?.metricsRetention === undefined }
+            checked={ features?.metricsRetention ?? false }
+            onChange={ (next) => updateFeature({ metricsRetention: next }) }
+            description="Deletes detailed vitals older than 30 days. Summaries, scores and movement stay. Cannot be undone."
+          />
+          <ToggleRow
+            label="Keep the system log in memory"
+            disabled={ isUpdating || features?.journalInMemory === undefined }
+            checked={ features?.journalInMemory ?? false }
+            onChange={ (next) => updateFeature({ journalInMemory: next }) }
+            description={ 'Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
+              + 'Nightstand\'s logs are kept. Older system log files on flash are removed after that restart.' }
+          />
+          <ToggleRow
+            label="Write flash less often"
+            disabled={ isUpdating || features?.longFlashCommit === undefined }
+            checked={ features?.longFlashCommit ?? false }
+            onChange={ (next) => updateFeature({ longFlashCommit: next }) }
+            description="Fewer flash writes. A power cut can lose up to the last minute of sensor recordings and logs."
+          />
+        </Stack>
       </Section>
       { rhythmsDialog === 'enable' && <EnableRhythmsDialog
         onClose={ () => setRhythmsDialog(undefined) }

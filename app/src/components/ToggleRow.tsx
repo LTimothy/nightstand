@@ -14,7 +14,7 @@ type ToggleRowProps = {
 // py 10px centres a one-line label on the 44px switch.
 export default function ToggleRow({ label, ariaLabel, checked, onChange, disabled, description, children }: ToggleRowProps) {
   return (
-    <Box sx={ { '&:not(:last-child)': { mb: description || children ? 1 : 0 } } }>
+    <Box>
       <Box sx={ { display: 'flex', alignItems: 'flex-start', gap: 2 } }>
         <Box sx={ { flex: 1, minWidth: 0, py: '10px' } }>
           <Typography variant="body1" sx={ { color: 'text.primary' } }>{ label }</Typography>

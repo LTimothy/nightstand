@@ -10,15 +10,9 @@ import PageContainer from '../PageContainer';
 import BedTabs from '@components/BedTabs';
 import PageHeader from '@components/PageHeader';
 import { media, weight } from '@design/tokens';
-import { BED_MAX_WIDTH, BED_PADDING_X } from '@components/pageRail';
+import { bedPageSx } from '@components/pageRail';
 
 interface BasePosition { head: number; feet: number }
-// Same rhythm as Bed, so the tabs stay put when switching between the two.
-const pageSx = {
-  [media.short]: { gap: 1, pt: 1 },
-  [media.tight]: { gap: 0.5, pt: 0.5 },
-  [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X, pt: '24px', pb: '40px' },
-} as const;
 // On a desktop the controls sit in Bed's 440 px left column, under the tabs.
 const columnSx = {
   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%',
@@ -157,7 +151,7 @@ export default function BaseControlPage() {
   const unavailable = isLoading || statusUnavailable || baseStatus?.isConfigured === false || !baseStatus;
 
   return (
-    <PageContainer sx={ pageSx }>
+    <PageContainer sx={ bedPageSx }>
       <PageHeader title="Bed"/>
       <BedTabs/>
       <Box sx={ columnSx }>

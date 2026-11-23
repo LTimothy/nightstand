@@ -44,8 +44,7 @@ function SideButtons({ title, side, path, format, disabled, save }: {
   return <Stack
     role="group"
     aria-label={ `${title} side buttons` }
-    spacing={ 1.5 }
-    sx={ { '&& > *:not(:last-child)': { mb: 0 } } }>
+    spacing={ 1.5 }>
     <Typography
       id={ titleId }
       variant="body2"

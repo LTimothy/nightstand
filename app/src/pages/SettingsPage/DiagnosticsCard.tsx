@@ -1,4 +1,4 @@
-import { Typography } from '@mui/material';
+import { Stack, Typography } from '@mui/material';
 import { DeepPartial } from 'ts-essentials';
 import type { Settings } from '@api/settingsSchema.ts';
 import { useServices } from '@api/services.ts';
@@ -30,7 +30,7 @@ export default function DiagnosticsCard({ settings, updateSettings }: Props) {
       variant="body2"
       color="text.secondary"
       sx={ { mb: 1 } }>Shown on System status.</Typography>
-    { SWITCHES.map(([label, flag, description]) => <ToggleRow
+    <Stack spacing={ 1 } useFlexGap>{ SWITCHES.map(([label, flag, description]) => <ToggleRow
       key={ flag }
       label={ label }
       disabled={ isUpdating || features?.[flag] === undefined || !biometricsEnabled }
@@ -39,6 +39,6 @@ export default function DiagnosticsCard({ settings, updateSettings }: Props) {
       // Unknown keeps the switch disabled with its plain description; only a known off points to Biometrics.
       description={ enabled === false ? <TurnOnFirst
         parent="Biometrics"
-        href="/settings/features#biometrics"/> : description }/>) }
+        href="/settings/features#biometrics"/> : description }/>) }</Stack>
   </Section>;
 }

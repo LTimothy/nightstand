@@ -8,6 +8,53 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+### Changed
+
+- Spacing and alignment are more even across Bed, Schedule, Sleep, Settings,
+  System status and Logs, including the states that only show after a
+  switch is turned on, a sheet opens or the bed is away, paused or ringing.
+- Settings and the Schedule editor use one switch row. Controls a switch
+  reveals, such as the center button temperature and the boost under Cover
+  buttons, are indented under it the same way everywhere.
+- Pause schedule and Update channel open as the same rounded sheet as the
+  Schedule sheets, and dialogs share one width and one button order.
+- Cover buttons now comes before Tap gestures in Settings > Bed and sides.
+- Software > Recovery lists the five newest versions, with Show all for the
+  rest.
+- Labels: Skip and Restore for a night's recurring alarms, Dismiss alarm,
+  Stop movement, Edit on the Tonight card, Open Schedule, Calibrate and
+  Switch now.
+
+### Fixes
+
+- The Rhythms undo bar stays on screen on wide windows and no longer covers
+  the end of the page on a phone.
+- The rhythm editor opens at the top, and Back returns to the rhythm you
+  opened.
+- Elevation keeps its buttons in place while the base moves, keeps Stop
+  above the bottom bar on short phones, and shares Bed's column on desktop
+  so the tabs stay put.
+- A skipped alarm no longer shifts its row sideways on Bed.
+- The Switch to upstream dialog wraps a long commit instead of scrolling
+  sideways.
+- The temperature stepper keeps its width in Celsius between whole and half
+  degrees.
+- Settings > Features no longer shows a Copy command button for the
+  Biometrics install. Browsers only allow copying on secure pages, so it
+  could not work on a Pod; the command can still be selected with one tap.
+- The daily reboot no longer logs "Command failed" each time it works; the
+  reboot ends the server before sudo can answer, which is now logged as
+  Reboot started. A reboot sudo refuses is still an error.
+- A center button press on a Pod 5 hub now logs how many clicks the hub
+  counted, so a double press that arrives as two single presses shows in
+  the log.
+- Installing or updating now marks the running boot slot as good when it is
+  not. The service that normally does this is switched off by the install,
+  so a slot installed right after a firmware update could run out of boots
+  and start the hub's other slot, which still runs Eight Sleep's system with
+  updates on. The check follows
+  [jalen-cheng](https://github.com/jalen-cheng)'s SevenSleep fork.
+
 ## [3.11.0] - 2026-11-22
 
 Adds a Cover sensors check with a guarded cover service restart, the measured water temperature, an option to write flash less often, removal of old system log files kept in memory, a To base warm-up, and a one-time alarm from Bed; settings now reach flash as soon as they are saved.
