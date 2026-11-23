@@ -1,4 +1,5 @@
-import { Box, FormControlLabel, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { Box, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import ToggleRow from '@components/ToggleRow';
 import type { SmartSchedule } from '@api/rhythmsSchema';
 import type { TemperatureFormat } from '@lib/temperatureConversions';
 import LevelStepper from './LevelStepper';
@@ -23,22 +24,18 @@ const WARM_UP_NOTE: Record<WarmUp, string> = {
 };
 
 export default function SmartScheduleControls({ value, onChange, format, trackingOn, daySleep, shortSleep = false, disabled }: Props) {
-  const toggle = (key: SwitchKey, label: string, description: string, blocked = false) => <Box key={ key }>
-    <FormControlLabel
-      label={ label }
-      labelPlacement="start"
-      sx={ { m: 0, width: '100%', justifyContent: 'space-between', gap: 2 } }
-      control={ <Switch
-        // A locked switch shows what the curve does, not the saved choice underneath.
-        checked={ value[key] && !blocked }
-        disabled={ disabled || blocked }
-        onChange={ event => {
-          const next: SmartSchedule = { ...value };
-          next[key] = event.target.checked;
-          onChange(next);
-        } }/> }/>
-    <Typography variant="body2" color="text.secondary">{ description }</Typography>
-  </Box>;
+  const toggle = (key: SwitchKey, label: string, description: string, blocked = false) => <ToggleRow
+    key={ key }
+    label={ label }
+    description={ description }
+    // A locked switch shows what the curve does, not the saved choice underneath.
+    checked={ value[key] && !blocked }
+    disabled={ disabled || blocked }
+    onChange={ checked => {
+      const next: SmartSchedule = { ...value };
+      next[key] = checked;
+      onChange(next);
+    } }/>;
   const warmUp: WarmUp = !value.warmUp ? 'off' : value.warmUpTo === 'base' ? 'base' : 'above';
   const chooseWarmUp = (next: WarmUp) => {
     const rest = { ...value };
@@ -53,7 +50,7 @@ export default function SmartScheduleControls({ value, onChange, format, trackin
     { !daySleep && shortSleep && <Typography variant="body2" role="note">
       This sleep is shorter than 3 hours, so there is no warm start.
     </Typography> }
-    <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 } }>
+    <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 1 } }>
       <Box sx={ { minWidth: 0, flex: '1 1 140px' } }>
         <Typography>Base temperature</Typography>
         <Typography variant="body2" color="text.secondary">Where you are comfortable. The curve stays within a few steps of it.</Typography>

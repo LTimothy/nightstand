@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Box, Button, Dialog, DialogContent, DialogTitle, MenuItem, Slider, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Slider, Stack, TextField, Typography } from '@mui/material';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import type { Alarm } from '@api/schedulesSchema';
 import AlarmTest from './AlarmTest';
 import { RISE_PATTERN_NOTE } from '@api/alarmPattern.ts';
-import { radius } from '@design/tokens';
+import { BOTTOM_SHEET } from '@design/sheetStyles';
 
 // The summary button for an alarm's vibration and the sheet it opens, shared by every alarm kind.
 export default function WakeVibration({ alarm, onChange, risePattern, maxDuration = 300, disabled }: {
@@ -39,8 +39,7 @@ export default function WakeVibration({ alarm, onChange, risePattern, maxDuratio
       aria-labelledby="wake-vibration-title"
       fullWidth
       maxWidth="sm"
-      sx={ { '& .MuiDialog-container': { alignItems: 'flex-end' },
-        '& .MuiDialog-paper': { m: 0, width: '100%', borderRadius: `${radius.base}px ${radius.base}px 0 0` } } }>
+      sx={ BOTTOM_SHEET }>
       <DialogTitle id="wake-vibration-title">Alarm vibration</DialogTitle>
       <DialogContent><Stack spacing={ 2 } sx={ { pt: 1 } }>
         <TextField
@@ -69,11 +68,9 @@ export default function WakeVibration({ alarm, onChange, risePattern, maxDuratio
           { durations.map(duration => <MenuItem key={ duration } value={ duration }>{ duration % 60 === 0 && duration > 0
             ? `${duration / 60} ${duration === 60 ? 'minute' : 'minutes'}` : `${duration} seconds` }</MenuItem>) }
         </TextField>
-        <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 } }>
-          <AlarmTest vibrationIntensity={ alarm.vibrationIntensity } vibrationPattern={ alarm.vibrationPattern }/>
-          <Button onClick={ close }>Done</Button>
-        </Box>
+        <AlarmTest vibrationIntensity={ alarm.vibrationIntensity } vibrationPattern={ alarm.vibrationPattern }/>
       </Stack></DialogContent>
+      <DialogActions><Button onClick={ close }>Done</Button></DialogActions>
     </Dialog>
   </>;
 }

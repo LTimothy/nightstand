@@ -74,6 +74,7 @@ export default function UpdateFreeSleepButton({ runningVersion, onProblem, onSta
       </Button>
       <Dialog
         open={ open }
+        maxWidth="sm"
         aria-labelledby={ titleId }
         slots={ {
           transition: Transition,
@@ -102,7 +103,7 @@ export default function UpdateFreeSleepButton({ runningVersion, onProblem, onSta
               <DialogContentText>
                 Nightstand restarts to finish, and schedules and alarms pause for up to five minutes.
               </DialogContentText>
-              <DialogContentText>
+              <DialogContentText sx={ { mt: 2, mb: 2 } }>
                 If the checks fail, Nightstand tries to go back to v{ runningVersion } on its own.
               </DialogContentText>
               <Accordion>
@@ -114,10 +115,10 @@ export default function UpdateFreeSleepButton({ runningVersion, onProblem, onSta
             </>
           ) }
           { phase === 'updating' && (
-            <Stack spacing={ 2 } alignItems="center" sx={ { py: 2 } }>
+            <Stack spacing={ 2 } alignItems="flex-start" sx={ { py: 2 } }>
               <CircularProgress/>
               <Typography variant="body2" color="text.secondary">
-                Installing { targetVersion }. This page reloads by itself
+                Installing v{ targetVersion }. This page reloads by itself
                 when Nightstand comes back on the new version.
               </Typography>
             </Stack>
@@ -139,7 +140,7 @@ export default function UpdateFreeSleepButton({ runningVersion, onProblem, onSta
             </Stack>
           ) }
         </DialogContent>
-        <DialogActions>
+        { phase !== 'updating' && <DialogActions>
           { phase === 'idle' && (
             <>
               <Button autoFocus={ inUse !== undefined } onClick={ () => { reset(); setOpen(false); } }>Cancel</Button>
@@ -152,7 +153,7 @@ export default function UpdateFreeSleepButton({ runningVersion, onProblem, onSta
           { (phase === 'timed_out' || phase === 'failed') && (
             <Button onClick={ () => { reset(); setOpen(false); } }>Close</Button>
           ) }
-        </DialogActions>
+        </DialogActions> }
       </Dialog>
     </>
   );

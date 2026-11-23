@@ -4,7 +4,7 @@ import type { Settings } from '@api/settingsSchema.ts';
 import { useServices } from '@api/services.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import Section from './Section.tsx';
-import FeatureToggleRow from './FeaturesSection/FeatureToggleRow.tsx';
+import ToggleRow from '@components/ToggleRow';
 import TurnOnFirst from './FeaturesSection/TurnOnFirst.tsx';
 
 const SWITCHES = [
@@ -30,7 +30,7 @@ export default function DiagnosticsCard({ settings, updateSettings }: Props) {
       variant="body2"
       color="text.secondary"
       sx={ { mb: 1 } }>Shown on System status.</Typography>
-    { SWITCHES.map(([label, flag, description]) => <FeatureToggleRow
+    { SWITCHES.map(([label, flag, description]) => <ToggleRow
       key={ flag }
       label={ label }
       disabled={ isUpdating || features?.[flag] === undefined || !biometricsEnabled }

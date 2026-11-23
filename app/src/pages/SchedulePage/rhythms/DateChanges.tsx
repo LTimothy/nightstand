@@ -4,7 +4,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import type { SideRhythms } from '@api/rhythmsSchema';
 import { palette, radius } from '@design/tokens';
 import { dayLabel, rhythmName, upcomingChanges, weekLabel, type DateChoice } from './rhythmsModel';
-import { INACTIVE } from './sheetStyles';
+import { INACTIVE } from '@design/sheetStyles';
 
 type Props = {
   sideData: SideRhythms;

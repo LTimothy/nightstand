@@ -8,7 +8,7 @@ import { NightRow, useNightExclude } from './NotesSheet';
 import OverlayChart from './OverlayChart';
 import SmartCurveChart from './SmartCurveChart';
 import { suggestionStart, withRows } from './rhythmsModel';
-import { INACTIVE, SCROLL_SHEET } from './sheetStyles';
+import { INACTIVE, SCROLL_SHEET } from '@design/sheetStyles';
 import { suggestionOverlay, unusualDates } from './suggestionOverlay';
 import {
   addLabel, dontSuggestLabel, evidenceSentence, holdsLine, NIGHTS_HEADING, provenance, questionHeading, sheetHeading, sheetOverline,
@@ -151,18 +151,18 @@ export default function SuggestionSheet(props: Props) {
       <Typography variant="body2" sx={ { mt: 1 } }>{ startsLine(start, rhythm.name) }</Typography>
     </DialogContent>
     { (error || exclude.error) && <Alert severity="error" sx={ { mx: 2, mt: 1 } }>{ error || exclude.error }</Alert> }
-    <DialogActions sx={ { flexWrap: 'wrap', gap: 1, px: 2, '& > :not(style) ~ :not(style)': { ml: 0 } } }>
+    <DialogActions>
+      <Button onClick={ props.onClose } sx={ { minHeight: 44 } }>Close</Button>
+      <Button aria-disabled={ busy || none } onClick={ guard(() => props.onDontSuggest(rows), none) } sx={ { minHeight: 44, ...INACTIVE } }>
+        { dontSuggestLabel(rows.length, entry.rows.length) }
+      </Button>
       <Button
         variant="contained"
         aria-disabled={ busy || none }
         onClick={ guard(() => props.onAdd(rows), none) }
-        sx={ { minHeight: 44, flexBasis: { xs: '100%', sm: 'auto' }, ...INACTIVE } }>
+        sx={ { minHeight: 44, ...INACTIVE } }>
         { addLabel(rhythm.name, rows.length, entry.rows.length) }
       </Button>
-      <Button aria-disabled={ busy || none } onClick={ guard(() => props.onDontSuggest(rows), none) } sx={ { minHeight: 44, ...INACTIVE } }>
-        { dontSuggestLabel(rows.length, entry.rows.length) }
-      </Button>
-      <Button onClick={ props.onClose } sx={ { minHeight: 44 } }>Close</Button>
     </DialogActions>
   </Dialog>;
 }

@@ -67,7 +67,11 @@ export default function RevertToStockRow({ runningVersion }: Props) {
         </Typography>
       </ButtonBase>
 
-      <Dialog aria-labelledby={ titleId } open={ open } onClose={ () => { if (phase !== 'updating') { reset(); setOpen(false); } } }>
+      <Dialog
+        maxWidth="sm"
+        aria-labelledby={ titleId }
+        open={ open }
+        onClose={ () => { if (phase !== 'updating') { reset(); setOpen(false); } } }>
         <DialogTitle id={ titleId }>
           { phase === 'idle' && 'Switch to upstream free-sleep?' }
           { phase === 'updating' && 'Switching to upstream...' }
@@ -125,7 +129,7 @@ export default function RevertToStockRow({ runningVersion }: Props) {
           ) }
           { phase === 'idle' && <RhythmsLeaveNote/> }
           { phase === 'updating' && (
-            <Stack spacing={ 2 } alignItems="center" sx={ { py: 2 } }>
+            <Stack spacing={ 2 } alignItems="flex-start" sx={ { py: 2 } }>
               <CircularProgress/>
               <Typography variant="body2" color="text.secondary">
                 Switching to upstream free-sleep. This page reloads by itself when done.
@@ -148,21 +152,19 @@ export default function RevertToStockRow({ runningVersion }: Props) {
             </Stack>
           ) }
         </DialogContent>
-        <DialogActions
-          sx={ { flexDirection: { xs: 'column', sm: 'row' }, gap: 1, px: 3, pb: 3,
-            '& > :not(style) ~ :not(style)': { ml: 0 }, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } } }>
+        { phase !== 'updating' && <DialogActions>
           { phase === 'idle' && (
             <>
               <Button autoFocus={ inUse !== undefined } onClick={ () => { reset(); setOpen(false); } }>Cancel</Button>
               <Button color="error" variant="contained" disabled={ !canRevert } onClick={ revert }>
-                { inUse ? 'Continue anyway' : 'Switch to upstream free-sleep' }
+                { inUse ? 'Continue anyway' : 'Switch now' }
               </Button>
             </>
           ) }
           { (phase === 'timed_out' || phase === 'failed') && (
             <Button onClick={ () => { reset(); setOpen(false); } }>Close</Button>
           ) }
-        </DialogActions>
+        </DialogActions> }
       </Dialog>
     </>
   );

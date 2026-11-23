@@ -2,7 +2,7 @@ import { Box, TextField } from '@mui/material';
 import { Settings } from '@api/settingsSchema.ts';
 import { DeepPartial } from 'ts-essentials';
 import { useAppStore } from '@state/appStore.tsx';
-import FeatureToggleRow from './FeaturesSection/FeatureToggleRow';
+import ToggleRow from '@components/ToggleRow';
 
 type PrimePodScheduleProps = {
   settings?: Settings;
@@ -12,7 +12,7 @@ type PrimePodScheduleProps = {
 export default function DailyPriming({ settings, updateSettings }: PrimePodScheduleProps) {
   const { isUpdating } = useAppStore();
   return <Box sx={ { display: 'flex', flexDirection: 'column', gap: 2, mb: 2 } }>
-    <FeatureToggleRow
+    <ToggleRow
       label="Prime daily"
       disabled={ isUpdating || !settings }
       checked={ settings?.primePodDaily?.enabled ?? false }
@@ -27,7 +27,7 @@ export default function DailyPriming({ settings, updateSettings }: PrimePodSched
       slotProps={ { inputLabel: { shrink: true } } }
       fullWidth
     />
-    <FeatureToggleRow
+    <ToggleRow
       label="Restart the Pod an hour before priming"
       disabled={ isUpdating || settings?.rebootDaily === undefined || settings?.primePodDaily?.enabled === false }
       checked={ settings ? settings.rebootDaily ?? true : false }

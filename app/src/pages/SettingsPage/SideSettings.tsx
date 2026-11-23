@@ -1,4 +1,4 @@
-import FeatureToggleRow from './FeaturesSection/FeatureToggleRow';
+import ToggleRow from '@components/ToggleRow';
 import { Box, TextField, Typography } from '@mui/material';
 import { DeepPartial } from 'ts-essentials';
 import { useEffect, useRef, useState } from 'react';
@@ -93,7 +93,7 @@ export default function SideSettings({ side, settings, updateSettings }: AwayMod
         }, readOnly: savingName, style: { unicodeBidi: 'isolate' } } }
         fullWidth
       />
-      <FeatureToggleRow
+      <ToggleRow
         label="Away mode"
         ariaLabel={ `${title} away mode` }
         disabled={ isUpdating || !settings }

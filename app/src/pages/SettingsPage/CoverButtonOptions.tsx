@@ -7,7 +7,7 @@ import type { TemperatureFormat } from '@lib/temperatureConversions';
 import { weight } from '@design/tokens';
 import TemperatureStepper from '../SchedulePage/TemperatureStepper';
 import TemperatureChangeSelect from './TemperatureChangeSelect';
-import FeatureToggleRow from './FeaturesSection/FeatureToggleRow';
+import ToggleRow from '@components/ToggleRow';
 import { coverButtonsPatch, DEFAULT_LOGO_F, readCoverButtons, type CoverButtonsPath, type CoverButtonValues } from './coverButtons';
 import useTemperatureFormat from '@lib/useTemperatureFormat';
 
@@ -23,6 +23,24 @@ function SideButtons({ title, side, path, format, disabled, save }: {
   const lengthId = useId();
   const values = side ? readCoverButtons(path, side) : null;
   const change = (next: Partial<CoverButtonValues>) => { if (values) save(coverButtonsPatch(path, values, next)); };
+  const center = typeof values?.logoF === 'number' && <Box>
+    <Typography
+      variant="body2"
+      color="text.secondary"
+      sx={ { mb: 1 } }>Center button temperature</Typography>
+    <TemperatureStepper
+      value={ values.logoF }
+      format={ format }
+      label={ `${title} center button temperature` }
+      disabled={ disabled }
+      onChange={ logoF => change({ logoF }) }/>
+    <Typography
+      variant="body2"
+      color="text.secondary"
+      sx={ { mt: 1 } }>
+      { path === 'taps' ? 'Also turns the side on.' : 'When no alarm is ringing, the center button sets this and turns the side on.' }
+    </Typography>
+  </Box>;
   return <Stack
     role="group"
     aria-label={ `${title} side buttons` }
@@ -47,48 +65,35 @@ function SideButtons({ title, side, path, format, disabled, save }: {
           format={ format }
           disabled={ disabled }
           onChange={ stepF => change({ stepF }) }/>
-        <FeatureToggleRow
+        <ToggleRow
           label="Swap plus and minus"
           ariaLabel={ `${title} swap plus and minus` }
           checked={ values.swapped }
           disabled={ disabled }
           onChange={ swapped => change({ swapped }) }/>
       </> }
-      { path === 'taps' && <FeatureToggleRow
+      { path === 'taps' ? <ToggleRow
         label="Center button sets a temperature"
         ariaLabel={ `${title} center button sets a temperature` }
         checked={ values.logoF !== null }
         disabled={ disabled }
-        onChange={ on => change({ logoF: on ? DEFAULT_LOGO_F : null }) }/> }
-      { values.logoOther && <Typography
-        variant="body2"
-        color="text.secondary">The quad tap is set to another action under Bed and sides &gt; Tap gestures,
-        so a single press only stops alarms.</Typography> }
-      { values.logoF !== null && <Box>
-        <Typography variant="body2">Center button temperature</Typography>
-        <TemperatureStepper
-          value={ values.logoF }
-          format={ format }
-          label={ `${title} center button temperature` }
-          disabled={ disabled }
-          onChange={ logoF => change({ logoF }) }/>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={ { mt: 1.5 } }>
-          { path === 'taps' ? 'Also turns the side on.' : 'When no alarm is ringing, the center button sets this and turns the side on.' }
-        </Typography>
-      </Box> }
-      { path === 'taps' && <>
-        <FeatureToggleRow
-          label="Double press for a boost"
-          ariaLabel={ `${title} double press for a boost` }
-          checked={ values.boostMinutes > 0 }
-          disabled={ disabled }
-          onChange={ on => change({ boostMinutes: on ? DEFAULT_BOOST_MINUTES : 0 }) }/>
+        onChange={ on => change({ logoF: on ? DEFAULT_LOGO_F : null }) }
+        description={ values.logoOther && <>The quad tap is set to another action under Bed and sides &gt; Tap gestures,
+          so a single press only stops alarms.</> }>
+        { center }
+      </ToggleRow> : center }
+      { path === 'taps' && <ToggleRow
+        label="Double press for a boost"
+        ariaLabel={ `${title} double press for a boost` }
+        checked={ values.boostMinutes > 0 }
+        disabled={ disabled }
+        onChange={ on => change({ boostMinutes: on ? DEFAULT_BOOST_MINUTES : 0 }) }>
         { values.boostMinutes > 0 && <Stack spacing={ 1.5 }>
           <Box>
-            <Typography variant="body2">Boost temperature</Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={ { mb: 1 } }>Boost temperature</Typography>
             <TemperatureStepper
               value={ values.boostF }
               format={ format }
@@ -96,7 +101,7 @@ function SideButtons({ title, side, path, format, disabled, save }: {
               disabled={ disabled }
               onChange={ boostF => change({ boostF }) }/>
           </Box>
-          <FormControl sx={ { minWidth: 140 } }>
+          <FormControl sx={ { minWidth: 140, alignSelf: 'flex-start' } }>
             <InputLabel id={ lengthId }>Boost length</InputLabel>
             <Select
               labelId={ lengthId }
@@ -117,7 +122,7 @@ function SideButtons({ title, side, path, format, disabled, save }: {
             Only while the side is on. Changing the temperature ends it.
           </Typography>
         </Stack> }
-      </> }
+      </ToggleRow> }
     </> }
   </Stack>;
 }
@@ -128,8 +133,7 @@ export default function CoverButtonOptions({ path, settings, disabled, save }: {
   const format = useTemperatureFormat();
   return <Stack
     spacing={ 3 }
-    // Indented under the switch on a Pod 4 hub; a Pod 5 hub has no switch to sit under.
-    sx={ path === 'buttons' ? { pl: 2, my: 2, borderLeft: 1, borderColor: 'divider' } : { mt: 2 } }>
+    sx={ path === 'taps' ? { mt: 2 } : undefined }>
     { SIDES.map(([side, title]) => <SideButtons
       key={ side }
       title={ title }

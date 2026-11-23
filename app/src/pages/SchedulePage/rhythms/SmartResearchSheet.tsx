@@ -4,7 +4,7 @@ import { useId, useState } from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, Stack, Typography } from '@mui/material';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { palette, weight } from '@design/tokens';
-import { SCROLL_SHEET } from './sheetStyles';
+import { SCROLL_SHEET } from '@design/sheetStyles';
 
 type Source = { cite: string; title: string; href: string; tested: string };
 type Phase = { heading: string; does: string; why: string; sources: Source[] };

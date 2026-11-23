@@ -6,7 +6,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import type { SideRhythms } from '@api/rhythmsSchema';
 import { palette, radius, weight } from '@design/tokens';
 import { changeFor, formatDate, MAX_CHANGE_DAYS_AHEAD } from './rhythmsModel';
-import { BOTTOM_SHEET } from './sheetStyles';
+import { BOTTOM_SHEET } from '@design/sheetStyles';
 
 const DATE = 'YYYY-MM-DD';
 const MONTH = 'YYYY-MM';

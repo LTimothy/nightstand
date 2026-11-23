@@ -50,7 +50,7 @@ describe('FeaturesSection', () => {
       await waitFor(() => expect(within(tracking).getAllByRole('link', { name: 'Turn on Biometrics first' })).toHaveLength(4));
       const toggle = within(tracking).getByRole('switch', { name: label });
       expect(toggle).toBeDisabled();
-      const row = toggle.closest('.MuiBox-root')!.parentElement!;
+      const row = toggle.closest<HTMLElement>('.MuiBox-root')!;
       expect(within(row).getByRole('link', { name: 'Turn on Biometrics first' })).toHaveAttribute('href', '#biometrics');
       expect(document.getElementById('biometrics')).not.toBeNull();
     },

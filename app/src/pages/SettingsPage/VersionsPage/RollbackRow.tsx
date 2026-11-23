@@ -50,7 +50,11 @@ export default function RollbackRow({ runningVersion, rollbackVersion }: Props) 
         </Stack>
       </ButtonBase>
 
-      <Dialog aria-labelledby={ titleId } open={ open } onClose={ () => { if (phase !== 'updating') { reset(); setOpen(false); } } }>
+      <Dialog
+        maxWidth="sm"
+        aria-labelledby={ titleId }
+        open={ open }
+        onClose={ () => { if (phase !== 'updating') { reset(); setOpen(false); } } }>
         <DialogTitle id={ titleId }>
           { phase === 'idle' && `Go back to v${rollbackVersion}?` }
           { phase === 'updating' && 'Rolling back...' }
@@ -68,7 +72,7 @@ export default function RollbackRow({ runningVersion, rollbackVersion }: Props) 
           ) }
           { phase === 'idle' && <RhythmsLeaveNote targetVersion={ rollbackVersion }/> }
           { phase === 'updating' && (
-            <Stack spacing={ 2 } alignItems="center" sx={ { py: 2 } }>
+            <Stack spacing={ 2 } alignItems="flex-start" sx={ { py: 2 } }>
               <CircularProgress/>
               <Typography variant="body2" color="text.secondary">
                 Rolling back to v{ rollbackVersion }. This page reloads by itself when done.
@@ -91,7 +95,7 @@ export default function RollbackRow({ runningVersion, rollbackVersion }: Props) 
             </Stack>
           ) }
         </DialogContent>
-        <DialogActions>
+        { phase !== 'updating' && <DialogActions>
           { phase === 'idle' && (
             <>
               <Button autoFocus={ inUse !== undefined } onClick={ () => { reset(); setOpen(false); } }>Cancel</Button>
@@ -101,7 +105,7 @@ export default function RollbackRow({ runningVersion, rollbackVersion }: Props) 
           { (phase === 'timed_out' || phase === 'failed') && (
             <Button onClick={ () => { reset(); setOpen(false); } }>Close</Button>
           ) }
-        </DialogActions>
+        </DialogActions> }
       </Dialog>
     </>
   );

@@ -4,7 +4,7 @@ import type { DayOfWeek } from '@api/schedulesSchema';
 import { describeDays, WEEK_DAYS } from '@api/rhythmDays';
 import { palette, radius } from '@design/tokens';
 import { dayName } from './rhythmsModel';
-import { BOTTOM_SHEET } from './sheetStyles';
+import { BOTTOM_SHEET } from '@design/sheetStyles';
 
 type Props = { name: string; onUse: (days: DayOfWeek[]) => void; onClose: () => void };
 

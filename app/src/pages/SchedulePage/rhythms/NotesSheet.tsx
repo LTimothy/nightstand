@@ -9,7 +9,7 @@ import { postNightExclude, postSuggestionRestore } from '@api/rhythms';
 import type { Dismissed, NightLog, Rhythm, SuggestionsResponse } from '@api/rhythmsSchema';
 import type { TemperatureFormat } from '@lib/temperatureConversions';
 import { palette, weight } from '@design/tokens';
-import { SCROLL_SHEET } from './sheetStyles';
+import { SCROLL_SHEET } from '@design/sheetStyles';
 import {
   AWAY_LINE, EXCLUDE_ERROR, HIDDEN_HEADING, hiddenIntro, hiddenRow, HOW_THIS_WORKS, HOW_TITLE, howSuggestionsWork, LEAVE_OUT, LEAVE_OUT_HINT,
   leaveOutName, nightLabel, noteLines, notesCountLine, notesTitle, SHOW_AGAIN, SHOW_AGAIN_ERROR, showAgainName, WHAT_COUNTS_TITLE, whatCounts,

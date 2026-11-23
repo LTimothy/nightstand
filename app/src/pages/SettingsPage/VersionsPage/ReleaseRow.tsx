@@ -57,7 +57,11 @@ export default function ReleaseRow({ release, runningVersion, body, offerReinsta
       </Box>
       { notes && <Typography variant="body2" color="text.secondary" sx={ { overflowWrap: 'anywhere' } }>{ notes }</Typography> }
 
-      <Dialog aria-labelledby={ titleId } open={ open } onClose={ () => { if (phase !== 'updating') { reset(); setOpen(false); } } }>
+      <Dialog
+        maxWidth="sm"
+        aria-labelledby={ titleId }
+        open={ open }
+        onClose={ () => { if (phase !== 'updating') { reset(); setOpen(false); } } }>
         <DialogTitle id={ titleId }>
           { phase === 'idle' && `${isReinstall ? 'Reinstall' : 'Install'} v${release.version}?` }
           { phase === 'updating' && 'Installing...' }
@@ -90,7 +94,7 @@ export default function ReleaseRow({ release, runningVersion, body, offerReinsta
           </Alert> }
           { phase === 'idle' && isDowngrade && <RhythmsLeaveNote targetVersion={ release.version }/> }
           { phase === 'updating' && (
-            <Stack spacing={ 2 } alignItems="center" sx={ { py: 2 } }>
+            <Stack spacing={ 2 } alignItems="flex-start" sx={ { py: 2 } }>
               <CircularProgress/>
               <Typography variant="body2" color="text.secondary">
                 Installing v{ release.version }. This page reloads by itself when Nightstand comes back.
@@ -114,7 +118,7 @@ export default function ReleaseRow({ release, runningVersion, body, offerReinsta
             </Stack>
           ) }
         </DialogContent>
-        <DialogActions>
+        { phase !== 'updating' && <DialogActions>
           { phase === 'idle' && (
             <>
               <Button autoFocus={ inUse !== undefined } onClick={ () => { reset(); setOpen(false); } }>Cancel</Button>
@@ -126,7 +130,7 @@ export default function ReleaseRow({ release, runningVersion, body, offerReinsta
           { (phase === 'timed_out' || phase === 'failed') && (
             <Button onClick={ () => { reset(); setOpen(false); } }>Close</Button>
           ) }
-        </DialogActions>
+        </DialogActions> }
       </Dialog>
     </Box>
   );

@@ -55,7 +55,7 @@ describe('the dialog title after a recorded failure', () => {
     const { user } = renderWithProviders(<RevertToStockRow runningVersion="3.3.0"/>);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Switch to upstream free-sleep' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Switch to upstream free-sleep' }));
-    await user.click(await screen.findByRole('button', { name: 'Switch to upstream free-sleep' }));
+    await user.click(await screen.findByRole('button', { name: 'Switch now' }));
     await afterPoll();
     expect(await screen.findByText('Switch did not finish')).toBeVisible();
   });

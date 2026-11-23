@@ -10,7 +10,7 @@ export default function TemperatureChangeSelect({ label, labelPrefixId, valueF, 
   label: string; labelPrefixId?: string; valueF: number; format: TemperatureFormat; disabled: boolean; onChange: (valueF: number) => void;
 }) {
   const id = useId();
-  return <FormControl sx={ { minWidth: 140 } }>
+  return <FormControl sx={ { minWidth: 140, alignSelf: 'flex-start' } }>
     <InputLabel id={ id }>{ label }</InputLabel>
     <Select
       labelId={ id }

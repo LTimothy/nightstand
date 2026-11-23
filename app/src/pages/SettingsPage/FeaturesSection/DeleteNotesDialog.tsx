@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Dialog, DialogActions, DialogTitle } from '@mui/material';
 import { postSuggestionsForget } from '@api/rhythms';
-import { INACTIVE } from '../../SchedulePage/rhythms/sheetStyles';
+import { INACTIVE } from '@design/sheetStyles';
 import { DELETE_NOTES, DELETE_NOTES_ERROR, DELETE_NOTES_QUESTION } from '../../SchedulePage/rhythms/suggestionsCopy';
 
 type Props = { onClose: () => void };

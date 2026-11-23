@@ -3,14 +3,15 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useUpdateAttentionStore, type UpdateOutcome } from '@state/updateAttentionStore';
 import {
   Accordion, AccordionDetails, AccordionSummary,
-  Alert, Box, Button, Drawer, FormControlLabel, Link as MuiLink, List, ListItem, ListItemButton, ListItemText, Radio, RadioGroup,
-  Typography,
+  Alert, Box, Button, Dialog, DialogContent, DialogTitle, FormControlLabel, Link as MuiLink, List, ListItem, ListItemButton, ListItemText,
+  Radio, RadioGroup, Typography,
 } from '@mui/material';
 import semver from 'semver';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { Link } from 'react-router-dom';
 import moment from 'moment-timezone';
+import { BOTTOM_SHEET } from '@design/sheetStyles';
 import { SubpageShell } from '../../DataPage/Header.tsx';
 import Section from '../Section.tsx';
 import MarkdownBody from '@components/MarkdownBody.tsx';
@@ -168,10 +169,16 @@ export default function VersionsPage() {
         <ListItemButton component={ Link } to="/changelog" sx={ { py: 1.5 } }>
           <ListItemText primary="Release notes" /><ChevronRightIcon color="action" />
         </ListItemButton>
-        <Drawer anchor="bottom" open={ channelOpen } onClose={ () => setChannelOpen(false) }>
-          <Box sx={ { p: 3, width: '100%', maxWidth: 720, mx: 'auto' } }>
-            <Typography variant="h2">Update channel</Typography>
-            <Typography variant="body2" color="text.secondary" sx={ { my: 2 } }>
+        <Dialog
+          open={ channelOpen }
+          onClose={ () => setChannelOpen(false) }
+          fullWidth
+          maxWidth="sm"
+          sx={ BOTTOM_SHEET }
+          aria-labelledby="update-channel-title">
+          <DialogTitle id="update-channel-title">Update channel</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" sx={ { mb: 2 } }>
             Stable changes less often. A release moves to stable once the maintainer has used it for a while
             without problems. Beta gets each release as soon as it is out, with less testing.
             </Typography>
@@ -196,8 +203,8 @@ export default function VersionsPage() {
               />) }
             </RadioGroup>
             { channelError && <Alert severity="error">{ channelError }</Alert> }
-          </Box>
-        </Drawer>
+          </DialogContent>
+        </Dialog>
         <Accordion
           disableGutters
           sx={ { border: 0, borderTop: 1, borderColor: 'divider', borderRadius: '0 !important' } }

@@ -2,8 +2,9 @@ import SectionHeading from '@components/SectionHeading';
 import moment from 'moment-timezone';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
-  Alert, Box, Button, FormControlLabel, IconButton, ListItemText, MenuItem, Paper, Stack, Switch, TextField, Typography,
+  Alert, Box, Button, IconButton, ListItemText, MenuItem, Paper, Stack, TextField, Typography,
 } from '@mui/material';
+import ToggleRow from '@components/ToggleRow';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import { useAppStore } from '@state/appStore';
 import { TemperatureFormat } from '@lib/temperatureConversions';
@@ -334,21 +335,18 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
           data-testid="schedule-event"
           data-invalid={ invalid || undefined }
           sx={ { p: 2 } }>
-          <FormControlLabel
+          <ToggleRow
             label={ alarms.length === 1 ? 'Alarm' : `Alarm ${index + 1}` }
-            labelPlacement="start"
-            sx={ { m: 0, mb: 1, width: '100%', justifyContent: 'space-between' } }
-            control={ <Switch
-              checked={ alarm.enabled }
-              disabled={ disabled }
-              slotProps={ { input: { 'aria-label': `Enable alarm ${index + 1}` } } }
-              onChange={ event => {
-                store.selectAlarm(index);
-                store.updateSelectedAlarm({ enabled: event.target.checked });
-                refollowLastAlarm();
-              } }/> }/>
+            ariaLabel={ `Enable alarm ${index + 1}` }
+            checked={ alarm.enabled }
+            disabled={ disabled }
+            onChange={ enabled => {
+              store.selectAlarm(index);
+              store.updateSelectedAlarm({ enabled });
+              refollowLastAlarm();
+            } }/>
           <Box
-            sx={ { display: 'grid', gridTemplateColumns: '145px 1fr 44px',
+            sx={ { mt: 1, display: 'grid', gridTemplateColumns: '145px 1fr 44px',
               gridTemplateAreas: '"field . delete"', alignItems: 'center', gap: 1 } }>
             <TextField
               label={ wake ? 'Ring at' : 'Wake at' }

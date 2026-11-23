@@ -5,7 +5,7 @@ import type { SideRhythms } from '@api/rhythmsSchema';
 import { palette, radius, weight } from '@design/tokens';
 import RhythmPicker from './RhythmPicker';
 import { describeDays, rhythmName, rhythmOptions, weekRuns, type DateChoice } from './rhythmsModel';
-import { INACTIVE } from './sheetStyles';
+import { INACTIVE } from '@design/sheetStyles';
 
 type Props = {
   sideData: SideRhythms;

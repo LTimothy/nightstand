@@ -4,7 +4,7 @@ import type { Settings } from '@api/settingsSchema.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import Section from './Section.tsx';
-import FeatureToggleRow from './FeaturesSection/FeatureToggleRow.tsx';
+import ToggleRow from '@components/ToggleRow';
 import CoverButtonOptions from './CoverButtonOptions.tsx';
 import { coverButtonsPath, POD5_HUB_GESTURES } from './coverButtons.ts';
 import { GESTURE_LABELS } from './tapActions.ts';
@@ -35,7 +35,7 @@ export default function CoverButtonsCard({ settings, updateSettings }: Props) {
     save={ save }/>;
   return <Section title="Cover buttons">
     { path === 'taps' ? <>
-      <FeatureToggleRow
+      <ToggleRow
         label="Buzz when a center button press is applied"
         disabled={ isUpdating || settings.features?.logoClickBuzz === undefined }
         checked={ settings.features?.logoClickBuzz ?? false }
@@ -47,13 +47,14 @@ export default function CoverButtonsCard({ settings, updateSettings }: Props) {
         color="text.secondary">{ POD5_HUB }</Typography>
       { options }
     </> : <>
-      <FeatureToggleRow
+      <ToggleRow
         label="Read cover buttons"
         disabled={ isUpdating || settings.features?.coverButtons === undefined }
         checked={ settings.features?.coverButtons ?? false }
         onChange={ next => save({ features: { coverButtons: next } }) }
-        description={ POD4_HUB }/>
-      { settings.features?.coverButtons && options }
+        description={ POD4_HUB }>
+        { settings.features?.coverButtons && options }
+      </ToggleRow>
     </> }
   </Section>;
 }

@@ -22,7 +22,7 @@ test('switching while a side is on asks for a second confirmation', async ({ pag
   await page.getByText('Switch to upstream free-sleep').click();
 
   const dialog = page.getByRole('dialog').filter({ hasText: 'Switch to upstream free-sleep?' });
-  await dialog.getByRole('button', { name: 'Switch to upstream free-sleep' }).click();
+  await dialog.getByRole('button', { name: 'Switch now' }).click();
 
   await expect(dialog.getByRole('alert').first()).toContainText('A side is on.');
   await expect(dialog.getByRole('button', { name: 'Continue anyway' })).toBeVisible();

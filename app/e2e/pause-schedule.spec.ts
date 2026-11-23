@@ -19,7 +19,7 @@ test('pausing tonight shows the paused side and resuming brings the schedule bac
   await expect(page.getByRole('radio', { name: /^Tonight only/ })).toBeChecked();
   await page.getByRole('radio', { name: 'Until a set time' }).check();
   await expect(page.getByLabel('Resume at')).toBeVisible();
-  const sheet = page.locator('.MuiDrawer-paper');
+  const sheet = page.getByRole('dialog');
   expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   // Against the set width: a phone widens its layout viewport to fit overflowing content.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
@@ -42,4 +42,12 @@ test('pausing tonight shows the paused side and resuming brings the schedule bac
   await expect(page.getByRole('button', { name: 'Pause schedule' })).toBeFocused();
   await expect(page.getByText(/^Schedule paused until /)).toHaveCount(0);
   await expect(target).not.toHaveAttribute('fill', grey);
+});
+
+test('the pause sheet is 600 wide on desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Pause schedule' }).click();
+  const box = await page.getByRole('dialog').boundingBox();
+  expect(box?.width).toBe(600);
 });

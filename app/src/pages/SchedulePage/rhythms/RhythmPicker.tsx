@@ -8,7 +8,7 @@ import type { DayOfWeek } from '@api/schedulesSchema';
 import { palette, radius } from '@design/tokens';
 import { describeDays } from '@api/rhythmDays';
 import { choiceKey, dayName, type DateChoice, type PickerOption } from './rhythmsModel';
-import { BOTTOM_SHEET } from './sheetStyles';
+import { BOTTOM_SHEET } from '@design/sheetStyles';
 
 // Lets a grouped week line change some of its days, not only all of them.
 export type DayChoice = { days: DayOfWeek[]; chosen: DayOfWeek[]; onChange: (chosen: DayOfWeek[]) => void };

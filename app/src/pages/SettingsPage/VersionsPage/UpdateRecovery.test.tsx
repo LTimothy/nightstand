@@ -21,7 +21,7 @@ const cases = [
     title: 'Go back to v2.9.0?', confirm: 'Go back now', log: 'rollback',
     render: (runningVersion: string) => <RollbackRow runningVersion={ runningVersion } rollbackVersion="2.9.0"/> },
   { name: 'upstream restore', open: 'Switch to upstream free-sleep',
-    title: 'Switch to upstream free-sleep?', confirm: 'Switch to upstream free-sleep', log: 'revert',
+    title: 'Switch to upstream free-sleep?', confirm: 'Switch now', log: 'revert',
     render: (runningVersion: string) => <RevertToStockRow runningVersion={ runningVersion }/> },
 ];
 

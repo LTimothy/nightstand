@@ -1,7 +1,7 @@
 import { Link } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
-const sx = { display: 'inline-flex', minHeight: 44, alignItems: 'center' };
+const sx = { display: 'inline-flex', minHeight: 44, alignItems: 'flex-start', mb: -3 };
 
 // The line under a switch that waits on another one. A same-page anchor scrolls natively; another page goes through the router.
 export default function TurnOnFirst({ parent, href }: { parent: string; href: string }) {

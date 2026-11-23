@@ -23,6 +23,7 @@ it('shows a failed channel save and retains the saved channel', async () => {
   server.use(savedOnStable(), http.post('*/settings', () => new HttpResponse(null, { status: 500 })));
   const { user } = renderWithProviders(<VersionsPage />);
   await user.click(await screen.findByRole('button', { name: /Update channel Stable/ }));
+  expect(screen.getByRole('dialog', { name: 'Update channel' })).toBeInTheDocument();
   await waitFor(() => expect(screen.getByRole('radio', { name: 'Beta' })).toBeEnabled());
   await user.click(screen.getByRole('radio', { name: 'Beta' }));
   expect(await screen.findByText(/Could not save the update channel/)).toBeInTheDocument();

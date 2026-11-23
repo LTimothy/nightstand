@@ -103,6 +103,7 @@ const buildComponents = ({ palette: p, radius, type }: ThemeTokens) => {
     MuiAccordionSummary: { styleOverrides: { root: { fontFamily: 'inherit', fontSize: 16, fontWeight: type.mediumWeight, minHeight: 44,
       '&.Mui-expanded': { minHeight: 44 },
       '&.Mui-focusVisible': { outlineOffset: '-2px' } }, content: { margin: '8px 0', '&.Mui-expanded': { margin: '8px 0' } } } },
+    MuiDialog: { defaultProps: { fullWidth: true, maxWidth: 'xs' } },
     MuiDialogTitle: { styleOverrides: { root: { fontSize: 16, fontWeight: type.headingWeight } } },
     // Loading is grey in every look, like the dial's stale state.
     MuiCircularProgress: { styleOverrides: { colorPrimary: { color: p.text.tertiary } } },

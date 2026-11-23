@@ -6,7 +6,7 @@ import {
 import type { SideRhythms } from '@api/rhythmsSchema';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
 import { palette, radius } from '@design/tokens';
-import { BOTTOM_SHEET, INACTIVE } from './sheetStyles';
+import { BOTTOM_SHEET, INACTIVE } from '@design/sheetStyles';
 import MultiDateSheet from './MultiDateSheet';
 import RhythmPicker from './RhythmPicker';
 import {

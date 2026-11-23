@@ -3,7 +3,7 @@ import { radius } from '@design/tokens';
 
 const SHEET_PAPER = { m: 0, width: '100%', borderRadius: `${radius.base}px ${radius.base}px 0 0` };
 
-// A dialog that rises from the bottom edge, as the pickers on this screen do.
+// A dialog that rises from the bottom edge, like a phone picker.
 export const BOTTOM_SHEET: SxProps<Theme> = {
   '& .MuiDialog-container': { alignItems: 'flex-end' },
   '& .MuiDialog-paper': SHEET_PAPER,

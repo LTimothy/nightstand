@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Box, Button, Dialog, DialogContent, DialogTitle, Typography } from '@mui/material';
 import NotificationsNone from '@mui/icons-material/NotificationsNone';
-import { palette, radius, sx as shared } from '@design/tokens';
+import { palette, sx as shared } from '@design/tokens';
+import { BOTTOM_SHEET } from '@design/sheetStyles';
 import { useAppStore } from '@state/appStore.tsx';
 import { useSettings } from '@api/settings.ts';
 import { isSchedulePaused } from '@api/schedulePause.ts';
@@ -37,8 +38,7 @@ export default function OneOffAlarmLine() {
         aria-labelledby="one-time-alarm-title"
         fullWidth
         maxWidth="sm"
-        sx={ { '& .MuiDialog-container': { alignItems: 'flex-end' },
-          '& .MuiDialog-paper': { m: 0, width: '100%', borderRadius: `${radius.base}px ${radius.base}px 0 0` } } }>
+        sx={ BOTTOM_SHEET }>
         <DialogTitle id="one-time-alarm-title">One-time alarm</DialogTitle>
         <DialogContent sx={ { pt: 1 } }>
           <OneOffAlarmSection startEnabled={ !text } onSaved={ () => setOpen(false) }/>

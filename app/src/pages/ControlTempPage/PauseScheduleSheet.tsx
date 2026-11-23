@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import moment from 'moment-timezone';
-import { Alert, Box, Button, Drawer, FormControlLabel, Radio, RadioGroup, TextField, Typography } from '@mui/material';
+import {
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Radio, RadioGroup, TextField, Typography,
+} from '@mui/material';
+import { BOTTOM_SHEET } from '@design/sheetStyles';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
 import { MAX_ON_DURATION_SECONDS } from '@api/deviceStatusSchema.ts';
 import { postSettings, useSettings } from '@api/settings.ts';
@@ -94,13 +97,9 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
   };
 
   return (
-    <Drawer
-      anchor="bottom"
-      open={ open }
-      onClose={ close }
-      slotProps={ { paper: { role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'pause-schedule-title' } } }>
-      <Box sx={ { p: 3, width: '100%', maxWidth: 720, mx: 'auto' } }>
-        <Typography variant="h2" id="pause-schedule-title">{ editing ? 'Change pause for' : 'Pause' } <bdi>{ name }</bdi>'s schedule</Typography>
+    <Dialog open={ open } onClose={ close } fullWidth maxWidth="sm" sx={ BOTTOM_SHEET } aria-labelledby="pause-schedule-title">
+      <DialogTitle id="pause-schedule-title">{ editing ? 'Change pause for' : 'Pause' } <bdi>{ name }</bdi>'s schedule</DialogTitle>
+      <DialogContent>
         <RadioGroup
           aria-labelledby="pause-schedule-title"
           value={ choice }
@@ -108,7 +107,7 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
             setChoice(value as Choice);
             setError('');
           } }
-          sx={ { my: 2, gap: 1 } }>
+          sx={ { mb: 2, gap: 1 } }>
           <FormControlLabel
             value="tonight"
             control={ <Radio autoFocus={ choice === 'tonight' }/> }
@@ -140,7 +139,7 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
             helperText={ untilError
               ?? `${untilLocal === defaultUntil ? 'In time for your next sleep. ' : ''}Timezone: ${friendlyTimeZone(timeZone)}` }
             slotProps={ { inputLabel: { shrink: true } } }
-            sx={ { ml: 4, mb: 1, maxWidth: 'calc(100% - 32px)' } }/> }
+            sx={ { ml: '33px', mb: 1, maxWidth: 'calc(100% - 33px)' } }/> }
           <FormControlLabel
             value="resume"
             control={ <Radio autoFocus={ choice === 'resume' }/> }
@@ -161,19 +160,19 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
           When the pause ends, an off side turns on if its night is in progress. Skipped alarms stay skipped.
         </Typography>
         { error && <Alert severity="error" sx={ { mt: 2 } }>{ error }</Alert> }
-        <Box sx={ { display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 } }>
-          <Button onClick={ close } aria-disabled={ saving || undefined } sx={ { minHeight: 44 } }>Cancel</Button>
-          { /* aria-disabled while saving, so keyboard focus stays on the button */ }
-          <Button
-            variant="contained"
-            onClick={ pause }
-            disabled={ !!untilError }
-            aria-disabled={ saving || undefined }
-            sx={ { minHeight: 44, ...(saving ? { opacity: 0.6 } : {}) } }>
-            { editing ? 'Save pause' : 'Pause' }
-          </Button>
-        </Box>
-      </Box>
-    </Drawer>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={ close } aria-disabled={ saving || undefined } sx={ { minHeight: 44 } }>Cancel</Button>
+        { /* aria-disabled while saving, so keyboard focus stays on the button */ }
+        <Button
+          variant="contained"
+          onClick={ pause }
+          disabled={ !!untilError }
+          aria-disabled={ saving || undefined }
+          sx={ { minHeight: 44, ...(saving ? { opacity: 0.6 } : {}) } }>
+          { editing ? 'Save pause' : 'Pause' }
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

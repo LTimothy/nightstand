@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, FormControlLabel, Stack, Switch, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Stack, TextField, Typography } from '@mui/material';
+import ToggleRow from '@components/ToggleRow';
 import moment from 'moment-timezone';
 
 import { friendlyTimeZone } from '@lib/timeZone';
@@ -122,15 +123,12 @@ export default function OneOffAlarmSection({ startEnabled = false, onSaved }: Pr
         { ' ' }Saved separately from the schedule.
       </Typography>
 
-      <FormControlLabel
+      <ToggleRow
         label="One-time alarm"
-        labelPlacement="start"
-        sx={ { m: 0, width: '100%', justifyContent: 'space-between' } }
-        control={ <Switch
-          slotProps={ { input: { 'aria-label': 'Enable one-time alarm' } } }
-          checked={ enabled }
-          disabled={ saving || isUpdating }
-          onChange={ (e) => setEnabled(e.target.checked) }/> }/>
+        ariaLabel="Enable one-time alarm"
+        checked={ enabled }
+        disabled={ saving || isUpdating }
+        onChange={ setEnabled }/>
 
       { enabled && <>
         <TextField
