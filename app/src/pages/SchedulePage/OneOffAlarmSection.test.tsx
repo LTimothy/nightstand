@@ -228,3 +228,15 @@ it('locks the alarm while the Pod is updating', async () => {
     useAppStore.setState({ isUpdating: false });
   }
 });
+
+it('moves a saved time that has passed to its next occurrence', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-11-22T22:30:00-08:00') });
+  try {
+    server.use(http.get('*/settings', () => HttpResponse.json(savedAlarm('double', '2026-11-22T05:30:00-08:00'))));
+    renderWithProviders(<OneOffAlarmSection startEnabled/>);
+    await waitFor(() => expect(screen.getByLabelText('Ring at')).toHaveValue('2026-11-23T05:30'));
+    expect(screen.queryByText('Time is in the past')).not.toBeInTheDocument();
+  } finally {
+    vi.useRealTimers();
+  }
+});

@@ -13,10 +13,17 @@ type Pattern = 'rise' | 'double';
 
 // HTML <input type="datetime-local"> wants "YYYY-MM-DDTHH:mm" with no offset.
 // We treat that string as wall-clock time in the user's timezone.
+// A saved time that has passed moves to its next occurrence, so a reopened alarm starts at a time it can ring.
 function isoToLocalInput(iso: string, tz: string): string {
   if (!iso) return '';
   const m = moment.tz(iso, tz);
-  return m.isValid() ? m.format('YYYY-MM-DDTHH:mm') : '';
+  if (!m.isValid()) return '';
+  const now = moment.tz(tz);
+  if (m.isBefore(now)) {
+    m.year(now.year()).month(now.month()).date(now.date());
+    if (!m.isAfter(now)) m.add(1, 'day');
+  }
+  return m.format('YYYY-MM-DDTHH:mm');
 }
 
 function localInputToIso(localStr: string, tz: string): string {
