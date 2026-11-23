@@ -352,7 +352,7 @@ test('a manual rhythm converted to Smart Schedule holds its line to wake with wa
   await page.getByLabel('Turn on at', { exact: true }).fill('20:00');
   await page.getByLabel('Wake at', { exact: true }).fill('08:00');
   await page.getByRole('button', { name: 'Smart Schedule', exact: true }).click();
-  await page.getByRole('switch', { name: 'Warm-up before wake', exact: true }).uncheck();
+  await page.getByRole('group', { name: 'Warm-up before wake', exact: true }).getByRole('button', { name: 'Off', exact: true }).click();
   await page.getByRole('combobox', { name: /^Turn off/ }).click();
   await page.getByRole('option', { name: 'At wake time', exact: true }).click();
   const chart = page.getByRole('figure', { name: /^Smart Schedule preview: .* at wake-up$/ });
