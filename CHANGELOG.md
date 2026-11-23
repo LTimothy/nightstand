@@ -8,6 +8,10 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
+## [3.11.0] - 2026-11-22
+
+Adds a Cover sensors check with a guarded cover service restart, the measured water temperature, an option to write flash less often, removal of old system log files kept in memory, a To base warm-up, and a one-time alarm from Bed; settings now reach flash as soon as they are saved.
+
 ### Features
 
 - System status > Cover sensors, on Pods that write `capSense2` cover
@@ -57,6 +61,8 @@ is a hard fork; for the history of the projects it descends from, see
 - Scripts run through a sudo rule set PATH to the system folders first, so
   the commands they run cannot come from folders the server user chooses.
   This includes the existing Biometrics off and system log scripts.
+
+Checked on: Pod 5, deployed from this code: Cover sensors reporting, the cover service restart with a side on, its hourly limit, buttons and an alarm after it, the flash commit switch both ways and across server and Pod restarts, the old system log cleanup and free space after a restart, the water readout at two targets, the Bed alarm line and its sheet, and the To base warm-up curve; not a cover side going silent on its own, or other Pods; no nights yet.
 
 ## [3.10.0] - 2026-11-21
 
