@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   Dialog,
-  DialogActions,
+  DialogContent,
   DialogTitle,
   Button,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material';
 import { useAppStore } from '@state/appStore.tsx';
 import AlarmIcon from '@mui/icons-material/Alarm';
@@ -39,9 +37,6 @@ export default function AlarmDismissal({ refetch }: AlarmDismissalProps) {
   const isAlarmVibrating = deviceStatus?.[side]?.isAlarmVibrating || false;
   const leftRinging = deviceStatus?.left?.isAlarmVibrating || false;
   const rightRinging = deviceStatus?.right?.isAlarmVibrating || false;
-
-  const theme = useTheme();
-  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Reset each side when its alarm stops, including the side not being viewed.
   useEffect(() => {
@@ -84,26 +79,14 @@ export default function AlarmDismissal({ refetch }: AlarmDismissalProps) {
   return (
     <Dialog
       open={ dismissed[side] ? false : isAlarmVibrating }
-      fullScreen={ false }
-      fullWidth
-      maxWidth="xs"
       aria-labelledby="active-alarm-title"
-      PaperProps={ { sx: { p: isSmallScreen ? 2 : 3 } } }
     >
-      <DialogTitle id="active-alarm-title">{ side === 'left' ? 'Left' : 'Right' } side alarm</DialogTitle>
-      <DialogActions
-        sx={ {
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-        } }
-      >
+      <DialogTitle id="active-alarm-title" sx={ { textAlign: 'center' } }>{ side === 'left' ? 'Left' : 'Right' } side alarm</DialogTitle>
+      <DialogContent sx={ { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 } }>
         <AlarmIcon
           fontSize="large"
           sx={ {
-            mb: 2, animation: `${pulse} 2s infinite`, '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+            animation: `${pulse} 2s infinite`, '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
           } }/>
         { error && <Alert severity="error">{ error }</Alert> }
         <Button
@@ -112,9 +95,9 @@ export default function AlarmDismissal({ refetch }: AlarmDismissalProps) {
           color="error"
           variant="contained"
         >
-          Dismiss Alarm
+          Dismiss alarm
         </Button>
-      </DialogActions>
+      </DialogContent>
     </Dialog>
   );
 }

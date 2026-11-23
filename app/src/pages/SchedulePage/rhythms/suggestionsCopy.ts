@@ -16,7 +16,6 @@ export const AWAY_LINE = 'Away. Counting resumes when this side is back.';
 export const LOAD_ERROR = 'Could not load suggestions.';
 export const EXCLUDE_ERROR = 'Could not save that night. Try again.';
 export const DELETE_NOTES = 'Delete notes';
-export const DELETE_NOTES_QUESTION = 'Delete notes for both sides? Counting restarts tonight.';
 export const DELETE_NOTES_ERROR = 'Could not delete notes. Try again.';
 export const LEAVE_OUT = 'Leave out';
 export const LEFT_OUT = ', left out';

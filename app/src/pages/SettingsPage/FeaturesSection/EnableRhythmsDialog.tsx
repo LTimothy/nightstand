@@ -108,7 +108,7 @@ export default function EnableRhythmsDialog({ onClose, onDone }: { onClose: () =
         { SIDES.map((side, sideIndex) => {
           const rhythms = Object.values(db[side].rhythms);
           return <Stack key={ side } spacing={ 1.5 } sx={ { mt: 2 } }>
-            <Typography component="h3" variant="h2">
+            <Typography component="h3" variant="h4">
               <bdi>{ settings?.[side]?.name || (side === 'left' ? 'Left side' : 'Right side') }</bdi>
             </Typography>
             { rhythms.length === 0 && <Typography variant="body2" color="text.secondary">No nights were scheduled.</Typography> }
@@ -134,7 +134,7 @@ export default function EnableRhythmsDialog({ onClose, onDone }: { onClose: () =
       </DialogContent>
       <DialogActions>
         <Button onClick={ onClose } disabled={ working }>Close</Button>
-        <Button variant="contained" onClick={ () => void saveAndOpen() } disabled={ working || invalid }>Save and open Schedule</Button>
+        <Button variant="contained" onClick={ () => void saveAndOpen() } disabled={ working || invalid }>Open Schedule</Button>
       </DialogActions>
     </> : <>
       <DialogTitle id="rhythms-on-title">Turn on Rhythms?</DialogTitle>

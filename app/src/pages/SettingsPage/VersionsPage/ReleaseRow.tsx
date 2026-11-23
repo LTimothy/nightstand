@@ -43,11 +43,11 @@ export default function ReleaseRow({ release, runningVersion, body, offerReinsta
 
   return (
     <Box sx={ { py: 1.5, borderBottom: `1px solid ${palette.border.subtle}` } }>
-      <Box sx={ { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 0 } }>
+      <Box sx={ { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 1 } }>
         <Typography sx={ { fontWeight: weight.heading } }>v{ release.version }</Typography>
         <Typography variant="caption" color="text.secondary">{ release.date }</Typography>
         <Chip label={ release.channel === 'beta' ? 'Beta' : 'Stable' } size="small" variant="outlined"/>
-        { isRunning && <Chip label="Running" size="small" color="success"/> }
+        { isRunning && <Chip label="Running" size="small" variant="outlined"/> }
         <Box sx={ { flex: 1 } }/>
         { (!isRunning || isReinstall) && (
           <Button variant="outlined" onClick={ () => setOpen(true) }>

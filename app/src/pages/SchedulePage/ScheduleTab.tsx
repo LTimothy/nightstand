@@ -52,10 +52,10 @@ export default function ScheduleTab() {
         If you go back to Rhythms, those weekly changes wait until you turn Rhythms off.
       </Typography>
       <Box sx={ { display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1, ml: -1 } }>
-        <Button size="small" disabled={ working } onClick={ () => void choose(() => disableRhythms({ powerOffNow: false })) }>
+        <Button disabled={ working } onClick={ () => void choose(() => disableRhythms({ powerOffNow: false })) }>
           Use my weekly schedule
         </Button>
-        <Button size="small" disabled={ working } onClick={ () => confirmLeave(() => void choose(enableRhythms)) }>
+        <Button disabled={ working } onClick={ () => confirmLeave(() => void choose(enableRhythms)) }>
           Go back to Rhythms
         </Button>
       </Box>

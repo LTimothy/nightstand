@@ -245,7 +245,12 @@ export default function LogsPage() {
                   <MoreVertIcon/>
                 </IconButton>
               </Tooltip>
-              <Menu anchorEl={ actionsAnchor } open={ !!actionsAnchor } onClose={ () => setActionsAnchor(null) }>
+              <Menu
+                anchorEl={ actionsAnchor }
+                open={ !!actionsAnchor }
+                onClose={ () => setActionsAnchor(null) }
+                anchorOrigin={ { vertical: 'bottom', horizontal: 'right' } }
+                transformOrigin={ { vertical: 'top', horizontal: 'right' } }>
                 <MenuItem onClick={ () => { handleDownload(); setActionsAnchor(null); } } disabled={ logs.length === 0 }>
                   <DownloadIcon sx={ { mr: 1 } }/>Download loaded lines
                 </MenuItem>
@@ -271,12 +276,9 @@ export default function LogsPage() {
         />
 
         { paused && pendingLogs.length > 0 && (
-          <Chip
-            label={ `${pendingLogs.length} new line${pendingLogs.length === 1 ? '' : 's'} buffered (resume to see them)` }
-            size="small"
-            onClick={ handleTogglePause }
-            sx={ { mb: 1, alignSelf: 'flex-start', cursor: 'pointer' } }
-          />
+          <Button onClick={ handleTogglePause } sx={ { ml: -1, mb: 1, alignSelf: 'flex-start' } }>
+            { `Show ${pendingLogs.length} new line${pendingLogs.length === 1 ? '' : 's'}` }
+          </Button>
         ) }
 
         { (filterText || severity !== 'all') && <Typography variant="body2" sx={ { pb: 1, borderBottom: 1, borderColor: 'divider' } }>

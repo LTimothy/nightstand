@@ -139,8 +139,8 @@ export default function UpcomingNight() {
             onClick={ () => { editingPause.current = true; setPauseOpen(true); } }>
             Change pause
           </Button> }
-          <Button component={ Link } to="/schedules" sx={ shared.lampLink }>
-            Edit schedule
+          <Button component={ Link } to="/schedules" aria-label="Edit schedule" sx={ shared.lampLink }>
+            Edit
           </Button>
         </Box>
       </Box>

@@ -42,7 +42,7 @@ export default function AlarmDisabledDialog({ open, setOpen, nightEnd, scope, al
     <DialogActions>
       <Button onClick={ () => setOpen(false) } disabled={ isSaving }>Cancel</Button>
       <Button variant="contained" disabled={ isSaving } onClick={ () => void handleSave() }>
-        { isSaving ? 'Saving...' : alarmDisabled ? 'Restore tonight' : 'Disable tonight' }
+        { isSaving ? 'Saving...' : alarmDisabled ? 'Restore' : 'Skip' }
       </Button>
     </DialogActions>
   </Dialog>;

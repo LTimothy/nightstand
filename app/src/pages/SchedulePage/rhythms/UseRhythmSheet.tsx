@@ -2,9 +2,9 @@ import { useId, useState } from 'react';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import type { DayOfWeek } from '@api/schedulesSchema';
 import { describeDays, WEEK_DAYS } from '@api/rhythmDays';
-import { palette, radius } from '@design/tokens';
 import { dayName } from './rhythmsModel';
 import { BOTTOM_SHEET } from '@design/sheetStyles';
+import { dayChipSx } from '../dayChipSx';
 
 type Props = { name: string; onUse: (days: DayOfWeek[]) => void; onClose: () => void };
 
@@ -25,15 +25,12 @@ export default function UseRhythmSheet({ name, onUse, onClose }: Props) {
         aria-labelledby={ titleId }
         value={ days }
         onChange={ (_event, next: DayOfWeek[]) => setDays(WEEK_DAYS.filter(day => next.includes(day))) }
-        sx={ { flexWrap: 'wrap', gap: 0.5,
-          '& .MuiToggleButtonGroup-grouped': { border: 1, borderColor: 'divider', borderRadius: `${radius.base}px !important`, m: 0 },
-          '& .MuiToggleButtonGroup-grouped.Mui-selected, & .MuiToggleButtonGroup-grouped.Mui-selected:hover': {
-            bgcolor: palette.accent, borderColor: palette.accent, color: palette.bg.base } } }>
+        sx={ { flexWrap: 'wrap', gap: 0.5 } }>
         { WEEK_DAYS.map(day => <ToggleButton
           key={ day }
           value={ day }
           aria-label={ dayName(day) }
-          sx={ { minWidth: 44, minHeight: 44, px: 1 } }>
+          sx={ dayChipSx }>
           { dayName(day).slice(0, 3) }
         </ToggleButton>) }
       </ToggleButtonGroup>

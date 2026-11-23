@@ -1,7 +1,7 @@
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import moment from 'moment-timezone';
 import { ServerStatusKey, StatusInfo } from '@api/serverStatusSchema.ts';
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography } from '@mui/material';
 
 import StatusChip from './StatusChip.tsx';
 import { postJobs, JobSchema, Jobs } from '@api/jobs.ts';
@@ -65,7 +65,10 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
   };
 
   return (
-    <Box sx={ { pt: divider ? 1.5 : 0, pb: 1.5, borderTop: divider ? `1px solid ${palette.border.subtle}` : 'none' } }>
+    <Box
+      sx={ {
+        pt: divider ? 1.5 : 0, pb: 1.5, '&:last-child': { pb: 0 }, borderTop: divider ? `1px solid ${palette.border.subtle}` : 'none',
+      } }>
       <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 } }>
         <Typography sx={ { fontSize: '1rem', fontWeight: weight.heading, color: palette.text.primary, flex: 1, minWidth: 0 } }>
           { statusName(job, statusInfo) }
@@ -73,13 +76,14 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
         <StatusChip info={ statusInfo } optional={ job === 'biometricsInstallation' && statusInfo.status === 'not_started' } />
       </Box>
 
-      <Typography sx={ { fontSize: '0.8125rem', color: palette.text.tertiary, mt: 0.5, lineHeight: 1.4 } }>
+      <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary, mt: 0.5 } }>
         { meta.blurb }
       </Typography>
 
       <Typography
+        variant="caption"
         sx={ {
-          fontSize: '0.8125rem',
+          display: 'block',
           color: statusInfo.status === 'failed' ? palette.status.error : palette.text.secondary,
           mt: 0.5,
           whiteSpace: 'pre-wrap',
@@ -92,7 +96,9 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
       </Typography>
 
       { statusInfo.coverRestore?.note && (
-        <Typography sx={ { fontSize: '0.8125rem', color: palette.text.secondary, mt: 0.5 } }>{ statusInfo.coverRestore.note }</Typography>
+        <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary, mt: 0.5 } }>
+          { statusInfo.coverRestore.note }
+        </Typography>
       ) }
       { (job === 'franken' || job === 'express') && <Typography variant="caption" color="text.secondary">{ statusInfo.name }</Typography> }
       { job === 'biometricsInstallation' && statusInfo.status === 'not_started' && (
@@ -101,20 +107,19 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
       { calibrationSide && <CalibrationSubline view={ calibration?.[calibrationSide] }/> }
 
       { timestamp && (
-        <Typography sx={ { fontSize: '0.75rem', color: palette.text.secondary, mt: 0.5 } }>
+        <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary, mt: 0.5 } }>
           { job === 'express' ? `Started ${timestamp}` : timestamp }
         </Typography>
       ) }
 
       { isRunnable && (
         <Box sx={ { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1.5, mt: 1 } }>
-          <Typography sx={ { fontSize: '0.75rem', color: palette.text.tertiary, flex: 1, lineHeight: 1.4 } }>
+          <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary, flex: 1, mt: 0.5 } }>
             { meta.runHint }
           </Typography>
           <Button
             onClick={ () => calibrationSide ? setConfirmationOpen(true) : void startJob() }
             variant="outlined"
-            size="small"
             disabled={ request === 'pending' || ((request === 'accepted' || request === 'queued') && !newStatus)
               || statusInfo.status === 'started' }
             startIcon={ <PlayArrowIcon /> }
@@ -128,13 +133,15 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
       <Dialog aria-labelledby={ titleId } open={ confirmationOpen } onClose={ () => setConfirmationOpen(false) }>
         <DialogTitle id={ titleId }>{ actionLabel }?</DialogTitle>
         <DialogContent>
-          Keep the { calibrationSide } side empty before continuing. Manual calibration uses the last
-          two hours of sensor data and bypasses the automatic occupancy check. Remove people and pets
-          from this side; if it has been occupied recently, wait for an empty stretch first.
+          <DialogContentText>
+            Keep the { calibrationSide } side empty before continuing. Manual calibration uses the last
+            two hours of sensor data and bypasses the automatic occupancy check. Remove people and pets
+            from this side; if it has been occupied recently, wait for an empty stretch first.
+          </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={ () => setConfirmationOpen(false) }>Cancel</Button>
-          <Button variant="contained" onClick={ () => void startJob() }>{ actionLabel }</Button>
+          <Button variant="contained" onClick={ () => void startJob() }>Calibrate</Button>
         </DialogActions>
       </Dialog>
     </Box>

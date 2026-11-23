@@ -252,7 +252,10 @@ export default function RhythmEditor({
     </Button> }
     { showDraft && <Box aria-hidden sx={ { height: saveError ? 200 : 72 } }/> }
     { showDraft && <DraftBar above={ saveError ? errorAlert : undefined }>
-      { problem ? <Button color="error" onClick={ showProblem } sx={ { flex: 1, minWidth: 0, whiteSpace: 'nowrap', px: 0 } }>{ problem }</Button>
+      { problem ? <Button
+        color="error"
+        onClick={ showProblem }
+        sx={ { flex: 1, minWidth: 0, whiteSpace: 'nowrap', px: 0, justifyContent: 'flex-start' } }>{ problem }</Button>
         : <Typography
           role="status"
           variant="body2"

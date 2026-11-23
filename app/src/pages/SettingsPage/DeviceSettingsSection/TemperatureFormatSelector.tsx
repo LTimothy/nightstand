@@ -17,7 +17,7 @@ export default function TemperatureFormatSelector({ settings, updateSettings }: 
     <Box>
       <Typography variant="body2" sx={ { mb: 1 } }>Temperature display</Typography>
       <ToggleButtonGroup
-        sx={ { flexWrap: 'wrap', gap: 0.5, '& .MuiToggleButton-root': { minHeight: 44 } } }
+        sx={ { flexWrap: 'wrap', '& .MuiToggleButton-root': { minHeight: 44 } } }
         color="primary"
         exclusive
         value={ format }

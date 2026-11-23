@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { postJobs } from '@api/jobs.ts';
 
@@ -30,13 +30,13 @@ export default function RebootButton() {
     <Dialog open={ open } onClose={ () => !pending && setOpen(false) } aria-labelledby="restart-title" fullWidth maxWidth="xs">
       <DialogTitle id="restart-title">Restart Pod?</DialogTitle>
       <DialogContent>
-        <Typography>
+        <DialogContentText>
           The app, schedules and alarms pause while the Pod restarts. Takes about a minute.
           Wait for it to reconnect before sending more commands.
-        </Typography>
+        </DialogContentText>
         { requested && <Typography role="status" sx={ { mt: 2 } }>Restart requested. Completion has not been confirmed.</Typography> }
         { error && <Alert severity="error" sx={ { mt: 2 } }>{ error }</Alert> }
-        { (requested || error) && <Button component={ Link } to="/settings/system">System status</Button> }
+        { (requested || error) && <Button component={ Link } to="/settings/system" sx={ { ml: -1, mt: 1 } }>System status</Button> }
       </DialogContent>
       <DialogActions>
         <Button disabled={ pending } onClick={ () => setOpen(false) }>{ requested ? 'Close' : 'Cancel' }</Button>

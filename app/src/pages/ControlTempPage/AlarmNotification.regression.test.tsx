@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
@@ -43,7 +43,7 @@ it('disabling the night expires after all its alarms, on the correct overnight d
   }));
   renderWithProviders(<AlarmNotification />);
   fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
-  fireEvent.click(await screen.findByRole('button', { name: /disable tonight/i }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Skip' }));
   await waitFor(() => expect(payload?.left.scheduleOverrides.alarm.disabled).toBe(true));
   expect(payload.left.scheduleOverrides.alarm.expiresAt).toBe('2026-09-29T09:00:00Z');
 });
@@ -109,7 +109,7 @@ it('opens the change dialog without an error when the bed turns off at wake', as
   expect(await screen.findByText('Alarm tomorrow at 7:00 AM')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Change' }));
   expect(await screen.findByLabelText('Alarm')).toHaveValue('07:00');
-  expect(screen.queryByText('Choose a future time before this night ends.')).not.toBeInTheDocument();
+  expect(screen.queryByText('Already past or too late.')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Alarm')).not.toBeInvalid();
 });
 
@@ -119,7 +119,7 @@ it('still rejects a replacement after the night ends', async () => {
   expect(await screen.findByText('Alarm tomorrow at 7:00 AM')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Change' }));
   fireEvent.change(await screen.findByLabelText('Alarm'), { target: { value: '07:01' } });
-  expect(screen.getByText('Choose a future time before this night ends.')).toBeInTheDocument();
+  expect(screen.getByText('Already past or too late.')).toBeInTheDocument();
 });
 
 it('shows upstream recurring alarms when the optional alarmsEnabled flag is absent', async () => {

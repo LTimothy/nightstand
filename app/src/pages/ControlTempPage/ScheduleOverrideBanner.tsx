@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Typography, Box } from '@mui/material';
+import { Button, Typography, Box } from '@mui/material';
 import moment from 'moment-timezone';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useSettings, postSettings } from '@api/settings.ts';
 import { isSchedulePaused } from '@api/schedulePause.ts';
 import { useAppStore } from '@state/appStore.tsx';
-import { weight } from '@design/tokens';
+import { sx as shared, weight } from '@design/tokens';
+import { cardSx } from './tonightStyles';
 import { formatPauseEnd } from './pauseTimes';
 
 export default function ScheduleOverrideBanner() {
@@ -53,35 +54,24 @@ export default function ScheduleOverrideBanner() {
   };
 
   return (
-    <Alert
-      severity="info"
-      icon={ false }
-      sx={ {
-        width: '100%',
-        backgroundColor: 'background.paper',
-        border: '1px solid',
-        borderColor: 'divider',
-        '& .MuiAlert-message': { width: '100%' },
-      } }
-    >
+    <Box role="alert" sx={ cardSx }>
       <Box display="flex" alignItems="center" justifyContent="space-between" gap={ 2 }>
         <Box>
           <Typography variant="body2" fontWeight={ weight.heading }>
             Holding your temperature
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="body2" color="text.secondary">
             Scheduled temperature changes resume at { formatPauseEnd(moment(override!.expiresAt), settings.timeZone) }
           </Typography>
         </Box>
         <Button
-          variant="text"
-          size="small"
+          sx={ { ...shared.lampLink, whiteSpace: 'nowrap', flex: 'none', mr: '-10px' } }
           onClick={ handleResume }
           disabled={ isResuming }
         >
           Resume now
         </Button>
       </Box>
-    </Alert>
+    </Box>
   );
 }

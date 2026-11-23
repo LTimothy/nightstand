@@ -40,6 +40,7 @@ import { weight } from '@design/tokens';
 // service, so it is the floor. Keep it in step with FLOOR_VERSION in
 // scripts/update.sh, which gates the same picker from the Pod side.
 const CAPABLE_FLOOR = '3.0.0';
+const RECENT_RELEASES = 5;
 const EIGHT_SLEEP_STEPS_URL = 'https://github.com/LTimothy/nightstand/blob/main/INSTALLATION.md#going-back-to-the-eight-sleep-app';
 
 export default function VersionsPage() {
@@ -47,6 +48,7 @@ export default function VersionsPage() {
   const { data: settings, isError: settingsError, refetch: refetchSettings } = useSettings();
   const { data: releases, isError: releasesFailed, refetch: checkReleases, dataUpdatedAt, isFetching } = useReleases();
   const [channelOpen, setChannelOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const channelRow = useRef<HTMLDivElement>(null);
   const updateProblem = useUpdateAttentionStore(state => state.updateAttention);
   const setUpdateProblem = useUpdateAttentionStore(state => state.setUpdateAttention);
@@ -111,7 +113,7 @@ export default function VersionsPage() {
             <Accordion
               disableGutters
               square
-              sx={ { background: 'transparent', boxShadow: 'none', border: 0, mb: 1, '&:before': { display: 'none' } } }
+              sx={ { background: 'transparent', boxShadow: 'none', border: 0, '&:before': { display: 'none' } } }
             >
               <AccordionSummary expandIcon={ <ExpandMoreIcon/> } sx={ { px: 0, minHeight: 44 } }>
                 <Typography variant="body2">What's new</Typography>
@@ -228,12 +230,12 @@ export default function VersionsPage() {
             { capable && releases && (
               <Box>
                 <SectionHeading sx={ { mb: 1.5 } }>Install a specific version</SectionHeading>
-                <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mb: 1 } }>
+                <Typography variant="body2" color="text.secondary" sx={ { mb: 1 } }>
             Downgrading keeps your data (databases aren't rewritten). Installing any version
             replaces the instant-rollback slot above. Versions below v{ CAPABLE_FLOOR } can't be
             installed from here.
                 </Typography>
-                { eligibleReleases.map(release => (
+                { (showAll ? eligibleReleases : eligibleReleases.slice(0, RECENT_RELEASES)).map(release => (
                   <ReleaseRow
                     key={ release.version }
                     release={ release }
@@ -242,11 +244,14 @@ export default function VersionsPage() {
                     offerReinstall={ offerReinstall }
                   />
                 )) }
+                { !showAll && eligibleReleases.length > RECENT_RELEASES && (
+                  <Button sx={ { ml: -1, mt: 1 } } onClick={ () => setShowAll(true) }>Show all { eligibleReleases.length } versions</Button>
+                ) }
               </Box>
             ) }
 
             <Box>
-              <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mb: 1 } }>
+              <Typography variant="body2" color="text.secondary" sx={ { mb: 1 } }>
           Replace Nightstand with the upstream free-sleep version this release pins.
               </Typography>
               <RevertToStockRow runningVersion={ running }/>

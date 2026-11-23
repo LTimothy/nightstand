@@ -1,9 +1,9 @@
 import { useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Dialog, DialogActions, DialogTitle } from '@mui/material';
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { postSuggestionsForget } from '@api/rhythms';
 import { INACTIVE } from '@design/sheetStyles';
-import { DELETE_NOTES, DELETE_NOTES_ERROR, DELETE_NOTES_QUESTION } from '../../SchedulePage/rhythms/suggestionsCopy';
+import { DELETE_NOTES, DELETE_NOTES_ERROR } from '../../SchedulePage/rhythms/suggestionsCopy';
 
 type Props = { onClose: () => void };
 
@@ -28,7 +28,8 @@ export default function DeleteNotesDialog({ onClose }: Props) {
     onClose();
   };
   return <Dialog open onClose={ onClose } aria-labelledby={ titleId }>
-    <DialogTitle id={ titleId }>{ DELETE_NOTES_QUESTION }</DialogTitle>
+    <DialogTitle id={ titleId }>Delete notes for both sides?</DialogTitle>
+    <DialogContent><DialogContentText>Counting restarts tonight.</DialogContentText></DialogContent>
     { failed && <Alert severity="error" sx={ { mx: 3 } }>{ DELETE_NOTES_ERROR }</Alert> }
     <DialogActions>
       <Button onClick={ onClose } sx={ { minHeight: 44 } }>Cancel</Button>

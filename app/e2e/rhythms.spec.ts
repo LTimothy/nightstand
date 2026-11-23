@@ -341,7 +341,7 @@ test('turning Rhythms on converts the weekly schedule and offers renaming', asyn
   await expect(sunday).toHaveValue('Sunday');
   await expect(summary.getByText('Alarm Double pulse, strength 60, 30 s', { exact: true })).toBeVisible();
   await sunday.fill('School night');
-  await summary.getByRole('button', { name: 'Save and open Schedule' }).click();
+  await summary.getByRole('button', { name: 'Open Schedule' }).click();
   await expect(page).toHaveURL(/\/schedules$/);
   await expect(page.getByRole('heading', { name: 'Week', exact: true })).toBeFocused();
   await expect(page.getByRole('button', { name: 'Edit School night' })).toBeVisible();

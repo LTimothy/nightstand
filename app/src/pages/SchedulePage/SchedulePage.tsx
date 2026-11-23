@@ -2,7 +2,7 @@ import SectionHeading from '@components/SectionHeading';
 import _ from 'lodash';
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, CircularProgress, Dialog, DialogTitle, DialogActions, Typography,
+  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, CircularProgress, Dialog, DialogTitle, DialogActions, Paper, Typography,
 } from '@mui/material';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { DeepPartial } from 'ts-essentials';
@@ -258,7 +258,7 @@ export default function SchedulePage({ notice: noticeProp }: { notice?: Notice }
       <SideControl beforeSideChange={ nextSide => confirmDiscard({ side: nextSide }) }/>
       <DayTabs beforeDayChange={ day => confirmDiscard({ day }) }/>
       <SchedulePauseNotice framed note="Changes you save apply after the pause." onResumed={ () => setFocusAfterResume(true) }/>
-      <Box sx={ { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 } }>
+      <Box sx={ { width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 } }>
         <Box sx={ { flex: 1, minWidth: 0 } }>
           <SectionHeading id="schedule-night-heading" tabIndex={ -1 } sx={ { outline: 'none' } }>
             { titleDay } night{ selectedSchedule && selectedSchedule.power.off < selectedSchedule.power.on
@@ -273,16 +273,19 @@ export default function SchedulePage({ notice: noticeProp }: { notice?: Notice }
       { !firstRun ? selectedSchedule?.power.enabled ? <>
         <ErrorBoundary componentName="Scheduling chart"><TemperatureScheduleChart/></ErrorBoundary>
         <ScheduleTimeline key={ `${side}-${selectedDay}` } format={ format } risePattern={ risePattern }/>
-      </> : <Typography color="text.secondary" sx={ { width: '100%' } }>This night is off</Typography> : <Box
-        sx={ { width: '100%', p: 2, border: 1, borderColor: 'divider', borderRadius: 1 } }>
+      </> : <Typography color="text.secondary" sx={ { width: '100%' } }>This night is off</Typography> : <Paper
+        variant="outlined"
+        sx={ { p: 2, width: '100%' } }>
         <SectionHeading>Set a bedtime and a wake time</SectionHeading>
         <Typography color="text.secondary" sx={ { my: 2 } }>
           Choose when the bed turns on and when you wake up, then adjust the temperature and vibration for this night.
         </Typography>
         <Button variant="contained" onClick={ startNight }>Set bedtime and wake time</Button>
-      </Box> }
+      </Paper> }
       { !firstRun && <ApplyToOtherDaysAccordion/> }
-      { settings?.features?.oneOffAlarms && <Accordion sx={ { width: '100%' } } slotProps={ { transition: { unmountOnExit: true } } }>
+      { settings?.features?.oneOffAlarms && <Accordion
+        sx={ { width: '100%' } }
+        slotProps={ { transition: { unmountOnExit: true }, heading: { component: 'h2' } } }>
         <AccordionSummary expandIcon={ <ExpandMore/> }>
           <Typography component="span" variant="inherit">{ oneOffText ? `One-time alarm: ${oneOffText}` : 'Add one-time alarm' }</Typography>
         </AccordionSummary>
@@ -296,7 +299,7 @@ export default function SchedulePage({ notice: noticeProp }: { notice?: Notice }
         { invalidTimes > 0 || schemaIssue ? <Button
           color="error"
           onClick={ showInvalidRow }
-          sx={ { flex: 1, minWidth: 0, whiteSpace: 'nowrap', px: 0 } }>
+          sx={ { flex: 1, minWidth: 0, whiteSpace: 'nowrap', px: 0, justifyContent: 'flex-start' } }>
           { schemaIssue ? 'Fix schedule' : `Fix ${invalidTimes} ${invalidTimes === 1 ? 'time' : 'times'}` }
         </Button>
           : <Typography

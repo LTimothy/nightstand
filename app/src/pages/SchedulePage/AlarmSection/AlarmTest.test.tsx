@@ -49,7 +49,7 @@ it('keeps the test locked when the sheet is closed and reopened', async () => {
   await waitFor(() => expect(posts).toHaveLength(1));
   first.unmount();
   renderWithProviders(<Test/>);
-  expect(screen.getByRole('button', { name: /^Test on/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Alarm running now...' })).toBeDisabled();
   expect(screen.getByText('Alarm running now...')).toBeInTheDocument();
   expect(posts).toHaveLength(1);
 });
@@ -75,10 +75,10 @@ it('ignores a late failure from an earlier press once a newer test is running', 
   release();
   await new Promise(resolve => setTimeout(resolve, 50));
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /^Test on/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Alarm running now...' })).toBeDisabled();
   second.unmount();
   renderWithProviders(<Test/>);
-  expect(screen.getByRole('button', { name: /^Test on/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Alarm running now...' })).toBeDisabled();
 });
 
 it('reports a failed test and allows another try', async () => {

@@ -12,7 +12,7 @@ import { AccordionExpanded } from './SchedulePage.types.ts';
 import { DayOfWeek } from '@api/schedulesSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { useScheduleStore } from './scheduleStore';
-import { radius } from '@design/tokens';
+import { dayChipSx } from './dayChipSx';
 
 export const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -69,7 +69,7 @@ export default function ApplyToOtherDaysAccordion() {
           <Button onClick={ setWeekends }>Weekends</Button>
           <Button onClick={ setEveryday }>Every day</Button>
         </Box>
-        <Box role="group" aria-label="Apply to days" sx={ { display: 'flex', flexWrap: 'wrap', gap: 1 } }>
+        <Box role="group" aria-label="Apply to days" sx={ { display: 'flex', flexWrap: 'wrap', gap: 0.5, ml: -1 } }>
           { daysOfWeek.map(day => {
             const lowerCaseDay = day.toLowerCase() as DayOfWeek;
             return <ToggleButton
@@ -79,7 +79,7 @@ export default function ApplyToOtherDaysAccordion() {
               selected={ selectedDays[lowerCaseDay] }
               disabled={ isUpdating }
               onChange={ () => toggleSelectedDay(lowerCaseDay) }
-              sx={ { minWidth: 44, height: 44, px: 1, borderRadius: radius.pill } }>{ day.slice(0, 3) }</ToggleButton>;
+              sx={ dayChipSx }>{ day.slice(0, 3) }</ToggleButton>;
           }) }
         </Box>
       </AccordionDetails>

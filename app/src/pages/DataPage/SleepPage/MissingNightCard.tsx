@@ -31,9 +31,11 @@ export default function MissingNightCard({ state, canAnalyze, onAnalyze, pending
       </Box>
       <Typography color="text.secondary" variant="body2" sx={ { mt: 0.5 } }>{ description }</Typography>
       { (state === 'pending' || state === 'failed') && (
-        <Button disabled={ !canAnalyze } onClick={ onAnalyze } sx={ { mt: 1 } }>{ state === 'failed' ? 'Try again' : 'Analyze now' }</Button>
+        <Button disabled={ !canAnalyze } onClick={ onAnalyze } sx={ { mt: 1, ml: -1 } }>
+          { state === 'failed' ? 'Try again' : 'Analyze now' }
+        </Button>
       ) }
-      { state === 'off' && <Button component={ Link } to="/settings/features" sx={ { mt: 1 } }>Open Features settings</Button> }
+      { state === 'off' && <Button component={ Link } to="/settings/features" sx={ { mt: 1, ml: -1 } }>Open Features settings</Button> }
     </GlassCard>
   );
 }

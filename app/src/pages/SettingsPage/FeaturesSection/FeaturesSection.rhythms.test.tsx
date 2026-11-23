@@ -41,7 +41,7 @@ it('turns Rhythms on and saves new names for the converted rhythms', async () =>
   const [first] = within(summary).getAllByRole('textbox');
   await user.clear(first);
   await user.type(first, 'School night');
-  await user.click(within(summary).getByRole('button', { name: 'Save and open Schedule' }));
+  await user.click(within(summary).getByRole('button', { name: 'Open Schedule' }));
   await waitFor(() => expect(Object.values(getMockRhythms()?.left.rhythms ?? {}).map(rhythm => rhythm.name)).toContain('School night'));
   expect(getSettings().features.rhythms).toBe(true);
 });

@@ -17,7 +17,7 @@ function presenceLabel(observation: PresenceSide | undefined): string | undefine
   const elapsed = Date.now() - Date.parse(observation?.stateChangedAt ?? '');
   if (!observation?.present || !isPresenceFresh(observation) || !Number.isFinite(elapsed) || elapsed < 0) return;
   const minutes = Math.floor(elapsed / 60_000);
-  return minutes < 1 ? 'In bed less than a minute' : `In bed ${minutes} min`;
+  return minutes < 1 ? 'In bed under 1 min' : `In bed ${minutes} min`;
 }
 
 const focusRing = { '&:has(input:focus-visible)': { outline: `2px solid ${palette.accent}`, outlineOffset: 3 } } as const;

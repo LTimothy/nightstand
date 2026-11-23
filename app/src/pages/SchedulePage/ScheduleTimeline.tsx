@@ -101,7 +101,9 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
       + ' Move Turn off later or pick an earlier time.' : timeHint;
   };
   const rowGrid = { display: 'grid', gridTemplateColumns: '145px 1fr 44px',
-    gridTemplateAreas: { xs: '"field . delete" "stepper stepper stepper"', sm: '"field stepper delete"' }, alignItems: 'center', gap: 1 };
+    gridTemplateAreas: {
+      xs: hideTemperatures ? '"field . delete"' : '"field . delete" "stepper stepper stepper"', sm: '"field stepper delete"',
+    }, alignItems: 'center', gap: 1 };
   const manyAlarms = !offAtWake && alarms.filter(value => value.enabled).length > (wake ? 0 : 1);
   const afterLabel = manyAlarms ? ' last alarm' : '';
   const delay = offAt ? relativeOffDelay(offAt, schedule.power.off) : undefined;
@@ -227,7 +229,7 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
             store.updateSelectedTemperatures({ ...schedule.temperatures, [time]: temperature });
           } }/></Box>
       </Box>
-      { invalid && <Typography color="error" variant="caption">
+      { invalid && <Typography color="error" variant="body2">
         { time === schedule.power.off ? 'This change happens as the bed turns off, so it has no effect. Move it earlier or delete it.'
           : time === schedule.power.on ? 'This change happens as the bed turns on. Change the starting temperature or move it later.'
             : timeHint }
@@ -370,7 +372,7 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
               sx={ { width: 44, height: 44, gridArea: 'delete' } }
               onClick={ () => { store.removeAlarm(index); refollowLastAlarm(); } }><DeleteOutline/></IconButton> }
           </Box>
-          { invalid && <Typography color="error" variant="caption">{ alarmHint(alarm.time) }</Typography> }
+          { invalid && <Typography color="error" variant="body2">{ alarmHint(alarm.time) }</Typography> }
           { alarm.enabled && <WakeVibration
             alarm={ alarm }
             risePattern={ risePattern }
@@ -401,7 +403,7 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
         } }
         sx={ { alignSelf: 'flex-start', px: 0 } }>Add warm-up</Button> }
       <Paper variant="outlined" data-testid="schedule-event" sx={ { p: 2 } }>
-        <Box sx={ { display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 2 } }>
+        <Box sx={ { display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 2, rowGap: 1 } }>
           { offAt && <TextField
             select
             label="Turn off"
@@ -442,22 +444,22 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
               store.updateSelectedSchedule({ power: { off: event.target.value } });
             } }/> }
           { offAt && !customOff && !upMode && followDelay !== undefined && <Typography
-            variant="caption"
+            variant="body2"
             color="text.secondary"
           >Turns off at { moment(schedule.power.off, 'HH:mm').format('h:mm A') }</Typography> }
         </Box>
-        { offWarning && <Typography variant="caption" color="error" sx={ { display: 'block', mt: 1 } }>
+        { offWarning && <Typography variant="body2" color="error" sx={ { display: 'block', mt: 1 } }>
           Wake time is before bedtime, so turn off was not moved.
         </Typography> }
-        { upMode && <Typography id={ upNoteId } role="status" variant="caption" color="text.secondary" sx={ { display: 'block', mt: 1 } }>
+        { upMode && <Typography id={ upNoteId } role="status" variant="body2" color="text.secondary" sx={ { display: 'block', mt: 1 } }>
           { upNote }
           { getUp?.tracking && <Box component="span" sx={ { display: 'block', mt: 0.5 } }>{ PRESENCE_NOTE }</Box> }
         </Typography> }
-        { customOff && delay !== undefined && <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mt: 1 } }>
+        { customOff && delay !== undefined && <Typography variant="body2" color="text.secondary" sx={ { display: 'block', mt: 1 } }>
           Matches { delay === 0 ? 'wake time' : `${delay} min after wake` }, so it will move with your wake time.
         </Typography> }
-        { fullDay && <Typography variant="caption" sx={ { display: 'block' } }>Next day, after 24 hours</Typography> }
-        { wake && !fullDay && nightMinutes > 16 * 60 && <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mt: 1 } }>
+        { fullDay && <Typography variant="body2" sx={ { display: 'block' } }>Next day, after 24 hours</Typography> }
+        { wake && !fullDay && nightMinutes > 16 * 60 && <Typography variant="body2" color="text.secondary" sx={ { display: 'block', mt: 1 } }>
           Turns off { schedule.power.off <= schedule.power.on ? 'the next day ' : '' }at
           { ' ' }{ moment(schedule.power.off, 'HH:mm').format('h:mm A') },
           { ' ' }{ Math.floor(nightMinutes / 60) } h{ nightMinutes % 60 ? ` ${nightMinutes % 60} min` : '' } after bedtime

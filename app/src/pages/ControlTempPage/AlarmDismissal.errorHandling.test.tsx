@@ -36,7 +36,7 @@ describe('AlarmDismissal on a failed dismiss', () => {
 
     const { user } = renderWithProviders(<AlarmDismissal refetch={ async () => {} } />);
 
-    const dismiss = await screen.findByRole('button', { name: 'Dismiss Alarm' });
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss alarm' });
     await user.click(dismiss);
 
     // Let the failed dismiss settle, then give any (buggy) dialog-close
@@ -47,7 +47,7 @@ describe('AlarmDismissal on a failed dismiss', () => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // The dismiss failed, so the dialog must still be open.
-    expect(screen.getByRole('button', { name: 'Dismiss Alarm' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss alarm' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(/Could not dismiss/);
   });
 });

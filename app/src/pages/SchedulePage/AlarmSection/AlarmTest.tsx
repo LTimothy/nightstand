@@ -1,4 +1,4 @@
-import { Box, Button, CircularProgress, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { useAppStore } from '@state/appStore.tsx';
 import { postAlarm } from '@api/alarm.ts';
 import { useEffect, useState } from 'react';
@@ -60,29 +60,14 @@ export default function AlarmTest({ vibrationIntensity, vibrationPattern }: Pick
         gap: 1,
       } }
     >
-      { isTesting && (
-        <Box
-          sx={ {
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 1,
-            pl: 2
-          } }
-        >
-          <CircularProgress size={ 12 } />
-          <Typography color="textSecondary">Alarm running now...</Typography>
-        </Box>
-      ) }
-
-      { error && <Typography role="alert" color="error" variant="caption">{ error }</Typography> }
+      { error && <Typography role="alert" color="error" variant="body2">{ error }</Typography> }
 
       <Button
         variant="outlined"
         onClick={ onTestAlarm }
         disabled={ isTesting }
       >
-        Test on { sleeper ? `${sleeper}'s side` : `${side} side` }
+        { isTesting ? 'Alarm running now...' : `Test on ${sleeper ? `${sleeper}'s side` : `${side} side`}` }
       </Button>
     </Box>
   );

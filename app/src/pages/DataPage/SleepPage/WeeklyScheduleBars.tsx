@@ -32,7 +32,7 @@ export default function WeeklyScheduleBars({ records, weekStart, timeZone, onSel
             disabled={ future || !onSelectDay }
             onClick={ () => onSelectDay?.(day.format('YYYY-MM-DD')) }
             sx={ {
-              width: '100%', display: 'grid', gridTemplateColumns: '64px minmax(0, 1fr)', gap: 1,
+              width: '100%', display: 'grid', gridTemplateColumns: '64px minmax(0, 1fr)', alignItems: 'start', gap: 1,
               textAlign: 'left', py: 1, minHeight: 44, borderTop: `1px solid ${palette.border.subtle}`,
               '&.Mui-focusVisible': { outline: `2px solid ${palette.accent}` },
             } }>

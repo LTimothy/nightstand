@@ -23,6 +23,11 @@ describe('MarkdownBody', () => {
     expect(container.querySelector('a')?.getAttribute('href')).toBe('https://example.com/two');
   });
 
+  it('renders headings at body size', () => {
+    const container = renderMarkdown('# Title\n\ntext');
+    expect(getComputedStyle(container.querySelector('h1')!).fontSize).toBe('1rem');
+  });
+
   it('renders a markdown image as a link to it, without loading it', () => {
     const container = renderMarkdown('![A screenshot](https://example.com/shot.png)');
     expect(loadsResources(container)).toBe(false);

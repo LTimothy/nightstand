@@ -40,7 +40,7 @@ describe('manual diagnostic jobs', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Calibrate left presence?' });
     expect(dialog).toHaveTextContent('Keep the left side empty');
     expect(posted).toBe(false);
-    await user.click(within(dialog).getByRole('button', { name: 'Calibrate left presence' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Calibrate' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Request accepted');
   });
 });

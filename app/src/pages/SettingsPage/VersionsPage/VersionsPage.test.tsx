@@ -235,3 +235,22 @@ describe('beta on stable notice waits for the saved channel', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /Update channel Beta/ })).toHaveFocus());
   });
 });
+
+it('lists the five newest versions in Recovery, then all on request', async () => {
+  server.use(
+    savedOnStable(),
+    http.get('*/api/deviceStatus', () => HttpResponse.json({
+      ...getDeviceStatus(), freeSleep: { ...getDeviceStatus().freeSleep, version: '3.0.0' },
+    })),
+    http.get('https://raw.githubusercontent.com/LTimothy/nightstand/main/releases.json', () => HttpResponse.json({
+      channels: ['stable', 'beta'],
+      releases: [1, 2, 3, 4, 5, 6, 7].map(minor => ({ kind: 'agent', version: `3.${minor}.0`, channel: 'stable', date: '2026-09-28' })),
+    })),
+  );
+  const { user } = renderWithProviders(<VersionsPage />);
+  await user.click(await screen.findByRole('button', { name: 'Recovery' }));
+  const showAll = await screen.findByRole('button', { name: 'Show all 7 versions' });
+  expect(screen.getAllByRole('button', { name: 'Install' })).toHaveLength(5);
+  await user.click(showAll);
+  expect(screen.getAllByRole('button', { name: 'Install' })).toHaveLength(7);
+});

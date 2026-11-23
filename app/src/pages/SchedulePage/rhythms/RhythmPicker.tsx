@@ -9,6 +9,7 @@ import { palette, radius } from '@design/tokens';
 import { describeDays } from '@api/rhythmDays';
 import { choiceKey, dayName, type DateChoice, type PickerOption } from './rhythmsModel';
 import { BOTTOM_SHEET } from '@design/sheetStyles';
+import { dayChipSx } from '../dayChipSx';
 
 // Lets a grouped week line change some of its days, not only all of them.
 export type DayChoice = { days: DayOfWeek[]; chosen: DayOfWeek[]; onChange: (chosen: DayOfWeek[]) => void };
@@ -45,15 +46,12 @@ export default function RhythmPicker({ title, subtitle, options, selected, dayCh
           color="primary"
           value={ dayChoice.chosen }
           onChange={ (_event, next: DayOfWeek[]) => dayChoice.onChange(dayChoice.days.filter(day => next.includes(day))) }
-          sx={ { px: 2, mb: 1.5, flexWrap: 'wrap', gap: 0.5,
-            '& .MuiToggleButtonGroup-grouped': { border: 1, borderColor: 'divider', borderRadius: `${radius.base}px !important`, m: 0 },
-            '& .MuiToggleButtonGroup-grouped.Mui-selected, & .MuiToggleButtonGroup-grouped.Mui-selected:hover': {
-              bgcolor: palette.accent, borderColor: palette.accent, color: palette.bg.base } } }>
+          sx={ { px: 2, mb: 1.5, flexWrap: 'wrap', gap: 0.5 } }>
           { dayChoice.days.map(day => <ToggleButton
             key={ day }
             value={ day }
             aria-label={ dayName(day) }
-            sx={ { minWidth: 44, minHeight: 44, px: 1 } }>
+            sx={ dayChipSx }>
             { dayName(day).slice(0, 3) }
           </ToggleButton>) }
         </ToggleButtonGroup>

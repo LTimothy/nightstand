@@ -113,10 +113,10 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
             control={ <Radio autoFocus={ choice === 'tonight' }/> }
             label={ <Box>
               <Typography>{ onceLabel }</Typography>
-              <Typography variant="caption" color="text.secondary" sx={ { display: 'block' } }>
+              <Typography variant="body2" color="text.secondary" sx={ { display: 'block' } }>
                 { `until ${formatPauseEnd(tonightEnd, timeZone, now)}` }
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={ { display: 'block' } }>{ skipLine(skips(tonightEnd), now) }</Typography>
+              <Typography variant="body2" color="text.secondary" sx={ { display: 'block' } }>{ skipLine(skips(tonightEnd), now) }</Typography>
             </Box> }
             sx={ { minHeight: 44, alignItems: 'flex-start', '& .MuiRadio-root': { mt: -0.5 } } }/>
           <FormControlLabel
@@ -124,7 +124,7 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
             control={ <Radio autoFocus={ choice === 'until' }/> }
             label={ <Box>
               <Typography>Until a set time</Typography>
-              { choice === 'until' && !untilError && <Typography variant="caption" color="text.secondary" sx={ { display: 'block' } }>
+              { choice === 'until' && !untilError && <Typography variant="body2" color="text.secondary" sx={ { display: 'block' } }>
                 { skipLine(skips(untilEnd), now) }
               </Typography> }
             </Box> }
@@ -145,7 +145,7 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
             control={ <Radio autoFocus={ choice === 'resume' }/> }
             label={ <Box>
               <Typography>Until I resume</Typography>
-              <Typography variant="caption" color="text.secondary" sx={ { display: 'block' } }>
+              <Typography variant="body2" color="text.secondary" sx={ { display: 'block' } }>
                 Skips every start and alarm until you resume
               </Typography>
             </Box> }

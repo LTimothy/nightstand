@@ -27,7 +27,7 @@ it('opens on the scheduled alarm without an error, even when the night ends at t
 
   await waitFor(() => expect(screen.getByLabelText('Alarm')).toHaveValue('06:30'));
   expect(screen.getByLabelText('Alarm')).toHaveAttribute('aria-invalid', 'false');
-  expect(screen.queryByText(/Choose a future time/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Already past or too late/)).not.toBeInTheDocument();
 });
 
 it('still flags an edited time that falls after the night ends', async () => {
@@ -35,5 +35,5 @@ it('still flags an edited time that falls after the night ends', async () => {
   server.use(http.get('*/api/settings', () => HttpResponse.json({ ...getSettings(), timeZone: 'UTC' })));
   renderWithProviders(<AlarmOverride { ...props } alarmTimeLocalOverride="07:00"/>);
 
-  expect(await screen.findByText(/Choose a future time/)).toBeInTheDocument();
+  expect(await screen.findByText(/Already past or too late/)).toBeInTheDocument();
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@test/renderWithProviders';
 import { server } from '@test/setup';
@@ -124,7 +124,7 @@ it('skips tonight\'s alarms until the resolved sleep ends, the bound the server 
   }));
   const { user } = renderWithProviders(<AlarmNotification/>);
   await user.click(await screen.findByRole('button', { name: 'Skip' }));
-  await user.click(await screen.findByRole('button', { name: 'Disable tonight' }));
+  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Skip' }));
   await waitFor(() => expect(posted).toBeDefined());
   const { alarm: written } = (posted as { left: { scheduleOverrides: { alarm: { disabled: boolean; expiresAt: string } } } })
     .left.scheduleOverrides;

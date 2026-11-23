@@ -61,7 +61,7 @@ export default function AlarmOverride({ open, setOverrideOpen, alarmTimeLocalOve
         disabled={ isSaving }
         error={ showError }
         helperText={ valid ? replacement.format('ddd, MMM D · h:mm A')
-          : showError ? 'Choose a future time before this night ends.' : undefined }
+          : showError ? 'Already past or too late.' : undefined }
         fullWidth />
       { error && <Alert severity="error" sx={ { mt: 2 } }>{ error }</Alert> }
     </DialogContent>

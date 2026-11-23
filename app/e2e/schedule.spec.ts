@@ -108,3 +108,14 @@ test('the unsaved summary fits at 320 px with side and days intact', async ({ pa
     || element.scrollWidth > element.clientWidth);
   expect(clipped).toBe(false);
 });
+
+test('the seven day chips sit on one row, each 44 wide, at 390 px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/schedules');
+  await page.getByRole('button', { name: 'Apply settings to other days' }).click();
+  const boxes = await page.getByRole('group', { name: 'Apply to days' }).getByRole('button').evaluateAll(
+    chips => chips.map(chip => chip.getBoundingClientRect()).map(({ y, width }) => ({ y, width })));
+  expect(boxes).toHaveLength(7);
+  expect(new Set(boxes.map(box => Math.round(box.y))).size).toBe(1);
+  for (const box of boxes) expect(box.width).toBe(44);
+});

@@ -5,6 +5,7 @@ import { postSettings, useSettings } from '@api/settings.ts';
 import { isSchedulePaused, pauseEndsAt } from '@api/schedulePause.ts';
 import { serverMessage } from '@lib/requestError';
 import { sx as shared, weight } from '@design/tokens';
+import { tonightLineSx } from './tonightStyles';
 import { useAppStore } from '@state/appStore.tsx';
 import { formatPauseEnd } from './pauseTimes';
 
@@ -54,8 +55,8 @@ export default function SchedulePauseNotice({ note, detail, framed = false, onRe
         ...(framed ? { p: 2, border: 1, borderColor: 'divider', borderRadius: 1 } : {}),
       } }>
       <Typography variant="body2" fontWeight={ weight.heading }>{ title }</Typography>
-      { detail && <Typography variant="body2" color="text.secondary">{ detail }</Typography> }
-      { note && <Typography variant="caption" color="text.secondary">{ note }</Typography> }
+      { detail && <Typography variant="body2" color="text.secondary" sx={ { ...tonightLineSx, m: 0 } }>{ detail }</Typography> }
+      { note && <Typography variant="body2" color="text.secondary" sx={ { ...tonightLineSx, m: 0 } }>{ note }</Typography> }
       { error && <Alert severity="error" sx={ { width: '100%' } }>{ error }</Alert> }
       { /* aria-disabled, not disabled, so keyboard focus stays on the button */ }
       <Button

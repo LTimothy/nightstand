@@ -73,12 +73,12 @@ export default function DisableRhythmsDialog({ onClose, onDone }: Props) {
         Could not load what happens next. You can still turn Rhythms off.
       </Alert> }
       { preview?.map(side => <Stack key={ side.side } spacing={ 0.5 } sx={ { mt: 2 } }>
-        <Typography component="h3" variant="h2"><bdi>{ side.name }</bdi></Typography>
+        <Typography component="h3" variant="h4"><bdi>{ side.name }</bdi></Typography>
         { previewLines(side, now, keepOn).map(line => <Typography key={ line } variant="body2" color="text.secondary">{ line }</Typography>) }
       </Stack>) }
-      { paused && <Typography variant="body2" sx={ { mt: 2 } }>
+      { paused && <DialogContentText sx={ { mt: 2 } }>
         A pause stays on here, but older versions of Nightstand do not carry it over.
-      </Typography> }
+      </DialogContentText> }
       { midSleep && <FormControl sx={ { mt: 2 } }>
         <FormLabel id="turn-off-sleep-label">
           { running.length === 1 ? `${running[0].name}'s rhythm sleep is in progress` : 'Both sides are in a rhythm sleep' }

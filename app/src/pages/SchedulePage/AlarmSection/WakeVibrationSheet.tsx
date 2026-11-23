@@ -26,7 +26,7 @@ export default function WakeVibration({ alarm, onChange, risePattern, maxDuratio
       disabled={ disabled }
       aria-label={ `Vibrate: ${pattern}, strength ${alarm.vibrationIntensity}, ${alarm.duration} seconds` }
       endIcon={ <ChevronRight/> }
-      sx={ { justifyContent: 'space-between', textAlign: 'left', minHeight: 44, mt: 1, px: 0 } }
+      sx={ { justifyContent: 'space-between', textAlign: 'left', minHeight: 44, mt: 1, px: 0, textTransform: 'none' } }
       onClick={ () => setOpen(true) }>
       <Typography component="span" variant="body2" color="text.secondary">
         { pattern }, strength { alarm.vibrationIntensity },

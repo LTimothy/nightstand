@@ -35,7 +35,7 @@ function GestureRow({ gesture, side, sideId, tap, format, baseConfigured, disabl
     : tap.type === 'alarm' ? 'Only while an alarm rings or is snoozed.'
       : tap.type === 'base_control' && baseConfigured === false ? 'No adjustable base is set up, so this does nothing.' : '';
   return <Box>
-    <Box sx={ { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 } }>
+    <Box sx={ { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 1.5 } }>
       <FormControl sx={ { minWidth: 180, flex: '1 1 180px' } }>
         <InputLabel id={ id }>{ label }</InputLabel>
         <Select

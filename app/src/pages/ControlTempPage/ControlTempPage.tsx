@@ -107,7 +107,11 @@ export default function ControlTempPage() {
           <PowerRow isOn={ isOn } refetch={ refetch } loading={ loading } onRetry={ staleSince ? () => void refetch() : undefined }/>
           { commandError && <Alert severity="error" sx={ { width: '100%' } }>{ commandError }</Alert> }
         </Box>
-        <Box sx={ { display: 'flex', flexDirection: 'column', gap: 2, width: '100%' } }>
+        <Box
+          sx={ {
+            display: 'flex', flexDirection: 'column', gap: 2, width: '100%',
+            '& .MuiAlert-root': { px: '16px', [media.narrow]: { px: '14px' }, [media.desktop]: { px: '22px' } },
+          } }>
           <ErrorBoundary componentName="Schedule override banner">
             <ScheduleOverrideBanner />
           </ErrorBoundary>

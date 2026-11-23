@@ -104,3 +104,14 @@ it('replaces displayed and buffered tails after a manual reconnect while paused'
   await user.click(screen.getByRole('button', { name: 'Resume live updates' }));
   for (const line of ['First line', 'Second line', 'Third line']) expect(screen.getAllByText(line, { exact: true })).toHaveLength(1);
 });
+
+it('offers buffered lines as a button that resumes the stream', async () => {
+  const { user } = renderWithProviders(<LogsPage/>);
+  await waitFor(() => expect(TestEventSource.latest).toBeDefined());
+  const stream = TestEventSource.latest;
+  act(() => stream.onopen?.());
+  await user.click(screen.getByRole('button', { name: 'Pause live updates' }));
+  act(() => stream.onmessage?.({ data: JSON.stringify({ message: 'Late line' }) }));
+  await user.click(await screen.findByRole('button', { name: 'Show 1 new line' }));
+  expect(await screen.findByText('Late line')).toBeVisible();
+});

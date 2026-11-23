@@ -378,7 +378,7 @@ describe('Suggestions from your changes', () => {
     server.use(http.post('*/rhythms/suggestions/forget', () => { forgot += 1; return new HttpResponse(null, { status: 204 }); }));
     const { user } = renderWithProviders(<FeaturesSection />);
     await user.click(await screen.findByRole('button', { name: 'Delete notes' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete notes for both sides? Counting restarts tonight.' });
+    const dialog = await screen.findByRole('dialog', { name: 'Delete notes for both sides?' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(forgot).toBe(0);
     await user.click(screen.getByRole('button', { name: 'Delete notes' }));
