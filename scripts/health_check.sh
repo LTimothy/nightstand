@@ -30,8 +30,12 @@ record_boot_settings() {
     [ "$ok" = 1 ] && v=$(printf '%s\n' "$out" | sed -n "s/^$1=//p" | head -n 1)
     case "$v" in '' | *[!A-Za-z0-9_.-]*) printf null ;; *) printf '"%s"' "$v" ;; esac
   }
-  printf '{"checkedAt": "%s", "bootdelay": %s, "currentSlot": %s, "nextSlot": %s}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(value bootdelay)" "$(value current_slot)" "$(value next_slot)" > "$tmp" \
+  local slot
+  slot=$(value current_slot | tr -d '"')
+  case "$slot" in a | b) ;; *) slot=none ;; esac
+  printf '{"checkedAt": "%s", "bootdelay": %s, "currentSlot": %s, "nextSlot": %s, "currentMarked": %s, "currentRetries": %s}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(value bootdelay)" "$(value current_slot)" "$(value next_slot)" \
+    "$(value "boot_${slot}_success")" "$(value "retry_boot_${slot}")" > "$tmp" \
     && chmod 644 "$tmp" && mv -f "$tmp" "$BOOT_SETTINGS"
   rm -f "$tmp"
 }

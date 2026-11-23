@@ -54,6 +54,8 @@ is a hard fork; for the history of the projects it descends from, see
   and start the hub's other slot, which still runs Eight Sleep's system with
   updates on. The check follows
   [jalen-cheng](https://github.com/jalen-cheng)'s SevenSleep fork.
+- System status > Boot rescue now also says whether the running boot slot is
+  marked good, and shows how many boots it has left when it is not.
 
 ## [3.11.0] - 2026-11-22
 
