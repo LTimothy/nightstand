@@ -595,6 +595,11 @@ if [ -f "$COPY/scripts/check_image_credentials.sh" ]; then
     || echo "WARNING: the prebuilt-image credential check could not finish; see INSTALLATION.md"
 fi
 
+# The install switches off the service that marks a boot slot good, so mark the running one here.
+if [ -f "$COPY/scripts/boot_slot.sh" ]; then
+  bash "$COPY/scripts/boot_slot.sh" confirm || echo "WARNING: the running boot slot is not marked good; see INSTALLATION.md"
+fi
+
 # --------------------------------------------------------------------------------
 # Finish
 echo "This is your dac.sock path (if it doesn't end in dac.sock, contact support):"

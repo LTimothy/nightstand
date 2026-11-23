@@ -694,6 +694,10 @@ if [ "$HEALTHY" = yes ]; then
   SWAP_NEW=
   # A target without the flash switch never puts the commit interval back itself.
   [ -f "$LIVE/scripts/flash_commit.sh" ] || mount -o remount,commit=5 /persistent 2>/dev/null || true
+  # Pods installed before this check get the running boot slot marked good on their next update.
+  if [ -f "$NEW_COPY/scripts/boot_slot.sh" ]; then
+    bash "$NEW_COPY/scripts/boot_slot.sh" confirm || say "WARNING: the running boot slot is not marked good"
+  fi
   for FIREWALL_ATTEMPT in 1 2; do
     sh "$NEW_COPY/scripts/block_internet_access.sh" || say "WARNING: firewall script reported an error; checking rules"
     # Older downgrade targets intentionally restore their historical firewall.
