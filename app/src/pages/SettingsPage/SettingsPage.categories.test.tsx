@@ -187,3 +187,11 @@ it('isolates names from the surrounding settings summary', async () => {
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
   expect((await screen.findByText('\u202eAlex')).tagName).toBe('BDI');
 });
+
+it('puts Cover buttons before Tap gestures so a growing gestures card cannot push it', async () => {
+  server.use(http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: 'Pod 5', coverVersion: 'Pod 5' })));
+  renderWithProviders(<SettingsPage/>, { initialRoute: '/settings/bed' });
+  const cover = await screen.findByRole('heading', { name: 'Cover buttons' });
+  const taps = screen.getByRole('heading', { name: 'Tap gestures' });
+  expect(cover.compareDocumentPosition(taps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});

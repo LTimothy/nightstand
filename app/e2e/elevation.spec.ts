@@ -7,7 +7,26 @@ test('Relax sends a preset and keeps Stop available until movement finishes', as
   await expect(head).toContainText('0°');
   await expect(feet).toContainText('0°');
   await page.getByRole('button', { name: /Relax Head/ }).click();
-  await expect(page.getByRole('button', { name: 'Stop Movement' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Stop movement' })).toBeVisible();
   await expect(head).toContainText('30°', { timeout: 15_000 });
   await expect(feet).toContainText('15°', { timeout: 15_000 });
+});
+
+test('Stop and the status line leave the presets where the finger is', async ({ page }) => {
+  await page.goto('/elevation');
+  const relax = page.getByRole('button', { name: /Relax Head/ });
+  const before = (await relax.boundingBox())!.y;
+  await relax.click();
+  await expect(page.getByRole('button', { name: 'Stop movement' })).toBeVisible();
+  expect((await relax.boundingBox())!.y).toBe(before);
+});
+
+test('the Elevation tab stays put when it opens on a desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const tab = page.getByRole('navigation', { name: 'Bed controls' }).getByRole('link', { name: 'Elevation' });
+  await page.goto('/');
+  const onBed = (await tab.boundingBox())!.x;
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-current', 'page');
+  expect((await tab.boundingBox())!.x).toBe(onBed);
 });

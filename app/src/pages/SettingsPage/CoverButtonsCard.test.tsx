@@ -216,16 +216,16 @@ describe('Cover buttons placement', () => {
   };
   const headings = () => screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
 
-  it('on a Pod 5 hub, follows Tap gestures with the options and no switch', async () => {
+  it('on a Pod 5 hub, precedes Tap gestures with the options and no switch', async () => {
     await bed('Pod 5', 'Pod 5');
-    expect(headings().slice(0, 3)).toEqual(['Tap gestures', 'Cover buttons', 'Priming']);
+    expect(headings().slice(0, 3)).toEqual(['Cover buttons', 'Tap gestures', 'Priming']);
     expect(screen.getByRole('group', { name: 'Left side buttons' })).toBeVisible();
     expect(screen.queryByRole('switch', { name: /cover buttons/i })).not.toBeInTheDocument();
   });
 
-  it('on a Pod 4 hub with a Pod 5 cover, follows Tap gestures with the switch', async () => {
+  it('on a Pod 4 hub with a Pod 5 cover, precedes Tap gestures with the switch', async () => {
     await bed('Pod 4', 'Pod 5');
-    expect(headings().slice(0, 2)).toEqual(['Tap gestures', 'Cover buttons']);
+    expect(headings().slice(0, 2)).toEqual(['Cover buttons', 'Tap gestures']);
     expect(screen.getByRole('switch', { name: 'Read cover buttons' })).toBeInTheDocument();
   });
 

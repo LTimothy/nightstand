@@ -183,14 +183,9 @@ export default function FeaturesSection() {
           <AccordionSummary expandIcon={ <ExpandMoreIcon/> }>How to install</AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2">Run this command over SSH, then enable Biometrics here.</Typography>
-            <Box component="code" sx={ { display: 'block', overflowWrap: 'anywhere', my: 1 } }>
+            <Box component="code" sx={ { display: 'block', overflowWrap: 'anywhere', userSelect: 'all', my: 1 } }>
                   sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh
             </Box>
-            <Button
-              onClick={ async () => {
-                try { await navigator.clipboard.writeText('sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh'); }
-                catch { setError('Could not copy the command. Select and copy it above.'); }
-              } }>Copy command</Button>
           </AccordionDetails>
         </Accordion> }
         <Box sx={ child }>

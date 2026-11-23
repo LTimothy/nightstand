@@ -13,8 +13,8 @@ export default function UndoBar({ message, disabled, onUndo, onClose }: Props) {
     action={ <Button onClick={ onUndo } disabled={ disabled } sx={ { color: palette.accent, minHeight: 44 } }>Undo</Button> }
     anchorOrigin={ { vertical: 'bottom', horizontal: 'center' } }
     sx={ {
-      bottom: { xs: 'calc(76px + env(safe-area-inset-bottom, 0px))', md: 24 },
-      left: { xs: 16 }, right: { xs: 16 },
+      bottom: { xs: 'calc(72px + env(safe-area-inset-bottom, 0px))', md: 24 },
+      left: { xs: 16, sm: '50%' }, right: { xs: 16, sm: 'auto' },
       '& .MuiSnackbarContent-root': {
         bgcolor: palette.bg.raised, color: palette.text.primary, border: `1px solid ${palette.border.medium}`,
         borderRadius: '24px', flexWrap: 'nowrap', minWidth: { sm: 360 },

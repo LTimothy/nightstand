@@ -14,5 +14,6 @@ it('widens to the Bed column on a desktop', () => {
 
 it('treats only the Bed routes as wide', () => {
   expect(['/', '/temperature'].every(isBedPath)).toBe(true);
+  expect(isBedPath('/elevation')).toBe(true);
   expect(['/schedules', '/settings/versions', '/sleep'].some(isBedPath)).toBe(false);
 });

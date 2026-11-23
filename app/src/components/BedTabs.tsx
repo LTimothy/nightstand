@@ -16,7 +16,10 @@ export default function BedTabs() {
       component="nav"
       aria-label="Bed controls"
       aria-hidden={ pending || undefined }
-      sx={ { display: 'flex', width: '100%', px: 0, borderBottom: 1, borderColor: 'divider', visibility: pending ? 'hidden' : undefined } }>
+      sx={ {
+        display: 'flex', width: '100%', px: 0, borderBottom: 1, borderColor: 'divider', visibility: pending ? 'hidden' : undefined,
+        [media.desktop]: { maxWidth: 440, alignSelf: 'flex-start' },
+      } }>
       { destinations.map(({ to, label }) => <Button
         key={ to }
         component={ Link }

@@ -78,7 +78,7 @@ export default function RevertToStockRow({ runningVersion }: Props) {
           { phase === 'failed' && <Alert severity="error">{ error }</Alert> }
           { phase === 'idle' && <InUseConfirm reasons={ inUse }/> }
           { phase === 'idle' && (
-            <DialogContentText component="div">
+            <DialogContentText component="div" sx={ { overflowWrap: 'anywhere' } }>
               <Typography variant="body2" sx={ { mb: 2 } }>
                 Replace the app with upstream free-sleep. Settings and sleep data remain on the Pod.
                 Schedules and alarms pause during restart.

@@ -33,7 +33,6 @@ const pageSx = {
   [media.tight]: { gap: 0.5, pt: 0.5 },
   [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X, pt: '24px', pb: '40px' },
 } as const;
-const tabsSx = { width: '100%', [media.desktop]: { maxWidth: 440, alignSelf: 'flex-start' } } as const;
 // One column on a phone. On a desktop the controls take 440 px and Tonight the rest, both from the top.
 const gridSx = {
   display: 'grid', width: '100%', rowGap: 2, alignItems: 'start', gridTemplateColumns: 'minmax(0, 1fr)',
@@ -87,7 +86,7 @@ export default function ControlTempPage() {
         title="Bed"
         status={ staleSince ? NOT_RESPONDING : deviceStatus?.isPriming ? 'Priming' : undefined }
         tone={ staleSince ? 'warn' : undefined }/>
-      <Box sx={ tabsSx }><BedTabs /></Box>
+      <BedTabs />
       { settingsError && <Alert severity="warning" sx={ { width: '100%' } }>
         Bed preferences are unavailable. { settings ? 'Using the last known preferences.' : 'Temperatures are shown in Fahrenheit.' }
       </Alert> }

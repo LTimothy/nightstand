@@ -285,7 +285,7 @@ describe('FeaturesSection', () => {
     expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)', 'Cooling warning']);
   });
 
-  it('shows and copies the root-owned installer path when biometrics is not installed', async () => {
+  it('shows the root-owned installer path when biometrics is not installed', async () => {
     const services = structuredClone(getServices());
     services.biometrics.jobs.installation.status = 'not_started';
     server.use(http.get('*/api/services', () => HttpResponse.json(services)));
@@ -293,8 +293,6 @@ describe('FeaturesSection', () => {
     const command = 'sh /usr/local/lib/nightstand/live/scripts/enable_biometrics.sh';
     await user.click(await screen.findByText('How to install'));
     expect(screen.getByText(command)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Copy command' }));
-    expect(await navigator.clipboard.readText()).toBe(command);
   });
 });
 

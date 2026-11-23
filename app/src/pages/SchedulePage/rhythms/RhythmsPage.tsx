@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import moment from 'moment-timezone';
 import { isAxiosError } from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
-import { Accordion, AccordionDetails, AccordionSummary, Alert, Button, Stack, Typography } from '@mui/material';
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Stack, Typography } from '@mui/material';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import PageHeader from '@components/PageHeader';
 import SectionHeading from '@components/SectionHeading';
@@ -93,7 +93,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
     if (active && active !== document.body) return;
     const next = closed.created ? document.querySelector<HTMLElement>(`[data-use-rhythm="${closed.id}"]`) : null;
     const card = closed.id ? next ?? document.querySelector<HTMLElement>(`[data-rhythm-id="${closed.id}"]`) : null;
-    (card ?? document.getElementById('rhythms-heading'))?.focus({ preventScroll: true });
+    (card ?? document.getElementById('rhythms-heading'))?.focus();
   }, [editing, db, side]);
   // Runs after the commit that shows the list, so the heading exists whatever the browser's frame timing.
   useEffect(() => {
@@ -438,6 +438,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
         </AccordionSummary>
         <AccordionDetails><OneOffAlarmSection/></AccordionDetails>
       </Accordion> }
+      { undo && <Box aria-hidden sx={ { height: 72 } }/> }
       { undo && <UndoBar
         message={ undo.message }
         disabled={ isUpdating }

@@ -9,9 +9,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import PageContainer from '../PageContainer';
 import BedTabs from '@components/BedTabs';
 import PageHeader from '@components/PageHeader';
-import { weight } from '@design/tokens';
+import { media, weight } from '@design/tokens';
+import { BED_MAX_WIDTH, BED_PADDING_X } from '@components/pageRail';
 
 interface BasePosition { head: number; feet: number }
+const pageSx = { [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X, pt: '24px', pb: '40px' } } as const;
+// On a desktop the controls sit in Bed's 440 px left column, under the tabs.
+const columnSx = {
+  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%',
+  [media.desktop]: { maxWidth: 440, alignSelf: 'flex-start' },
+} as const;
 const presets = {
   flat: { head: 0, feet: 0 },
   sleep: { head: 1, feet: 5 },
@@ -145,72 +152,74 @@ export default function BaseControlPage() {
   const unavailable = isLoading || statusUnavailable || baseStatus?.isConfigured === false || !baseStatus;
 
   return (
-    <PageContainer>
+    <PageContainer sx={ pageSx }>
       <PageHeader title="Bed"/>
       <BedTabs/>
-      { isLoading && !statusUnavailable && !baseStatus && <CircularProgress size={ 24 } aria-label="Loading base position" /> }
-      { statusUnavailable && <Alert severity="error">Could not load the base position.</Alert> }
-      { baseStatus?.isConfigured === false && <Alert severity="info">
-        No adjustable base found. Pair an adjustable base in Eight Sleep's app before using Elevation.
-        <Button component={ Link } to="/" sx={ { display: 'flex', width: 'fit-content', px: 0 } }>Back to Temperature</Button>
-      </Alert> }
-      { error && <Alert severity="error" sx={ { width: '100%' } }>{ error }</Alert> }
-      { baseStatus?.isConfigured !== false && <>
-        <Box sx={ { width: '100%', maxWidth: 280 } }>
-          <BedVisualization headPosition={ baseStatus?.head ?? 0 } feetPosition={ baseStatus?.feet ?? 0 } />
-        </Box>
-        { (moving || requested || feedback) && <Typography role="status" variant="body2" color="text.secondary">
-          { moving ? 'Base is moving...' : requested ? 'Movement requested. Waiting for feedback.' : feedback }
-        </Typography> }
-        <Stack direction="row" spacing={ 2 } sx={ { width: '100%', justifyContent: 'center' } }>
-          { (['head', 'feet'] as const).map(axis => (
-            <Box key={ axis } sx={ { textAlign: 'center', minWidth: 0 } }>
-              <Typography variant="body2">{ axis === 'head' ? 'Head' : 'Feet' } angle</Typography>
-              <Stack direction="row" alignItems="center">
-                <IconButton
-                  aria-label={ `Decrease ${axis} angle` }
-                  disabled={ unavailable || isUpdating || pending || position[axis] <= 0 }
-                  onClick={ () => updatePosition({ ...position, [axis]: Math.max(0, position[axis] - 1) }) }>
-                  <RemoveIcon />
-                </IconButton>
-                <Typography sx={ { minWidth: 40, fontSize: '1.5rem', fontWeight: weight.medium, fontVariantNumeric: 'tabular-nums' } }>
-                  { position[axis] }°
-                </Typography>
-                <IconButton
-                  aria-label={ `Increase ${axis} angle` }
-                  disabled={ unavailable || isUpdating || pending || position[axis] >= (axis === 'head' ? 45 : 30) }
-                  onClick={ () => updatePosition({ ...position, [axis]: Math.min(axis === 'head' ? 45 : 30, position[axis] + 1) }) }>
-                  <AddIcon />
-                </IconButton>
-              </Stack>
-            </Box>
-          )) }
-        </Stack>
-        { showStop && <Button
-          variant="contained"
-          color="error"
-          fullWidth
-          onClick={ () => void handleStop() }
-          disabled={ stopMutation.isPending }>
-          { stopMutation.isPending ? 'Stopping...' : 'Stop Movement' }
-        </Button> }
-        <Box sx={ { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1, width: '100%' } }>
-          { Object.entries(presets).map(([name, preset]) => {
-            const active = baseStatus?.head === preset.head && baseStatus?.feet === preset.feet;
-            return <Paper key={ name } variant="outlined" sx={ { borderColor: active ? 'primary.main' : 'divider' } }>
-              <Button
-                fullWidth
-                aria-pressed={ active }
-                disabled={ unavailable || isUpdating || pending || moving || (requested && !queued) }
-                onClick={ () => void handlePreset(name as keyof typeof presets) }
-                sx={ { flexDirection: 'column', py: 1.5 } }>
-                <Typography component="span">{ name.charAt(0).toUpperCase() + name.slice(1) }</Typography>
-                <Typography component="span" variant="caption" color="text.secondary">Head { preset.head }°, feet { preset.feet }°</Typography>
-              </Button>
-            </Paper>;
-          }) }
-        </Box>
-      </> }
+      <Box sx={ columnSx }>
+        { isLoading && !statusUnavailable && !baseStatus && <CircularProgress size={ 24 } aria-label="Loading base position" /> }
+        { statusUnavailable && <Alert severity="error">Could not load the base position.</Alert> }
+        { baseStatus?.isConfigured === false && <Alert severity="info">
+          No adjustable base found. Pair an adjustable base in Eight Sleep's app before using Elevation.
+          <Button component={ Link } to="/" sx={ { display: 'flex', width: 'fit-content', px: 0 } }>Back to Temperature</Button>
+        </Alert> }
+        { error && <Alert severity="error" sx={ { width: '100%' } }>{ error }</Alert> }
+        { baseStatus?.isConfigured !== false && <>
+          <Box sx={ { width: '100%', maxWidth: 280 } }>
+            <BedVisualization headPosition={ baseStatus?.head ?? 0 } feetPosition={ baseStatus?.feet ?? 0 } />
+          </Box>
+          <Typography role="status" variant="body2" color="text.secondary" sx={ { minHeight: 21 } }>
+            { moving ? 'Base is moving...' : requested ? 'Movement requested. Waiting for feedback.' : feedback }
+          </Typography>
+          <Stack direction="row" spacing={ 2 } sx={ { width: '100%', justifyContent: 'center' } }>
+            { (['head', 'feet'] as const).map(axis => (
+              <Box key={ axis } sx={ { textAlign: 'center', minWidth: 0 } }>
+                <Typography variant="body2">{ axis === 'head' ? 'Head' : 'Feet' } angle</Typography>
+                <Stack direction="row" alignItems="center">
+                  <IconButton
+                    aria-label={ `Decrease ${axis} angle` }
+                    disabled={ unavailable || isUpdating || pending || position[axis] <= 0 }
+                    onClick={ () => updatePosition({ ...position, [axis]: Math.max(0, position[axis] - 1) }) }>
+                    <RemoveIcon />
+                  </IconButton>
+                  <Typography sx={ { minWidth: 40, fontSize: '1.5rem', fontWeight: weight.medium, fontVariantNumeric: 'tabular-nums' } }>
+                    { position[axis] }°
+                  </Typography>
+                  <IconButton
+                    aria-label={ `Increase ${axis} angle` }
+                    disabled={ unavailable || isUpdating || pending || position[axis] >= (axis === 'head' ? 45 : 30) }
+                    onClick={ () => updatePosition({ ...position, [axis]: Math.min(axis === 'head' ? 45 : 30, position[axis] + 1) }) }>
+                    <AddIcon />
+                  </IconButton>
+                </Stack>
+              </Box>
+            )) }
+          </Stack>
+          <Box sx={ { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1, width: '100%' } }>
+            { Object.entries(presets).map(([name, preset]) => {
+              const active = baseStatus?.head === preset.head && baseStatus?.feet === preset.feet;
+              return <Paper key={ name } variant="outlined" sx={ { borderColor: active ? 'primary.main' : 'divider' } }>
+                <Button
+                  fullWidth
+                  aria-pressed={ active }
+                  disabled={ unavailable || isUpdating || pending || moving || (requested && !queued) }
+                  onClick={ () => void handlePreset(name as keyof typeof presets) }
+                  sx={ { flexDirection: 'column', py: 1.5 } }>
+                  <Typography component="span">{ name.charAt(0).toUpperCase() + name.slice(1) }</Typography>
+                  <Typography component="span" variant="caption" color="text.secondary">Head { preset.head }°, feet { preset.feet }°</Typography>
+                </Button>
+              </Paper>;
+            }) }
+          </Box>
+          { showStop && <Button
+            variant="contained"
+            color="error"
+            fullWidth
+            onClick={ () => void handleStop() }
+            disabled={ stopMutation.isPending }>
+            { stopMutation.isPending ? 'Stopping...' : 'Stop movement' }
+          </Button> }
+        </> }
+      </Box>
     </PageContainer>
   );
 }

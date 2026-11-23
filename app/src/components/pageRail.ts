@@ -14,4 +14,4 @@ export const bannerRailSx = (wide: boolean) => ({
   ...(wide ? { [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X } } : {}),
 }) as const;
 
-export const isBedPath = (pathname: string) => pathname === '/' || pathname === '/temperature';
+export const isBedPath = (pathname: string) => ['/', '/temperature', '/elevation'].includes(pathname);

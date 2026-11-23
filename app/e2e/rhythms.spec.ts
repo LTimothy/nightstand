@@ -39,6 +39,44 @@ test('choosing a rhythm for some days of a line saves it and can be undone', asy
   await expect(page.getByRole('button', { name: 'Sun to Thu: Workday' })).toBeVisible();
 });
 
+test('the undo bar sits fully inside a wide viewport with its message', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await open(page, '/schedules');
+  await page.getByRole('button', { name: 'Fri and Sat: Weekend' }).click();
+  await page.getByRole('dialog', { name: 'Fri and Sat' }).getByRole('button', { name: /^Workday/ }).click();
+  const undo = page.getByRole('alert').filter({ hasText: 'Fri and Sat now use Workday' });
+  await expect(undo.getByText('Fri and Sat now use Workday')).toBeVisible();
+  const box = await undo.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(1280);
+});
+
+test('the undo bar does not cover Add one-time alarm at the end of the page', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 740 });
+  await open(page, '/schedules');
+  await page.getByRole('button', { name: 'Fri and Sat: Weekend' }).click();
+  await page.getByRole('dialog', { name: 'Fri and Sat' }).getByRole('button', { name: /^Workday/ }).click();
+  const undo = page.getByRole('alert').filter({ hasText: 'Fri and Sat now use Workday' });
+  await expect(undo).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const add = await page.getByRole('button', { name: 'Add one-time alarm' }).first().boundingBox();
+  const bar = await undo.boundingBox();
+  expect(add!.y + add!.height).toBeLessThanOrEqual(bar!.y);
+});
+
+test('Edit opens the editor at the top, and Back brings the rhythm card into view', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 500 });
+  await open(page, '/schedules');
+  const edit = page.getByRole('button', { name: 'Edit Weekend' });
+  await edit.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await edit.click();
+  await expect(page.getByLabel('Turn on at', { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.getByRole('button', { name: 'Rhythms', exact: true }).click();
+  await expect(edit).toBeInViewport();
+});
+
 test('opening another picker puts the undo bar away', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await open(page, '/schedules');

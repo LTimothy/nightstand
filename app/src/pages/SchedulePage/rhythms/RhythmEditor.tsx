@@ -106,7 +106,9 @@ export default function RhythmEditor({
   // The card that opened the editor is gone, so start keyboard users at the rhythm's heading.
   const loaded = !!nightBaseline;
   useEffect(() => {
-    if (loaded) focusIfLost(() => document.getElementById('rhythm-night-heading'));
+    if (!loaded) return;
+    window.scrollTo(0, 0);
+    focusIfLost(() => document.getElementById('rhythm-night-heading'));
   }, [loaded]);
 
   if (!night || !nightBaseline) return null;

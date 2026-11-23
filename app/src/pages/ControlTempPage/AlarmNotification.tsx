@@ -47,7 +47,7 @@ export default function AlarmNotification() {
       severity="info"
       sx={ {
         width: '100%', p: 0, background: 'transparent', border: 0, color: 'text.secondary',
-        '& .MuiAlert-message': { width: '100%', py: 0 },
+        '& .MuiAlert-message': { width: '100%', py: 0, overflow: 'visible' },
       } }>
       <AlarmOverride
         open={ overrideOpen }

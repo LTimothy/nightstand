@@ -110,3 +110,8 @@ it.each(Array.from({ length: 55 }, (_, index) => index + 55))('restores the exac
   fireEvent.keyDown(screen.getByRole('spinbutton'), { key: 'ArrowDown' });
   expect(onChange).toHaveBeenLastCalledWith(value);
 });
+
+it.each<[TemperatureFormat, string]>([['celsius', '80px'], ['fahrenheit', '62px']])('%s uses min-width %s', (format, width) => {
+  render(<TemperatureStepper value={ 79 } format={ format } label="Temperature" disabled={ false } onChange={ vi.fn() }/>);
+  expect(screen.getByRole('spinbutton')).toHaveStyle({ minWidth: width });
+});

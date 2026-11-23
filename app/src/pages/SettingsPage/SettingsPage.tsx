@@ -141,17 +141,17 @@ export default function SettingsPage() {
               </Typography>
             </Section>
           </ErrorBoundary>
+          <ErrorBoundary componentName="Cover buttons">
+            <CoverButtonsCard
+              settings={ settings }
+              updateSettings={ updateSettings }/>
+          </ErrorBoundary>
           <ErrorBoundary componentName="Tap gestures">
             <Section title="Tap gestures">
               <TapGestures
                 settings={ settings }
                 updateSettings={ updateSettings }/>
             </Section>
-          </ErrorBoundary>
-          <ErrorBoundary componentName="Cover buttons">
-            <CoverButtonsCard
-              settings={ settings }
-              updateSettings={ updateSettings }/>
           </ErrorBoundary>
           <ErrorBoundary componentName="Bed preferences">
             <Section>

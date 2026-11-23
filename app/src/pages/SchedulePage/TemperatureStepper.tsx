@@ -73,8 +73,8 @@ export default function TemperatureStepper({ value, format, label, disabled, onC
           step(event.key === 'ArrowUp' ? 1 : -1);
         }
       } }
-      sx={ { minWidth: isTargetFormat(format) ? 80 : 62, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        textAlign: 'center', fontSize: 24, fontWeight: weight.medium,
+      sx={ { minWidth: isTargetFormat(format) || format === 'celsius' ? 80 : 62, minHeight: 44,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: 24, fontWeight: weight.medium,
         fontVariantNumeric: 'tabular-nums', opacity: disabled ? 0.5 : 1,
         '&:focus-visible': { outline: '2px solid', outlineOffset: 3, borderRadius: 1 } } }>{ formatTemperature(value, format) }</Box>
     <IconButton

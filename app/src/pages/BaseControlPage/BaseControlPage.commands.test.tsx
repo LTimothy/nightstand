@@ -64,9 +64,9 @@ it('a late request failure cannot restore movement after Stop', async () => {
   renderControls();
   fireEvent.click(screen.getByRole('button', { name: 'Increase head angle' }));
   await act(async () => vi.advanceTimersByTimeAsync(500));
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop Movement' })));
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop movement' })));
   await act(async () => rejectPosition(new Error('late request failure')));
-  expect(screen.queryByRole('button', { name: 'Stop Movement' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Stop movement' })).not.toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
@@ -83,9 +83,9 @@ it('allows presets after Stop fails while keeping Stop available', async () => {
   api.stop.mockRejectedValueOnce(new Error('offline'));
   renderControls();
   fireEvent.click(screen.getByRole('button', { name: 'Increase head angle' }));
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop Movement' })));
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop movement' })));
   expect(screen.getByRole('button', { name: /Relax/ })).toBeEnabled();
-  expect(screen.getByRole('button', { name: 'Stop Movement' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Stop movement' })).toBeEnabled();
 });
 
 
@@ -93,11 +93,11 @@ it.each(['position', 'preset'])('clears a failed Stop after a successful %s comm
   api.stop.mockRejectedValueOnce(new Error('offline'));
   renderControls();
   fireEvent.click(screen.getByRole('button', { name: 'Increase head angle' }));
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop Movement' })));
-  expect(screen.getByRole('button', { name: 'Stop Movement' })).toBeEnabled();
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop movement' })));
+  expect(screen.getByRole('button', { name: 'Stop movement' })).toBeEnabled();
   fireEvent.click(screen.getByRole('button', { name: command === 'position' ? 'Increase head angle' : /Relax/ }));
   await act(async () => vi.advanceTimersByTimeAsync(3100));
-  expect(screen.queryByRole('button', { name: 'Stop Movement' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Stop movement' })).not.toBeInTheDocument();
 });
 
 it.each([true, false])('clears a failed Stop on fresh stationary status after moving was %s', async (isMoving) => {
@@ -105,10 +105,10 @@ it.each([true, false])('clears a failed Stop on fresh stationary status after mo
   api.stop.mockRejectedValueOnce(new Error('offline'));
   const view = renderControls();
   fireEvent.click(screen.getByRole('button', { name: 'Increase head angle' }));
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop Movement' })));
-  expect(screen.getByRole('button', { name: 'Stop Movement' })).toBeEnabled();
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stop movement' })));
+  expect(screen.getByRole('button', { name: 'Stop movement' })).toBeEnabled();
   status.data = { ...status.data, isMoving: false };
   status.dataUpdatedAt += 1;
   view.rerender(<MemoryRouter initialEntries={ ['/elevation'] }><BaseControlPage/></MemoryRouter>);
-  expect(screen.queryByRole('button', { name: 'Stop Movement' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Stop movement' })).not.toBeInTheDocument();
 });

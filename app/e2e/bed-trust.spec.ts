@@ -155,3 +155,19 @@ test('with presence stale, the get-up caption keeps only the latest turn-off', a
   await expect(page.getByText(/^In bed/)).toBeVisible();
   expect(await positions()).toEqual(stale);
 });
+
+test('skipping the alarm leaves the bell where it was', async ({ page }) => {
+  await open(page);
+  // The alarm line's text starts right after the bell, so its x tracks the bell's.
+  const line = page.locator('[data-tonight]').getByText(/^Alarm (today|tomorrow) at/);
+  await expect(line).toBeVisible();
+  const before = (await line.boundingBox())!.x;
+  await page.locator('[data-tonight]').getByRole('button', { name: 'Skip', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  // The confirm is the dialog's last action.
+  await dialog.getByRole('button').last().click();
+  await expect(dialog).toBeHidden();
+  const skipped = page.locator('[data-tonight]').getByText('Recurring alarms skipped');
+  await expect(skipped).toBeVisible();
+  expect((await skipped.boundingBox())!.x).toBe(before);
+});
