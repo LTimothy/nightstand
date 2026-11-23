@@ -110,7 +110,7 @@ export default function ControlTempPage() {
         <Box
           sx={ {
             display: 'flex', flexDirection: 'column', gap: 2, width: '100%',
-            '& .MuiAlert-root': { px: '16px', [media.narrow]: { px: '14px' }, [media.desktop]: { px: '22px' } },
+            '& > .MuiAlert-root': { px: '16px', [media.narrow]: { px: '14px' }, [media.desktop]: { px: '22px' } },
           } }>
           <ErrorBoundary componentName="Schedule override banner">
             <ScheduleOverrideBanner />

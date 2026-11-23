@@ -41,7 +41,7 @@ export default function MissedAlarmBanner({ wide = false }: { wide?: boolean }) 
         <Alert
           role="none"
           severity="warning"
-          sx={ { flexWrap: { xs: 'wrap', sm: 'nowrap' }, '& .MuiAlert-message': { flexBasis: { xs: '100%', sm: 'auto' } } } }
+          sx={ { flexWrap: { xs: 'wrap', sm: 'nowrap' }, '& .MuiAlert-message': { flexBasis: { xs: 'calc(100% - 34px)', sm: 'auto' } } } }
           action={ (
             <Button
               color="inherit"

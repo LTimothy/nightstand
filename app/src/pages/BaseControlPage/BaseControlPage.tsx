@@ -13,7 +13,12 @@ import { media, weight } from '@design/tokens';
 import { BED_MAX_WIDTH, BED_PADDING_X } from '@components/pageRail';
 
 interface BasePosition { head: number; feet: number }
-const pageSx = { [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X, pt: '24px', pb: '40px' } } as const;
+// Same rhythm as Bed, so the tabs stay put when switching between the two.
+const pageSx = {
+  [media.short]: { gap: 1, pt: 1 },
+  [media.tight]: { gap: 0.5, pt: 0.5 },
+  [media.desktop]: { maxWidth: BED_MAX_WIDTH, px: BED_PADDING_X, pt: '24px', pb: '40px' },
+} as const;
 // On a desktop the controls sit in Bed's 440 px left column, under the tabs.
 const columnSx = {
   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%',
@@ -214,6 +219,8 @@ export default function BaseControlPage() {
             variant="contained"
             color="error"
             fullWidth
+            // Sticky so a short phone still shows it above the bottom bar while the base moves.
+            sx={ { position: 'sticky', bottom: { xs: 'calc(72px + env(safe-area-inset-bottom, 0px))', md: 16 }, zIndex: 1 } }
             onClick={ () => void handleStop() }
             disabled={ stopMutation.isPending }>
             { stopMutation.isPending ? 'Stopping...' : 'Stop movement' }

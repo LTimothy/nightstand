@@ -69,7 +69,7 @@ export default function ApplyToOtherDaysAccordion() {
           <Button onClick={ setWeekends }>Weekends</Button>
           <Button onClick={ setEveryday }>Every day</Button>
         </Box>
-        <Box role="group" aria-label="Apply to days" sx={ { display: 'flex', flexWrap: 'wrap', gap: 0.5, ml: -1 } }>
+        <Box role="group" aria-label="Apply to days" sx={ { display: 'flex', flexWrap: 'wrap', gap: 0.5, ml: { xs: -1, sm: 0 } } }>
           { daysOfWeek.map(day => {
             const lowerCaseDay = day.toLowerCase() as DayOfWeek;
             return <ToggleButton

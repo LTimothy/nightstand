@@ -151,16 +151,19 @@ export default function SuggestionSheet(props: Props) {
       <Typography variant="body2" sx={ { mt: 1 } }>{ startsLine(start, rhythm.name) }</Typography>
     </DialogContent>
     { (error || exclude.error) && <Alert severity="error" sx={ { mx: 2, mt: 1 } }>{ error || exclude.error }</Alert> }
-    <DialogActions>
+    <DialogActions sx={ { flexWrap: 'wrap', rowGap: 1 } }>
       <Button onClick={ props.onClose } sx={ { minHeight: 44 } }>Close</Button>
-      <Button aria-disabled={ busy || none } onClick={ guard(() => props.onDontSuggest(rows), none) } sx={ { minHeight: 44, ...INACTIVE } }>
+      <Button
+        aria-disabled={ busy || none }
+        onClick={ guard(() => props.onDontSuggest(rows), none) }
+        sx={ { minHeight: 44, whiteSpace: 'nowrap', ...INACTIVE } }>
         { dontSuggestLabel(rows.length, entry.rows.length) }
       </Button>
       <Button
         variant="contained"
         aria-disabled={ busy || none }
         onClick={ guard(() => props.onAdd(rows), none) }
-        sx={ { minHeight: 44, ...INACTIVE } }>
+        sx={ { minHeight: 44, whiteSpace: 'nowrap', ...INACTIVE } }>
         { addLabel(rhythm.name, rows.length, entry.rows.length) }
       </Button>
     </DialogActions>

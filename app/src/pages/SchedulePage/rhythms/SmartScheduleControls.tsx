@@ -43,7 +43,7 @@ export default function SmartScheduleControls({ value, onChange, format, trackin
     onChange(next === 'off' ? { ...rest, warmUp: false }
       : next === 'base' ? { ...rest, warmUp: true, warmUpTo: 'base' } : { ...rest, warmUp: true });
   };
-  return <Stack spacing={ 2 } sx={ { width: '100%' } }>
+  return <Stack spacing={ 2 } sx={ { width: '100%', '&& > *:not(:last-child)': { mb: 0 } } }>
     { daySleep && <Typography variant="body2" role="note">
       This sleep is mostly during the day, so there is no warm start and the cool-down is a little quicker.
     </Typography> }

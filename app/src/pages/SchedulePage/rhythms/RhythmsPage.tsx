@@ -436,7 +436,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
         sx={ { width: '100%' } }
         slotProps={ { transition: { unmountOnExit: true }, heading: { component: 'h2' } } }>
         <AccordionSummary expandIcon={ <ExpandMore/> }>
-          <Typography component="h2" variant="inherit">{ oneOffText ? `One-time alarm: ${oneOffText}` : 'Add one-time alarm' }</Typography>
+          <Typography component="span" variant="inherit">{ oneOffText ? `One-time alarm: ${oneOffText}` : 'Add one-time alarm' }</Typography>
         </AccordionSummary>
         <AccordionDetails><OneOffAlarmSection/></AccordionDetails>
       </Accordion> }

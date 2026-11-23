@@ -26,7 +26,20 @@ test('the Elevation tab stays put when it opens on a desktop', async ({ page }) 
   const tab = page.getByRole('navigation', { name: 'Bed controls' }).getByRole('link', { name: 'Elevation' });
   await page.goto('/');
   const onBed = (await tab.boundingBox())!.x;
+  const onBedY = (await tab.boundingBox())!.y;
   await tab.click();
   await expect(tab).toHaveAttribute('aria-current', 'page');
   expect((await tab.boundingBox())!.x).toBe(onBed);
+  expect((await tab.boundingBox())!.y).toBe(onBedY);
+});
+
+test('Stop stays above the bottom bar on a short phone while the base moves', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/elevation');
+  await page.getByRole('button', { name: /Relax Head/ }).click();
+  const stop = page.getByRole('button', { name: 'Stop movement' });
+  await expect(stop).toBeVisible();
+  const bar = (await page.getByRole('navigation', { name: 'Primary mobile' }).boundingBox())!;
+  const box = (await stop.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(bar.y);
 });

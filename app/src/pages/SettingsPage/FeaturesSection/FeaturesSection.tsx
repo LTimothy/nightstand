@@ -181,7 +181,7 @@ export default function FeaturesSection() {
           { !biometricsInstalled && <Accordion
             disableGutters
             square
-            sx={ { background: 'transparent', boxShadow: 'none', border: 0, mb: 1, '&:before': { display: 'none' } } }
+            sx={ { background: 'transparent', boxShadow: 'none', border: 0, '&:before': { display: 'none' } } }
           >
             <AccordionSummary expandIcon={ <ExpandMoreIcon/> } sx={ { px: 0, minHeight: 44 } }>How to install</AccordionSummary>
             <AccordionDetails sx={ { px: 0 } }>

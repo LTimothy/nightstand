@@ -114,7 +114,7 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
 
       { isRunnable && (
         <Box sx={ { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1.5, mt: 1 } }>
-          <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary, flex: 1, mt: 0.5 } }>
+          <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary } }>
             { meta.runHint }
           </Typography>
           <Button
