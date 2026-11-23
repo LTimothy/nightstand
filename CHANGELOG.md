@@ -50,6 +50,14 @@ is a hard fork; for the history of the projects it descends from, see
 - Settings, schedules and Rhythms are written all the way to flash as soon
   as they are saved, so a change you just made survives a power cut.
 
+### Fixes
+
+- Installing the same scripts again replaces a published root-owned copy
+  whose contents no longer match, instead of keeping it by its folder name.
+- Scripts run through a sudo rule set PATH to the system folders first, so
+  the commands they run cannot come from folders the server user chooses.
+  This includes the existing Biometrics off and system log scripts.
+
 ## [3.10.0] - 2026-11-21
 
 Adds a center button boost and a confirmation buzz on a Pod 5 hub, an option to ring alarms on a side that is off, the same alarm editor with Test for the one-time alarm, dragging on the Bed dial, and optional Pod 5 target temperature labels.
