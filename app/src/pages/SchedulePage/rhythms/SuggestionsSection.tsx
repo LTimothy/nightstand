@@ -49,13 +49,13 @@ export default function SuggestionsSection({ sideData, suggestions, away, onShow
       { away && <Typography variant="body2">{ AWAY_LINE }</Typography> }
       <Typography variant="body2" color="text.secondary">{ sectionCaption() }</Typography>
       { lines.length > 0 && <Box component="ul" sx={ { listStyle: 'none', p: 0, m: 0 } }>
-        { lines.map(line => <Box component="li" key={ line.id } sx={ { display: 'flex', alignItems: 'center', gap: 1, py: 0.5 } }>
+        { lines.map(line => <Box component="li" key={ line.id } sx={ { display: 'flex', alignItems: 'center', gap: 1, minHeight: 44, py: 0 } }>
           <Typography variant="body2" sx={ { flex: 1, minWidth: 0, overflowWrap: 'anywhere' } }>{ line.text }</Typography>
           { line.review && <Button
             aria-label={ line.review }
             data-review={ line.id }
             onClick={ () => onReview(line.id) }
-            sx={ { minHeight: 44, flexShrink: 0 } }>
+            sx={ { minHeight: 44, flexShrink: 0, mr: -1 } }>
             { REVIEW }
           </Button> }
         </Box>) }

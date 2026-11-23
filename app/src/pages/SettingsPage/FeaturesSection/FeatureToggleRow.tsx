@@ -17,7 +17,7 @@ type FeatureToggleRowProps = {
 // before this; this is the first shared one.
 export default function FeatureToggleRow({ label, checked, onChange, disabled, description, ariaLabel }: FeatureToggleRowProps) {
   return (
-    <Box sx={ { mb: 1 } }>
+    <Box sx={ { '&:not(:last-child)': { mb: description ? 2 : 1 } } }>
       <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, py: 0.5 } }>
         <Typography sx={ { fontSize: '1rem', color: palette.text.primary } }>{ label }</Typography>
         <Switch
@@ -29,7 +29,7 @@ export default function FeatureToggleRow({ label, checked, onChange, disabled, d
         />
       </Box>
       { description && (
-        <Box display='flex' gap={ 1 } alignItems='flex-start' sx={ { mt: 1 } }>
+        <Box display='flex' gap={ 1 } alignItems='flex-start'>
           <Typography component="div" sx={ { color: palette.text.secondary, fontSize: '0.875rem', lineHeight: 1.5 } }>
             { description }
           </Typography>

@@ -99,9 +99,7 @@ export default function SideControl({ compact = true, mergeAwaySides = true, bef
           ? temperatureColor(fahrenheitToLevel(status.targetTemperatureF)) : 'text.secondary';
         const check = selected && <CheckCircleOutline
           aria-hidden
-          sx={ compact
-            ? { position: 'absolute', top: 10, right: 10, fontSize: 18, color: palette.accent, pointerEvents: 'none' }
-            : { fontSize: 17, color: palette.accent, flex: 'none' } }/>;
+          sx={ { fontSize: compact ? 18 : 17, color: palette.accent, flex: 'none' } }/>;
         // The Bed tiles cut long lines short; a hover shows them in full.
         const full = compact ? undefined : [title, shown, occupancy].filter(Boolean).join('\n');
         return <Box component="label" key={ key } title={ full } sx={ compact ? compactTileSx(selected) : bedTileSx(selected) }>
@@ -116,7 +114,7 @@ export default function SideControl({ compact = true, mergeAwaySides = true, bef
             sx={ { position: 'absolute', inset: 0, opacity: 0, p: 0, '& input': { width: '100%', height: '100%' } } }/>
           { compact ? <>
             <Box sx={ { minWidth: 0, flex: 1 } }>
-              <Typography fontWeight={ weight.heading } sx={ { fontSize: 16, pr: 2.5, overflowWrap: 'anywhere', lineHeight: 1.2 } }>
+              <Typography fontWeight={ weight.heading } sx={ { fontSize: 16, overflowWrap: 'anywhere', lineHeight: 1.2 } }>
                 <bdi>{ title }</bdi>
               </Typography>
               <Typography variant="caption" color={ stateColor } sx={ { display: 'block', lineHeight: 1.2, minHeight: '1.2em' } }>

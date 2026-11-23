@@ -1,4 +1,5 @@
 import { Alert, Paper, Typography } from '@mui/material';
+import SectionHeading from '@components/SectionHeading';
 import { useStorage } from '@api/storage.ts';
 import { formatBytes } from '../../lib/formatBytes.ts';
 
@@ -19,7 +20,7 @@ export default function FlashHealthPanel() {
   if (!flash) return null;
   const worn = (flash.preEolInfo ?? 1) >= 2 || Math.max(flash.lifeTimeA ?? 0, flash.lifeTimeB ?? 0) >= 9;
   return <Paper variant="outlined" sx={ { p: 2 } }>
-    <Typography component="h2" variant="h6">Flash memory</Typography>
+    <SectionHeading sx={ { mb: 1.5 } }>Flash memory</SectionHeading>
     <Typography variant="body2" color="text.secondary" sx={ { mb: 1 } }>
       The Pod keeps its software, settings and sensor history on built-in flash memory, which wears a little
       with every write. The memory chip keeps its own estimate in 10% steps. This page only reads it.

@@ -47,11 +47,10 @@ export default function DateChanges({ sideData, from, today, disabled, onChoose 
               sx={ { minWidth: 0 } }
               slotProps={ { secondary: { sx: { overflowWrap: 'anywhere' } } } }/>
             <Button
-              size="small"
               aria-label={ `${label}: back to ${weekLabel(sideData, change.date)}` }
               aria-disabled={ disabled || undefined }
               onClick={ () => { if (!disabled) onChoose(change.date, { kind: 'weekly' }); } }
-              sx={ { minHeight: 44, flexShrink: 0, ...INACTIVE } }>
+              sx={ { minHeight: 44, flexShrink: 0, mr: -1, ...INACTIVE } }>
               Back to Week
             </Button>
           </ListItem>;

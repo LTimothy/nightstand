@@ -221,7 +221,7 @@ export default function LogsPage() {
             sx={ { minWidth: 0, width: '100%' } }
           />
 
-          <Box sx={ { display: 'flex', width: '100%', alignItems: 'center', gap: 1 } }>
+          <Box sx={ { display: 'flex', width: '100%', alignItems: 'flex-end', gap: 1 } }>
             <FormControl size="small" sx={ { minWidth: 0, flex: 1, my: 0 } }>
               <InputLabel id="log-level-label">Severity</InputLabel>
               <Select labelId="log-level-label" label="Severity" value={ severity } onChange={ event => setSeverity(event.target.value) }>
@@ -258,7 +258,7 @@ export default function LogsPage() {
         </Box>
 
         { selectedLog && (
-          <Typography sx={ { color: palette.text.secondary, fontSize: '0.8125rem', mb: 1.5 } }>
+          <Typography variant="body2" color="text.secondary" sx={ { mb: 1.5 } }>
             { getLogDescription(selectedLog) }
           </Typography>
         ) }
@@ -291,7 +291,7 @@ export default function LogsPage() {
             overflowY: 'auto',
             maxHeight: `${window.innerHeight - 340}px`,
             fontFamily: 'monospace',
-            p: 1,
+            pr: 1,
             '&::-webkit-scrollbar': {
               width: '10px',
             },

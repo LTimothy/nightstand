@@ -9,7 +9,7 @@ export default function LicenseModal() {
   return (
     <>
       <ListItemButton onClick={ () => setOpen(true) } sx={ { px: 0 } }>
-        <ListItemText primary="View license and disclaimer" /><ChevronRightIcon />
+        <ListItemText primary="View license and disclaimer" /><ChevronRightIcon color="action" />
       </ListItemButton>
       <Dialog open={ open } onClose={ () => setOpen(false) } aria-labelledby="license-title" fullWidth maxWidth="md">
         <DialogTitle id="license-title">License and disclaimer</DialogTitle>

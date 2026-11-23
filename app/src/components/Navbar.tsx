@@ -14,6 +14,7 @@ import { useUpdateAttentionStore } from '@state/updateAttentionStore';
 import { useDeviceStatus } from '@api/deviceStatus';
 import { useStatusSummary } from '../pages/StatusPage/useStatusSummary';
 import { PAGES, primaryRoute } from './pages';
+import { bannerRailSx, isBedPath } from './pageRail';
 import { weight } from '@design/tokens';
 
 export default function Navbar() {
@@ -51,7 +52,6 @@ export default function Navbar() {
           left: 0,
           right: 0,
           height: 64,
-          px: 3,
           alignItems: 'center',
           justifyContent: 'space-between',
           bgcolor: 'background.default',
@@ -60,9 +60,9 @@ export default function Navbar() {
           zIndex: 1100,
         } }
       >
-        <Box sx={ { width: '100%', maxWidth: 672, mx: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } }>
+        <Box sx={ { ...bannerRailSx(isBedPath(pathname)), mx: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } }>
           <Typography sx={ { fontWeight: weight.heading } }>Nightstand</Typography>
-          <Box sx={ { display: 'flex', gap: 1 } }>
+          <Box sx={ { display: 'flex', gap: 1, mr: -1 } }>
             { PAGES.map((page) => (
               <Button
                 key={ page.route }

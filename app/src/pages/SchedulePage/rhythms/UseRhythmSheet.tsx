@@ -1,6 +1,5 @@
 import { useId, useState } from 'react';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
-import Check from '@mui/icons-material/Check';
 import type { DayOfWeek } from '@api/schedulesSchema';
 import { describeDays, WEEK_DAYS } from '@api/rhythmDays';
 import { palette, radius } from '@design/tokens';
@@ -34,8 +33,7 @@ export default function UseRhythmSheet({ name, onUse, onClose }: Props) {
           key={ day }
           value={ day }
           aria-label={ dayName(day) }
-          sx={ { minWidth: 44, minHeight: 44, px: 1, gap: 0.5 } }>
-          { days.includes(day) && <Check aria-hidden sx={ { fontSize: 16 } }/> }
+          sx={ { minWidth: 44, minHeight: 44, px: 1 } }>
           { dayName(day).slice(0, 3) }
         </ToggleButton>) }
       </ToggleButtonGroup>

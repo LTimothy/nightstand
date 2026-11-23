@@ -19,7 +19,7 @@ export default function UsageBar({ label, usedBytes, totalBytes, usedPercent, ca
       : palette.text.secondary;
 
   return (
-    <Box sx={ { mb: 1.5 } }>
+    <Box sx={ { '&:not(:last-child)': { mb: 1.5 } } }>
       <Box sx={ { display: 'flex', alignItems: 'center', gap: 1, mb: 1 } }>
         <Typography sx={ { fontSize: '1rem', color: palette.text.primary, flex: 1 } }>
           { label }

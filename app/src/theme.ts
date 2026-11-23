@@ -75,7 +75,8 @@ const buildComponents = ({ palette: p, radius, type }: ThemeTokens) => {
     ] } } },
     MuiSlider: { styleOverrides: { root: { padding: '20px 0' }, thumb: { '&::after': { width: 44, height: 44 } } } },
     MuiSwitch: {
-      styleOverrides: { root: { width: 64, height: 44, padding: 15 }, switchBase: { padding: 12, color: p.text.secondary } },
+      // The negative margin puts the thumb's outer edge on the content edge, like buttons and text.
+      styleOverrides: { root: { width: 64, height: 44, padding: 15, marginRight: -12 }, switchBase: { padding: 12, color: p.text.secondary } },
     },
     MuiRadio: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
     MuiCheckbox: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },

@@ -108,7 +108,7 @@ export default function SettingsPage() {
           Could not load settings.
         </Alert>
       ) }
-      { isLoading && category && <CircularProgress aria-label="Loading settings" /> }
+      { isLoading && category && <CircularProgress aria-label="Loading settings" sx={ { alignSelf: 'center' } } /> }
       { !selected && (
         <List disablePadding sx={ { bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden' } }>
           { categories.map((item) => (
@@ -133,7 +133,7 @@ export default function SettingsPage() {
           <ErrorBoundary componentName="Side settings">
             <Section>
               <SideSettings side="left" settings={ settings } updateSettings={ updateSettings } />
-              <Box sx={ { my: 2, borderTop: 1, borderColor: 'divider' } } />
+              <Box sx={ { mb: 2, borderTop: 1, borderColor: 'divider' } } />
               <SideSettings side="right" settings={ settings } updateSettings={ updateSettings } />
               <Typography variant="body2" color="text.secondary" sx={ { mt: 2 } }>
                 Away mode pauses that side's schedules and mirrors the active side. If both sides are away, neither
@@ -186,7 +186,7 @@ export default function SettingsPage() {
         <>
           <List disablePadding sx={ { bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden' } }>
             { [['system', 'System status'], ['logs', 'Logs']].map(([key, label]) => (
-              <ListItemButton key={ key } component={ Link } to={ `/settings/${key}` } sx={ { minHeight: 44 } }>
+              <ListItemButton key={ key } component={ Link } to={ `/settings/${key}` } divider={ key === 'system' } sx={ { py: 1.5 } }>
                 <ListItemText primary={ label } secondary={ key === 'system' ? details.device : undefined }/><ChevronRightIcon color="action"/>
               </ListItemButton>
             )) }

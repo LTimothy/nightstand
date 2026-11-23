@@ -62,7 +62,7 @@ export default function MultiDateSheet({ sideData, today, onNext, onClose }: Pro
     sx={ BOTTOM_SHEET }>
     <DialogTitle id={ titleId }>Change several dates</DialogTitle>
     <DialogContent sx={ { px: { xs: 0.75, sm: 3 } } }>
-      <Typography variant="body2" color="text.secondary" sx={ { px: { xs: 1.25, sm: 0 }, mb: 1 } }>
+      <Typography variant="body2" color="text.secondary" sx={ { px: { xs: 2.25, sm: 0 }, mb: 1 } }>
         Tap each date that should use the same rhythm, up to { MAX_CHANGE_DAYS_AHEAD } days ahead.
       </Typography>
       <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } }>
@@ -122,10 +122,10 @@ export default function MultiDateSheet({ sideData, today, onNext, onClose }: Pro
           </ButtonBase>;
         }) }
       </Box>
-      <Typography role="status" variant="body2" sx={ { px: { xs: 1.25, sm: 0 }, mt: 1 } }>
+      <Typography role="status" variant="body2" sx={ { px: { xs: 2.25, sm: 0 }, mt: 1 } }>
         { chosen.length ? `${chosen.length} ${chosen.length === 1 ? 'date' : 'dates'} selected` : 'No dates selected' }
       </Typography>
-      <Typography variant="caption" color="text.secondary" sx={ { display: 'block', px: { xs: 1.25, sm: 0 } } }>
+      <Typography variant="caption" color="text.secondary" sx={ { display: 'block', px: { xs: 2.25, sm: 0 } } }>
         A dot marks a date that is already changed.
       </Typography>
     </DialogContent>

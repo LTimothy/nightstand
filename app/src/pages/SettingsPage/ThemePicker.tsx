@@ -40,7 +40,7 @@ export default function ThemePicker({ reload = () => window.location.reload() }:
           value={ id }
           control={ <Radio/> }
           label={ <Box component="span" sx={ optionSx }><ThemePreview id={ id }/>{ THEME_NAMES[id] }</Box> }
-          sx={ { minHeight: 44, mx: 0 } }/>) }
+          sx={ { minHeight: 44, ml: '-11px', mr: 0 } }/>) }
       </RadioGroup>
       { /* aria-disabled, not disabled, so the button stays in place and in the tab order */ }
       <Button

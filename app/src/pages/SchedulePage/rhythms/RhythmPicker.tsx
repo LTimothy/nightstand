@@ -53,8 +53,7 @@ export default function RhythmPicker({ title, subtitle, options, selected, dayCh
             key={ day }
             value={ day }
             aria-label={ dayName(day) }
-            sx={ { minWidth: 44, minHeight: 44, px: 1, gap: 0.5 } }>
-            { dayChoice.chosen.includes(day) && <Check aria-hidden sx={ { fontSize: 16 } }/> }
+            sx={ { minWidth: 44, minHeight: 44, px: 1 } }>
             { dayName(day).slice(0, 3) }
           </ToggleButton>) }
         </ToggleButtonGroup>

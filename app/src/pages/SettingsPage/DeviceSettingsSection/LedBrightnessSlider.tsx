@@ -108,7 +108,7 @@ export default function LedBrightnessSlider() {
             { value: 0, label: 'Off' },
             { value: 100, label: '100%' },
           ] }
-          sx={ { width: '100%', '& .MuiSlider-markLabel[data-index="0"]': { transform: 'none' },
+          sx={ { width: '100%', display: 'block', mb: 1, '& .MuiSlider-markLabel[data-index="0"]': { transform: 'none' },
             '& .MuiSlider-markLabel[data-index="1"]': { transform: 'translateX(-100%)' } } }
         />
       </Box>

@@ -44,8 +44,9 @@ export default function StatusPage() {
         <>
           { !isError && !stale && keys.length === 0 && <Alert severity="info">No status checks are available yet.</Alert> }
           { !isError && !stale && keys.length > 0 && <Alert severity={ attention.length ? 'warning' : coreReady ? 'success' : 'info' }>
-            <AlertTitle>{ attention.length ? `${attentionNames} ${attention.length === 1 ? 'needs' : 'need'} attention`
-              : coreReady ? 'Everything is running' : 'Waiting for core services' }</AlertTitle>
+            <AlertTitle sx={ { '&:last-child': { mb: 0 } } }>
+              { attention.length ? `${attentionNames} ${attention.length === 1 ? 'needs' : 'need'} attention`
+                : coreReady ? 'Everything is running' : 'Waiting for core services' }</AlertTitle>
             { !attention.length && !coreReady && <Typography variant="body2">Waiting for { waitingNames }.</Typography> }
             { overdue.length > 0 && <Typography variant="body2">
               { overdueNames } { overdue.length === 1 ? 'has' : 'have' } not started. Check the service below or open Logs.

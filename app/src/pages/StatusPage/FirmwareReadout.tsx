@@ -1,4 +1,5 @@
 import { Paper, Stack, Typography } from '@mui/material';
+import SectionHeading from '@components/SectionHeading';
 import type { FirmwareSnapshot } from '@api/firmware';
 import { unitOf, type TemperatureFormat } from '@lib/temperatureConversions';
 
@@ -7,7 +8,7 @@ export default function FirmwareReadout({ data, format }: { data: FirmwareSnapsh
   const degrees = (valueC: number) => `${(celsius ? valueC : valueC * 9 / 5 + 32).toFixed(1)}°${celsius ? 'C' : 'F'}`;
   return <Paper variant="outlined" sx={ { p: 2 } }>
     <Stack spacing={ 1 }>
-      <Typography component="h2" variant="h6">Firmware target</Typography>
+      <SectionHeading sx={ { pb: 0.5 } }>Firmware target</SectionHeading>
       { data.availability === 'Monitoring unavailable' && <Typography>Monitoring unavailable</Typography> }
       { (['left', 'right'] as const).map(side => {
         const sample = data.targets[side];

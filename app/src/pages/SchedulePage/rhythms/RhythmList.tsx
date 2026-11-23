@@ -23,7 +23,7 @@ export default function RhythmList({ sideData, today, disabled, chart, onOpen, o
   const captionId = useId();
   const rhythms = Object.values(sideData.rhythms);
   const full = rhythms.length >= MAX_RHYTHMS_PER_SIDE;
-  return <Stack spacing={ 1 } sx={ { width: '100%' } }>
+  return <Stack spacing={ 2 } sx={ { width: '100%' } }>
     { rhythms.map(rhythm => {
       const usage = rhythmUsage(sideData, rhythm.id, today);
       const unused = !usage.days.length && !usage.dates.length;

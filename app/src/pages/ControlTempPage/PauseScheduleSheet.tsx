@@ -108,7 +108,7 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
             setChoice(value as Choice);
             setError('');
           } }
-          sx={ { my: 2 } }>
+          sx={ { my: 2, gap: 1 } }>
           <FormControlLabel
             value="tonight"
             control={ <Radio autoFocus={ choice === 'tonight' }/> }

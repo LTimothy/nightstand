@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import moment from 'moment-timezone';
 import {
-  Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItemButton, ListItemText, TextField,
+  Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItemButton, ListItemText, Stack, TextField,
 } from '@mui/material';
 import type { SideRhythms } from '@api/rhythmsSchema';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
@@ -105,23 +105,25 @@ export default function ComingUp({
         }) }
       </List>
     </Box>
-    { more }
-    <Button
-      onClick={ () => {
-        if (disabled) return;
-        onSheetOpen?.();
-        setAskDate(true);
-      } }
-      aria-disabled={ disabled || undefined }
-      sx={ { alignSelf: 'flex-start', px: 0, ...INACTIVE } }>Change a later date</Button>
-    <Button
-      onClick={ () => {
-        if (disabled) return;
-        onSheetOpen?.();
-        setSeveralOpen(true);
-      } }
-      aria-disabled={ disabled || undefined }
-      sx={ { alignSelf: 'flex-start', px: 0, ...INACTIVE } }>Change several dates</Button>
+    <Stack sx={ { alignItems: 'flex-start' } }>
+      { more }
+      <Button
+        onClick={ () => {
+          if (disabled) return;
+          onSheetOpen?.();
+          setAskDate(true);
+        } }
+        aria-disabled={ disabled || undefined }
+        sx={ { px: 0, ...INACTIVE } }>Change a later date</Button>
+      <Button
+        onClick={ () => {
+          if (disabled) return;
+          onSheetOpen?.();
+          setSeveralOpen(true);
+        } }
+        aria-disabled={ disabled || undefined }
+        sx={ { px: 0, ...INACTIVE } }>Change several dates</Button>
+    </Stack>
     { severalOpen && <MultiDateSheet
       sideData={ sideData }
       today={ today }

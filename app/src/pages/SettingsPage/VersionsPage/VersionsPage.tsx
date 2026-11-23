@@ -161,12 +161,12 @@ export default function VersionsPage() {
         <ListItemButton
           ref={ channelRow }
           onClick={ () => setChannelOpen(true) }
-          sx={ { minHeight: 44, borderBottom: 1, borderColor: 'divider' } }>
+          sx={ { py: 1.5, borderBottom: 1, borderColor: 'divider' } }>
           <ListItemText primary="Update channel" secondary={ channelLabel } />
-          <ChevronRightIcon />
+          <ChevronRightIcon color="action" />
         </ListItemButton>
-        <ListItemButton component={ Link } to="/changelog" sx={ { minHeight: 44 } }>
-          <ListItemText primary="Release notes" /><ChevronRightIcon />
+        <ListItemButton component={ Link } to="/changelog" sx={ { py: 1.5 } }>
+          <ListItemText primary="Release notes" /><ChevronRightIcon color="action" />
         </ListItemButton>
         <Drawer anchor="bottom" open={ channelOpen } onClose={ () => setChannelOpen(false) }>
           <Box sx={ { p: 3, width: '100%', maxWidth: 720, mx: 'auto' } }>
@@ -202,7 +202,7 @@ export default function VersionsPage() {
           disableGutters
           sx={ { border: 0, borderTop: 1, borderColor: 'divider', borderRadius: '0 !important' } }
           slotProps={ { transition: { unmountOnExit: true } } }>
-          <AccordionSummary expandIcon={ <ExpandMoreIcon/> }>Recovery</AccordionSummary>
+          <AccordionSummary expandIcon={ <ExpandMoreIcon/> } sx={ { fontWeight: weight.regular, lineHeight: 1.5 } }>Recovery</AccordionSummary>
           <AccordionDetails sx={ { display: 'flex', flexDirection: 'column', gap: 2 } }>
             { !capable && (
               <Typography variant="body2" color="text.secondary">

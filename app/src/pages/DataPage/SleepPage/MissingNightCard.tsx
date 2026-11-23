@@ -24,7 +24,7 @@ export default function MissingNightCard({ state, canAnalyze, onAnalyze, pending
   const copy = COPY[state];
   const description = state === 'pending' && pendingDescription ? pendingDescription : copy.description;
   return (
-    <GlassCard role="status" sx={ { mb: 2 } }>
+    <GlassCard role="status">
       <Box sx={ { display: 'flex', alignItems: 'center', gap: 1 } }>
         { state === 'analyzing' && <CircularProgress size={ 20 } aria-label="Analysis running"/> }
         <SectionHeading>{ copy.title }</SectionHeading>

@@ -88,7 +88,7 @@ export default function ControlTempPage() {
         status={ staleSince ? NOT_RESPONDING : deviceStatus?.isPriming ? 'Priming' : undefined }
         tone={ staleSince ? 'warn' : undefined }/>
       <Box sx={ tabsSx }><BedTabs /></Box>
-      { settingsError && <Alert severity="warning">
+      { settingsError && <Alert severity="warning" sx={ { width: '100%' } }>
         Bed preferences are unavailable. { settings ? 'Using the last known preferences.' : 'Temperatures are shown in Fahrenheit.' }
       </Alert> }
       <Box sx={ gridSx }>

@@ -114,7 +114,7 @@ export default function SmartCurveChart({ night, wake, smart, before, date, time
           id: 'before', label: 'Now', data: beforeData, valueFormatter: seriesValueFormatter(beforeStored, format), showMark: false,
           curve: 'stepAfter' as const, color: palette.text.secondary,
         }] : [])] }
-        margin={ { right: 32, left: 36, top: 5, bottom: 24 } }
+        margin={ { right: 16, left: 36, top: 5, bottom: 24 } }
         sx={ {
           [`& .${lineElementClasses.root}`]: { stroke: 'url(#smart-grad-line)' },
           '& .MuiLineElement-series-before': { stroke: palette.text.secondary, strokeDasharray: '4 4' },

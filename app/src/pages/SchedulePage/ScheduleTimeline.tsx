@@ -236,12 +236,13 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
   return <Stack spacing={ 2 } sx={ { width: '100%' } }>
     { error && <Alert severity="error" onClose={ () => setError('') }>{ error }</Alert> }
     <Stack component="section" aria-labelledby="bedtime-heading" spacing={ 1 }>
-      <SectionHeading id="bedtime-heading">Bedtime</SectionHeading>
+      <SectionHeading sx={ { pb: 0.5 } } id="bedtime-heading">Bedtime</SectionHeading>
       <Paper id="schedule-bedtime" variant="outlined" data-testid="schedule-event" sx={ { p: 2 } }>
         <Box sx={ rowGrid }>
           <TextField
             label={ bedtimeNote === undefined ? 'Turn on at' : 'Bedtime' }
             helperText={ bedtimeNote === undefined ? undefined : 'When you usually get into bed' }
+            slotProps={ { formHelperText: { sx: { whiteSpace: 'nowrap' } } } }
             type="time"
             size="small"
             value={ schedule.power.on }
@@ -273,7 +274,7 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
       </Paper>
     </Stack>
     { !hideTemperatures && <Stack component="section" aria-labelledby="night-heading" spacing={ 1 }>
-      <SectionHeading id="night-heading">Through the night</SectionHeading>
+      <SectionHeading sx={ { pb: 0.5 } } id="night-heading">Through the night</SectionHeading>
       { times.filter(isNightTime).map(renderTemperature) }
       { !times.some(isNightTime) && <Typography variant="body2" color="text.secondary">
         Keep the bedtime temperature until wake-up.
@@ -286,7 +287,7 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
       </Button>
     </Stack> }
     <Stack component="section" aria-labelledby="wake-heading" spacing={ 1 }>
-      <SectionHeading id="wake-heading">{ wake || wakeAlarm ? 'Wake up' : 'Get up' }</SectionHeading>
+      <SectionHeading sx={ { pb: 0.5 } } id="wake-heading">{ wake || wakeAlarm ? 'Wake up' : 'Get up' }</SectionHeading>
       { !hideTemperatures && times.filter(isWakeTime).map(renderTemperature) }
       { wake && <Paper
         id="schedule-wake"
@@ -318,8 +319,8 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
               refollowLastAlarm(time);
             } }/>
         </Box>
-        { wakeInvalid && <Typography color="error" variant="caption">{ alarmHint(wake.time, 'this wake time') }</Typography> }
-        <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mt: 0.5 } }>
+        { wakeInvalid && <Typography color="error" variant="body2">{ alarmHint(wake.time, 'this wake time') }</Typography> }
+        <Typography variant="body2" color="text.secondary" sx={ { display: 'block', mt: 0.5 } }>
           The warm-up and turn off follow this time, with or without an alarm.
         </Typography>
       </Paper> }
@@ -402,7 +403,7 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
         } }
         sx={ { alignSelf: 'flex-start', px: 0 } }>Add warm-up</Button> }
       <Paper variant="outlined" data-testid="schedule-event" sx={ { p: 2 } }>
-        <Box sx={ { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2 } }>
+        <Box sx={ { display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 2 } }>
           { offAt && <TextField
             select
             label="Turn off"

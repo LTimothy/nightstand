@@ -213,14 +213,19 @@ function SleepContext({ side, timeZone, biometricsV2 }: { side: Side; timeZone: 
           setChosenDate(date);
           setWeekDate(weekStart.format('YYYY-MM-DD'));
         } }/>
-      <Tabs value={ view } onChange={ (_, next: string) => setView(next) } aria-label="Sleep period" variant="fullWidth">
+      <Tabs
+        value={ view }
+        onChange={ (_, next: string) => setView(next) }
+        aria-label="Sleep period"
+        variant="fullWidth"
+        sx={ { borderBottom: 1, borderColor: 'divider' } }>
         <Tab value="night" label="Night" id="sleep-night" aria-controls="sleep-panel"/>
         <Tab value="week" label="Week" id="sleep-week" aria-controls="sleep-panel"/>
       </Tabs>
       <Box role="tabpanel" id="sleep-panel" aria-labelledby={ `sleep-${view}` }>
         { isError ? (
           <Alert severity="error" action={ <Button onClick={ () => refetch() }>Retry</Button> }>Sleep records could not be loaded.</Alert>
-        ) : isPending ? <CircularProgress aria-label="Loading sleep records"/> : view === 'week' ? (
+        ) : isPending ? <CircularProgress aria-label="Loading sleep records" sx={ { display: 'block', mx: 'auto' } }/> : view === 'week' ? (
           <ErrorBoundary componentName="Weekly time in bed">
             <SleepBalanceCard
               records={ records }
@@ -246,15 +251,13 @@ function SleepContext({ side, timeZone, biometricsV2 }: { side: Side; timeZone: 
                 onAnalyze={ () => void analysis.analyze() }/>
             ) }
             { fallback && displayed && (
-              <Box sx={ { mb: 2 } }>
-                <Typography variant="body2" color="text.secondary">Most recent recording</Typography>
-              </Box>
+              <Typography variant="body2" color="text.secondary">Most recent recording</Typography>
             ) }
             { displayed && (
               <Box
                 sx={ {
                   display: 'grid', gap: 2, alignItems: 'start',
-                  gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1.1fr) minmax(0, 1fr)' },
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
                 } }>
                 <Box sx={ { display: 'grid', gap: 2, minWidth: 0 } }>
                   <ErrorBoundary componentName="Night summary">
@@ -284,7 +287,7 @@ export default function SleepPage() {
   const { data: settings, isError, isFetched, refetch } = useSettings();
   return (
     <ErrorBoundary componentName="Sleep page">
-      <PageContainer sx={ { mb: 12, gap: 2, alignItems: 'stretch' } }>
+      <PageContainer sx={ { gap: 2, alignItems: 'stretch' } }>
         <PageHeader title="Sleep"/>
         { isError || (isFetched && !settings) ? (
           <Alert severity="error" action={ <Button onClick={ () => refetch() }>Retry</Button> }>

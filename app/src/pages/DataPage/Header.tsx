@@ -15,7 +15,7 @@ export default function Header({ title, backTo = '/settings', backLabel = 'Back 
       component={ Link }
       to={ backTo }
       startIcon={ <NavigateBeforeIcon/> }
-      sx={ { mb: 1, minHeight: 44, display: { lg: 'none' } } }>
+      sx={ { mb: 1, px: 0, minHeight: 44, display: { lg: 'none' } } }>
       { backLabel }
     </Button> }
     <PageHeader title={ title }/>

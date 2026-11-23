@@ -15,7 +15,7 @@ export default function SleepFitnessCard({ sleepRecord, timeZone, title, timeZon
 
   return (
     <GlassCard aria-label="Night summary">
-      { title && <SectionHeading sx={ { color: 'text.secondary', mb: 1.5 } }>{ title }</SectionHeading> }
+      { title && <SectionHeading sx={ { mb: 1.5 } }>{ title }</SectionHeading> }
       { timeZoneLabel && <Typography variant="body2" color="text.secondary" sx={ { mb: 1 } }>{ timeZoneLabel }</Typography> }
       <Typography sx={ typography.metricValue }>
         { formatSleepDuration(sleepRecord.sleep_period_seconds) }

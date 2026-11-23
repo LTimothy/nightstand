@@ -1,4 +1,5 @@
 import { Alert, Paper, Stack, Typography } from '@mui/material';
+import SectionHeading from '@components/SectionHeading';
 import { useSettings } from '@api/settings';
 import { useFirmware } from '@api/firmware';
 import { useDeviceStatus } from '@api/deviceStatus';
@@ -20,7 +21,7 @@ export default function FirmwarePanel() {
   const { target, health } = query.data.reported;
   return <Stack spacing={ 2 }>
     { settings?.features.coolingWarning && target && health && <Paper variant="outlined" sx={ { p: 2 } }>
-      <Typography component="h2" variant="h6">Cooling warning</Typography>
+      <SectionHeading sx={ { mb: 1.5 } }>Cooling warning</SectionHeading>
       { query.data.availability === 'Monitoring unavailable' ? <Typography>Monitoring unavailable</Typography>
         : (['left', 'right'] as const).map(side => <Alert severity={ query.data!.cooling[side].active ? 'warning' : 'info' } key={ side }>
           { side === 'left' ? 'Left' : 'Right' }: { query.data!.cooling[side].active ? query.data!.cooling[side].message
@@ -32,7 +33,7 @@ export default function FirmwarePanel() {
     { settings?.features.tapDiagnostics && <TapDiagnostics data={ query.data } /> }
     { settings?.features.firmwareTargetReadout && target && <FirmwareReadout data={ query.data } format={ format } /> }
     { settings?.features.firmwareHealth && query.data.availability !== 'Monitoring unavailable' && <Paper variant="outlined" sx={ { p: 2 } }>
-      <Typography component="h2" variant="h6">Firmware health details</Typography>
+      <SectionHeading sx={ { mb: 1.5 } }>Firmware health details</SectionHeading>
       <Typography>{ query.data.sensorFresh ? 'Recent sensor readings received.' : 'No recent readings' }</Typography>
       { query.data.incidents.filter(item => item.severity !== 'diagnostic').map(item => <Stack
         key={ `${item.code}-${item.side}-${item.details.bus ?? item.details.port ?? ''}` }
