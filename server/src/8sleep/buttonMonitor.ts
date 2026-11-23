@@ -265,6 +265,8 @@ export class ButtonMonitor {
       const side: Side = event.side;
       const buttons = settingsDB.data[side].buttons ?? defaultSideSettings.buttons;
       if (event.button === 'middle') {
+        // The hub's own count, so a report shows whether a double press arrived as one double or two singles.
+        if (event.hub) logger.info(`[buttonMonitor] ${side} center button: ${event.clicks ?? 1} click${(event.clicks ?? 1) === 1 ? '' : 's'}`);
         const favoriteF = logoTap ? (logoTap.type === 'set_temperature' ? logoTap.temperatureF : null) : buttons.favoriteTemperatureF;
         if ((activeAlarms.has(side) || hasSnooze(side)) && event.hub) {
           // The hub stops the alarm itself.

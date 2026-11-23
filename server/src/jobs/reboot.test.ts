@@ -4,6 +4,8 @@ import { it, mock } from 'node:test';
 const reboots: string[] = [];
 const logs: string[] = [];
 const warnings: string[] = [];
+const errors: string[] = [];
+let killedBySignal = false;
 let activeUnit = '';
 let checkFailed = false;
 let dailyJob: (() => Promise<void>) | undefined;
@@ -11,7 +13,7 @@ mock.module('child_process', { namedExports: {
   // Report each reboot as failed so the reboot latch does not carry between tests.
   exec: (command: string, callback: (error: Error | null) => void) => {
     reboots.push(command);
-    callback(new Error('not rebooting under test'));
+    callback(Object.assign(new Error('Command failed: sudo /sbin/reboot'), killedBySignal ? { signal: 'SIGTERM' } : {}));
   },
   execFile: (_command: string, args: string[], _options: unknown, callback: (error: Error | null, stdout: string) => void) => {
     callback(checkFailed ? new Error('check failed') : null, args.includes(activeUnit) ? 'active' : 'inactive');
@@ -19,7 +21,7 @@ mock.module('child_process', { namedExports: {
 } });
 mock.module(new URL('../logger.js', import.meta.url).href, { defaultExport: {
   warn: (message: string) => warnings.push(message),
-  debug: () => {}, info: (message: string) => logs.push(message), error: () => {},
+  debug: () => {}, info: (message: string) => logs.push(message), error: (message: string) => errors.push(message),
 } });
 mock.module('node-schedule', { defaultExport: {
   RecurrenceRule: class {},
@@ -79,5 +81,21 @@ it('warns when the daily reboot operation check fails', async () => {
     assert.ok(warnings.some(message => /Skipping daily reboot.*Cannot check/.test(message)));
   } finally {
     checkFailed = false;
+  }
+});
+
+it('logs a reboot that stops the server as started, and a refused one as an error', async () => {
+  errors.length = 0;
+  logs.length = 0;
+  await reboot();
+  assert.ok(errors.some(message => /Command failed/.test(message)));
+  errors.length = 0;
+  killedBySignal = true;
+  try {
+    await reboot();
+    assert.deepEqual(errors, []);
+    assert.ok(logs.includes('Reboot started'));
+  } finally {
+    killedBySignal = false;
   }
 });

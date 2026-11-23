@@ -207,6 +207,17 @@ describe('ButtonMonitor', () => {
       await settingsDB.write();
     });
 
+    it('logs the click count the hub reported for a center press', async () => {
+      const { default: logger } = await import('../logger.js');
+      const info = mock.method(logger, 'info');
+      try {
+        await press('middle', 2);
+        assert.ok(info.mock.calls.some(call => String(call.arguments[0]) === '[buttonMonitor] left center button: 2 clicks'));
+      } finally {
+        info.mock.restore();
+      }
+    });
+
     it('buzzes once after a single click applies the temperature', async () => {
       await press('middle');
       assert.deepEqual(updates, [{ left: { isOn: true, targetTemperatureF: 78 } }]);
