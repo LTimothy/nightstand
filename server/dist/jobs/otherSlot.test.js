@@ -86,6 +86,20 @@ describe('otherSlotSupported', async () => {
         assert.equal(await supported(t.run), null);
         assert.equal(t.calls.length, 2);
     });
+    it('runs the script once at a time, so overlapping calls agree', async () => {
+        const supported = await load();
+        let running = 0;
+        let overlapped = false;
+        const run = async () => {
+            running += 1;
+            if (running > 1)
+                overlapped = true;
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            running -= 1;
+        };
+        assert.deepEqual(await Promise.all([supported(run), supported(run)]), [true, true]);
+        assert.equal(overlapped, false);
+    });
     it('answers null in remote dev mode without running anything', async () => {
         const supported = await load();
         config.remoteDevMode = true;

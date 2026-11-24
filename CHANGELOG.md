@@ -6,7 +6,9 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
-## [Unreleased]
+## [3.11.1] - 2026-11-24
+
+Evens out spacing across the app, keeps the running boot slot marked good after an install or update, and adds an optional way back in through the hub's other boot slot.
 
 ### Changed
 
@@ -66,6 +68,8 @@ is a hard fork; for the history of the projects it descends from, see
   needs. With the switch on, Nightstand prepares the slot again
   when it starts. Over SSH, `boot_slot.sh other-access` and `other-undo` do the
   same. See the installation guide, step 11.
+
+Checked on: Pod 5, deployed from this code before its last fix, which runs the boot slot script one call at a time; the app pages in the demo at phone, tablet and desktop widths in all three looks; the boot slot check, the Boot rescue line, and the Rescue switch turned on, off and on again on the owner's Pod; not other Pods; no nights yet.
 
 ## [3.11.0] - 2026-11-22
 
