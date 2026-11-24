@@ -55,3 +55,52 @@ describe('applyOtherSlot', () => {
     assert.equal(held, 2);
   });
 });
+
+describe('otherSlotSupported', async () => {
+  const config = (await import('../config.js')).default;
+  const { PrivilegedCommandError } = await import('./privilegedCommand.js');
+  let fresh = 0;
+  // A fresh module each time, so each test starts with nothing cached.
+  const load = async () => {
+    config.remoteDevMode = false;
+    fresh += 1;
+    return (await import(`./otherSlot.js?fresh=${fresh}`) as typeof import('./otherSlot.js')).otherSlotSupported;
+  };
+  const counted = (fail?: Error) => {
+    const calls: number[] = [];
+    const run = async () => { calls.push(1); if (fail) throw fail; };
+    return { calls, run };
+  };
+
+  it('caches a supported slot', async () => {
+    const supported = await load();
+    const t = counted();
+    assert.equal(await supported(t.run), true);
+    assert.equal(await supported(t.run), true);
+    assert.equal(t.calls.length, 1);
+  });
+
+  it('caches an unsupported slot', async () => {
+    const supported = await load();
+    const t = counted(new PrivilegedCommandError('Unable to start systemd-journald.service.'));
+    assert.equal(await supported(t.run), false);
+    assert.equal(await supported(t.run), false);
+    assert.equal(t.calls.length, 1);
+  });
+
+  it('asks again when the sudo rule is not there yet', async () => {
+    const supported = await load();
+    const t = counted(new PrivilegedCommandError('Cannot run systemd-journald.service: its service or sudo permission is missing.'));
+    assert.equal(await supported(t.run), null);
+    assert.equal(await supported(t.run), null);
+    assert.equal(t.calls.length, 2);
+  });
+
+  it('answers null in remote dev mode without running anything', async () => {
+    const supported = await load();
+    config.remoteDevMode = true;
+    const t = counted();
+    assert.equal(await supported(t.run), null);
+    assert.equal(t.calls.length, 0);
+  });
+});

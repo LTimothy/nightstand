@@ -10,6 +10,7 @@ import SideSettings from './SideSettings.tsx';
 import { SubpageShell } from '../DataPage/Header.tsx';
 import { useServices } from '@api/services.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
+import { useOtherSlotSupported } from '@api/otherSlot.ts';
 import { Version } from '@api/deviceStatusSchema.ts';
 import { useStatusSummary } from '../StatusPage/useStatusSummary';
 import { Settings } from '@api/settingsSchema.ts';
@@ -42,6 +43,7 @@ export default function SettingsPage() {
   const category = pathname.split('/')[2] ?? '';
   const { data: services } = useServices();
   const { data: device } = useDeviceStatus();
+  const { data: otherSlot } = useOtherSlotSupported();
   const latestVersion = useLatestVersion();
   const runningVersion = device?.freeSleep?.version;
   const updateAvailable = runningVersion && latestVersion && semver.valid(runningVersion) && semver.valid(latestVersion)
@@ -55,7 +57,7 @@ export default function SettingsPage() {
     ...(device && device.hubVersion !== Version.Pod5
       ? [biometricsEnabled && settings?.features?.biometricsV2 && settings?.features?.uncheckedCapPresence] : []),
     ...(device?.hubVersion === Version.Pod5 ? [settings?.features?.targetTemperatureLabels, settings?.features?.coverAutoRestore] : []),
-    settings?.features?.otherSlotAccess,
+    ...(otherSlot?.supported === true || settings?.features?.otherSlotAccess === true ? [settings?.features?.otherSlotAccess] : []),
     settings?.features?.oneOffAlarms, settings?.features?.alarmsWhenOff, biometricsInstalled && biometricsEnabled,
     settings?.features?.rhythms,
     settings?.features?.rhythms && settings?.features?.rhythmSuggestions,

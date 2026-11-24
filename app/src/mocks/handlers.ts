@@ -228,6 +228,7 @@ export const handlers = [
     await delay(150);
     return HttpResponse.json({ entries: deepClone(getChangelog()) });
   }),
+  http.get('/api/otherSlot', () => HttpResponse.json({ supported: true })),
   http.get('/api/update/rollback-info', () => HttpResponse.json(rollbackInfo)),
   http.get('/api/update/last-result', () => HttpResponse.json({ error: 'No result recorded yet' }, { status: 404 })),
   http.post('/api/update', async ({ request }) => (await refuseWhileInUse(request)) ?? new HttpResponse(null, { status: 204 })),

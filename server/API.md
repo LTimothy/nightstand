@@ -1722,6 +1722,25 @@ the biometrics service; `/api/deviceStatus` converts them.
 
 ---
 
+## `/api/otherSlot`
+
+### GET
+
+- Says whether the hub's other boot slot has what the SSH access to the other
+  boot slot switch relies on. The app shows that switch only when `supported`
+  is `true` or the switch is already on. `null` means it could not tell yet,
+  for example before the sudo rule is in place or in local development; it is
+  asked again next time. A definite answer is kept for the life of the server
+  process.
+
+#### Response
+
+```json
+{ "supported": true }
+```
+
+---
+
 ## `/api/update`
 
 The update, rollback and switch routes below, like `update` and `reboot` in

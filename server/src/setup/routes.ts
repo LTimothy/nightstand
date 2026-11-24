@@ -31,6 +31,7 @@ import storage from '../routes/storage/storage.js';
 import memory from '../routes/memory/memory.js';
 import calibration from '../routes/calibration/calibration.js';
 import changelog from '../routes/changelog/changelog.js';
+import otherSlot from '../routes/otherSlot/otherSlot.js';
 import logger from '../logger.js';
 import { registerErrorHandlers } from './errorHandlers.js';
 
@@ -69,6 +70,7 @@ export default function (app: Express) {
   app.use('/api/memory', memory);
   app.use('/api/calibration', calibration);
   app.use('/api/changelog', changelog);
+  app.use('/api/otherSlot', otherSlot);
   app.use('/api', (req: Request, res: Response) => {
     res.status(404).json({ error: { message: 'Not Found' } });
   });

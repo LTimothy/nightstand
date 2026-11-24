@@ -262,10 +262,11 @@ RULES=(
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/flash_commit.sh default"
   # The Cover sensors restart on System status, with no arguments.
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/cover_restore.sh"
-  # The SSH access to the other boot slot switch, with exactly these three arguments.
+  # The SSH access to the other boot slot switch and its check, with exactly these four arguments.
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-access"
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-undo"
   "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-status"
+  "$USERNAME ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-supported"
 )
 
 # Build the new file beside the old one and check it before it goes live: a

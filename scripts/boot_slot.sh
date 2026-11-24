@@ -9,6 +9,7 @@
 #                               switch off its updater, keep it off the internet
 #   boot_slot.sh other-undo     put the files it saved back
 #   boot_slot.sh other-status   say whether the other slot is prepared
+#   boot_slot.sh other-supported  say whether other-access could work on that slot
 #
 # Exit codes: 0 done or fine, 1 not marked or a step failed, 2 cannot tell
 # or refused (no fw_printenv, unknown slot, not root, nothing to copy).
@@ -167,6 +168,16 @@ other_status() {
   [ -s "$OTHER_ROOT/etc/ssh/authorized_keys" ] && [ "$masked" = yes ] && [ "$walled" = yes ] && [ -n "$hash" ] && [ "$(rewt_hash "$OTHER_ROOT/etc/shadow")" = "$hash" ]
 }
 
+# Only what the other slot has; this slot's keys and password are the user's to fix.
+other_supported() {
+  open_other ro || return $?
+  [ -n "$(rewt_hash "$OTHER_ROOT/etc/shadow")" ] || { echo "Other slot: not supported, it has no rewt user."; return 2; }
+  local missing
+  missing=$(other_mismatches)
+  [ -z "$missing" ] || { echo "Other slot: not supported, it lacks $(printf '%s' "$missing" | paste -sd ';' - | sed 's/;/, /g')."; return 2; }
+  echo "Other slot: supported."
+}
+
 other_access() {
   local keys hash unit rules
   keys=$(keys_file)
@@ -241,5 +252,6 @@ case "${1:-}" in
   other-access) other_access ;;
   other-undo) other_undo ;;
   other-status) other_status ;;
-  *) echo "Usage: boot_slot.sh status | confirm | other-access | other-undo | other-status" >&2; exit 2 ;;
+  other-supported) other_supported ;;
+  *) echo "Usage: boot_slot.sh status | confirm | other-access | other-undo | other-status | other-supported" >&2; exit 2 ;;
 esac

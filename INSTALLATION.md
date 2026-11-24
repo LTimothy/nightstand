@@ -303,7 +303,7 @@ over SSH. The install and every update mark the running slot good, and Boot
 rescue says whether it is, so the hub should not start the other slot on its
 own. If you want a way back in should the hub ever start the other slot,
 turn on Settings > Features > Rescue > SSH access to the other
-boot slot (optional), or run this once as root over SSH:
+boot slot (optional; it shows only when the other slot has what it needs), or run this once as root over SSH:
 
 ```bash
 bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-access

@@ -81,6 +81,17 @@ it.each([['Pod 4', 14], ['Pod 5', 15]])('leaves cover buttons out of the count o
   expect(await screen.findByText(`4 of ${total} on`)).toBeVisible();
 });
 
+it('leaves the other boot slot switch out of the count where the slot is not supported, unless it is on', async () => {
+  const settings = getSettings();
+  server.use(http.get('*/api/otherSlot', () => HttpResponse.json({ supported: false })));
+  const { unmount } = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
+  expect(await screen.findByText('4 of 14 on')).toBeVisible();
+  unmount();
+  server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, otherSlotAccess: true } })));
+  renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
+  expect(await screen.findByText('5 of 15 on')).toBeVisible();
+});
+
 const featureCount = async (features: Record<string, boolean>) => {
   const settings = getSettings();
   server.use(http.get('*/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, ...features } })));

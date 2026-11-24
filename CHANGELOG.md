@@ -62,7 +62,8 @@ is a hard fork; for the history of the projects it descends from, see
   that slot's updater, and keeps it off the internet with a home-network-only
   firewall. It saves the files it changes first, and turning the switch off
   puts them back. It changes nothing on a stock slot that differs from the one
-  it was checked on. With the switch on, Nightstand prepares the slot again
+  it was checked on, and the switch only shows when the other slot has what it
+  needs. With the switch on, Nightstand prepares the slot again
   when it starts. Over SSH, `boot_slot.sh other-access` and `other-undo` do the
   same. See the installation guide, step 11.
 

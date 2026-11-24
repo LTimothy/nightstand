@@ -156,8 +156,26 @@ describe('FeaturesSection', () => {
       + 'its updater is off and it stays off the internet. Turning this off puts that slot back as it was.')).toBeVisible();
   });
 
-  // The script itself refuses a stock slot that differs, so the switch shows on every hub.
-  it.each(['Pod 3', 'Pod 4'])('shows the other boot slot switch on a %s hub', async model => {
+  it.each([false, null])('hides the Rescue card when the other slot support is %s', async supported => {
+    server.use(http.get('*/api/otherSlot', () => HttpResponse.json({ supported })));
+    const { queryClient } = renderWithProviders(<FeaturesSection />);
+    await screen.findByRole('region', { name: 'Storage' });
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+    expect(screen.queryByRole('region', { name: 'Rescue' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the Rescue card when the switch is already on, so it can be turned off', async () => {
+    const settings = getSettings();
+    server.use(
+      http.get('*/api/otherSlot', () => HttpResponse.json({ supported: false })),
+      http.get('*/api/settings', () => HttpResponse.json({ ...settings, features: { ...settings.features, otherSlotAccess: true } })),
+    );
+    renderWithProviders(<FeaturesSection />);
+    const rescue = await screen.findByRole('region', { name: 'Rescue' });
+    expect(within(rescue).getByRole('switch', { name: 'SSH access to the other boot slot' })).toBeChecked();
+  });
+
+  it.each(['Pod 3', 'Pod 4'])('shows the other boot slot switch on a supported %s hub', async model => {
     server.use(http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: model })));
     renderWithProviders(<FeaturesSection />);
     const rescue = await screen.findByRole('region', { name: 'Rescue' });

@@ -15,6 +15,7 @@ import { useSettings, postSettings } from '@api/settings.ts';
 import { Settings } from '@api/settingsSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
+import { useOtherSlotSupported } from '@api/otherSlot.ts';
 import { Version } from '@api/deviceStatusSchema.ts';
 import { DeepPartial } from 'ts-essentials';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -27,6 +28,7 @@ const UNCHECKED_CAP_PRESENCE = 'Schedules, auto-off and the in-bed indicator fol
 
 export default function FeaturesSection() {
   const [error, setError] = useState<string | null>(null);
+  const { data: otherSlot } = useOtherSlotSupported();
   const { data: services, refetch: refetchServices, isLoading: servicesLoading, isError: servicesError } = useServices();
   const { data: settings, refetch: refetchSettings, isLoading: settingsLoading, isError: settingsError } = useSettings();
   const { data: deviceStatus } = useDeviceStatus();
@@ -269,7 +271,7 @@ export default function FeaturesSection() {
           />
         </Stack>
       </Section>
-      <Section title="Rescue">
+      { (otherSlot?.supported === true || features?.otherSlotAccess === true) && <Section title="Rescue">
         <ToggleRow
           label="SSH access to the other boot slot"
           disabled={ isUpdating || features?.otherSlotAccess === undefined }
@@ -278,7 +280,7 @@ export default function FeaturesSection() {
           description={ 'If the hub ever starts its other boot slot, your SSH keys and rewt password work there, '
             + 'its updater is off and it stays off the internet. Turning this off puts that slot back as it was.' }
         />
-      </Section>
+      </Section> }
       { rhythmsDialog === 'enable' && <EnableRhythmsDialog
         onClose={ () => setRhythmsDialog(undefined) }
         onDone={ text => setRhythmsMessage({ text, severity: 'success' }) }/> }
