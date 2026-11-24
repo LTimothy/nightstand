@@ -104,7 +104,9 @@ other_status() {
   echo "Other slot: SSH keys $([ -s "$OTHER_ROOT/etc/ssh/authorized_keys" ] && echo present || echo absent);" \
     "rewt password $([ "$(rewt_hash "$OTHER_ROOT/etc/shadow")" = "$(rewt_hash "$THIS_ROOT/etc/shadow")" ] && echo same || echo different);" \
     "updater $([ "$masked" = yes ] && echo off || echo on)."
-  [ -s "$OTHER_ROOT/etc/ssh/authorized_keys" ] && [ "$masked" = yes ]
+  local hash
+  hash=$(rewt_hash "$THIS_ROOT/etc/shadow")
+  [ -s "$OTHER_ROOT/etc/ssh/authorized_keys" ] && [ "$masked" = yes ] && [ -n "$hash" ] && [ "$(rewt_hash "$OTHER_ROOT/etc/shadow")" = "$hash" ]
 }
 
 other_access() {
@@ -112,11 +114,17 @@ other_access() {
   keys=$(keys_file)
   [ -s "$keys" ] || { echo "No SSH keys in $keys to copy, so there would be no way in. Refusing."; return 2; }
   hash=$(rewt_hash "$THIS_ROOT/etc/shadow")
-  [ -n "$hash" ] || { echo "No rewt password on this slot. Refusing."; return 2; }
+  case "$hash" in \$*) ;; *) echo "rewt has no usable password on this slot, so sudo would not work there. Refusing."; return 2 ;; esac
   open_other rw || return $?
   [ -n "$(rewt_hash "$OTHER_ROOT/etc/shadow")" ] || { echo "The other slot has no rewt user. Refusing."; return 2; }
-  # Saved once, so running this again never overwrites the stock originals.
-  if [ ! -d "$SAVED" ]; then
+  # A unit override that is not ours would be lost on undo, so leave such a slot alone.
+  for unit in $MASKS; do
+    [ ! -e "$OTHER_ROOT/etc/systemd/system/$unit" ] && [ ! -L "$OTHER_ROOT/etc/systemd/system/$unit" ] && continue
+    [ "$(readlink "$OTHER_ROOT/etc/systemd/system/$unit")" = /dev/null ] \
+      || { echo "The other slot already overrides $unit. Refusing."; return 2; }
+  done
+  # Saved once, so running this again never overwrites the stock originals. added-masks is written last.
+  if [ ! -f "$SAVED/added-masks" ]; then
     mkdir -p "$SAVED" && chmod 700 "$SAVED" || return 1
     cp -p "$OTHER_ROOT/etc/shadow" "$SAVED/shadow" || return 1
     if [ -e "$OTHER_ROOT/etc/ssh/authorized_keys" ]; then cp -p "$OTHER_ROOT/etc/ssh/authorized_keys" "$SAVED/authorized_keys" || return 1; fi
@@ -124,15 +132,18 @@ other_access() {
   fi
   # sshd reads the file as the user logging in, so it stays world readable.
   install -m 644 "$keys" "$OTHER_ROOT/etc/ssh/authorized_keys" || return 1
-  awk -F: -v OFS=: -v h="$hash" '$1 == "rewt" { $2 = h } { print }' "$OTHER_ROOT/etc/shadow" > "$OTHER_ROOT/etc/shadow.nightstand" \
-    && cat "$OTHER_ROOT/etc/shadow.nightstand" > "$OTHER_ROOT/etc/shadow" && rm -f "$OTHER_ROOT/etc/shadow.nightstand" || return 1
+  local tmp="$OTHER_ROOT/etc/shadow.nightstand"
+  ( umask 077; awk -F: -v OFS=: -v h="$hash" '$1 == "rewt" { $2 = h } { print }' "$OTHER_ROOT/etc/shadow" > "$tmp" ) \
+    && cat "$tmp" > "$OTHER_ROOT/etc/shadow" || { rm -f "$tmp"; return 1; }
+  rm -f "$tmp"
   for unit in $MASKS; do ln -sfn /dev/null "$OTHER_ROOT/etc/systemd/system/$unit" || return 1; done
   echo "Other slot: prepared. If the hub starts it, log in as rewt on port 8822 with your SSH key; its updater is off."
 }
 
 other_undo() {
   local unit
-  [ -f "$SAVED/shadow" ] || { echo "Nothing saved, so nothing to put back."; return 0; }
+  [ -e "$SAVED" ] || { echo "Nothing saved, so nothing to put back."; return 0; }
+  [ -f "$SAVED/shadow" ] && [ -f "$SAVED/added-masks" ] || { echo "The saved files in $SAVED are incomplete. Restore the slot from its image."; return 1; }
   open_other rw || return $?
   cat "$SAVED/shadow" > "$OTHER_ROOT/etc/shadow" || return 1
   if [ -f "$SAVED/authorized_keys" ]; then cp -p "$SAVED/authorized_keys" "$OTHER_ROOT/etc/ssh/authorized_keys"; else rm -f "$OTHER_ROOT/etc/ssh/authorized_keys"; fi || return 1

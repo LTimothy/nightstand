@@ -112,6 +112,30 @@ describe('boot_slot.sh other slot access', () => {
     assert.equal(existsSync(t.saved), false);
   });
 
+  it('refuses a locked rewt password on this slot, since sudo would not work there', () => {
+    const t = slots();
+    writeFileSync(path.join(path.dirname(t.otherRoot), 'a/etc/shadow'), 'rewt:!:1:0:99999:7:::\n');
+    assert.equal(t.run('other-access').status, 2);
+    assert.equal(read(path.join(t.otherRoot, 'etc/shadow')), STOCK_SHADOW);
+  });
+
+  it('refuses when the other slot already overrides an updater unit it would not restore', () => {
+    const t = slots();
+    writeFileSync(path.join(t.otherRoot, 'etc/systemd/system/swupdate.service'), '[Service]\n');
+    assert.equal(t.run('other-access').status, 2);
+    assert.equal(existsSync(t.saved), false);
+  });
+
+  it('saves again after an incomplete save, and undo refuses an incomplete save', () => {
+    const t = slots();
+    mkdirSync(t.saved);
+    assert.equal(t.run('other-undo').status, 1);
+    assert.equal(t.run('other-access').status, 0);
+    assert.equal(read(path.join(t.saved, 'shadow')), STOCK_SHADOW);
+    assert.equal(t.run('other-undo').status, 0);
+    assert.equal(read(path.join(t.otherRoot, 'etc/shadow')), STOCK_SHADOW);
+  });
+
   it('refuses without SSH keys to copy, changing nothing', () => {
     const t = slots('');
     assert.equal(t.run('other-access').status, 2);

@@ -310,9 +310,11 @@ bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-access
 
 It copies your SSH keys there so you can log in as `rewt` on port 8822, gives
 `rewt` the same password as on this slot so `sudo` works, and switches off that
-slot's updater so it cannot overwrite Nightstand. Everything else stays stock.
-It saves the three files it changes first, and `other-undo` puts them back;
-`other-status` shows the state. Once logged in there, `sudo fw_setenv
+slot's updater so it cannot overwrite Nightstand. It changes nothing else
+there. It saves the three files it changes first, and `other-undo` puts them back;
+`other-status` shows the state. That slot makes new SSH host keys the first
+time it starts, so your SSH client will warn that the host key changed. Once
+logged in there, `sudo fw_setenv
 current_slot` with this slot's letter and a reboot bring Nightstand back.
 
 ### 12. Set up internet access
