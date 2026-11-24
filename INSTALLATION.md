@@ -296,6 +296,25 @@ which can mean a stock update is waiting. If you see that, do not restart or
 unplug the Pod, and open an issue on GitHub. None of this helps a Pod that was
 already locked before Nightstand was installed.
 
+The hub keeps a second copy of its system, the other boot slot, which stays
+stock: online, with Eight Sleep updates on, and with no way to log in over SSH.
+The install and every update mark the running slot good, and Boot rescue says
+whether it is, so the hub should not start the other slot on its own. A
+factory reset does not use the other slot; it reinstalls from a separate
+firmware partition. If you want a way back in should the hub ever start the
+other slot, run this once as root (optional):
+
+```bash
+bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-access
+```
+
+It copies your SSH keys there so you can log in as `rewt` on port 8822, gives
+`rewt` the same password as on this slot so `sudo` works, and switches off that
+slot's updater so it cannot overwrite Nightstand. Everything else stays stock.
+It saves the three files it changes first, and `other-undo` puts them back;
+`other-status` shows the state. Once logged in there, `sudo fw_setenv
+current_slot` with this slot's letter and a reboot bring Nightstand back.
+
 ### 12. Set up internet access
 
 This connects the Pod to your Wi-Fi. Pod 3 with an SD card: skip this step.
