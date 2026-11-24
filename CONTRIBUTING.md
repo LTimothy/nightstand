@@ -253,34 +253,37 @@ older reader against a copy of the resulting database before release.
 
 ## Release ritual
 
-1. Bump the version in `server/src/serverInfo.json`.
-2. Pin the SHA-256 checksum of each new migration in
+1. Push `dev` and wait for CI to pass on that exact commit. Fix any failure on
+   `dev` before going on; a tag that is already public can only be fixed by a
+   new version.
+2. Bump the version in `server/src/serverInfo.json`.
+3. Pin the SHA-256 checksum of each new migration in
    `server/prisma/shipped-migrations.json`.
-3. If `scripts/install.sh` now needs something only this release ships,
+4. If `scripts/install.sh` now needs something only this release ships,
    raise its `MIN_INSTALL_VERSION` to this version.
-4. Add the new release to the top of `releases.json`, following the shape of
+5. Add the new release to the top of `releases.json`, following the shape of
    the entry below it: `kind` (always `bundle`), `version`, `date`, and
    `channel` (`beta` unless there is a reason to ship straight to `stable`).
    A bundle also carries its own `upstreamBase`, the release it was built
-   from, and its `features` list. Its `treeSha256` is added in step 8.
-5. Add a matching entry at the top of `CHANGELOG.md` (the `## [Unreleased]`
+   from, and its `features` list. Its `treeSha256` is added in step 9.
+6. Add a matching entry at the top of `CHANGELOG.md` (the `## [Unreleased]`
    notes become `## [<version>] - <date>`), starting with a one-sentence
    summary on its own line before the notes. The app shows it as the
    release's preview. End the entry with one line,
    `Checked on: <model>, <what was exercised>, <nights>.` If the test
    counts in `docs/TESTING.md` have moved by more than about a hundred,
    update them from the last CI run on `dev`.
-6. Rebuild both packages from a clean `npm ci` (`npm run build:pr` in
+7. Rebuild both packages from a clean `npm ci` (`npm run build:pr` in
    `server/` and `app/`), remove any files `scripts/check-bundles.sh` lists,
    run it again until it lists nothing, and commit the output.
-7. Commit everything together on `dev`. The release commit is the last
+8. Commit everything together on `dev`. The release commit is the last
    commit before the tag.
-8. Run `scripts/release_digest.sh`, which writes the release's checksum
+9. Run `scripts/release_digest.sh`, which writes the release's checksum
    (`treeSha256`) into `releases.json` and amends the release commit. Then
    fast-forward `main` to `dev` (`git switch main && git merge --ff-only
    dev`) and tag: `git tag -a v<version> -m "..."`.
-9. Push both branches and the tag: `git push origin main dev v<version>`.
-10. Create the GitHub Release: `gh release create v<version> --title
+10. Push both branches and the tag: `git push origin main dev v<version>`.
+11. Create the GitHub Release: `gh release create v<version> --title
     "v<version>" --notes-file <(python3 scripts/release_notes.py <version>
     checked.md)`, where `checked.md` contains only the bullets below, filled
     in and kept out of the repository. From the repository root, preview with
