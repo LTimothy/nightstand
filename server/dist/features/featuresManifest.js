@@ -1385,7 +1385,8 @@ export const FEATURES_MANIFEST = [
         default: false,
         touchpoints: [
             'scripts/boot_slot.sh', 'scripts/setup_services.sh', 'server/src/jobs/otherSlot.ts',
-            'server/src/routes/settings/settings.ts', 'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+            'server/src/routes/settings/settings.ts', 'server/src/routes/otherSlot/otherSlot.ts', 'app/src/api/otherSlot.ts',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
         ],
         depends_on: [],
         reversible: true,

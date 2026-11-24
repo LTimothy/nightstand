@@ -289,6 +289,7 @@ describe('setup_services.sh', () => {
             'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-access',
             'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-undo',
             'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-status',
+            'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-supported',
         ]);
         assert.ok(rules.every((rule) => !/[*?[\]]/.test(rule.split('NOPASSWD:')[1])), 'no wildcards');
     });

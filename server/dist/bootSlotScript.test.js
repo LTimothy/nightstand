@@ -193,6 +193,23 @@ describe('boot_slot.sh other slot access', () => {
         assert.equal(existsSync(t.saved), false);
         assert.equal(t.run('other-status').status, 2);
     });
+    it('calls a stock slot supported even without keys here, and writes nothing', () => {
+        const t = slots('');
+        const result = t.run('other-supported');
+        assert.equal(result.status, 0, result.stdout);
+        assert.equal(read(path.join(t.otherRoot, 'etc/shadow')), STOCK_SHADOW);
+        assert.equal(existsSync(t.saved), false);
+    });
+    it('calls a slot that lacks what it relies on unsupported, naming why', () => {
+        const t = slots();
+        writeFileSync(path.join(t.otherRoot, 'etc/ssh/sshd_config'), 'Port 22\n');
+        const result = t.run('other-supported');
+        assert.equal(result.status, 2);
+        assert.match(result.stdout, /not supported, it lacks SSH on port 8822/);
+        writeFileSync(path.join(t.otherRoot, 'etc/shadow'), 'root:*:1:0:99999:7:::\n');
+        assert.match(t.run('other-supported').stdout, /no rewt user/);
+        assert.equal(existsSync(t.saved), false);
+    });
     it('refuses without SSH keys to copy, changing nothing', () => {
         const t = slots('');
         assert.equal(t.run('other-access').status, 2);

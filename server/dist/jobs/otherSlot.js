@@ -1,6 +1,6 @@
 import config from '../config.js';
 import logger from '../logger.js';
-import { holdOperations, runPrivilegedCommand } from './privilegedCommand.js';
+import { holdOperations, PrivilegedCommandError, runPrivilegedCommand } from './privilegedCommand.js';
 // The unit name only satisfies runPrivilegedCommand's unit check; nothing restarts.
 // Literal commands, so setupServicesScript.test.ts can match them to the sudo rules.
 const runScript = async (action) => {
@@ -37,5 +37,24 @@ export async function syncOtherSlot(on, run = runScript, hold = holdOperations) 
     catch (error) {
         logger.warn(`Could not prepare the other boot slot: ${error instanceof Error ? error.message : String(error)}`);
     }
+}
+const checkSupported = () => runPrivilegedCommand(['/bin/bash', '/usr/local/lib/nightstand/live/scripts/boot_slot.sh', 'other-supported'], 'systemd-journald.service');
+let supported;
+// Null when it cannot tell yet: right after an update the sudo rule lands after the server starts.
+export async function otherSlotSupported(run = checkSupported) {
+    if (config.remoteDevMode)
+        return null;
+    if (supported !== undefined)
+        return supported;
+    try {
+        await run();
+        supported = true;
+    }
+    catch (error) {
+        if (error instanceof PrivilegedCommandError && error.message.startsWith('Cannot run '))
+            return null;
+        supported = false;
+    }
+    return supported;
 }
 //# sourceMappingURL=otherSlot.js.map
