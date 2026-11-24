@@ -11,11 +11,12 @@
 #   boot_slot.sh confirm   mark the running slot good if it is not
 #
 # Opt-in, for a way back in if the hub ever starts its other slot. They keep
-# that slot's system stock apart from three files, saved first so undo puts
+# that slot's system stock apart from a few files, saved first so undo puts
 # them back exactly:
 #   boot_slot.sh other-access   let this slot's SSH keys log in there as rewt,
-#                               give rewt the same password, and switch off
-#                               its updater so it cannot overwrite this slot
+#                               give rewt the same password, switch off its
+#                               updater so it cannot overwrite this slot, and
+#                               keep it off the internet but on the home network
 #   boot_slot.sh other-undo     put those files back
 #   boot_slot.sh other-status   say whether the other slot is prepared
 #
@@ -32,6 +33,37 @@ THIS_ROOT="${NIGHTSTAND_THIS_ROOT:-}"
 OTHER_ROOT="${NIGHTSTAND_OTHER_ROOT:-}"
 SAVED="${NIGHTSTAND_OTHER_SLOT_SAVED:-/persistent/nightstand-other-slot}"
 MASKS="swupdate.service swupdate.socket swupdate-progress.service"
+FIREWALL_MARK="# nightstand other slot: home network only"
+# Loaded by the stock slot's iptables.service before the network starts.
+# Everything outbound that is not the home network is refused at once.
+RULES_V4="$FIREWALL_MARK
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT DROP [0:0]
+-A OUTPUT -o lo -j ACCEPT
+-A OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A OUTPUT -d 10.0.0.0/8 -j ACCEPT
+-A OUTPUT -d 172.16.0.0/12 -j ACCEPT
+-A OUTPUT -d 192.168.0.0/16 -j ACCEPT
+-A OUTPUT -d 169.254.0.0/16 -j ACCEPT
+-A OUTPUT -d 224.0.0.0/4 -j ACCEPT
+-A OUTPUT -d 255.255.255.255/32 -j ACCEPT
+-A OUTPUT -j REJECT
+COMMIT"
+RULES_V6="$FIREWALL_MARK
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT DROP [0:0]
+-A OUTPUT -o lo -j ACCEPT
+-A OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A OUTPUT -p ipv6-icmp -j ACCEPT
+-A OUTPUT -d fe80::/10 -j ACCEPT
+-A OUTPUT -d fc00::/7 -j ACCEPT
+-A OUTPUT -d ff00::/8 -j ACCEPT
+-A OUTPUT -j REJECT
+COMMIT"
 
 running_slot() {
   sed -n 's/.*root=PARTLABEL=rootfs_\([ab]\)\([[:space:]].*\)\{0,1\}$/\1/p' "$CMDLINE" 2>/dev/null | head -n 1
@@ -101,16 +133,20 @@ other_status() {
   open_other ro || return $?
   local masked=yes unit
   for unit in $MASKS; do [ "$(readlink "$OTHER_ROOT/etc/systemd/system/$unit")" = /dev/null ] || masked=no; done
+  local walled=no
+  grep -qxF "$FIREWALL_MARK" "$OTHER_ROOT/etc/iptables/iptables.rules" 2>/dev/null \
+    && grep -qxF "$FIREWALL_MARK" "$OTHER_ROOT/etc/iptables/ip6tables.rules" 2>/dev/null && walled=yes
   echo "Other slot: SSH keys $([ -s "$OTHER_ROOT/etc/ssh/authorized_keys" ] && echo present || echo absent);" \
+    "internet $([ "$walled" = yes ] && echo blocked || echo open);" \
     "rewt password $([ "$(rewt_hash "$OTHER_ROOT/etc/shadow")" = "$(rewt_hash "$THIS_ROOT/etc/shadow")" ] && echo same || echo different);" \
     "updater $([ "$masked" = yes ] && echo off || echo on)."
   local hash
   hash=$(rewt_hash "$THIS_ROOT/etc/shadow")
-  [ -s "$OTHER_ROOT/etc/ssh/authorized_keys" ] && [ "$masked" = yes ] && [ -n "$hash" ] && [ "$(rewt_hash "$OTHER_ROOT/etc/shadow")" = "$hash" ]
+  [ -s "$OTHER_ROOT/etc/ssh/authorized_keys" ] && [ "$masked" = yes ] && [ "$walled" = yes ] && [ -n "$hash" ] && [ "$(rewt_hash "$OTHER_ROOT/etc/shadow")" = "$hash" ]
 }
 
 other_access() {
-  local keys hash unit
+  local keys hash unit rules
   keys=$(keys_file)
   [ -s "$keys" ] || { echo "No SSH keys in $keys to copy, so there would be no way in. Refusing."; return 2; }
   hash=$(rewt_hash "$THIS_ROOT/etc/shadow")
@@ -130,6 +166,12 @@ other_access() {
     if [ -e "$OTHER_ROOT/etc/ssh/authorized_keys" ]; then cp -p "$OTHER_ROOT/etc/ssh/authorized_keys" "$SAVED/authorized_keys" || return 1; fi
     for unit in $MASKS; do [ -e "$OTHER_ROOT/etc/systemd/system/$unit" ] || [ -L "$OTHER_ROOT/etc/systemd/system/$unit" ] || echo "$unit"; done > "$SAVED/added-masks"
   fi
+  # Saved separately, so a slot prepared before the firewall step still gets its stock rules saved.
+  for rules in iptables.rules ip6tables.rules; do
+    [ -e "$SAVED/$rules" ] || [ ! -e "$OTHER_ROOT/etc/iptables/$rules" ] && continue
+    grep -qxF "$FIREWALL_MARK" "$OTHER_ROOT/etc/iptables/$rules" && continue
+    cp -p "$OTHER_ROOT/etc/iptables/$rules" "$SAVED/$rules" || return 1
+  done
   # sshd reads the file as the user logging in, so it stays world readable.
   install -m 644 "$keys" "$OTHER_ROOT/etc/ssh/authorized_keys" || return 1
   local tmp="$OTHER_ROOT/etc/shadow.nightstand"
@@ -137,16 +179,22 @@ other_access() {
     && cat "$tmp" > "$OTHER_ROOT/etc/shadow" || { rm -f "$tmp"; return 1; }
   rm -f "$tmp"
   for unit in $MASKS; do ln -sfn /dev/null "$OTHER_ROOT/etc/systemd/system/$unit" || return 1; done
-  echo "Other slot: prepared. If the hub starts it, log in as rewt on port 8822 with your SSH key; its updater is off."
+  mkdir -p "$OTHER_ROOT/etc/iptables" || return 1
+  printf '%s\n' "$RULES_V4" > "$OTHER_ROOT/etc/iptables/iptables.rules" || return 1
+  printf '%s\n' "$RULES_V6" > "$OTHER_ROOT/etc/iptables/ip6tables.rules" || return 1
+  echo "Other slot: prepared. If the hub starts it, log in as rewt on port 8822 with your SSH key; its updater is off and it stays off the internet."
 }
 
 other_undo() {
-  local unit
+  local unit rules
   [ -e "$SAVED" ] || { echo "Nothing saved, so nothing to put back."; return 0; }
   [ -f "$SAVED/shadow" ] && [ -f "$SAVED/added-masks" ] || { echo "The saved files in $SAVED are incomplete. Restore the slot from its image."; return 1; }
   open_other rw || return $?
   cat "$SAVED/shadow" > "$OTHER_ROOT/etc/shadow" || return 1
   if [ -f "$SAVED/authorized_keys" ]; then cp -p "$SAVED/authorized_keys" "$OTHER_ROOT/etc/ssh/authorized_keys"; else rm -f "$OTHER_ROOT/etc/ssh/authorized_keys"; fi || return 1
+  for rules in iptables.rules ip6tables.rules; do
+    if [ -f "$SAVED/$rules" ]; then cp -p "$SAVED/$rules" "$OTHER_ROOT/etc/iptables/$rules"; else rm -f "$OTHER_ROOT/etc/iptables/$rules"; fi || return 1
+  done
   while read -r unit; do
     [ -n "$unit" ] && [ "$(readlink "$OTHER_ROOT/etc/systemd/system/$unit")" = /dev/null ] && rm -f "$OTHER_ROOT/etc/systemd/system/$unit"
   done < "$SAVED/added-masks"

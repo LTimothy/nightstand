@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,7 +75,9 @@ describe('boot_slot.sh other slot access', () => {
     const thisRoot = path.join(dir, 'a');
     const otherRoot = path.join(dir, 'b');
     for (const d of ['etc/ssh', 'home/root/ssh']) mkdirSync(path.join(thisRoot, d), { recursive: true });
-    for (const d of ['etc/ssh', 'etc/systemd/system']) mkdirSync(path.join(otherRoot, d), { recursive: true });
+    for (const d of ['etc/ssh', 'etc/systemd/system', 'etc/iptables']) mkdirSync(path.join(otherRoot, d), { recursive: true });
+    writeFileSync(path.join(otherRoot, 'etc/iptables/iptables.rules'), '');
+    writeFileSync(path.join(otherRoot, 'etc/iptables/ip6tables.rules'), '');
     writeFileSync(path.join(thisRoot, 'etc/ssh/sshd_config'), 'Port 8822\nAuthorizedKeysFile /home/root/ssh/authorized_keys\n');
     writeFileSync(path.join(thisRoot, 'home/root/ssh/authorized_keys'), keys);
     writeFileSync(path.join(thisRoot, 'etc/shadow'), 'root:$6$mine$root:1:0:99999:7:::\nrewt:$6$mine$rewt:1:0:99999:7:::\n');
@@ -100,7 +102,14 @@ describe('boot_slot.sh other slot access', () => {
     assert.match(read(path.join(t.otherRoot, 'etc/shadow')), /^rewt:\$6\$mine\$rewt:1:0/m);
     assert.match(read(path.join(t.otherRoot, 'etc/shadow')), /^root:\*:1:0/m, 'root is left alone');
     for (const unit of masks) assert.equal(readlinkSync(path.join(t.otherRoot, 'etc/systemd/system', unit)), '/dev/null');
-    assert.equal(t.run('other-status').status, 0);
+    const v4 = read(path.join(t.otherRoot, 'etc/iptables/iptables.rules'));
+    assert.match(v4, /^:OUTPUT DROP/m);
+    assert.match(v4, /^-A OUTPUT -d 192\.168\.0\.0\/16 -j ACCEPT$/m);
+    assert.match(v4, /^-A OUTPUT -j REJECT\nCOMMIT$/m);
+    assert.match(read(path.join(t.otherRoot, 'etc/iptables/ip6tables.rules')), /^-A OUTPUT -d fe80::\/10 -j ACCEPT$/m);
+    const status = t.run('other-status');
+    assert.equal(status.status, 0);
+    assert.match(status.stdout, /internet blocked/);
     // A second run keeps the stock originals saved the first time.
     assert.equal(t.run('other-access').status, 0);
     assert.equal(read(path.join(t.saved, 'shadow')), STOCK_SHADOW);
@@ -109,6 +118,8 @@ describe('boot_slot.sh other slot access', () => {
     assert.equal(read(path.join(t.otherRoot, 'etc/shadow')), STOCK_SHADOW);
     assert.equal(existsSync(path.join(t.otherRoot, 'etc/ssh/authorized_keys')), false);
     for (const unit of masks) assert.equal(existsSync(path.join(t.otherRoot, 'etc/systemd/system', unit)), false);
+    assert.equal(read(path.join(t.otherRoot, 'etc/iptables/iptables.rules')), '');
+    assert.equal(read(path.join(t.otherRoot, 'etc/iptables/ip6tables.rules')), '');
     assert.equal(existsSync(t.saved), false);
   });
 
@@ -134,6 +145,18 @@ describe('boot_slot.sh other slot access', () => {
     assert.equal(read(path.join(t.saved, 'shadow')), STOCK_SHADOW);
     assert.equal(t.run('other-undo').status, 0);
     assert.equal(read(path.join(t.otherRoot, 'etc/shadow')), STOCK_SHADOW);
+  });
+
+  it('saves the stock firewall rules on a re-run for a slot prepared before the firewall step', () => {
+    const t = slots();
+    writeFileSync(path.join(t.otherRoot, 'etc/iptables/iptables.rules'), '# stock\n');
+    assert.equal(t.run('other-access').status, 0);
+    rmSync(path.join(t.saved, 'iptables.rules'));
+    writeFileSync(path.join(t.otherRoot, 'etc/iptables/iptables.rules'), '# stock\n');
+    assert.equal(t.run('other-access').status, 0);
+    assert.equal(read(path.join(t.saved, 'iptables.rules')), '# stock\n');
+    assert.equal(t.run('other-undo').status, 0);
+    assert.equal(read(path.join(t.otherRoot, 'etc/iptables/iptables.rules')), '# stock\n');
   });
 
   it('refuses without SSH keys to copy, changing nothing', () => {

@@ -58,9 +58,9 @@ is a hard fork; for the history of the projects it descends from, see
   marked good, and shows how many boots it has left when it is not.
 - Optional, run by hand as root: `boot_slot.sh other-access` prepares the
   hub's other, stock boot slot as a way back in. It copies your SSH keys
-  there, gives `rewt` the same password, and switches off that slot's
-  updater; `other-undo` puts the three files back. See the installation
-  guide, step 11.
+  there, gives `rewt` the same password, switches off that slot's updater,
+  and keeps it off the internet with a home-network-only firewall;
+  `other-undo` puts the files back. See the installation guide, step 11.
 
 ## [3.11.0] - 2026-11-22
 
