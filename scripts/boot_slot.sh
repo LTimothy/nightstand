@@ -149,11 +149,13 @@ other_mismatches() {
   [ "$found" = yes ] || echo "sudo for rewt"
 }
 
+lacking() { other_mismatches | paste -sd ';' - | sed 's/;/, /g'; }
+
 other_status() {
   open_other ro || return $?
   local missing
-  missing=$(other_mismatches)
-  [ -z "$missing" ] || { echo "Other slot: not supported, it lacks $(printf '%s' "$missing" | paste -sd ';' - | sed 's/;/, /g')."; return 2; }
+  missing=$(lacking)
+  [ -z "$missing" ] || { echo "Other slot: not supported, it lacks $missing."; return 2; }
   local masked=yes unit
   for unit in $MASKS; do [ "$(readlink "$OTHER_ROOT/etc/systemd/system/$unit")" = /dev/null ] || masked=no; done
   local walled=no
@@ -173,8 +175,8 @@ other_supported() {
   open_other ro || return $?
   [ -n "$(rewt_hash "$OTHER_ROOT/etc/shadow")" ] || { echo "Other slot: not supported, it has no rewt user."; return 2; }
   local missing
-  missing=$(other_mismatches)
-  [ -z "$missing" ] || { echo "Other slot: not supported, it lacks $(printf '%s' "$missing" | paste -sd ';' - | sed 's/;/, /g')."; return 2; }
+  missing=$(lacking)
+  [ -z "$missing" ] || { echo "Other slot: not supported, it lacks $missing."; return 2; }
   echo "Other slot: supported."
 }
 
@@ -187,8 +189,8 @@ other_access() {
   open_other rw || return $?
   [ -n "$(rewt_hash "$OTHER_ROOT/etc/shadow")" ] || { echo "The other slot has no rewt user. Refusing."; return 2; }
   local missing
-  missing=$(other_mismatches)
-  [ -z "$missing" ] || { echo "The other slot is not one this was checked on; it lacks $(printf '%s' "$missing" | paste -sd ';' - | sed 's/;/, /g'). Refusing."; return 2; }
+  missing=$(lacking)
+  [ -z "$missing" ] || { echo "The other slot is not one this was checked on; it lacks $missing. Refusing."; return 2; }
   # A unit override that is not ours would be lost on undo, so leave such a slot alone.
   for unit in $MASKS; do
     [ ! -e "$OTHER_ROOT/etc/systemd/system/$unit" ] && [ ! -L "$OTHER_ROOT/etc/systemd/system/$unit" ] && continue
