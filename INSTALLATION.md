@@ -297,12 +297,11 @@ unplug the Pod, and open an issue on GitHub. None of this helps a Pod that was
 already locked before Nightstand was installed.
 
 The hub keeps a second copy of its system, the other boot slot, which stays
-stock: online, with Eight Sleep updates on, and with no way to log in over SSH.
-The install and every update mark the running slot good, and Boot rescue says
-whether it is, so the hub should not start the other slot on its own. A
-factory reset does not use the other slot; it reinstalls from a separate
-firmware partition. If you want a way back in should the hub ever start the
-other slot, run this once as root (optional):
+stock: online, with Eight Sleep updates on, and with no way for you to log in
+over SSH. The install and every update mark the running slot good, and Boot
+rescue says whether it is, so the hub should not start the other slot on its
+own. If you want a way back in should the hub ever start the other slot, run
+this once as root (optional):
 
 ```bash
 bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-access
@@ -314,8 +313,10 @@ slot's updater so it cannot overwrite Nightstand. It changes nothing else
 there. It saves the three files it changes first, and `other-undo` puts them back;
 `other-status` shows the state. That slot makes new SSH host keys the first
 time it starts, so your SSH client will warn that the host key changed. Once
-logged in there, `sudo fw_setenv
-current_slot` with this slot's letter and a reboot bring Nightstand back.
+logged in there as `rewt`, `sudo fw_setenv current_slot` with this slot's
+letter and a reboot bring Nightstand back. Keep the Pod's internet paused at
+your router while it runs the stock slot, since that system talks to Eight
+Sleep's servers.
 
 ### 12. Set up internet access
 
