@@ -40,8 +40,9 @@ Nightstand comes with no warranty (see [License](#license)).
   for Pod 2 through Pod 5
   ([steps](INSTALLATION.md#going-back-to-the-eight-sleep-app)), but I haven't
   tried it after an install and haven't found anyone who has. After a reset
-  the Pod updates its firmware, and some Pod 5 units on newer firmware have a
-  locked bootloader, so you may not be able to install Nightstand again. I
+  the Pod updates its firmware, and Pods on newer firmware can have a locked
+  bootloader (reported so far on Pod 5), so you may not be able to install
+  Nightstand again. I
   haven't tried the Pod 3 and Pod 4 steps either. If the Pod
   stops booting, the serial cable gives you a root shell to repair it. That
   doesn't restore Eight Sleep's software, and neither does switching to
@@ -152,7 +153,7 @@ personal and network details.
 | Pod 6 | Unknown. |
 
 > [!CAUTION]
-> Some Pod 5 units on newer firmware have a locked bootloader. See [issue #6](https://github.com/LTimothy/nightstand/issues/6).
+> Pods on newer firmware can have a locked bootloader, reported so far on Pod 5. See [issue #6](https://github.com/LTimothy/nightstand/issues/6).
 
 One Pod 3 owner's reports led to three fixes; only the first is confirmed
 on that Pod. The adjustable base controls are untested, because I have no

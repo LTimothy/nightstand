@@ -65,8 +65,9 @@ for your model. On a Pod 5 there is no tested way back.
 - Pod 5: the model I use and test on.
 
 > [!CAUTION]
-> Some Pod 5 units on newer firmware have a locked bootloader that blocks
-> installation at step 4. Units kept offline before the update are not affected.
+> Pods on newer firmware can have a locked bootloader that blocks installation
+> at step 4. Reports so far are from Pod 5, but a firmware update could bring it
+> to any model. Units kept offline before the update are not affected.
 > See [issue #6](https://github.com/LTimothy/nightstand/issues/6) for the
 > current state.
 
@@ -145,8 +146,8 @@ open the device, check the name again.
 ### 4. Plug the power into the Pod
 
 > [!CAUTION]
-> Some Pod 5 units on newer firmware do not show `Hit any key to stop autoboot`
-> and boot straight through. If yours does, **stop here**. There is no software
+> Pods on newer firmware may not show `Hit any key to stop autoboot` and boot
+> straight through. Reports so far are from Pod 5. If yours does, **stop here**. There is no software
 > workaround yet. See [issue #6](https://github.com/LTimothy/nightstand/issues/6)
 > for the current state.
 
