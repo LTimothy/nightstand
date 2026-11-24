@@ -11,6 +11,8 @@ import { changesRhythmsFlag, pauseRejection } from './settingsGuards.js';
 import { syncRawArchiveConf } from '../../jobs/rawArchiveConf.js';
 import { syncJournalStorage } from '../../jobs/journalStorage.js';
 import { syncFlashCommit } from '../../jobs/flashCommit.js';
+import { applyOtherSlot } from '../../jobs/otherSlot.js';
+import { OperationBusyError, privilegedErrorStatus } from '../../jobs/privilegedCommand.js';
 router.get('/settings', async (req, res) => {
     await settingsDB.read();
     res.json(settingsDB.data);
@@ -32,6 +34,26 @@ router.post('/settings', async (req, res) => {
     // into settingsDB.data verbatim if the raw body were merged instead.
     const validatedUpdate = validationResult.data;
     delete validatedUpdate.id;
+    const otherSlot = validatedUpdate.features?.otherSlotAccess;
+    if (otherSlot !== undefined)
+        await settingsDB.read();
+    // Saved only once the script succeeds, so the switch never reads on without a way in.
+    if (otherSlot !== undefined && otherSlot !== settingsDB.data.features.otherSlotAccess) {
+        try {
+            await applyOtherSlot(otherSlot);
+        }
+        catch (error) {
+            logger.warn(`Could not ${otherSlot ? 'prepare' : 'put back'} the other boot slot: `
+                + `${error instanceof Error ? error.message : String(error)}`);
+            res.status(privilegedErrorStatus(error)).json({
+                error: error instanceof OperationBusyError ? error.message : otherSlot
+                    ? 'Could not prepare the other boot slot. It needs an SSH key and a rewt password on this Pod. '
+                        + 'Run boot_slot.sh other-status over SSH for details.'
+                    : 'Could not put the other boot slot back. Run boot_slot.sh other-undo over SSH for details.',
+            });
+            return;
+        }
+    }
     const resumed = [];
     const held = [];
     const resumedAt = new Date();

@@ -5,6 +5,11 @@ export default async function reboot() {
     await admitReboot();
     logger.debug('Rebooting pod...');
     exec('sudo /sbin/reboot', (error, stdout, stderr) => {
+        // The reboot ends this process by signal before sudo can return, so that is success, not a failure.
+        if (error?.signal) {
+            logger.info('Reboot started');
+            return;
+        }
         if (error) {
             releaseRebootLatch();
             logger.error(`Error: ${error.message}`);

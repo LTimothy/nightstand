@@ -17,7 +17,7 @@ function lockKey(file) {
         'import os, sys; s = os.stat(sys.argv[1]); print("%02x:%02x:%d" % (os.major(s.st_dev), os.minor(s.st_dev), s.st_ino))',
         file], { encoding: 'utf8' }).trim();
 }
-function setup({ active = 'active', answers = false, status, silentCurl = false, lockHeld = false, otherDeviceLock = false, procLocks = true, activeSince, uptime = 100000, fwPrintenv = 'printf "bootdelay=2\\ncurrent_slot=a\\nnext_slot=a\\n"', } = {}) {
+function setup({ active = 'active', answers = false, status, silentCurl = false, lockHeld = false, otherDeviceLock = false, procLocks = true, activeSince, uptime = 100000, fwPrintenv = 'printf "bootdelay=2\\ncurrent_slot=a\\nnext_slot=a\\nboot_a_success=1\\nretry_boot_a=5\\n"', } = {}) {
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-health-'));
     const bin = path.join(dir, 'bin');
     mkdirSync(bin);
@@ -212,14 +212,14 @@ describe('health_check.sh', () => {
         settled.cleanup();
     });
     const settings = (file) => JSON.parse(readFileSync(file, 'utf8'));
-    const nulls = { bootdelay: null, currentSlot: null, nextSlot: null };
+    const nulls = { bootdelay: null, currentSlot: null, nextSlot: null, currentMarked: null, currentRetries: null };
     it('writes boot settings from fw_printenv once an hour', () => {
         // Most runs exit early, so the write has to come before those exits.
         const t = setup({ active: 'inactive' });
         t.run();
         t.run();
         const written = settings(t.bootSettings);
-        assert.deepEqual({ ...written, checkedAt: undefined }, { checkedAt: undefined, bootdelay: '2', currentSlot: 'a', nextSlot: 'a' });
+        assert.deepEqual({ ...written, checkedAt: undefined }, { checkedAt: undefined, bootdelay: '2', currentSlot: 'a', nextSlot: 'a', currentMarked: '1', currentRetries: '5' });
         assert.ok(!Number.isNaN(Date.parse(written.checkedAt ?? '')));
         assert.equal(statSync(t.bootSettings).mode & 0o777, 0o644);
         assert.equal(t.log().match(/^fw_printenv $/gm)?.length, 1);
@@ -246,7 +246,7 @@ describe('health_check.sh', () => {
     it('keeps bootdelay when the slot names are not defined', () => {
         const t = setup({ fwPrintenv: 'printf "baudrate=115200\\nbootdelay=2\\n"' });
         t.run();
-        assert.deepEqual({ ...settings(t.bootSettings), checkedAt: undefined }, { checkedAt: undefined, bootdelay: '2', currentSlot: null, nextSlot: null });
+        assert.deepEqual({ ...settings(t.bootSettings), checkedAt: undefined }, { checkedAt: undefined, bootdelay: '2', currentSlot: null, nextSlot: null, currentMarked: null, currentRetries: null });
         t.cleanup();
     });
     it('records nulls when fw_printenv is missing', () => {

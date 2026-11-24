@@ -3,6 +3,8 @@ import { it, mock } from 'node:test';
 const reboots = [];
 const logs = [];
 const warnings = [];
+const errors = [];
+let killedBySignal = false;
 let activeUnit = '';
 let checkFailed = false;
 let dailyJob;
@@ -10,7 +12,7 @@ mock.module('child_process', { namedExports: {
         // Report each reboot as failed so the reboot latch does not carry between tests.
         exec: (command, callback) => {
             reboots.push(command);
-            callback(new Error('not rebooting under test'));
+            callback(Object.assign(new Error('Command failed: sudo /sbin/reboot'), killedBySignal ? { signal: 'SIGTERM' } : {}));
         },
         execFile: (_command, args, _options, callback) => {
             callback(checkFailed ? new Error('check failed') : null, args.includes(activeUnit) ? 'active' : 'inactive');
@@ -18,7 +20,7 @@ mock.module('child_process', { namedExports: {
     } });
 mock.module(new URL('../logger.js', import.meta.url).href, { defaultExport: {
         warn: (message) => warnings.push(message),
-        debug: () => { }, info: (message) => logs.push(message), error: () => { },
+        debug: () => { }, info: (message) => logs.push(message), error: (message) => errors.push(message),
     } });
 mock.module('node-schedule', { defaultExport: {
         RecurrenceRule: class {
@@ -79,6 +81,22 @@ it('warns when the daily reboot operation check fails', async () => {
     }
     finally {
         checkFailed = false;
+    }
+});
+it('logs a reboot that stops the server as started, and a refused one as an error', async () => {
+    errors.length = 0;
+    logs.length = 0;
+    await reboot();
+    assert.ok(errors.some(message => /Command failed/.test(message)));
+    errors.length = 0;
+    killedBySignal = true;
+    try {
+        await reboot();
+        assert.deepEqual(errors, []);
+        assert.ok(logs.includes('Reboot started'));
+    }
+    finally {
+        killedBySignal = false;
     }
 });
 //# sourceMappingURL=reboot.test.js.map

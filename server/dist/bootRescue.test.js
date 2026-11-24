@@ -7,6 +7,14 @@ import { bootRescueStatus, readBootSettings } from './bootRescue.js';
 it('bootdelay 2 with matching slots is healthy', () => {
     assert.deepEqual(bootRescueStatus({ bootdelay: '2', currentSlot: 'a', nextSlot: 'a' }), { status: 'healthy', message: 'Serial rescue is available (bootdelay 2).' });
 });
+it('says the running slot is marked good when it is', () => {
+    assert.deepEqual(bootRescueStatus({ bootdelay: '2', currentSlot: 'a', nextSlot: 'a', currentMarked: '1', currentRetries: '5' }), { status: 'healthy', message: 'Serial rescue is available (bootdelay 2). Slot a is marked good.' });
+});
+it('fails with the boots left when the running slot is not marked good', () => {
+    const { status, message } = bootRescueStatus({ bootdelay: '2', currentSlot: 'b', nextSlot: 'b', currentMarked: '0', currentRetries: '3' });
+    assert.equal(status, 'failed');
+    assert.match(message, /^Slot b is not marked good \(3 boots left\)\. .*Updating Nightstand marks it/);
+});
 it('bootdelay -1 is healthy', () => {
     assert.deepEqual(bootRescueStatus({ bootdelay: '-1', currentSlot: 'a', nextSlot: 'a' }), { status: 'healthy', message: 'Serial rescue is available (bootdelay -1).' });
 });

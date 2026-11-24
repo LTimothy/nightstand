@@ -286,6 +286,9 @@ describe('setup_services.sh', () => {
             'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/flash_commit.sh long',
             'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/flash_commit.sh default',
             'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/cover_restore.sh',
+            'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-access',
+            'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-undo',
+            'dac ALL=(root) NOPASSWD: /bin/bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-status',
         ]);
         assert.ok(rules.every((rule) => !/[*?[\]]/.test(rule.split('NOPASSWD:')[1])), 'no wildcards');
     });

@@ -132,6 +132,8 @@ export const defaultFeatures = {
     targetTemperatureLabels: false,
     // Alarms ring on a side that is off (alarmScheduler.ts).
     alarmsWhenOff: false,
+    // Prepares the other boot slot as a way back in (scripts/boot_slot.sh other-access).
+    otherSlotAccess: false,
 };
 const FeaturesSchema = z.object({
     sleepScore: z.boolean(),
@@ -156,6 +158,7 @@ const FeaturesSchema = z.object({
     longFlashCommit: z.boolean(),
     targetTemperatureLabels: z.boolean(),
     alarmsWhenOff: z.boolean(),
+    otherSlotAccess: z.boolean(),
 }).strict();
 export const SettingsSchema = z.object({
     id: z.string(),

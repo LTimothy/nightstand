@@ -1374,5 +1374,29 @@ export const FEATURES_MANIFEST = [
         rationale: 'Optional: every temperature shows a new number, which is confusing without warning. '
             + 'Settings and schedules are unchanged.',
     },
+    {
+        id: 'other-slot-access',
+        title: 'SSH access to the other boot slot',
+        description: 'Prepares the hub\'s other, stock boot slot as a way back in: this slot\'s SSH keys and rewt password, '
+            + 'updater off, home network only. Refuses a stock slot that differs from the one it was checked on. Off by default.',
+        category: 'safety',
+        version: '3.11.1',
+        flag: 'otherSlotAccess',
+        default: false,
+        touchpoints: [
+            'scripts/boot_slot.sh', 'scripts/setup_services.sh', 'server/src/jobs/otherSlot.ts',
+            'server/src/routes/settings/settings.ts', 'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.tsx',
+        ],
+        depends_on: [],
+        reversible: true,
+        tests: [
+            'server/src/bootSlotScript.test.ts', 'server/src/jobs/otherSlot.test.ts',
+            'server/src/routes/settings/settingsOtherSlot.test.ts',
+            'app/src/pages/SettingsPage/FeaturesSection/FeaturesSection.test.tsx',
+        ],
+        upstream_offer: false,
+        rationale: 'Optional: it writes to the stock boot slot and copies this slot\'s SSH keys and rewt password hash there, '
+            + 'so it waits for an explicit opt-in. Turning it off puts the saved files back.',
+    },
 ];
 //# sourceMappingURL=featuresManifest.js.map

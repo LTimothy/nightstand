@@ -28,6 +28,14 @@ describe('updater shell scripts', () => {
         assert.match(healthy.slice(0, 400), /\[ -f "\$LIVE\/scripts\/flash_commit\.sh" \] \|\| mount -o remount,commit=5 \/persistent 2>\/dev\/null \|\| true\n/);
         assert.equal(src.match(/commit=5/g)?.length, 1, 'only after the health check passed');
     });
+    it('update.sh and install.sh mark the running boot slot good, update.sh only after the health check', () => {
+        const update = readFileSync(path.join(repoRoot, 'scripts/update.sh'), 'utf8');
+        const healthy = update.slice(update.indexOf('if [ "$HEALTHY" = yes ]; then'));
+        assert.match(healthy.slice(0, 700), /bash "\$NEW_COPY\/scripts\/boot_slot\.sh" confirm \|\| say "WARNING/);
+        assert.equal(update.match(/boot_slot\.sh" confirm/g)?.length, 1);
+        const install = readFileSync(path.join(repoRoot, 'scripts/install.sh'), 'utf8');
+        assert.match(install, /bash "\$COPY\/scripts\/boot_slot\.sh" confirm \|\| echo "WARNING/);
+    });
     for (const script of SCRIPTS) {
         it(`${script} exists and parses (bash -n)`, () => {
             const full = path.join(repoRoot, script);
