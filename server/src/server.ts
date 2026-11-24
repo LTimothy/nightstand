@@ -28,6 +28,7 @@ import { syncRawArchiveConf } from './jobs/rawArchiveConf.js';
 import { syncBiometrics } from './jobs/biometricsSync.js';
 import { startJournalTidy, syncJournalStorage } from './jobs/journalStorage.js';
 import { syncFlashCommit } from './jobs/flashCommit.js';
+import { syncOtherSlot } from './jobs/otherSlot.js';
 
 const port = 3000;
 const app = express();
@@ -169,6 +170,8 @@ async function startServer() {
     .then(() => startJournalTidy(() => settingsDB.data.features.journalInMemory));
   // The remount does not survive a restart of the Pod.
   void syncFlashCommit(settingsDB.data.features.longFlashCommit);
+  // A firmware update or a hand-run undo can leave the other slot stock again.
+  void syncOtherSlot(settingsDB.data.features.otherSlotAccess);
 
   // Initialize Franken once before listening
   if (!config.remoteDevMode) {

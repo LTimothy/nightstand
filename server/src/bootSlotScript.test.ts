@@ -75,7 +75,18 @@ describe('boot_slot.sh other slot access', () => {
     const thisRoot = path.join(dir, 'a');
     const otherRoot = path.join(dir, 'b');
     for (const d of ['etc/ssh', 'home/root/ssh']) mkdirSync(path.join(thisRoot, d), { recursive: true });
-    for (const d of ['etc/ssh', 'etc/systemd/system', 'etc/iptables']) mkdirSync(path.join(otherRoot, d), { recursive: true });
+    for (const d of ['etc/ssh', 'etc/systemd/system', 'etc/iptables', 'lib/systemd/system', 'etc/sudoers.d']) {
+      mkdirSync(path.join(otherRoot, d), { recursive: true });
+    }
+    // The stock pieces other-access checks for before it changes anything.
+    writeFileSync(path.join(otherRoot, 'lib/systemd/system/iptables.service'),
+      'ExecStart=/usr/sbin/iptables-restore -w -- /etc/iptables/iptables.rules\n');
+    writeFileSync(path.join(otherRoot, 'lib/systemd/system/ip6tables.service'),
+      'ExecStart=/usr/sbin/ip6tables-restore -w -- /etc/iptables/ip6tables.rules\n');
+    writeFileSync(path.join(otherRoot, 'lib/systemd/system/swupdate.service'), '[Service]\n');
+    writeFileSync(path.join(otherRoot, 'etc/ssh/sshd_config'),
+      'Port 8822\nAuthorizedKeysFile\t/etc/ssh/authorized_keys .ssh/authorized_keys\nAllowUsers rewt\n');
+    writeFileSync(path.join(otherRoot, 'etc/sudoers.d/50-rewt'), 'rewt ALL=(ALL) ALL\n');
     writeFileSync(path.join(otherRoot, 'etc/iptables/iptables.rules'), '');
     writeFileSync(path.join(otherRoot, 'etc/iptables/ip6tables.rules'), '');
     writeFileSync(path.join(thisRoot, 'etc/ssh/sshd_config'), 'Port 8822\nAuthorizedKeysFile /home/root/ssh/authorized_keys\n');
@@ -83,8 +94,8 @@ describe('boot_slot.sh other slot access', () => {
     writeFileSync(path.join(thisRoot, 'etc/shadow'), 'root:$6$mine$root:1:0:99999:7:::\nrewt:$6$mine$rewt:1:0:99999:7:::\n');
     writeFileSync(path.join(otherRoot, 'etc/shadow'), STOCK_SHADOW);
     const saved = path.join(dir, 'saved');
-    const run = (arg: string) => spawnSync('bash', [SCRIPT, arg], {
-      env: { ...process.env, NIGHTSTAND_THIS_ROOT: thisRoot, NIGHTSTAND_OTHER_ROOT: otherRoot, NIGHTSTAND_OTHER_SLOT_SAVED: saved },
+    const run = (arg: string, extra: Record<string, string> = {}) => spawnSync('bash', [SCRIPT, arg], {
+      env: { ...process.env, NIGHTSTAND_THIS_ROOT: thisRoot, NIGHTSTAND_OTHER_ROOT: otherRoot, NIGHTSTAND_OTHER_SLOT_SAVED: saved, ...extra },
       encoding: 'utf8',
     });
     return { run, otherRoot, saved };
@@ -157,6 +168,47 @@ describe('boot_slot.sh other slot access', () => {
     assert.equal(read(path.join(t.saved, 'iptables.rules')), '# stock\n');
     assert.equal(t.run('other-undo').status, 0);
     assert.equal(read(path.join(t.otherRoot, 'etc/iptables/iptables.rules')), '# stock\n');
+  });
+
+  it('ignores the test folders under sudo', () => {
+    const t = slots();
+    assert.notEqual(t.run('other-access', { SUDO_USER: 'dac' }).status, 0);
+    assert.equal(read(path.join(t.otherRoot, 'etc/shadow')), STOCK_SHADOW);
+    assert.equal(existsSync(path.join(t.otherRoot, 'etc/ssh/authorized_keys')), false);
+    assert.equal(existsSync(t.saved), false);
+    assert.equal(t.run('other-access').status, 0);
+    t.run('other-undo', { SUDO_USER: 'dac' });
+    assert.equal(existsSync(t.saved), true);
+    assert.equal(readlinkSync(path.join(t.otherRoot, 'etc/systemd/system/swupdate.service')), '/dev/null');
+  });
+
+  it('saves afresh when the other slot has been rewritten stock since the last save', () => {
+    const t = slots();
+    assert.equal(t.run('other-access').status, 0);
+    const NEW_SHADOW = STOCK_SHADOW.replace('$6$stock$abc', '$6$newimage$def');
+    writeFileSync(path.join(t.otherRoot, 'etc/shadow'), NEW_SHADOW);
+    rmSync(path.join(t.otherRoot, 'etc/ssh/authorized_keys'));
+    for (const unit of masks) rmSync(path.join(t.otherRoot, 'etc/systemd/system', unit));
+    writeFileSync(path.join(t.otherRoot, 'etc/iptables/iptables.rules'), '# new image\n');
+    writeFileSync(path.join(t.otherRoot, 'etc/iptables/ip6tables.rules'), '# new image 6\n');
+    assert.equal(t.run('other-access').status, 0);
+    assert.equal(read(path.join(t.saved, 'shadow')), NEW_SHADOW);
+    assert.equal(t.run('other-undo').status, 0);
+    assert.equal(read(path.join(t.otherRoot, 'etc/shadow')), NEW_SHADOW);
+    assert.equal(read(path.join(t.otherRoot, 'etc/iptables/iptables.rules')), '# new image\n');
+    assert.equal(read(path.join(t.otherRoot, 'etc/iptables/ip6tables.rules')), '# new image 6\n');
+  });
+
+  it('refuses a stock slot that lacks what it relies on, naming each piece and changing nothing', () => {
+    const t = slots();
+    writeFileSync(path.join(t.otherRoot, 'etc/ssh/sshd_config'), 'Port 22\n');
+    rmSync(path.join(t.otherRoot, 'lib/systemd/system/iptables.service'));
+    const result = t.run('other-access');
+    assert.equal(result.status, 2);
+    assert.match(result.stdout, /lacks an iptables\.service that loads \/etc\/iptables\/iptables\.rules, SSH on port 8822, SSH keys read from/);
+    assert.equal(read(path.join(t.otherRoot, 'etc/shadow')), STOCK_SHADOW);
+    assert.equal(existsSync(t.saved), false);
+    assert.equal(t.run('other-status').status, 2);
   });
 
   it('refuses without SSH keys to copy, changing nothing', () => {

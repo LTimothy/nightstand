@@ -1,23 +1,13 @@
 #!/bin/bash
-# The hub keeps two copies of its system, slot a and slot b. U-Boot gives a
-# slot that is not marked good a few boots, counting down, and then starts the
-# other slot, which still holds Eight Sleep's system with its updates on and
-# no internet block. Eight Sleep's defibrillator service marks a slot good,
-# and the install switches that service off, so a slot installed straight
-# after a firmware update would never be marked. This marks the running slot,
-# which has booted, and changes nothing when it is already marked.
+# The hub keeps two system slots; U-Boot starts the other, stock slot when the
+# running one is not marked good, and the install switches off the service that
+# marks it. The other-* commands, opt-in, prepare that slot as a way back in.
 #
-#   boot_slot.sh status    say which slot is running and whether it is marked
-#   boot_slot.sh confirm   mark the running slot good if it is not
-#
-# Opt-in, for a way back in if the hub ever starts its other slot. They keep
-# that slot's system stock apart from a few files, saved first so undo puts
-# them back exactly:
-#   boot_slot.sh other-access   let this slot's SSH keys log in there as rewt,
-#                               give rewt the same password, switch off its
-#                               updater so it cannot overwrite this slot, and
-#                               keep it off the internet but on the home network
-#   boot_slot.sh other-undo     put those files back
+#   boot_slot.sh status         say which slot is running and whether it is marked
+#   boot_slot.sh confirm        mark the running slot good if it is not
+#   boot_slot.sh other-access   copy this slot's SSH keys and rewt password there,
+#                               switch off its updater, keep it off the internet
+#   boot_slot.sh other-undo     put the files it saved back
 #   boot_slot.sh other-status   say whether the other slot is prepared
 #
 # Exit codes: 0 done or fine, 1 not marked or a step failed, 2 cannot tell
@@ -25,6 +15,9 @@
 set -u
 export PATH="/usr/sbin:/sbin:/usr/bin:/bin"
 
+# Test hooks never apply when run through sudo.
+[ -n "${SUDO_USER:-}" ] && unset NIGHTSTAND_PROC_CMDLINE NIGHTSTAND_FW_PRINTENV NIGHTSTAND_FW_SETENV \
+  NIGHTSTAND_THIS_ROOT NIGHTSTAND_OTHER_ROOT NIGHTSTAND_OTHER_SLOT_SAVED
 CMDLINE="${NIGHTSTAND_PROC_CMDLINE:-/proc/cmdline}"
 FW_PRINTENV="${NIGHTSTAND_FW_PRINTENV:-fw_printenv}"
 FW_SETENV="${NIGHTSTAND_FW_SETENV:-fw_setenv}"
@@ -129,8 +122,37 @@ rewt_hash() {
   awk -F: '$1 == "rewt" { print $2 }' "$1"
 }
 
+# What other-access relies on in the other slot's stock system, checked so a
+# different firmware is refused instead of half prepared. Prints what is missing.
+other_mismatches() {
+  local o="$OTHER_ROOT" unit file found
+  unit_file() { for file in "$o/etc/systemd/system/$1" "$o/lib/systemd/system/$1" "$o/usr/lib/systemd/system/$1"; do
+    [ -f "$file" ] && [ ! -L "$file" ] && { printf '%s' "$file"; return 0; }; done; return 1; }
+  for unit in iptables:iptables.rules ip6tables:ip6tables.rules; do
+    file=$(unit_file "${unit%%:*}.service") && grep -q "restore.*/etc/iptables/${unit##*:}" "$file" \
+      || echo "an ${unit%%:*}.service that loads /etc/iptables/${unit##*:}"
+  done
+  # Masked by an earlier run is fine; otherwise the unit must be where systemd finds it.
+  [ "$(readlink "$o/etc/systemd/system/swupdate.service")" = /dev/null ] || unit_file swupdate.service >/dev/null \
+    || echo "an updater named swupdate.service"
+  grep -qE '^[[:space:]]*Port[[:space:]]+8822([[:space:]]|$)' "$o/etc/ssh/sshd_config" 2>/dev/null || echo "SSH on port 8822"
+  grep -qE '^[[:space:]]*AuthorizedKeysFile([[:space:]].*)?[[:space:]]/etc/ssh/authorized_keys([[:space:]]|$)' "$o/etc/ssh/sshd_config" 2>/dev/null \
+    || echo "SSH keys read from /etc/ssh/authorized_keys"
+  if grep -qE '^[[:space:]]*AllowUsers' "$o/etc/ssh/sshd_config" 2>/dev/null; then
+    grep -qE '^[[:space:]]*AllowUsers([[:space:]].*)?[[:space:]]rewt([[:space:]]|$)' "$o/etc/ssh/sshd_config" || echo "SSH that lets rewt log in"
+  fi
+  found=no
+  for file in "$o/etc/sudoers" "$o"/etc/sudoers.d/*; do
+    grep -qE '^[[:space:]]*rewt[[:space:]]+ALL[[:space:]]*=[[:space:]]*\(ALL(:ALL)?\)[[:space:]]+ALL' "$file" 2>/dev/null && found=yes
+  done
+  [ "$found" = yes ] || echo "sudo for rewt"
+}
+
 other_status() {
   open_other ro || return $?
+  local missing
+  missing=$(other_mismatches)
+  [ -z "$missing" ] || { echo "Other slot: not supported, it lacks $(printf '%s' "$missing" | paste -sd ';' - | sed 's/;/, /g')."; return 2; }
   local masked=yes unit
   for unit in $MASKS; do [ "$(readlink "$OTHER_ROOT/etc/systemd/system/$unit")" = /dev/null ] || masked=no; done
   local walled=no
@@ -153,12 +175,23 @@ other_access() {
   case "$hash" in \$*) ;; *) echo "rewt has no usable password on this slot, so sudo would not work there. Refusing."; return 2 ;; esac
   open_other rw || return $?
   [ -n "$(rewt_hash "$OTHER_ROOT/etc/shadow")" ] || { echo "The other slot has no rewt user. Refusing."; return 2; }
+  local missing
+  missing=$(other_mismatches)
+  [ -z "$missing" ] || { echo "The other slot is not one this was checked on; it lacks $(printf '%s' "$missing" | paste -sd ';' - | sed 's/;/, /g'). Refusing."; return 2; }
   # A unit override that is not ours would be lost on undo, so leave such a slot alone.
   for unit in $MASKS; do
     [ ! -e "$OTHER_ROOT/etc/systemd/system/$unit" ] && [ ! -L "$OTHER_ROOT/etc/systemd/system/$unit" ] && continue
     [ "$(readlink "$OTHER_ROOT/etc/systemd/system/$unit")" = /dev/null ] \
       || { echo "The other slot already overrides $unit. Refusing."; return 2; }
   done
+  # A slot rewritten stock since the last save: the saved copies are the old image's, so save afresh.
+  if [ -e "$SAVED" ]; then
+    local stock=yes
+    for unit in $MASKS; do [ -L "$OTHER_ROOT/etc/systemd/system/$unit" ] && stock=no; done
+    for rules in iptables.rules ip6tables.rules; do grep -qxF "$FIREWALL_MARK" "$OTHER_ROOT/etc/iptables/$rules" 2>/dev/null && stock=no; done
+    [ "$(rewt_hash "$OTHER_ROOT/etc/shadow")" = "$hash" ] && stock=no
+    if [ "$stock" = yes ]; then rm -rf "$SAVED" || return 1; fi
+  fi
   # Saved once, so running this again never overwrites the stock originals. added-masks is written last.
   if [ ! -f "$SAVED/added-masks" ]; then
     mkdir -p "$SAVED" && chmod 700 "$SAVED" || return 1

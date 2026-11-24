@@ -46,19 +46,22 @@ export default function FeaturesSection() {
     target?.focus({ preventScroll: true });
   }, [hash, loaded]);
 
+  const showServerError = (error: unknown) => {
+    console.error(error);
+    const status = isAxiosError(error) ? error.response?.status : undefined;
+    // A 409 says an update, rollback or switch is running.
+    const message = isAxiosError(error) && status && (status === 409 || (status >= 500 && status < 600))
+      ? error.response?.data?.error : undefined;
+    setError(typeof message === 'string' && message.trim() ? message : 'Could not save this change. Try again.');
+  };
+
   const updateServices = (services: DeepPartial<Services>) => {
     setError(null);
     setIsUpdating(true);
 
     postServices(services)
       .then(() => refetchServices())
-      .catch((error) => {
-        console.error(error);
-        const status = isAxiosError(error) ? error.response?.status : undefined;
-        // A 409 says an update, rollback or switch is running.
-        const message = status && (status === 409 || (status >= 500 && status < 600)) ? error.response?.data?.error : undefined;
-        setError(typeof message === 'string' && message.trim() ? message : 'Could not save this change. Try again.');
-      })
+      .catch(showServerError)
       .finally(() => setIsUpdating(false));
   };
 
@@ -68,10 +71,7 @@ export default function FeaturesSection() {
 
     postSettings({ features })
       .then(() => refetchSettings())
-      .catch((error) => {
-        console.error(error);
-        setError('Could not save this change. Try again.');
-      })
+      .catch(showServerError)
       .finally(() => setIsUpdating(false));
   };
 
@@ -268,6 +268,16 @@ export default function FeaturesSection() {
             description="Fewer flash writes. A power cut can lose up to the last minute of sensor recordings and logs."
           />
         </Stack>
+      </Section>
+      <Section title="Rescue">
+        <ToggleRow
+          label="SSH access to the other boot slot"
+          disabled={ isUpdating || features?.otherSlotAccess === undefined }
+          checked={ features?.otherSlotAccess ?? false }
+          onChange={ (next) => updateFeature({ otherSlotAccess: next }) }
+          description={ 'If the hub ever starts its other boot slot, your SSH keys and rewt password work there, '
+            + 'its updater is off and it stays off the internet. Turning this off puts that slot back as it was.' }
+        />
       </Section>
       { rhythmsDialog === 'enable' && <EnableRhythmsDialog
         onClose={ () => setRhythmsDialog(undefined) }

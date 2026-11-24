@@ -300,8 +300,9 @@ The hub keeps a second copy of its system, the other boot slot, which stays
 stock: online, with Eight Sleep updates on, and with no way for you to log in
 over SSH. The install and every update mark the running slot good, and Boot
 rescue says whether it is, so the hub should not start the other slot on its
-own. If you want a way back in should the hub ever start the other slot, run
-this once as root (optional):
+own. If you want a way back in should the hub ever start the other slot,
+turn on Settings > Features > Rescue > SSH access to the other
+boot slot (optional), or run this once as root over SSH:
 
 ```bash
 bash /usr/local/lib/nightstand/live/scripts/boot_slot.sh other-access
@@ -311,13 +312,16 @@ It copies your SSH keys there so you can log in as `rewt` on port 8822, gives
 `rewt` the same password as on this slot so `sudo` works, switches off that
 slot's updater so it cannot overwrite Nightstand, and gives it a firewall that
 keeps it on your home network but off the internet. It changes nothing else
-there. If your Wi-Fi was set up by the Eight Sleep app, that system restarts
+there. It first checks that the other slot has the stock firewall service,
+updater, SSH setup and sudo rule it relies on, and changes nothing if one is
+different; this was checked on a Pod 5. If your Wi-Fi was set up by the Eight Sleep app, that system restarts
 itself every few minutes while it has no internet; SSH still works between
-restarts. It saves the three files it changes first, and `other-undo` puts them back;
-`other-status` shows the state. That slot makes new SSH host keys the first
-time it starts, so your SSH client will warn that the host key changed. Once
-logged in there as `rewt`, `sudo fw_setenv current_slot` with this slot's
-letter and a reboot bring Nightstand back.
+restarts. It saves the files it changes first, and `other-undo` puts them back;
+`other-status` shows the state. With the switch on, Nightstand prepares the
+slot again when it starts; turn the switch off to undo. That slot makes new
+SSH host keys the first time it starts, so your SSH client will warn that the
+host key changed. Once logged in there as `rewt`, `sudo fw_setenv
+current_slot` with this slot's letter and a reboot bring Nightstand back.
 
 ### 12. Set up internet access
 

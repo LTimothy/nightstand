@@ -56,11 +56,15 @@ is a hard fork; for the history of the projects it descends from, see
   [jalen-cheng](https://github.com/jalen-cheng)'s SevenSleep fork.
 - System status > Boot rescue now also says whether the running boot slot is
   marked good, and shows how many boots it has left when it is not.
-- Optional, run by hand as root: `boot_slot.sh other-access` prepares the
-  hub's other, stock boot slot as a way back in. It copies your SSH keys
-  there, gives `rewt` the same password, switches off that slot's updater,
-  and keeps it off the internet with a home-network-only firewall;
-  `other-undo` puts the files back. See the installation guide, step 11.
+- Optional: Settings > Features > Rescue > SSH access to the other
+  boot slot prepares the hub's other, stock boot slot as a way back in. It
+  copies your SSH keys there, gives `rewt` the same password, switches off
+  that slot's updater, and keeps it off the internet with a home-network-only
+  firewall. It saves the files it changes first, and turning the switch off
+  puts them back. It changes nothing on a stock slot that differs from the one
+  it was checked on. With the switch on, Nightstand prepares the slot again
+  when it starts. Over SSH, `boot_slot.sh other-access` and `other-undo` do the
+  same. See the installation guide, step 11.
 
 ## [3.11.0] - 2026-11-22
 

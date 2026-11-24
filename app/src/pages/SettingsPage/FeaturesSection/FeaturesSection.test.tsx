@@ -21,14 +21,14 @@ const onPod4 = () => server.use(http.get('*/deviceStatus', () => HttpResponse.js
 const switchNames = (region: HTMLElement) => within(region).getAllByRole('switch').map(control => control.getAttribute('aria-label'));
 
 describe('FeaturesSection', () => {
-  it('groups the switches into Everyday, Sleep tracking and Storage cards', async () => {
+  it('groups the switches into Everyday, Sleep tracking, Storage and Rescue cards', async () => {
     onPod4();
     renderWithProviders(<FeaturesSection />);
     const everyday = await screen.findByRole('region', { name: 'Everyday' });
     const tracking = screen.getByRole('region', { name: 'Sleep tracking' });
     const storage = screen.getByRole('region', { name: 'Storage' });
     expect(screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
-      .toEqual(['Everyday', 'Sleep tracking', 'Storage']);
+      .toEqual(['Everyday', 'Sleep tracking', 'Storage', 'Rescue']);
     expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm', 'Ring alarms when the side is off']);
     expect(within(everyday).getByRole('button', { name: 'Delete notes' })).toBeVisible();
     expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)',
@@ -143,6 +143,36 @@ describe('FeaturesSection', () => {
       + 'At most once an hour, never near an alarm.')).toBeVisible();
     await user.click(toggle);
     expect(posted).toEqual({ features: { coverAutoRestore: true } });
+  });
+
+  it('adds a last Rescue card on a Pod 5 with the other boot slot switch, off by default', async () => {
+    renderWithProviders(<FeaturesSection />);
+    const rescue = await screen.findByRole('region', { name: 'Rescue' });
+    expect(screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
+      .toEqual(['Everyday', 'Sleep tracking', 'Storage', 'Rescue']);
+    expect(switchNames(rescue)).toEqual(['SSH access to the other boot slot']);
+    expect(within(rescue).getByRole('switch', { name: 'SSH access to the other boot slot' })).not.toBeChecked();
+    expect(within(rescue).getByText('If the hub ever starts its other boot slot, your SSH keys and rewt password work there, '
+      + 'its updater is off and it stays off the internet. Turning this off puts that slot back as it was.')).toBeVisible();
+  });
+
+  // The script itself refuses a stock slot that differs, so the switch shows on every hub.
+  it.each(['Pod 3', 'Pod 4'])('shows the other boot slot switch on a %s hub', async model => {
+    server.use(http.get('*/deviceStatus', () => HttpResponse.json({ ...getDeviceStatus(), hubVersion: model })));
+    renderWithProviders(<FeaturesSection />);
+    const rescue = await screen.findByRole('region', { name: 'Rescue' });
+    expect(within(rescue).getByRole('switch', { name: 'SSH access to the other boot slot' })).toBeInTheDocument();
+  });
+
+  it('shows the server\'s reason and leaves the other boot slot switch off when preparing fails', async () => {
+    const message = 'Could not prepare the other boot slot. It needs an SSH key and a rewt password on this Pod. '
+      + 'Run boot_slot.sh other-status over SSH for details.';
+    server.use(http.post('*/api/settings', () => HttpResponse.json({ error: message }, { status: 500 })));
+    const { user } = renderWithProviders(<FeaturesSection />);
+    const toggle = await screen.findByRole('switch', { name: 'SSH access to the other boot slot' });
+    await user.click(toggle);
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(toggle).not.toBeChecked();
   });
 
   it.each(['Pod 3', 'Pod 4'])('hides the automatic cover service restart on a %s hub', async model => {
