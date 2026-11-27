@@ -33,8 +33,9 @@ let retimeJobs: () => void = () => {};
 
 async function loadHeartRatesFromDb(side: Side, from: Date, to: Date): Promise<HeartRateRow[]> {
   const { prisma } = await import('../../db/prisma.js');
+  const { personWhere } = await import('../../db/sideSwaps.js');
   const rows = await prisma.vitals.findMany({
-    where: { side, timestamp: { gte: Math.floor(from.getTime() / 1000), lte: Math.floor(to.getTime() / 1000) } },
+    where: { ...personWhere(side, 'timestamp'), timestamp: { gte: Math.floor(from.getTime() / 1000), lte: Math.floor(to.getTime() / 1000) } },
     orderBy: { timestamp: 'asc' },
     select: { timestamp: true, heart_rate: true },
   });

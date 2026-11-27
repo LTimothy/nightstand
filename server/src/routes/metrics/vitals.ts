@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { parseMetricsQuery, parseRowsQuery, ROWS_QUERY_ERROR } from './metricsQuery.js';
 import { prisma } from '../../db/prisma.js';
+import { personWhere } from '../../db/sideSwaps.js';
 import { biometricsV2Enabled } from '../../features/biometricsV2.js';
 import { legacyVitalsSelect } from './vitalsV2.js';
 import { readVitalsSummary, VitalsSummaryBusyError } from '../../db/vitalsSummary.js';
@@ -13,7 +14,7 @@ const DEFAULT_SUMMARY_SECONDS = 90 * 24 * 3600;
 router.get('/vitals', async (req: Request, res: Response) => {
   const range = parseRowsQuery(req.query);
   if (!range) return res.status(400).json({ error: ROWS_QUERY_ERROR });
-  const query: Prisma.vitalsWhereInput = { side: range.side, timestamp: { gte: range.start, lte: range.end } };
+  const query: Prisma.vitalsWhereInput = { ...personWhere(range.side, 'timestamp'), timestamp: { gte: range.start, lte: range.end } };
 
   // With new sleep tracking off the response carries only the columns every
   // release has sent; on, the newer estimate columns come too.

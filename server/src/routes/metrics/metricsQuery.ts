@@ -1,4 +1,5 @@
 import moment from 'moment-timezone';
+import { physicalSide } from '../../db/sideSwaps.js';
 
 export interface MetricsQuery {
   side?: 'left' | 'right';
@@ -62,5 +63,6 @@ export function parseNightQuery(query: Record<string, unknown>): NightQuery | nu
   const range = parseMetricsQuery(query);
   if (!range?.side || range.start === undefined || range.end === undefined) return null;
   if (range.end <= range.start || range.end - range.start > MAX_NIGHT_SECONDS) return null;
-  return { side: range.side, start: range.start, end: range.end };
+  // A night is read from the side it was recorded on.
+  return { side: physicalSide(range.side, range.start), start: range.start, end: range.end };
 }

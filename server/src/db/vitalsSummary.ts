@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { legacyMovement, loadMovement } from './movement.js';
 import type { VitalsSummary } from './vitalsRecordSchema.js';
 import type { MetricsQuery } from '../routes/metrics/metricsQuery.js';
+import { personWhere, physicalSide } from './sideSwaps.js';
 import { summarizeStages, toStageVitals, type StageSummary } from './sleepStageSummary.js';
 
 export type SummaryClient = Pick<Prisma.TransactionClient, 'vitals' | 'vitals_summaries' | 'movement'>;
@@ -112,13 +113,14 @@ export class VitalsSummaryBusyError extends Error {}
 
 export async function readVitalsSummary(client: SummaryClient, range: MetricsQuery, newerBreathing: boolean): Promise<VitalsSummary> {
   const loadSaved = () => client.vitals_summaries.findMany({
-    where: { side: range.side, entered_bed_at: { gte: range.start }, left_bed_at: { lte: range.end } },
+    where: { ...personWhere(range.side, 'entered_bed_at'), entered_bed_at: { gte: range.start }, left_bed_at: { lte: range.end } },
     orderBy: { entered_bed_at: 'asc' },
   });
+  const exactSide = range.side && range.start !== undefined ? physicalSide(range.side, range.start) : range.side;
   for (let attempt = 0; attempt < 3; attempt++) {
     const saved = await loadSaved();
     // Exact nights also retain the positive-only averages displayed by the app.
-    const exact = saved.find(row => row.side === range.side
+    const exact = saved.find(row => row.side === exactSide
       && row.entered_bed_at === range.start && row.left_bed_at === range.end);
     if (exact) {
       const stats = parseVitalsStats(exact.payload);
@@ -133,7 +135,7 @@ export async function readVitalsSummary(client: SummaryClient, range: MetricsQue
       if (!disjoint.some(kept => kept.side === row.side && kept.left_bed_at > row.entered_bed_at)) disjoint.push(row);
     }
     const stats = await collectVitalsStats(client, {
-      side: range.side, timestamp: { gte: range.start, lte: range.end },
+      ...personWhere(range.side, 'timestamp'), timestamp: { gte: range.start, lte: range.end },
       NOT: disjoint.map(row => ({ side: row.side, timestamp: { gte: row.entered_bed_at, lte: row.left_bed_at } })),
     });
     // Retention may commit between reads. Retry without taking SQLite's writer lock.
