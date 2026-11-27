@@ -1,16 +1,15 @@
 import { useState, type ReactNode } from 'react';
-import moment from 'moment-timezone';
 import {
-  Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItemButton, ListItemText, Stack, TextField,
+  Box, Button, Chip, List, ListItemButton, ListItemText, Stack,
 } from '@mui/material';
 import type { SideRhythms } from '@api/rhythmsSchema';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
 import { palette, radius } from '@design/tokens';
-import { BOTTOM_SHEET, INACTIVE } from '@design/sheetStyles';
+import { INACTIVE } from '@design/sheetStyles';
 import MultiDateSheet from './MultiDateSheet';
 import RhythmPicker from './RhythmPicker';
 import {
-  changeFor, dayLabel, effectiveRhythmId, formatDate, MAX_CHANGE_DAYS_AHEAD, NO_SLEEP, rhythmOptions, rhythmTimes,
+  changeFor, dayLabel, effectiveRhythmId, NO_SLEEP, rhythmOptions, rhythmTimes,
   sleepDetail, weekLabel, type DateChoice, type PickerOption,
 } from './rhythmsModel';
 
@@ -35,19 +34,9 @@ export default function ComingUp({
   const [pickerDate, setPickerDate] = useState<string>();
   const [severalOpen, setSeveralOpen] = useState(false);
   const [several, setSeveral] = useState<string[]>();
-  const [askDate, setAskDate] = useState(false);
-  const [laterDate, setLaterDate] = useState('');
-  const maxDate = moment(today, 'YYYY-MM-DD').add(MAX_CHANGE_DAYS_AHEAD, 'days').format('YYYY-MM-DD');
-  const laterValid = /^\d{4}-\d{2}-\d{2}$/.test(laterDate) && laterDate >= today && laterDate <= maxDate;
-  const laterError = !!laterDate && !laterValid;
-  const range = `Pick a date from today to ${formatDate(maxDate)}`;
   const now = Date.now();
   // A sleep still running from yesterday can change too; its picker says it is the one in progress.
   const runningDate = sleeps.find(sleep => Date.parse(sleep.start) <= now && now < Date.parse(sleep.end))?.date;
-  const closeLater = () => {
-    setAskDate(false);
-    setLaterDate('');
-  };
   const openPicker = (date: string) => {
     onSheetOpen?.();
     setPickerDate(date);
@@ -111,18 +100,10 @@ export default function ComingUp({
         onClick={ () => {
           if (disabled) return;
           onSheetOpen?.();
-          setAskDate(true);
-        } }
-        aria-disabled={ disabled || undefined }
-        sx={ { px: 0, ...INACTIVE } }>Change a later date</Button>
-      <Button
-        onClick={ () => {
-          if (disabled) return;
-          onSheetOpen?.();
           setSeveralOpen(true);
         } }
         aria-disabled={ disabled || undefined }
-        sx={ { px: 0, ...INACTIVE } }>Change several dates</Button>
+        sx={ { px: 0, ...INACTIVE } }>Change dates</Button>
     </Stack>
     { severalOpen && <MultiDateSheet
       sideData={ sideData }
@@ -130,10 +111,11 @@ export default function ComingUp({
       onClose={ () => setSeveralOpen(false) }
       onNext={ picked => {
         setSeveralOpen(false);
-        setSeveral(picked);
+        if (picked.length === 1) openPicker(picked[0]);
+        else setSeveral(picked);
       } }/> }
     { several && <RhythmPicker
-      title={ `${several.length} ${several.length === 1 ? 'date' : 'dates'}` }
+      title={ `${several.length} dates` }
       subtitle="For the sleeps that start on these dates"
       options={ [
         ...rhythmOptions(sideData),
@@ -144,36 +126,6 @@ export default function ComingUp({
         onChooseMany(several, choice);
         setSeveral(undefined);
       } }/> }
-    <Dialog
-      open={ askDate }
-      onClose={ closeLater }
-      aria-labelledby="later-date-title"
-      fullWidth
-      maxWidth="sm"
-      sx={ BOTTOM_SHEET }>
-      <DialogTitle id="later-date-title">Pick a date</DialogTitle>
-      <DialogContent>
-        <TextField
-          type="date"
-          label="Date"
-          value={ laterDate }
-          error={ laterError }
-          helperText={ laterError ? range : `Up to ${MAX_CHANGE_DAYS_AHEAD} days ahead` }
-          sx={ { mt: 1 } }
-          slotProps={ { inputLabel: { shrink: true }, htmlInput: { min: today, max: maxDate } } }
-          onChange={ event => setLaterDate(event.target.value) }/>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={ closeLater }>Cancel</Button>
-        <Button
-          variant="contained"
-          disabled={ !laterValid }
-          onClick={ () => {
-            closeLater();
-            setPickerDate(laterDate);
-          } }>Choose a rhythm</Button>
-      </DialogActions>
-    </Dialog>
     { pickerDate && <RhythmPicker
       title={ dayLabel(pickerDate, today) }
       subtitle={ pickerDate === runningDate ? 'For the sleep in progress now' : 'For the sleep that starts on this date' }

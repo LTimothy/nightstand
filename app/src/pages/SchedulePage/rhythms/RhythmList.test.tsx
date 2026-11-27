@@ -17,7 +17,7 @@ it('describes each rhythm and opens it', async () => {
     onUse={ () => {} }/>);
   const workday = screen.getByRole('button', { name: 'Edit Workday' });
   expect(workday).toHaveTextContent('10:30 PM to 6:45 AM · Smart Schedule');
-  expect(workday).toHaveTextContent('Used on Sun to Thu');
+  expect(workday).not.toHaveTextContent('Used on');
   await user.click(workday);
   expect(onOpen).toHaveBeenCalledWith('workday');
 });
@@ -52,7 +52,7 @@ it('draws each rhythm\'s chart inside its card and describes the card by its sen
     onNew={ () => {} }
     onUse={ () => {} }/>);
   const workday = screen.getByRole('button', { name: 'Edit Workday' });
-  expect(workday).toHaveAccessibleDescription('1 night so far.');
+  expect(workday).not.toHaveAccessibleDescription();
   expect(workday.querySelector('[data-schedule]')).not.toBeNull();
   const weekend = screen.getByRole('button', { name: 'Edit Weekend' });
   expect(weekend.querySelector('[data-schedule]')).not.toBeNull();

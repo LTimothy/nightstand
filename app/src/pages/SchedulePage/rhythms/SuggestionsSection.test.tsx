@@ -33,7 +33,6 @@ const show = (props: Partial<Parameters<typeof SuggestionsSection>[0]> = {}) => 
 it('explains the rule and gives one line per rhythm', () => {
   show();
   expect(screen.getByRole('region', { name: 'Suggestions' })).toBeInTheDocument();
-  expect(screen.getByText(/^Nightstand writes down changes you make by hand during a rhythm\./)).toBeInTheDocument();
   expect(screen.getByText('Workday: 3 of 5 nights so far')).toBeInTheDocument();
   expect(screen.getByText('Weekend: no changes in 14 nights')).toBeInTheDocument();
   expect(screen.getAllByRole('listitem')).toHaveLength(2);

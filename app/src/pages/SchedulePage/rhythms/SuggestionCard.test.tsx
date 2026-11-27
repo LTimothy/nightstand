@@ -21,7 +21,7 @@ it('names every setting Add writes, with the count behind each, and offers a rev
     counted={ 14 }
     format="fahrenheit"
     onReview={ onReview }/>);
-  expect(screen.getByText('Suggestion from your changes')).toBeInTheDocument();
+  expect(screen.getByText('Suggestion')).toBeInTheDocument();
   expect(screen.getByText('Off days: 79°F at 11:45 PM, back to 82°F at 4:00 AM')).toBeInTheDocument();
   expect(screen.getByText('From 9 of 14 nights')).toBeInTheDocument();
   const review = screen.getByRole('button', { name: 'Review suggestion for Off days' });

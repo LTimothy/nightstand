@@ -26,13 +26,13 @@ type Props = {
   onClose: () => void;
 };
 
-type RowProps = { night: NightLog; excluded: boolean; format: TemperatureFormat; timeZone: string; onToggle: () => void; note?: string };
+type RowProps = { night: NightLog; excluded: boolean; format: TemperatureFormat; timeZone: string; onToggle: () => void };
 
 const nightKey = (night: NightLog) => `${night.rhythmId}|${night.date}`;
 const subheading = { fontSize: 16, fontWeight: weight.heading } as const;
 
 // The date and the toggle share one 44 px line, so the changes below get the full width at 320 px.
-export function NightRow({ night, excluded, format, timeZone, onToggle, note }: RowProps) {
+function NightRow({ night, excluded, format, timeZone, onToggle }: RowProps) {
   const lines = noteLines(night, format, timeZone);
   if (night.tonight) {
     return <Box component="li" sx={ { py: 0.5 } }>
@@ -58,14 +58,13 @@ export function NightRow({ night, excluded, format, timeZone, onToggle, note }: 
         { LEAVE_OUT }
       </ToggleButton>
     </Box>
-    { note && <Typography variant="body2" sx={ { pl: 1.5, color: palette.status.warn } }>{ note }</Typography> }
     { lines.map((line, index) => <Typography key={ index } variant="body2" sx={ { pl: 1.5, color: 'inherit', overflowWrap: 'anywhere' } }>
       { line }
     </Typography>) }
   </Box>;
 }
 
-export function useNightExclude(side: 'left' | 'right') {
+function useNightExclude(side: 'left' | 'right') {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const inFlight = useRef(new Set<string>());

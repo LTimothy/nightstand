@@ -4,7 +4,7 @@ import type { ResolvedSleepResponse, SleepEvent } from '@api/rhythmsResponse';
 import { buildCurve } from '@api/smartCurve';
 import {
   alarmNightFromSleeps, currentSleep, isEveningSleep, nextSleepEvent, pauseOptionLabel, scheduledTemperatureFromSleeps, skipLine,
-  preWarms, skippedFromSleeps, sleepAt, warmStartBedtime, withArticle,
+  preWarms, skippedFromSleeps, sleepAt,
 } from './sleepEvents';
 
 const TZ = 'UTC';
@@ -85,31 +85,11 @@ const smartSleep = (baseLevel: number, warmStart: boolean, points?: unknown[]): 
   } as ResolvedSleepResponse;
 };
 
-it('names the bedtime for any pre-warm and flags warming only above neutral', () => {
-  expect(warmStartBedtime(smartSleep(0, true), TZ)?.toISOString()).toBe('2026-09-28T22:30:00.000Z');
-  expect(warmStartBedtime(smartSleep(-7, true), TZ)?.toISOString()).toBe('2026-09-28T22:30:00.000Z');
+it('flags warming only above neutral', () => {
   expect(preWarms(smartSleep(0, true))).toBe(true);
   expect(preWarms(smartSleep(-7, true))).toBe(false);
   expect(preWarms(undefined)).toBe(false);
-  expect(warmStartBedtime(smartSleep(0, false), TZ)?.toISOString()).toBe('2026-09-28T22:30:00.000Z');
   expect(preWarms(smartSleep(0, false))).toBe(false);
-  expect(warmStartBedtime(sleeps[0], TZ)).toBeUndefined();
-  expect(warmStartBedtime(undefined, TZ)).toBeUndefined();
-});
-
-it('reads a curve with an unknown phase without guessing', () => {
-  const known = smartSleep(0, true);
-  const points = known.smartCurve!.points;
-  const withUnknownLater = points.map((point, index) => index === 2 ? { ...point, phase: null } : point);
-  expect(warmStartBedtime(smartSleep(0, true, withUnknownLater), TZ)?.toISOString()).toBe('2026-09-28T22:30:00.000Z');
-  const withUnknownFirst = points.map((point, index) => index === 0 ? { ...point, phase: null } : point);
-  expect(warmStartBedtime(smartSleep(0, true, withUnknownFirst), TZ)).toBeUndefined();
-});
-
-it('words a bedtime with the right article', () => {
-  expect(withArticle('10:30 PM')).toBe('a 10:30 PM');
-  expect(withArticle('8:00 AM')).toBe('an 8:00 AM');
-  expect(withArticle('11:15 PM')).toBe('an 11:15 PM');
 });
 
 it('tells an evening sleep from a day sleep', () => {

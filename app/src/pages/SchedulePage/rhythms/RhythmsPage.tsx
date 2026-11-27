@@ -40,7 +40,7 @@ import {
 } from './rhythmsModel';
 import useTemperatureFormat from '@lib/useTemperatureFormat';
 
-const SHORT_COMING_UP = 7;
+const SHORT_COMING_UP = 3;
 const LONG_COMING_UP = 14;
 
 // `refused` explains an undo that would change nothing, such as a deleted rhythm whose place was taken.
@@ -368,6 +368,7 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
           disabled={ isUpdating }
           chart={ suggestionsOn && suggestions.data?.enabled ? {
             log: suggestions.data.log, timeZone, format, trackingOn: !!services?.biometrics?.enabled,
+            cardIds: cards.map(entry => entry.rhythmId),
           } : undefined }
           onOpen={ id => {
             setUndo(undefined);
@@ -400,7 +401,6 @@ export default function RhythmsPage({ db }: { db: RhythmsDB }) {
         rhythm={ reviewRhythm }
         side={ side }
         counted={ suggestions.data.nights[reviewEntry.rhythmId]?.counted ?? 0 }
-        log={ suggestions.data.log.filter(night => night.rhythmId === reviewEntry.rhythmId) }
         sleeps={ sleeps }
         today={ today }
         timeZone={ timeZone }

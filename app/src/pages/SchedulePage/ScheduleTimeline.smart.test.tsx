@@ -37,7 +37,6 @@ it('asks for the bedtime and says when the bed starts warming under Smart Schedu
   render(<ScheduleTimeline format="level" hideTemperatures bedtimeNote="The bed starts warming at 8:30 PM."/>);
   // The section is labelled "Bedtime" too, so ask for the input.
   expect(screen.getByLabelText('Bedtime', { selector: 'input' })).toHaveValue('21:00');
-  expect(screen.getByText('When you usually get into bed')).toBeInTheDocument();
   expect(screen.getByText('The bed starts warming at 8:30 PM.')).toBeInTheDocument();
   expect(screen.queryByLabelText('Turn on at')).not.toBeInTheDocument();
 });
@@ -56,7 +55,6 @@ it('keeps Wake up and an enabled Wake at when the rhythm has no alarm', () => {
   const wake = screen.getByRole('region', { name: 'Wake up' });
   expect(within(wake).getByLabelText('Wake at')).toHaveValue('07:00');
   expect(within(wake).getByLabelText('Wake at')).toBeEnabled();
-  expect(within(wake).getByText('The warm-up and turn off follow this time, with or without an alarm.')).toBeInTheDocument();
 });
 
 it('moves an alarm set at the old wake time and a following turn off with the wake time', () => {

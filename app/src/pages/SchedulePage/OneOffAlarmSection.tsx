@@ -118,9 +118,8 @@ export default function OneOffAlarmSection({ startEnabled = false, onSaved }: Pr
         One-time alarm saved for <bdi>{ name }</bdi>.
       </Typography> }
       <Typography variant="body2" color="text.secondary">
-        Rings once for <bdi>{ name }</bdi>, then turns off.
+        Rings once.
         { settings.features?.alarmsWhenOff ? '' : ' Rings only if this side is on at that time.' }
-        { ' ' }Saved separately from the schedule.
       </Typography>
 
       <ToggleRow

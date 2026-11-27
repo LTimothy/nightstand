@@ -6,11 +6,11 @@ import type { Block } from './rhythmOverlay';
 import { withRows } from './rhythmsModel';
 import {
   addLabel, cardEvidence, cardLine, cardRowLine, DONT_SUGGEST, dontSuggestLabel, evidenceSentence, hiddenForLine,
-  hiddenIntro, hiddenRow, MATCH_CURVE, MATCH_SCHEDULE, nearLine, nightsSoFar,
+  hiddenIntro, hiddenRow, MATCH_CURVE, MATCH_SCHEDULE, nearLine,
   provenance, reviewName, sheetHeading, sheetOverline, showAgainName, showNightsLabel, startsLine,
   typicalNightText, uncheckedNote, undoAddMessage, undoHideMessage, withChangeRows,
   clockOf, featureDescription, howSuggestionsWork, LEAVE_OUT_HINT, leaveOutName, nightLabel, noteLines, notesCountLine, notesTitle,
-  pairTemperatures, reasonLine, sectionCaption, whatCounts,
+  pairTemperatures, reasonLine, whatCounts,
   holdsLine, questionHeading, typicalLine, votesSentence,
 } from './suggestionsCopy';
 
@@ -64,8 +64,6 @@ describe('reason lines', () => {
 
 describe('rule texts', () => {
   it('reads the gate from the rules', () => {
-    expect(sectionCaption()).toBe('Nightstand writes down changes you make by hand during a rhythm. One you repeat on half or more of '
-      + 'your nights is suggested here after 5 nights.');
     expect(howSuggestionsWork()).toBe('A change you make the same way, within about 2 hours, on half or more of your last 14 nights is '
       + 'suggested after 5 nights. The suggested time and temperature are the middle of those nights. On a Smart Schedule rhythm it '
       + 'suggests the base, one step at a time. Nothing changes until you add it.');
@@ -74,14 +72,13 @@ describe('rule texts', () => {
       + 'or made during a pause, is not noted.');
     expect(whatCounts(true)).toBe(`${whatCounts(false)} On a Smart Schedule rhythm, only changes during the night count, of half a `
       + 'level or more.');
-    expect(featureDescription()).toBe('Notes your manual temperature changes during a rhythm and suggests the ones you repeat. '
+    expect(featureDescription()).toBe('Suggests the manual temperature changes you repeat during a rhythm. '
       + 'Notes stay on this Pod for 90 days, not in backups.');
   });
 
   it('follows a changed rule', () => {
     const rules = { ...SUGGESTION_RULES, MIN_NIGHTS: 7, MIN_SHARE: 0.6, NOTE_DAYS: 60, COALESCE_MIN: 5 };
     expect(howSuggestionsWork(rules)).toMatch(/on 6 in 10 or more of your last 14 nights is suggested after 7 nights\./);
-    expect(sectionCaption(rules)).toContain('after 7 nights');
     expect(whatCounts(false, rules)).toContain('undone within 5 minutes');
     expect(featureDescription(rules)).toContain('for 60 days');
   });
@@ -212,7 +209,7 @@ describe('the review sheet', () => {
   });
 
   it('says where the numbers come from and when the change starts', () => {
-    expect(provenance('Off days')).toBe('Middle values of those nights, rounded. Counted since you last changed Off days.');
+    expect(provenance).toBe('Rounded middle of those nights.');
     expect(startsLine({ kind: 'tonight' }, 'Off days')).toBe('Starts tonight.');
     expect(startsLine({ kind: 'today', at: '14:00' }, 'Night shift')).toBe('Starts at 2:00 PM today.');
     expect(startsLine({ kind: 'date', date: '2026-10-18' }, 'Off days')).toBe('Starts Sun, Oct 18.');
@@ -313,13 +310,11 @@ describe('the sentence under a rhythm card\'s chart', () => {
       .toBe('On half or more nights you turned it up to 83°F around 11:15 PM.');
   });
 
-  it('says when the nights match, and counts them before there are five', () => {
+  it('says when the nights match, ', () => {
     expect(typicalNightText([], '23:00', 'fahrenheit', false)).toBe(MATCH_SCHEDULE);
     expect(typicalNightText([], '23:00', 'fahrenheit', true)).toBe(MATCH_CURVE);
     expect(MATCH_SCHEDULE).toBe('Your nights match the schedule.');
     expect(MATCH_CURVE).toBe('Your nights match the curve.');
-    expect(nightsSoFar(2)).toBe('2 nights so far.');
-    expect(nightsSoFar(1)).toBe('1 night so far.');
   });
 });
 

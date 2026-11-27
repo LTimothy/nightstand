@@ -16,7 +16,7 @@ export const BLOCK_OPACITY = 0.22;
 // `farF` is the schedule's value farthest from `f` inside it. `turned` is how the typical night moved at `from`,
 // null when it held still and the schedule moved instead.
 export type Block = { from: number; to: number; f: number; farF: number; schedule: Step[]; turned: 'down' | 'up' | null };
-export type Overlay = { endMin: number; loF: number; hiF: number; plan: Step[]; nights: number; drawn: number; blocks: Block[] };
+export type Overlay = { endMin: number; loF: number; hiF: number; plan: Step[]; drawn: number; blocks: Block[] };
 type Args = { rhythm: Rhythm; log: NightLog[]; today: string; timeZone: string; trackingOn: boolean };
 type Night = { points: Step[]; end: number };
 
@@ -144,7 +144,7 @@ export function rhythmOverlay(args: Args): Overlay {
   const typical = blocks.map(block => block.f);
   // The schedule's values and RANGE_F either way, widened to the typical night where it is drawn.
   return {
-    endMin, plan, nights: counted.length, drawn: nights.length, blocks,
+    endMin, plan, drawn: nights.length, blocks,
     loF: Math.min(Math.min(...planned) - RANGE_F, ...typical),
     hiF: Math.max(Math.max(...planned) + RANGE_F, ...typical),
   };

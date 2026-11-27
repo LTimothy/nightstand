@@ -20,7 +20,7 @@ describe('OneOffAlarmSection', () => {
     const { user } = renderWithProviders(<OneOffAlarmSection />, { initialRoute: '/schedules' });
 
     // The section renders its heading once settings load.
-    expect(await screen.findByText(/Rings once for/)).toHaveTextContent('Rings once for Alex');
+    expect(await screen.findByText(/^Rings once\./)).toBeInTheDocument();
 
     await user.click(await screen.findByRole('switch', { name: 'Enable one-time alarm' }));
     fireEvent.change(screen.getByLabelText('Ring at'), { target: { value: '2099-01-02T07:30' } });
@@ -125,8 +125,8 @@ describe('Save while the alarm is off', () => {
 
 it('says it rings only if the side is on at that time', async () => {
   renderWithProviders(<OneOffAlarmSection/>);
-  expect(await screen.findByText(/Rings once for/)).toHaveTextContent(
-    'Rings once for Alex, then turns off. Rings only if this side is on at that time. Saved separately from the schedule.',
+  expect(await screen.findByText(/^Rings once\./)).toHaveTextContent(
+    'Rings once. Rings only if this side is on at that time.',
   );
 });
 
@@ -135,8 +135,7 @@ it('leaves out the side-on sentence while alarms ring with the side off', async 
   settings.features = { ...settings.features, alarmsWhenOff: true };
   server.use(http.get('*/settings', () => HttpResponse.json(settings)));
   renderWithProviders(<OneOffAlarmSection/>);
-  expect(await screen.findByText(/Rings once for/)).toHaveTextContent(
-    'Rings once for Alex, then turns off. Saved separately from the schedule.',
+  expect(await screen.findByText(/^Rings once\./)).toHaveTextContent(/^Rings once\.$/
   );
 });
 

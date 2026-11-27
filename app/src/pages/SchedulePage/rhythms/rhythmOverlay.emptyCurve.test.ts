@@ -26,6 +26,6 @@ describe('a Smart rhythm card with an empty curve', () => {
     });
     const overlay = () => rhythmOverlay({ rhythm: workday, log, today: '2026-10-12', timeZone: 'UTC', trackingOn: false });
     expect(overlay).not.toThrow();
-    expect(overlay()).toMatchObject({ plan: [], nights: 5, blocks: [] });
+    expect(overlay()).toMatchObject({ plan: [], blocks: [] });
   });
 });

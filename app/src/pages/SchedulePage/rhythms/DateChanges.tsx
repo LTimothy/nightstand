@@ -27,7 +27,7 @@ export default function DateChanges({ sideData, from, today, disabled, onChoose 
       endIcon={ <ExpandMore sx={ { transform: open ? 'rotate(180deg)' : undefined } }/> }
       onClick={ () => setOpen(value => !value) }
       sx={ { alignSelf: 'flex-start', px: 0, minHeight: 44 } }>
-      Date changes ({ changes.length })
+      Changed dates ({ changes.length })
     </Button>
     { open && <Box
       id={ listId }

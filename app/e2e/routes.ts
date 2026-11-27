@@ -73,8 +73,8 @@ export const SWEEP: SweepState[] = [
     name: 'several dates',
     path: '/schedules',
     open: async page => {
-      await press(page, 'Change several dates');
-      await shown(page, 'dialog', 'Change several dates');
+      await press(page, 'Change dates');
+      await shown(page, 'dialog', 'Change dates');
     },
   },
   {

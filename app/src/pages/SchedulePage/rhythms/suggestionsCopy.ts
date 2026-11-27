@@ -29,13 +29,11 @@ export const NIGHTS_HEADING = 'Your nights';
 export const WITH_CHANGE_HEADING = 'With this change';
 export const HIDDEN_HEADING = 'Hidden';
 export const SHOW_AGAIN = 'Show again';
-export const CARD_OVERLINE = 'Suggestion from your changes';
+export const CARD_OVERLINE = 'Suggestion';
 export const DONT_SUGGEST = "Don't suggest this";
 export const DONT_SUGGEST_CHECKED = "Don't suggest the checked";
 export const HIDE_ERROR = 'Could not hide this suggestion. Try again.';
 export const SHOW_AGAIN_ERROR = 'Could not show it again. Try again.';
-export const UNUSUAL = 'Unusual';
-export const THOSE_NIGHTS = 'Those nights';
 
 export const MATCH_SCHEDULE = 'Your nights match the schedule.';
 export const MATCH_CURVE = 'Your nights match the curve.';
@@ -62,12 +60,8 @@ export function pairTemperatures(fromF: number, toF: number, format: Temperature
 }
 
 export const featureDescription = (rules: SuggestionRules = SUGGESTION_RULES) =>
-  'Notes your manual temperature changes during a rhythm and suggests the ones you repeat. '
+  'Suggests the manual temperature changes you repeat during a rhythm. '
   + `Notes stay on this Pod for ${rules.NOTE_DAYS} days, not in backups.`;
-
-export const sectionCaption = (rules: SuggestionRules = SUGGESTION_RULES) =>
-  `Nightstand writes down changes you make by hand during a rhythm. One you repeat on ${atLeast(rules.MIN_SHARE)} of your nights `
-  + `is suggested here after ${rules.MIN_NIGHTS} nights.`;
 
 // The rest of the rule (how a suggestion stays, the near miss floor) is in docs/VALIDATION.md.
 export const howSuggestionsWork = (rules: SuggestionRules = SUGGESTION_RULES) =>
@@ -134,8 +128,6 @@ const warmth = (direction: 'down' | 'up') => (direction === 'down' ? 'cooler' : 
 const capitalized = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 const uncapitalized = (text: string) => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
 const joinAnd = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
-
-export const nightsSoFar = (nights: number) => `${count(nights, 'night')} so far.`;
 
 // The sentence under a rhythm card's chart: what the typical night did where it left the schedule, in time order.
 // A Smart rhythm's nights are tonight's curve with your hand changes, so you are the subject there too.
@@ -267,7 +259,7 @@ export function votesSentence(row: StepRow, counted: number, on: string, format:
   return `On ${row.supporting} of the last ${counted} nights you turned it ${row.direction} to about ${newValue(row, format)} ${when}.`;
 }
 
-export const provenance = (name: string) => `Middle values of those nights, rounded. Counted since you last changed ${name}.`;
+export const provenance = 'Rounded middle of those nights.';
 
 export function startsLine(start: SuggestionStart, name: string): string {
   if (start.kind === 'tonight') return 'Starts tonight.';

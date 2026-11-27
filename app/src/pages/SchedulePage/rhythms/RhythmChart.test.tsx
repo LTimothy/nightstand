@@ -17,13 +17,14 @@ const night = (date: string, changes: NightLog['changes'] = []): NightLog => ({
 const change = (date: string, hours: number, targetF: number, fromF = 82) =>
   ({ at: at(date, hours), fromF, targetF, plannedF: 82, held: false, source: 'api' as const });
 const dates = Array.from({ length: 6 }, (_, index) => `2026-10-0${index + 1}`);
-const draw = (log: NightLog[], format: 'fahrenheit' | 'level' = 'fahrenheit') => render(<RhythmChart
+const draw = (log: NightLog[], format: 'fahrenheit' | 'level' = 'fahrenheit', hasCard = false) => render(<RhythmChart
   rhythm={ offDays }
   log={ log }
   today="2026-10-12"
   timeZone="UTC"
   format={ format }
   trackingOn={ false }
+  hasCard={ hasCard }
   captionId="caption"/>);
 const path = (container: HTMLElement, selector: string) => container.querySelector(selector);
 
@@ -42,10 +43,10 @@ describe('the chart on a rhythm card', () => {
     expect(document.getElementById('caption')).toBeEmptyDOMElement();
   });
 
-  it('says only how many nights until five can be drawn, never that they match', () => {
+  it('says nothing until five nights can be drawn, never that they match', () => {
     const held = { ...night(dates[4]), sets: [{ at: at(dates[4], 8), temperatureF: null }] };
     draw([...dates.slice(0, 4).map(date => night(date)), held]);
-    expect(document.getElementById('caption')).toHaveTextContent(/^5 nights so far\.$/);
+    expect(document.getElementById('caption')).toBeEmptyDOMElement();
   });
 
   it('draws where a typical night differs as a tinted block with a dashed edge, its value inside, and says so', () => {
@@ -93,12 +94,17 @@ describe('the chart on a rhythm card', () => {
     expect(container.querySelectorAll('[data-block-label]')).toHaveLength(0);
   });
 
-  it('says the nights match when nothing differs, and counts them before there are five', () => {
+  it('says the nights match when nothing differs, and stays silent before there are five', () => {
     draw(dates.map(date => night(date)));
     expect(document.getElementById('caption')).toHaveTextContent('Your nights match the schedule.');
     expect(document.querySelectorAll('[data-block]')).toHaveLength(0);
     draw(dates.slice(0, 2).map(date => night(date, [change(date, 0.75, 79)])));
-    expect(screen.getByText('2 nights so far.')).toBeInTheDocument();
+    expect(screen.queryByText(/so far/)).not.toBeInTheDocument();
+  });
+
+  it('leaves the sentence to the suggestion card when one exists', () => {
+    draw(dates.map(date => night(date, [change(date, 0.75, 79)])), 'fahrenheit', true);
+    expect(document.getElementById('caption')).toBeEmptyDOMElement();
   });
 
   it('plots in display units, so a level label sits where its value is drawn', () => {

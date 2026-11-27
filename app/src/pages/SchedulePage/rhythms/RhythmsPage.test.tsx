@@ -38,8 +38,8 @@ it('shows the week, the next two weeks and the rhythms for the chosen side', asy
   expect(screen.getByRole('button', { name: 'Sun to Thu: Workday' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Fri and Sat: Weekend' })).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: 'Wed, Sep 30: No sleep scheduled, changed' })).toBeInTheDocument();
-  expect(screen.getAllByRole('button', { name: /^(Today|Tomorrow|Yesterday|\w{3}), / })).toHaveLength(7);
-  await user.click(screen.getByRole('button', { name: 'Show 7 more dates' }));
+  expect(screen.getAllByRole('button', { name: /^(Today|Tomorrow|Yesterday|\w{3}), / })).toHaveLength(3);
+  await user.click(screen.getByRole('button', { name: 'Show 11 more dates' }));
   expect(screen.getAllByRole('button', { name: /^(Today|Tomorrow|Yesterday|\w{3}), / })).toHaveLength(14);
   await user.click(screen.getByRole('radio', { name: /^Sam/ }));
   const nightShift = await screen.findByRole('button', { name: 'Edit Night shift' });
@@ -132,8 +132,8 @@ it('saves several dates in one write and undoes them together', async () => {
     posts.push(await request.clone().json());
   }));
   const { user } = renderWithProviders(<ScheduleTab/>);
-  await user.click(await screen.findByRole('button', { name: 'Change several dates' }));
-  const sheet = await screen.findByRole('dialog', { name: 'Change several dates' });
+  await user.click(await screen.findByRole('button', { name: 'Change dates' }));
+  const sheet = await screen.findByRole('dialog', { name: 'Change dates' });
   await user.click(within(sheet).getByRole('button', { name: 'Mon, Sep 28' }));
   await user.click(within(sheet).getByRole('button', { name: 'Tue, Sep 29' }));
   await user.click(within(sheet).getByRole('button', { name: 'Choose a rhythm' }));
@@ -359,7 +359,7 @@ it('draws the chart on the rhythm cards while suggestions are on, and nothing wh
   try {
     const { unmount } = renderWithProviders(<ScheduleTab/>);
     const workday = await screen.findByRole('button', { name: 'Edit Workday' });
-    await waitFor(() => expect(workday).toHaveAccessibleDescription('1 night so far.'));
+    await waitFor(() => expect(workday.querySelector('[data-schedule]')).not.toBeNull());
     unmount();
   } finally {
     noSuggestions();
@@ -439,7 +439,10 @@ it('says so and closes the sheet when leaving a night out ends the suggestion', 
   try {
     const { user } = renderWithProviders(<ScheduleTab/>);
     await user.click(await screen.findByRole('button', { name: 'Review suggestion for Weekend' }));
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Leave out, / }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^Show the \d+ nights/ }));
+    await user.click(await screen.findByRole('button', { name: /^Leave out, / }));
+    // The notes sheet stays open over the closed suggestion sheet.
+    await user.click(await screen.findByRole('button', { name: 'Close' }, { timeout: 3000 }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     const note = screen.getByText('No suggestion for Weekend without that night.').closest('[role="status"]') as HTMLElement;
     await user.click(within(note).getByRole('button', { name: 'Close' }));

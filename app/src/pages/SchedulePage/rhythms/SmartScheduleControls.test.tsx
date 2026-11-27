@@ -20,7 +20,7 @@ it('changes intensity, switches and the base level', async () => {
   await user.click(screen.getByRole('button', { name: 'Increase base temperature' }));
   expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_SMART, baseLevel: 1 });
   expect(screen.getByRole('switch', { name: 'Skip the warm-up if I get up early' })).toBeEnabled();
-  expect(screen.getByText(/Off for a sleep that is mostly during the day or shorter than 3 hours/)).toBeInTheDocument();
+  expect(screen.getByText('A little warmer when you get into bed.')).toBeInTheDocument();
 });
 
 it('needs Biometrics for up early and explains day sleep', () => {
@@ -73,7 +73,6 @@ it('chooses where the warm-up ends, or turns it off', async () => {
 
   const second = show({ ...DEFAULT_SMART, warmUp: true, warmUpTo: 'base' });
   group = screen.getByRole('group', { name: 'Warm-up before wake' });
-  expect(screen.getByText('Warms back to your base temperature by your wake time.')).toBeInTheDocument();
   await second.user.click(within(group).getByRole('button', { name: 'Above base' }));
   expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_SMART, warmUp: true });
   expect(onChange.mock.lastCall?.[0]).not.toHaveProperty('warmUpTo');

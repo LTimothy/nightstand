@@ -74,7 +74,7 @@ it('leads with the next start while the side is off', () => {
   fixture.on = '21:00';
   fixture.expiresAt = '2026-09-28T19:00:00Z';
   render(<MemoryRouter><UpcomingNight/></MemoryRouter>);
-  expect(screen.getByText('Turns on tonight at 9:00 PM, set to 82°F')).toBeInTheDocument();
+  expect(screen.getByText('Turns on tonight at 9:00 PM, 82°F')).toBeInTheDocument();
   expect(screen.queryByText(/Changes to/)).not.toBeInTheDocument();
 });
 
@@ -93,7 +93,7 @@ it('draws the card at the shared 12 px radius with its actions as 44 px lamp lin
   const { container } = render(<ThemeProvider theme={ theme }><MemoryRouter><UpcomingNight/></MemoryRouter></ThemeProvider>);
   expect(container.querySelector('[data-tonight]')).toHaveStyle({ borderRadius: '12px' });
   expect(screen.getByRole('link', { name: 'Edit schedule' })).toHaveStyle({ minHeight: '44px', fontSize: '15px' });
-  expect(screen.getByText('Turns on tonight at 9:00 PM, set to 82°F')).toHaveStyle({ fontSize: '15px' });
+  expect(screen.getByText('Turns on tonight at 9:00 PM, 82°F')).toHaveStyle({ fontSize: '15px' });
 });
 
 const smartNight = (level: number) => ({
@@ -113,10 +113,10 @@ const smartNight = (level: number) => ({
 it.each([
   [0, 'Turns on'],
   [1, 'Starts warming'],
-])('words a level %i pre-warm as "%s" and names the bedtime', (level, verb) => {
+])('words a level %i pre-warm as "%s"', (level, verb) => {
   vi.spyOn(moment, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00Z'));
   fixture.expiresAt = '2026-09-28T10:00:00Z';
   fixture.bed = { state: 'rhythms', sleeps: [smartNight(level)], names: { every: 'Every night' } };
   render(<MemoryRouter><UpcomingNight/></MemoryRouter>);
-  expect(screen.getByText(`${verb} tonight at 8:40 PM for a 9:00 PM bedtime, set to 83°F (Every night)`)).toBeInTheDocument();
+  expect(screen.getByText(`${verb} tonight at 8:40 PM, 83°F (Every night)`)).toBeInTheDocument();
 });

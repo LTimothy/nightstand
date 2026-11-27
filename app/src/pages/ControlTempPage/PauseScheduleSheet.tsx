@@ -112,10 +112,7 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
             value="tonight"
             control={ <Radio autoFocus={ choice === 'tonight' }/> }
             label={ <Box>
-              <Typography>{ onceLabel }</Typography>
-              <Typography variant="body2" color="text.secondary" sx={ { display: 'block' } }>
-                { `until ${formatPauseEnd(tonightEnd, timeZone, now)}` }
-              </Typography>
+              <Typography>{ `${onceLabel}, until ${formatPauseEnd(tonightEnd, timeZone, now)}` }</Typography>
               <Typography variant="body2" color="text.secondary" sx={ { display: 'block' } }>{ skipLine(skips(tonightEnd), now) }</Typography>
             </Box> }
             sx={ { minHeight: 44, alignItems: 'flex-start', '& .MuiRadio-root': { mt: -0.5 } } }/>
@@ -145,19 +142,13 @@ export default function PauseScheduleSheet({ open, onClose, onPaused }: {
             control={ <Radio autoFocus={ choice === 'resume' }/> }
             label={ <Box>
               <Typography>Until I resume</Typography>
-              <Typography variant="body2" color="text.secondary" sx={ { display: 'block' } }>
-                Skips every start and alarm until you resume
-              </Typography>
             </Box> }
             sx={ { minHeight: 44, alignItems: 'flex-start', '& .MuiRadio-root': { mt: -0.5 } } }/>
         </RadioGroup>
         { onNow && <Typography variant="body2" sx={ { mb: 1 } }><bdi>{ onNow }</bdi></Typography> }
         <Typography variant="body2" color="text.secondary">
-          Your saved schedule is kept.
-          { !settings[other].awayMode && <> <bdi>{ partner }</bdi>'s side is not affected.</> }
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={ { mt: 1 } }>
-          When the pause ends, an off side turns on if its night is in progress. Skipped alarms stay skipped.
+          { !settings[other].awayMode && <><bdi>{ partner }</bdi>'s side is not affected. </> }
+          Skipped alarms stay skipped. If the pause ends mid-sleep, the side turns on.
         </Typography>
         { error && <Alert severity="error" sx={ { mt: 2 } }>{ error }</Alert> }
       </DialogContent>

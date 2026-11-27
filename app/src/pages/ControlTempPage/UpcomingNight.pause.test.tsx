@@ -220,7 +220,7 @@ it.each(['legacy', 'rhythms'] as const)('does not predict back on schedule for a
 it('offers a pause next to tonight\'s plan', () => {
   renderCard();
   expect(screen.getByRole('button', { name: 'Pause schedule' })).toBeInTheDocument();
-  expect(screen.getByText('Turns on tonight at 9:00 PM, set to 82°F')).toBeInTheDocument();
+  expect(screen.getByText('Turns on tonight at 9:00 PM, 82°F')).toBeInTheDocument();
   expect(screen.getByText('Alarm row')).toBeInTheDocument();
 });
 
@@ -228,7 +228,7 @@ it('does not offer a pause when the server does not know about pausing', () => {
   fixture.serverKnowsPause = false;
   renderCard();
   expect(screen.queryByRole('button', { name: 'Pause schedule' })).not.toBeInTheDocument();
-  expect(screen.getByText('Turns on tonight at 9:00 PM, set to 82°F')).toBeInTheDocument();
+  expect(screen.getByText('Turns on tonight at 9:00 PM, 82°F')).toBeInTheDocument();
 });
 
 it('replaces tonight\'s plan with the paused notice', () => {

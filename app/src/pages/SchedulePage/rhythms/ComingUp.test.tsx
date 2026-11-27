@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
@@ -80,26 +80,21 @@ it('offers going back to the Week for a changed date', async () => {
   expect(onChoose).toHaveBeenCalledWith('2026-09-30', { kind: 'weekly' });
 });
 
-it('changes a later date up to 60 days ahead', async () => {
+it('opens the single-date picker when one date is chosen', async () => {
   const { user, onChoose } = renderComingUp(['2026-09-28']);
-  await user.click(screen.getByRole('button', { name: 'Change a later date' }));
-  const ask = await screen.findByRole('dialog', { name: 'Pick a date' });
-  const field = within(ask).getByLabelText('Date');
-  expect(field).toHaveAttribute('max', '2026-11-27');
-  fireEvent.change(field, { target: { value: '2026-11-28' } });
-  expect(within(ask).getByText('Pick a date from today to Fri, Nov 27')).toBeInTheDocument();
-  expect(within(ask).getByRole('button', { name: 'Choose a rhythm' })).toBeDisabled();
-  fireEvent.change(field, { target: { value: '2026-11-20' } });
-  await user.click(within(ask).getByRole('button', { name: 'Choose a rhythm' }));
-  const picker = await screen.findByRole('dialog', { name: 'Fri, Nov 20' });
+  await user.click(screen.getByRole('button', { name: 'Change dates' }));
+  const sheet = await screen.findByRole('dialog', { name: 'Change dates' });
+  await user.click(within(sheet).getByRole('button', { name: 'Tue, Sep 29' }));
+  await user.click(within(sheet).getByRole('button', { name: 'Choose a rhythm' }));
+  const picker = await screen.findByRole('dialog', { name: 'Tomorrow, Sep 29' });
   await user.click(within(picker).getByRole('button', { name: /^No sleep scheduled/ }));
-  expect(onChoose).toHaveBeenCalledWith('2026-11-20', { kind: 'none' });
+  expect(onChoose).toHaveBeenCalledWith('2026-09-29', { kind: 'none' });
 });
 
 it('gives several dates one rhythm', async () => {
   const { user, onChooseMany } = renderComingUp(['2026-09-28']);
-  await user.click(screen.getByRole('button', { name: 'Change several dates' }));
-  const sheet = await screen.findByRole('dialog', { name: 'Change several dates' });
+  await user.click(screen.getByRole('button', { name: 'Change dates' }));
+  const sheet = await screen.findByRole('dialog', { name: 'Change dates' });
   await user.click(within(sheet).getByRole('button', { name: 'Tue, Sep 29' }));
   await user.click(within(sheet).getByRole('button', { name: 'Wed, Sep 30, changed' }));
   await user.click(within(sheet).getByRole('button', { name: 'Choose a rhythm' }));
@@ -120,28 +115,10 @@ it('says a sleep that started yesterday is the one in progress', async () => {
   expect(onChoose).toHaveBeenCalledWith('2026-09-27', { kind: 'none' });
 });
 
-it('starts the later date empty after Cancel and after a pick', async () => {
-  const { user } = renderComingUp(['2026-09-28']);
-  await user.click(screen.getByRole('button', { name: 'Change a later date' }));
-  let ask = await screen.findByRole('dialog', { name: 'Pick a date' });
-  fireEvent.change(within(ask).getByLabelText('Date'), { target: { value: '2026-10-20' } });
-  await user.click(within(ask).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Pick a date' })).not.toBeInTheDocument());
-  await user.click(screen.getByRole('button', { name: 'Change a later date' }));
-  ask = await screen.findByRole('dialog', { name: 'Pick a date' });
-  expect(within(ask).getByLabelText('Date')).toHaveValue('');
-  fireEvent.change(within(ask).getByLabelText('Date'), { target: { value: '2026-10-20' } });
-  await user.click(within(ask).getByRole('button', { name: 'Choose a rhythm' }));
-  await user.click(within(await screen.findByRole('dialog', { name: 'Tue, Oct 20' })).getByRole('button', { name: /^Weekend/ }));
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  await user.click(screen.getByRole('button', { name: 'Change a later date' }));
-  expect(within(await screen.findByRole('dialog', { name: 'Pick a date' })).getByLabelText('Date')).toHaveValue('');
-});
-
 it('keeps the date buttons focusable while a save runs', async () => {
   const { user } = renderComingUp(['2026-09-28'], [], undefined, true);
-  for (const name of ['Change a later date', 'Change several dates']) {
-    const button = screen.getByRole('button', { name });
+  {
+    const button = screen.getByRole('button', { name: 'Change dates' });
     expect(button).toHaveAttribute('aria-disabled', 'true');
     expect(button).not.toBeDisabled();
     await user.click(button);

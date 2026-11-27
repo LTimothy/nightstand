@@ -318,5 +318,5 @@ test('an off side\'s Tonight card leads with when it starts', async ({ page }) =
   await page.getByRole('button', { name: 'Turn off' }).click();
   await expect(page.getByRole('button', { name: 'Turn on' })).toBeVisible();
   await expect(page.locator('[data-tonight]').getByText(/^Starts warming/))
-    .toHaveText(/^Starts warming tonight at 10:00\sPM for a 10:30\sPM bedtime, set to \+1 \(Workday\)$/);
+    .toHaveText(/^Starts warming tonight at 10:00\sPM, \+1 \(Workday\)$/);
 });

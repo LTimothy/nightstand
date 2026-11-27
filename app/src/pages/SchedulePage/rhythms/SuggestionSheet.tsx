@@ -1,18 +1,17 @@
 import { useCallback, useId, useState } from 'react';
 import { Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Typography } from '@mui/material';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
-import type { NightLog, Rhythm, RhythmSuggestion, SuggestionRow } from '@api/rhythmsSchema';
+import type { Rhythm, RhythmSuggestion, SuggestionRow } from '@api/rhythmsSchema';
 import type { TemperatureFormat } from '@lib/temperatureConversions';
 import { weight } from '@design/tokens';
-import { NightRow, useNightExclude } from './NotesSheet';
 import OverlayChart from './OverlayChart';
 import SmartCurveChart from './SmartCurveChart';
 import { suggestionStart, withRows } from './rhythmsModel';
 import { INACTIVE, SCROLL_SHEET } from '@design/sheetStyles';
-import { suggestionOverlay, unusualDates } from './suggestionOverlay';
+import { suggestionOverlay } from './suggestionOverlay';
 import {
   addLabel, dontSuggestLabel, evidenceSentence, holdsLine, NIGHTS_HEADING, provenance, questionHeading, sheetHeading, sheetOverline,
-  showNightsLabel, startsLine, THOSE_NIGHTS, typicalLine, uncheckedNote, UNUSUAL, votesSentence, WITH_CHANGE_HEADING, withChangeRows,
+  showNightsLabel, startsLine, typicalLine, uncheckedNote, votesSentence, WITH_CHANGE_HEADING, withChangeRows,
 } from './suggestionsCopy';
 
 type Props = {
@@ -20,7 +19,6 @@ type Props = {
   rhythm: Rhythm;
   side: 'left' | 'right';
   counted: number;
-  log: NightLog[];
   sleeps: ResolvedSleepResponse[];
   today: string;
   timeZone: string;
@@ -43,7 +41,7 @@ const subheading = { fontSize: 16, fontWeight: weight.heading, mt: 3, '&:first-c
 
 // One sheet per rhythm, for a card or a near miss. Add writes only the checked rows, in one save.
 export default function SuggestionSheet(props: Props) {
-  const { entry, rhythm, side, counted, log, sleeps, today, timeZone, format, trackingOn, error, busy, pausedUntil } = props;
+  const { entry, rhythm, side, counted, sleeps, today, timeZone, format, trackingOn, error, busy, pausedUntil } = props;
   const titleId = useId();
   const [checked, setChecked] = useState(() => entry.rows.map(() => true));
   // Starts on the heading, never on Add, so an Enter carried over from Review cannot add anything. A ref, since the
@@ -58,13 +56,6 @@ export default function SuggestionSheet(props: Props) {
   const step = entry.rows.length === 1 && entry.rows[0].kind === 'step' ? entry.rows[0] : null;
   // The votes sentence under the chart replaces the evidence sentence above it.
   const voted = step?.votes?.length ? step : null;
-  const exclude = useNightExclude(side);
-  // Supporting nights only, the far-off ones first so they are the first to check.
-  const unusual = rows.flatMap(row => (row.kind === 'base' ? [] : unusualDates(row.votes ?? [])));
-  const thoseNights = smart ? [] : [...new Set(rows.flatMap(row => row.supportingDates))]
-    .flatMap(date => log.filter(night => night.date === date && night.rhythmId === entry.rhythmId))
-    .sort((a, b) => Number(unusual.includes(b.date)) - Number(unusual.includes(a.date)) || a.date.localeCompare(b.date));
-  const listId = useId();
   const guard = (run: () => void, blocked = false) => () => {
     if (!busy && !blocked) run();
   };
@@ -125,19 +116,6 @@ export default function SuggestionSheet(props: Props) {
       { voted && <Typography variant="body2" sx={ { mt: 1 } }>
         { votesSentence(voted, counted, rhythm.night.power.on, format) }
       </Typography> }
-      { thoseNights.length > 0 && <>
-        <Typography component="h3" id={ listId } sx={ subheading }>{ THOSE_NIGHTS }</Typography>
-        <Box component="ul" aria-labelledby={ listId } sx={ { listStyle: 'none', p: 0, m: 0, mt: 0.5 } }>
-          { thoseNights.map(night => <NightRow
-            key={ night.date }
-            night={ night }
-            excluded={ exclude.excludedOf(night) }
-            format={ format }
-            timeZone={ timeZone }
-            note={ unusual.includes(night.date) ? UNUSUAL : undefined }
-            onToggle={ () => void exclude.toggle(night) }/>) }
-        </Box>
-      </> }
       <Button onClick={ props.onShowNights } sx={ { minHeight: 44, px: 0 } }>{ showNightsLabel(counted) }</Button>
       <Typography component="h3" sx={ subheading }>{ WITH_CHANGE_HEADING }</Typography>
       <Box component="ul" sx={ { listStyle: 'none', p: 0, m: 0, mt: 0.5 } }>
@@ -146,11 +124,11 @@ export default function SuggestionSheet(props: Props) {
         </Typography>) }
       </Box>
       <Typography variant="body2" color="text.secondary" sx={ { mt: 2 } }>
-        { step ? typicalLine(step, format) : provenance(rhythm.name) }
+        { step ? typicalLine(step, format) : provenance }
       </Typography>
       <Typography variant="body2" sx={ { mt: 1 } }>{ startsLine(start, rhythm.name) }</Typography>
     </DialogContent>
-    { (error || exclude.error) && <Alert severity="error" sx={ { mx: 2, mt: 1 } }>{ error || exclude.error }</Alert> }
+    { error && <Alert severity="error" sx={ { mx: 2, mt: 1 } }>{ error }</Alert> }
     <DialogActions sx={ { flexWrap: 'wrap', rowGap: 1 } }>
       <Button onClick={ props.onClose } sx={ { minHeight: 44 } }>Close</Button>
       <Button

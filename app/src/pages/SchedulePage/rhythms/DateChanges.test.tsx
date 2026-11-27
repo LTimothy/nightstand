@@ -21,7 +21,7 @@ function renderChanges(sideData: SideRhythms, disabled = false) {
 
 it('lists every change, including one made weeks ahead', async () => {
   const { user } = renderChanges(withChanges([{ date: '2026-09-30', rhythmId: null }, { date: '2026-11-05', rhythmId: 'weekend' }]));
-  const toggle = screen.getByRole('button', { name: 'Date changes (2)' });
+  const toggle = screen.getByRole('button', { name: 'Changed dates (2)' });
   expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await user.click(toggle);
   expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -33,19 +33,19 @@ it('lists every change, including one made weeks ahead', async () => {
 
 it('shows nothing when no date is changed', () => {
   renderChanges(withChanges([]));
-  expect(screen.queryByRole('button', { name: /^Date changes/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Changed dates/ })).not.toBeInTheDocument();
 });
 
 it('puts a date back to the Week', async () => {
   const { user, onChoose } = renderChanges(withChanges([{ date: '2026-09-30', rhythmId: null }]));
-  await user.click(screen.getByRole('button', { name: 'Date changes (1)' }));
+  await user.click(screen.getByRole('button', { name: 'Changed dates (1)' }));
   await user.click(screen.getByRole('button', { name: 'Wed, Sep 30: back to Week: Workday' }));
   expect(onChoose).toHaveBeenCalledWith('2026-09-30', { kind: 'weekly' });
 });
 
 it('keeps going back focusable but inactive while a save runs', async () => {
   const { user, onChoose } = renderChanges(withChanges([{ date: '2026-09-30', rhythmId: null }]), true);
-  await user.click(screen.getByRole('button', { name: 'Date changes (1)' }));
+  await user.click(screen.getByRole('button', { name: 'Changed dates (1)' }));
   const back = screen.getByRole('button', { name: /^Wed, Sep 30: back to/ });
   expect(back).toHaveAttribute('aria-disabled', 'true');
   expect(back).not.toBeDisabled();

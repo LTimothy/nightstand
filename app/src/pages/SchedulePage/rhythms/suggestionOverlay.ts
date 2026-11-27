@@ -1,6 +1,6 @@
 // The review chart as data: the saved schedule, where the suggestion changes it, and the nights that voted for it.
 // x is minutes after the rhythm's power-on, f is °F.
-import type { Rhythm, SuggestionRow, SuggestionVote } from '@api/rhythmsSchema';
+import type { Rhythm, SuggestionRow } from '@api/rhythmsSchema';
 import { nightMinutes } from '@api/rhythmWake';
 import { displayTemperature, type TemperatureFormat } from '@lib/temperatureConversions';
 import { planSteps, RANGE_F, type Step } from './nightsChartModel';
@@ -8,27 +8,7 @@ import type { ChartDot } from './OverlayChart';
 import type { Block } from './rhythmOverlay';
 import { withRows } from './rhythmsModel';
 
-// A night this far from the others' median is marked Unusual; it still counts.
-export const UNUSUAL_F = 5;
-const UNUSUAL_MIN_VOTES = 3;
-
 const valueAt = (steps: Step[], x: number) => steps.reduce((value, step) => (step.x <= x ? step.f : value), steps[0].f);
-
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = sorted.length >> 1;
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
-
-export function unusualDates(votes: SuggestionVote[]): string[] {
-  if (votes.length < UNUSUAL_MIN_VOTES) return [];
-  return votes
-    .filter((vote, index) => {
-      const others = votes.filter((_, other) => other !== index).map(v => v.temperatureF);
-      return Math.abs(vote.temperatureF - median(others)) > UNUSUAL_F;
-    })
-    .map(vote => vote.date);
-}
 
 // One block per run where the suggested schedule holds a value other than the saved one.
 function blocksBetween(plan: Step[], after: Step[], endMin: number): Block[] {

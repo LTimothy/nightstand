@@ -79,7 +79,7 @@ it('keeps the Bed page error when a power command fails under Rhythms', async ()
 
 it('fills the Tonight card and the alarm line from the resolved sleep', async () => {
   renderWithProviders(<UpcomingNight/>);
-  expect(await screen.findByText(/Turns on tonight at 10:30 PM, set to \+2/)).toBeInTheDocument();
+  expect(await screen.findByText(/Turns on tonight at 10:30 PM, \+2/)).toBeInTheDocument();
   expect(await screen.findByText('Alarm tomorrow at 6:30 AM')).toBeInTheDocument();
 });
 
@@ -135,18 +135,18 @@ it('skips tonight\'s alarms until the resolved sleep ends, the bound the server 
 it('says the bed starts warming only when the pre-warm is above neutral', async () => {
   bed.value = { state: 'rhythms', sleeps: [smartTonight({ base: 0, prewarm: 2 })] };
   const { unmount } = renderWithProviders(<UpcomingNight/>);
-  expect(await screen.findByText('Starts warming tonight at 10:00 PM for a 10:30 PM bedtime, set to +2')).toBeInTheDocument();
+  expect(await screen.findByText('Starts warming tonight at 10:00 PM, +2')).toBeInTheDocument();
   unmount();
 
   bed.value = { state: 'rhythms', sleeps: [smartTonight({ base: 0 })] };
   const second = renderWithProviders(<UpcomingNight/>);
-  expect(await screen.findByText('Turns on tonight at 10:30 PM, set to 0')).toBeInTheDocument();
+  expect(await screen.findByText('Turns on tonight at 10:30 PM, 0')).toBeInTheDocument();
   second.unmount();
 
   // A cool sleeper's pre-warm stays below neutral, so the bed only turns on early.
   bed.value = { state: 'rhythms', sleeps: [smartTonight({ base: -7, prewarm: -5 })] };
   renderWithProviders(<UpcomingNight/>);
-  expect(await screen.findByText('Turns on tonight at 10:00 PM for a 10:30 PM bedtime, set to \u22125')).toBeInTheDocument();
+  expect(await screen.findByText('Turns on tonight at 10:00 PM, \u22125')).toBeInTheDocument();
   expect(screen.queryByText(/Starts warming/)).not.toBeInTheDocument();
 });
 

@@ -4,7 +4,7 @@ import SectionHeading from '@components/SectionHeading';
 import type { useSuggestions } from '@api/rhythms';
 import type { Rhythm, SideRhythms, SuggestionsResponse } from '@api/rhythmsSchema';
 import {
-  AWAY_LINE, hiddenForLine, LOAD_ERROR, nearLine, reasonLine, REVIEW, reviewName, SECTION_TITLE, sectionCaption, SHOW_NIGHTS,
+  AWAY_LINE, hiddenForLine, LOAD_ERROR, nearLine, reasonLine, REVIEW, reviewName, SECTION_TITLE, SHOW_NIGHTS,
 } from './suggestionsCopy';
 
 type Props = {
@@ -47,7 +47,6 @@ export default function SuggestionsSection({ sideData, suggestions, away, onShow
     </Alert> }
     { data && <>
       { away && <Typography variant="body2">{ AWAY_LINE }</Typography> }
-      <Typography variant="body2" color="text.secondary">{ sectionCaption() }</Typography>
       { lines.length > 0 && <Box component="ul" sx={ { listStyle: 'none', p: 0, m: 0 } }>
         { lines.map(line => <Box component="li" key={ line.id } sx={ { display: 'flex', alignItems: 'center', gap: 1, minHeight: 44, py: 0 } }>
           <Typography variant="body2" sx={ { flex: 1, minWidth: 0, overflowWrap: 'anywhere' } }>{ line.text }</Typography>

@@ -17,12 +17,6 @@ type Props = {
 type SwitchKey = 'warmStart' | 'upEarly';
 type WarmUp = 'off' | 'base' | 'above';
 
-const WARM_UP_NOTE: Record<WarmUp, string> = {
-  off: 'The bed stays at its night temperature until you wake.',
-  base: 'Warms back to your base temperature by your wake time.',
-  above: 'Warms to a little above your base temperature by your wake time.',
-};
-
 export default function SmartScheduleControls({ value, onChange, format, trackingOn, daySleep, shortSleep = false, disabled }: Props) {
   const toggle = (key: SwitchKey, label: string, description: string, blocked = false) => <ToggleRow
     key={ key }
@@ -53,7 +47,6 @@ export default function SmartScheduleControls({ value, onChange, format, trackin
     <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 1 } }>
       <Box sx={ { minWidth: 0, flex: '1 1 140px' } }>
         <Typography>Base temperature</Typography>
-        <Typography variant="body2" color="text.secondary">Where you are comfortable. The curve stays within a few steps of it.</Typography>
       </Box>
       <LevelStepper
         level={ value.baseLevel }
@@ -77,7 +70,7 @@ export default function SmartScheduleControls({ value, onChange, format, trackin
     </Box>
     { toggle('warmStart', 'Warm start', daySleep ? 'Off for this rhythm, because its sleep is mostly during the day.'
       : shortSleep ? 'Off for this rhythm, because its sleep is shorter than 3 hours.'
-        : 'A little warmer when you get into bed. Off for a sleep that is mostly during the day or shorter than 3 hours.',
+        : 'A little warmer when you get into bed.',
     daySleep || shortSleep) }
     <Box>
       <Typography id="smart-warmup-label" sx={ { mb: 1 } }>Warm-up before wake</Typography>
@@ -92,10 +85,9 @@ export default function SmartScheduleControls({ value, onChange, format, trackin
         <ToggleButton value="base">To base</ToggleButton>
         <ToggleButton value="above">Above base</ToggleButton>
       </ToggleButtonGroup>
-      <Typography variant="body2" color="text.secondary" sx={ { mt: 1 } }>{ WARM_UP_NOTE[warmUp] }</Typography>
     </Box>
     { toggle('upEarly', 'Skip the warm-up if I get up early', trackingOn
-      ? 'If you are out of bed for 30 minutes in the last 90 before your wake time, the bed goes back to your base.'
+      ? 'Out of bed for 30 minutes near wake time: back to base.'
       : 'Needs Biometrics.', !trackingOn || !value.warmUp) }
   </Stack>;
 }

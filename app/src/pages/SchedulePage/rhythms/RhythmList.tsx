@@ -13,7 +13,7 @@ type Props = {
   today: string;
   disabled: boolean;
   // The notes behind each card's chart, while Suggestions from your changes is on.
-  chart?: { log: NightLog[]; timeZone: string; format: TemperatureFormat; trackingOn: boolean };
+  chart?: { log: NightLog[]; timeZone: string; format: TemperatureFormat; trackingOn: boolean; cardIds?: string[] };
   onOpen: (id: string) => void;
   onNew: () => void;
   onUse: (id: string) => void;
@@ -41,9 +41,9 @@ export default function RhythmList({ sideData, today, disabled, chart, onOpen, o
             <Box sx={ { minWidth: 0 } }>
               <Typography sx={ { fontSize: 16, fontWeight: weight.heading, overflowWrap: 'anywhere' } }><bdi>{ rhythm.name }</bdi></Typography>
               { detail !== rhythm.name && <Typography variant="body2" color="text.secondary">{ detail }</Typography> }
-              <Typography variant="caption" color="text.secondary" sx={ { display: 'block' } }>
+              { (unused || usage.dates.length > 0) && <Typography variant="caption" color="text.secondary" sx={ { display: 'block' } }>
                 { describeUsage(usage) }
-              </Typography>
+              </Typography> }
             </Box>
             <ChevronRight aria-hidden sx={ { color: 'text.secondary', flexShrink: 0 } }/>
           </Box>
@@ -54,6 +54,7 @@ export default function RhythmList({ sideData, today, disabled, chart, onOpen, o
             timeZone={ chart.timeZone }
             format={ chart.format }
             trackingOn={ chart.trackingOn }
+            hasCard={ chart.cardIds?.includes(rhythm.id) }
             captionId={ `${captionId}-${rhythm.id}` }/> }
         </ButtonBase>
         { unused && <Button

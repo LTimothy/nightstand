@@ -194,13 +194,6 @@ export default function RhythmEditor({
       action={ <Button onClick={ () => useScheduleStore.getState().updateSelectedSchedule({ power: { enabled: true } }) }>Turn on</Button> }>
       This rhythm's night is off.
     </Alert> }
-    <ScheduleTimeline
-      format={ format }
-      risePattern={ risePattern }
-      hideTemperatures={ mode === 'smart' }
-      bedtimeNote={ note }
-      wake={ { time: wake, onChange: setWake } }
-      getUp={ { on: smart.offWhenUp === true, tracking: trackingOn, onChange: on => setSmart(withOffWhenUp(smart, on)) } }/>
     <Box component="section" aria-labelledby="temperature-heading" sx={ { width: '100%', display: 'flex', flexDirection: 'column', gap: 1.5 } }>
       <SectionHeading id="temperature-heading">Temperature</SectionHeading>
       <ToggleButtonGroup
@@ -217,6 +210,15 @@ export default function RhythmEditor({
         <ToggleButton value="smart">Smart Schedule</ToggleButton>
         <ToggleButton value="manual">Set by hand</ToggleButton>
       </ToggleButtonGroup>
+    </Box>
+    <ScheduleTimeline
+      format={ format }
+      risePattern={ risePattern }
+      hideTemperatures={ mode === 'smart' }
+      bedtimeNote={ note }
+      wake={ { time: wake, onChange: setWake } }
+      getUp={ { on: smart.offWhenUp === true, tracking: trackingOn, onChange: on => setSmart(withOffWhenUp(smart, on)) } }/>
+    { (mode === 'smart' || night.power.enabled) && <Box sx={ { width: '100%', display: 'flex', flexDirection: 'column', gap: 1.5 } }>
       { night.power.enabled && <ErrorBoundary componentName="Rhythm chart">
         { mode === 'smart'
           ? <SmartCurveChart
@@ -245,7 +247,7 @@ export default function RhythmEditor({
         daySleep={ daySleep }
         shortSleep={ shortSleep }
         disabled={ isUpdating }/> }
-    </Box>
+    </Box> }
     { saveError && !showDraft && errorAlert }
     { original && <Button color="error" onClick={ () => setDeleteOpen(true) } disabled={ isUpdating } sx={ { alignSelf: 'flex-start', px: 0 } }>
       Delete rhythm

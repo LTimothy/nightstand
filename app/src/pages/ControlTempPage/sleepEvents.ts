@@ -66,21 +66,11 @@ export function sleepAt(sleeps: ResolvedSleepResponse[], at: Date) {
   return sleeps.find(sleep => Date.parse(sleep.start) <= at.getTime() && at.getTime() <= Date.parse(sleep.end));
 }
 
-// The bedtime of a Smart Schedule sleep that turns on early for a pre-warm, whatever its level.
-export function warmStartBedtime(sleep: ResolvedSleepResponse | undefined, timeZone: string): moment.Moment | undefined {
-  const curve = sleep?.smartCurve;
-  // A first point from a newer phase list is not known to be a pre-warm.
-  return sleep?.smart && curve?.points[0]?.phase === 'prewarm' ? moment.tz(curve.bedtime, timeZone) : undefined;
-}
-
 // Whether that pre-warm is above neutral; at neutral the early power-on is just "Turns on".
 export function preWarms(sleep: ResolvedSleepResponse | undefined): boolean {
   const first = sleep?.smart ? sleep.smartCurve?.points[0] : undefined;
   return !!first?.phase && warmsBeforeBedtime([{ at: new Date(first.at), level: first.level, phase: first.phase }]);
 }
-
-// "a 10:30 PM bedtime", "an 8:00 AM bedtime".
-export const withArticle = (time: string) => `${/^(8|11):/.test(time) ? 'an' : 'a'} ${time}`;
 
 export function isEveningSleep(sleep: ResolvedSleepResponse, timeZone: string): boolean {
   const hour = moment.tz(sleep.start, timeZone).hour();

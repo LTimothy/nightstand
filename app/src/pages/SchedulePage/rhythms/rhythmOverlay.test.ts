@@ -23,7 +23,7 @@ const overlay = (log: NightLog[]) => rhythmOverlay({ ...args, log });
 
 describe('the chart on a rhythm card', () => {
   it('draws the schedule in steps over the rhythm\'s own length', () => {
-    expect(overlay([])).toEqual({ endMin: 480, plan: [{ x: 0, f: 82 }, { x: 240, f: 79 }], nights: 0, drawn: 0, blocks: [], loF: 75, hiF: 86 });
+    expect(overlay([])).toEqual({ endMin: 480, plan: [{ x: 0, f: 82 }, { x: 240, f: 79 }], drawn: 0, blocks: [], loF: 75, hiF: 86 });
   });
 
   it('draws a change half or more of the nights made, and never a one-off', () => {
@@ -31,7 +31,7 @@ describe('the chart on a rhythm card', () => {
       ...dates.slice(0, 3).map(date => night(date, [change(date, 0.75, 79)])),
       night(dates[3], [change(dates[3], 2, 88)]), night(dates[4]), night(dates[5]),
     ];
-    expect(overlay(log)).toMatchObject({ nights: 6, loF: 75, hiF: 86, blocks: [
+    expect(overlay(log)).toMatchObject({ loF: 75, hiF: 86, blocks: [
       { from: 45, to: 240, f: 79, farF: 82, schedule: [{ x: 45, f: 82 }], turned: 'down' },
     ] });
     expect(overlay(log.slice(1)).blocks).toEqual([]);
@@ -49,10 +49,10 @@ describe('the chart on a rhythm card', () => {
 
   it('shows nothing of the nights under five, left out or under another plan', () => {
     const changed = dates.slice(0, 5).map(date => night(date, [change(date, 0.75, 79)]));
-    expect(overlay(changed)).toMatchObject({ nights: 5, blocks: [expect.objectContaining({ f: 79 })] });
-    expect(overlay([{ ...changed[0], excluded: true }, ...changed.slice(1)])).toMatchObject({ nights: 4, blocks: [] });
-    expect(overlay([{ ...changed[0], samePlan: false, plan: [] }, ...changed.slice(1)])).toMatchObject({ nights: 4, blocks: [] });
-    expect(overlay([{ ...changed[0], tonight: true }, ...changed.slice(1)])).toMatchObject({ nights: 4, blocks: [] });
+    expect(overlay(changed)).toMatchObject({ blocks: [expect.objectContaining({ f: 79 })] });
+    expect(overlay([{ ...changed[0], excluded: true }, ...changed.slice(1)])).toMatchObject({ blocks: [] });
+    expect(overlay([{ ...changed[0], samePlan: false, plan: [] }, ...changed.slice(1)])).toMatchObject({ blocks: [] });
+    expect(overlay([{ ...changed[0], tonight: true }, ...changed.slice(1)])).toMatchObject({ blocks: [] });
   });
 
   it('stops once fewer than half the nights are still running', () => {
@@ -74,12 +74,12 @@ describe('the chart on a rhythm card', () => {
 
   it('counts a night with nothing written to draw, as the notes do', () => {
     const held = night(dates[1], [], { sets: [{ at: at(dates[1], 8), temperatureF: null }] });
-    expect(overlay([night(dates[0]), held])).toMatchObject({ nights: 2, drawn: 1 });
+    expect(overlay([night(dates[0]), held])).toMatchObject({ drawn: 1 });
   });
 
   it('counts the last 14 nights and widens the range to the typical night', () => {
     const log = dates.map(date => night(date, [change(date, 2, 70)]));
-    expect(overlay(log)).toMatchObject({ nights: 14, loF: 70, hiF: 86, blocks: [expect.objectContaining({ from: 120, f: 70 })] });
+    expect(overlay(log)).toMatchObject({ loF: 70, hiF: 86, blocks: [expect.objectContaining({ from: 120, f: 70 })] });
   });
 
   it('starts a night written before the power-on at the power-on, with the value in force', () => {
@@ -110,11 +110,11 @@ describe('the chart on a rhythm card', () => {
 
   it('draws tonight\'s curve for a Smart rhythm and leaves out the curve\'s own writes', () => {
     const drawn = smart(dates.slice(0, 5).map(date => smartNight(date)));
-    expect(drawn).toMatchObject({ endMin: 495, nights: 5, drawn: 5, blocks: [] });
+    expect(drawn).toMatchObject({ endMin: 495, drawn: 5, blocks: [] });
     expect(drawn.plan[0].x).toBe(0);
     expect(drawn.plan.length).toBeGreaterThan(2);
     expect(typicalNightText(drawn.blocks, '22:30', 'fahrenheit', true)).toBe(MATCH_CURVE);
-    expect(smart([])).toMatchObject({ nights: 0, blocks: [] });
+    expect(smart([])).toMatchObject({ blocks: [] });
   });
 
   it('holds a cool-down change on a Smart night until the hold phase starts', () => {

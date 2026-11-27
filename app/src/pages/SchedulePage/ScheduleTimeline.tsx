@@ -244,8 +244,6 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
         <Box sx={ rowGrid }>
           <TextField
             label={ bedtimeNote === undefined ? 'Turn on at' : 'Bedtime' }
-            helperText={ bedtimeNote === undefined ? undefined : 'When you usually get into bed' }
-            slotProps={ { formHelperText: { sx: { whiteSpace: 'nowrap' } } } }
             type="time"
             size="small"
             value={ schedule.power.on }
@@ -323,9 +321,6 @@ export default function ScheduleTimeline({ format, risePattern = false, hideTemp
             } }/>
         </Box>
         { wakeInvalid && <Typography color="error" variant="body2">{ alarmHint(wake.time, 'this wake time') }</Typography> }
-        <Typography variant="body2" color="text.secondary" sx={ { display: 'block', mt: 0.5 } }>
-          The warm-up and turn off follow this time, with or without an alarm.
-        </Typography>
       </Paper> }
       { wake && !hideTemperatures && times.filter(isAfterWake).map(renderTemperature) }
       { orderedAlarms.flatMap(({ alarm, index }, alarmPosition) => {

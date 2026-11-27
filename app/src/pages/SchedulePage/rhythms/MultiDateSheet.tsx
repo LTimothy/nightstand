@@ -60,10 +60,10 @@ export default function MultiDateSheet({ sideData, today, onNext, onClose }: Pro
     fullWidth
     maxWidth="sm"
     sx={ BOTTOM_SHEET }>
-    <DialogTitle id={ titleId }>Change several dates</DialogTitle>
+    <DialogTitle id={ titleId }>Change dates</DialogTitle>
     <DialogContent sx={ { px: { xs: 0.75, sm: 3 } } }>
       <Typography variant="body2" color="text.secondary" sx={ { px: { xs: 2.25, sm: 0 }, mb: 1 } }>
-        Tap each date that should use the same rhythm, up to { MAX_CHANGE_DAYS_AHEAD } days ahead.
+        Tap dates, up to { MAX_CHANGE_DAYS_AHEAD } days ahead.
       </Typography>
       <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } }>
         <IconButton
@@ -125,9 +125,12 @@ export default function MultiDateSheet({ sideData, today, onNext, onClose }: Pro
       <Typography role="status" variant="body2" sx={ { px: { xs: 2.25, sm: 0 }, mt: 1 } }>
         { chosen.length ? `${chosen.length} ${chosen.length === 1 ? 'date' : 'dates'} selected` : 'No dates selected' }
       </Typography>
-      <Typography variant="caption" color="text.secondary" sx={ { display: 'block', px: { xs: 2.25, sm: 0 } } }>
+      { cells.some(date => date && changeFor(sideData, date)) && <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={ { display: 'block', px: { xs: 2.25, sm: 0 } } }>
         A dot marks a date that is already changed.
-      </Typography>
+      </Typography> }
     </DialogContent>
     <DialogActions>
       <Button onClick={ onClose }>Cancel</Button>

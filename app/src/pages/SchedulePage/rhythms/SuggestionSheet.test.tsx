@@ -1,12 +1,10 @@
 /* eslint-disable react/no-multi-comp */
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '@test/renderWithProviders';
-import { server } from '@test/setup';
 import type { ResolvedSleepResponse } from '@api/rhythmsResponse';
-import { DEFAULT_SMART, type NightLog, type SuggestionRow, type SuggestionVote } from '@api/rhythmsSchema';
+import { DEFAULT_SMART, type SuggestionRow, type SuggestionVote } from '@api/rhythmsSchema';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
 import SuggestionSheet, { sheetKey } from './SuggestionSheet';
 
@@ -30,10 +28,6 @@ const up: SuggestionRow = {
 const base: SuggestionRow = {
   kind: 'base', key: 'base:down', direction: 'down', supporting: 5, ...evidence, baseLevel: -1, currentBaseLevel: 0,
 };
-const log: NightLog[] = [{
-  date: '2026-10-15', rhythmId: 'off-days', tonight: false, excluded: false, plan: [{ offsetMin: 0, temperatureF: 82 }], endMin: 480,
-  changes: [],
-}];
 const sleep = (date: string, start: string, end: string) => ({ rhythmId: 'off-days', date, start, end }) as ResolvedSleepResponse;
 const sleeps = [
   sleep('2026-10-16', '2026-10-16T23:00:00Z', '2026-10-17T07:00:00Z'),
@@ -47,7 +41,6 @@ const open = (over: Partial<Parameters<typeof SuggestionSheet>[0]> = {}) => {
     rhythm={ offDays }
     side="right"
     counted={ 14 }
-    log={ log }
     sleeps={ sleeps }
     today="2026-10-17"
     timeZone="UTC"
@@ -166,7 +159,6 @@ it('starts the checks over when a refetch changes its rows', async () => {
         rhythm={ offDays }
         side="right"
         counted={ 14 }
-        log={ log }
         sleeps={ sleeps }
         today="2026-10-17"
         timeZone="UTC"
@@ -196,18 +188,9 @@ describe('one step with its nights', () => {
     kind: 'step', key: 'step:down', direction: 'down', supporting: 4, firstNight: '2026-10-24', lastNight: '2026-10-31',
     supportingDates: votes.map(v => v.date), votes, time: '22:15', temperatureF: 77, plannedF: 79,
   };
-  const at = (date: string, offsetMin: number) => new Date(Date.parse(`${date}T20:00:00Z`) + offsetMin * 60_000).toISOString();
-  const nights: NightLog[] = [
-    ...votes.map(({ date, offsetMin, temperatureF }) => ({
-      date, rhythmId: 'off-days', tonight: false, excluded: false, plan: [{ offsetMin: 0, temperatureF: 79 }], endMin: 660,
-      changes: [{ at: at(date, offsetMin), fromF: 79, targetF: temperatureF, plannedF: 79, held: false, source: 'api' as const }],
-    })),
-    { date: '2026-10-25', rhythmId: 'off-days', tonight: false, excluded: false, plan: [{ offsetMin: 0, temperatureF: 79 }], endMin: 660,
-      changes: [] },
-  ];
-  const single = () => open({ entry: { rhythmId: 'off-days', near: false, rows: [live] }, rhythm, counted: 8, log: nights });
+  const single = () => open({ entry: { rhythmId: 'off-days', near: false, rows: [live] }, rhythm, counted: 8 });
 
-  it('shows a single step as a question with the chart and its nights', () => {
+  it('shows a single step as a question with the chart', () => {
     single();
     const dialog = screen.getByRole('dialog', { name: 'Cool to 77°F at 10:15 PM?' });
     expect(within(dialog).getByText('Your schedule holds 79°F then.')).toBeInTheDocument();
@@ -218,56 +201,18 @@ describe('one step with its nights', () => {
       .toHaveAccessibleName('On 4 of the last 8 nights you turned it down to about 77°F between 10:09 PM and 11:57 PM.');
     expect(dialog.querySelectorAll('[data-dot][data-edge="bottom"]')).toHaveLength(1);
     expect(dialog.querySelectorAll('[data-dot]')).toHaveLength(4);
-    const list = within(dialog).getByRole('list', { name: 'Those nights' });
-    const rows = within(list).getAllByRole('listitem');
-    expect(rows).toHaveLength(4);
-    expect(rows[0]).toHaveTextContent('Mon, Oct 26');
-    // Under the date, before the night's changes, so a busy night cannot push it out of view.
-    expect(rows[0].textContent).toMatch(/^Mon, Oct 26Leave outUnusual/);
-    expect(within(rows[1]).queryByText('Unusual')).not.toBeInTheDocument();
-    rows.forEach(row => expect(within(row).getByRole('button', { name: /^Leave out, / })).toBeInTheDocument());
-  });
-
-  it('leaves a night out from the sheet', async () => {
-    const posted: unknown[] = [];
-    server.use(http.post('*/rhythms/suggestions/exclude', async ({ request }) => {
-      posted.push(await request.json());
-      return new HttpResponse(null, { status: 204 });
-    }));
-    const { user, queryClient } = single();
-    const refetch = vi.spyOn(queryClient, 'invalidateQueries');
-    await user.click(screen.getByRole('button', { name: 'Leave out, Mon, Oct 26' }));
-    await waitFor(() => expect(posted).toEqual([{ side: 'right', rhythmId: 'off-days', date: '2026-10-26', excluded: true }]));
-    await waitFor(() => expect(refetch).toHaveBeenCalledWith({ queryKey: ['useSuggestions'] }));
   });
 
   it('keeps the smart sheet as it was', () => {
     open({ entry: { rhythmId: 'workday', near: true, rows: [base] }, rhythm: workday, side: 'left', counted: 12, sleeps: [] });
     expect(screen.getByRole('dialog', { name: 'Base one step cooler' })).toBeInTheDocument();
     expect(screen.getByRole('figure').getAttribute('aria-label')).toMatch(/^Smart Schedule preview\./);
-    expect(screen.queryByRole('list', { name: 'Those nights' })).not.toBeInTheDocument();
   });
 
-  it('draws two rows on the card chart and lists their nights', () => {
+  it('draws two rows on the card chart', () => {
     open();
     expect(screen.getByRole('dialog', { name: 'Cooler around 11:45 PM, warmer around 5:00 AM' })).toBeInTheDocument();
     expect(document.querySelectorAll('[data-block]').length).toBeGreaterThan(0);
-    const list = screen.getByRole('list', { name: 'Those nights' });
-    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
-    expect(within(list).getByRole('button', { name: 'Leave out, Thu, Oct 15' })).toBeInTheDocument();
-  });
-
-  it('lists only the checked rows\' nights', async () => {
-    const night = (date: string): NightLog => ({ ...log[0], date });
-    const rows = [{ ...down, supportingDates: ['2026-10-15'] }, { ...up, supportingDates: ['2026-10-14'] }];
-    const { user } = open({
-      entry: { rhythmId: 'off-days', near: false, rows },
-      log: [night('2026-10-14'), night('2026-10-15')],
-    });
-    expect(within(screen.getByRole('list', { name: 'Those nights' })).getAllByRole('listitem')).toHaveLength(2);
-    await user.click(screen.getByRole('checkbox', { name: /^7 of 14 nights/ }));
-    const list = screen.getByRole('list', { name: 'Those nights' });
-    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
-    expect(within(list).getByRole('button', { name: 'Leave out, Thu, Oct 15' })).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Those nights' })).not.toBeInTheDocument();
   });
 });

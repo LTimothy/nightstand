@@ -102,23 +102,23 @@ test('a date change is marked and can go back to Week', async ({ page }) => {
 
 test('a change past Coming up is listed and can be taken back', async ({ page }) => {
   await open(page, '/schedules');
-  await page.getByRole('button', { name: 'Change a later date' }).click();
-  const sheet = page.getByRole('dialog', { name: 'Pick a date' });
-  await sheet.getByLabel('Date').fill('2026-12-31');
-  await expect(sheet.getByText('Pick a date from today to Fri, Nov 27')).toBeVisible();
-  await sheet.getByLabel('Date').fill('2026-11-05');
+  await page.getByRole('button', { name: 'Change dates' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Change dates' });
+  await sheet.getByRole('button', { name: 'Next month' }).click();
+  await sheet.getByRole('button', { name: 'Next month' }).click();
+  await sheet.getByRole('button', { name: 'Thu, Nov 5', exact: true }).click();
   await sheet.getByRole('button', { name: 'Choose a rhythm' }).click();
   await page.getByRole('dialog', { name: 'Thu, Nov 5' }).getByRole('button', { name: 'No sleep scheduled' }).click();
-  await page.getByRole('button', { name: 'Date changes (2)' }).click();
+  await page.getByRole('button', { name: 'Changed dates (2)' }).click();
   await page.getByRole('button', { name: 'Thu, Nov 5: back to Week: Workday' }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'Thu, Nov 5 is back to Week: Workday' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Date changes (1)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Changed dates (1)' })).toBeVisible();
 });
 
 test('several dates take one rhythm in one save with one undo', async ({ page }) => {
   await open(page, '/schedules');
-  await page.getByRole('button', { name: 'Change several dates' }).click();
-  const calendar = page.getByRole('dialog', { name: 'Change several dates' });
+  await page.getByRole('button', { name: 'Change dates' }).click();
+  const calendar = page.getByRole('dialog', { name: 'Change dates' });
   await calendar.getByRole('button', { name: 'Tue, Sep 29', exact: true }).click();
   // Arrow keys move between dates; Space picks the focused one.
   await calendar.getByRole('button', { name: 'Tue, Sep 29', exact: true }).press('ArrowRight');
@@ -182,10 +182,10 @@ test('a Smart Schedule rhythm shows its controls and a preview', async ({ page }
   await expect(page.getByRole('region', { name: 'Bedtime' }).getByLabel('Bedtime', { exact: true })).toHaveValue('22:30');
   await expect(page.getByText('The bed starts warming at 10:00 PM.')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Through the night' })).toHaveCount(0);
-  // The times come before the temperature controls.
+  // The temperature controls come before the times.
   const wakeBox = await page.getByRole('region', { name: 'Wake up' }).boundingBox();
   const temperatureBox = await page.getByRole('region', { name: 'Temperature' }).boundingBox();
-  expect(wakeBox!.y).toBeLessThan(temperatureBox!.y);
+  expect(temperatureBox!.y).toBeLessThan(wakeBox!.y);
   // Turning the alarm off keeps the wake time and the warm-up.
   await page.getByRole('switch', { name: 'Enable alarm 1' }).click();
   await expect(page.getByRole('heading', { name: 'Wake up', exact: true })).toBeVisible();
@@ -269,7 +269,7 @@ test('an overlapping change names the days and shows above the draft bar', async
 test('Bed reads the resolved sleep while Rhythms is on', async ({ page }) => {
   await open(page, '/');
   // Workday is a Smart Schedule rhythm with a 10:30 PM bedtime, so the bed powers on for the pre-warm at 10:00 PM.
-  await expect(page.getByText(/^Starts warming tonight at 10:00 PM for a 10:30 PM bedtime/)).toBeVisible();
+  await expect(page.getByText(/^Starts warming tonight at 10:00 PM/)).toBeVisible();
   await expect(page.getByText('Alarm tomorrow at 6:30 AM')).toBeVisible();
   await page.getByRole('button', { name: 'Pause schedule' }).click();
   await expect(page.getByRole('radio', { name: /^Tonight only.*Skips: 10:00 PM start, temperature changes, 6:30 AM alarm/ })).toBeChecked();
@@ -284,14 +284,14 @@ test('a day sleep is this sleep on Bed and in the pause sheet', async ({ page })
   await expect(page.getByRole('heading', { name: 'This sleep' })).toBeVisible();
   await expect(page.getByText(/^Warm-up starts at 2:50 PM for your 3:15 PM wake-up$/)).toBeVisible();
   await page.getByRole('button', { name: 'Pause schedule' }).click();
-  await expect(page.getByRole('radio', { name: /^This sleep only\s*until 3:30 PM today/ })).toBeChecked();
+  await expect(page.getByRole('radio', { name: /^This sleep only, until 3:30 PM today/ })).toBeChecked();
   await expect(page.getByText(/^Sam's side is on now and stays/)).toBeVisible();
 });
 
 test('a Smart Schedule sleep without a warm start says turns on', async ({ page }) => {
   await open(page, '/', new Date('2026-09-29T05:00:00Z'));
   await page.getByRole('radiogroup', { name: 'Bed side' }).getByRole('radio', { name: /^Sam/ }).click();
-  await expect(page.getByText(/^Turns on tomorrow at 7:40 AM for an 8:00 AM bedtime, set to/)).toBeVisible();
+  await expect(page.getByText(/^Turns on tomorrow at 7:40 AM, /)).toBeVisible();
 });
 
 test('turning Rhythms off previews the handoff and brings back the weekly schedule', async ({ page }) => {
@@ -352,7 +352,7 @@ test('the Rhythms screen and editor fit 320px without sideways scrolling', async
   await open(page, '/schedules');
   await expect(page.getByRole('heading', { name: 'Coming up', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
-  await page.getByRole('button', { name: 'Change several dates' }).click();
+  await page.getByRole('button', { name: 'Change dates' }).click();
   await expect(page.getByRole('button', { name: 'Tue, Sep 29', exact: true })).toBeVisible();
   const cell = await page.getByRole('button', { name: 'Tue, Sep 29', exact: true }).boundingBox();
   expect(cell!.width).toBeGreaterThanOrEqual(44);

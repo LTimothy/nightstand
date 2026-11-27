@@ -51,9 +51,8 @@ const SWEEP: Screen[] = [
     opens: [
       clickThenDialog('Sun to Thu: Workday'),
       clickThenDialog(/^Today, .*: /),
-      clickThenDialog('Change several dates'),
-      clickThenDialog('Change a later date'),
-      click('Date changes (1)'),
+      clickThenDialog('Change dates'),
+      click('Changed dates (1)'),
       click('New rhythm'),
       click('Add one-time alarm'),
       editRhythm,

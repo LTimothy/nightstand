@@ -143,21 +143,21 @@ export function listMockSleeps(side: Side, from: Date, to: Date) {
 }
 
 // The demo has no controller and no presence stream, so it acts as if presence
-// were fresh: only a "When I get up" sleep is live, to say when it turns off at
+// were fresh: any running sleep is live, and a "When I get up" one says when it turns off at
 // the latest. The demo has no daily restart.
 export function mockLive(side: Side, now = new Date()): RhythmsLive | null {
   const day = 24 * 60 * 60 * 1000;
   const sleeps = listMockSleeps(side, new Date(now.getTime() - day), new Date(now.getTime() + 2 * day));
   const index = sleeps.findIndex(sleep => Date.parse(sleep.start) <= now.getTime() && now.getTime() < Date.parse(sleep.end));
   const sleep = sleeps[index];
-  if (!sleep?.offWhenUp) return null;
+  if (!sleep) return null;
   const next = sleeps.slice(index + 1).find(item => Date.parse(item.start) >= Date.parse(sleep.end));
   const by = latestOff({ setOff: new Date(sleep.end), nextStart: next ? new Date(next.start) : null });
   const points = (sleep.smartCurve?.points ?? []).flatMap(({ at, level, phase }) => (phase ? [{ at: new Date(at), level, phase }] : []));
   return {
     side, date: sleep.date, phase: points.length ? phaseAt(points, now) : null, waiting: false,
     coolStart: sleep.smartCurve?.coolStart ?? sleep.start,
-    hold: null, baseSince: null, nextChange: null, offWhenUp: { by: by.toISOString() },
+    hold: null, baseSince: null, nextChange: null, offWhenUp: sleep.offWhenUp ? { by: by.toISOString() } : null,
   };
 }
 

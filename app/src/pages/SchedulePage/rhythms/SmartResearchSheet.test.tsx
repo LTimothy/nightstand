@@ -16,6 +16,7 @@ it('lists what each study tested, with links, and ends with the medical line', a
   expect(dialog).toHaveTextContent(
     'Comfortable when you lie down, a little cooler once you have settled in bed, and warming gently before your wake time');
   expect(within(dialog).getByRole('heading', { name: 'Once you have settled in' })).toBeInTheDocument();
+  expect(within(dialog).getByText(/In a shared bed it can mistake the other sleeper for you/)).toBeInTheDocument();
   expect(dialog).toHaveTextContent(
     'In one lab study, a mattress that drew heat away during sleep was linked with a little more deep sleep and '
     + "a slightly lower heart rate. The Pod's curve has not been tested for this.");

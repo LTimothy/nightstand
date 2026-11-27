@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SuggestionRow, SuggestionVote } from '@api/rhythmsSchema';
 import { createDemoRhythms } from '../../../mocks/rhythmsMock';
-import { suggestionOverlay, unusualDates } from './suggestionOverlay';
+import { suggestionOverlay } from './suggestionOverlay';
 
 const vote = (date: string, offsetMin: number, temperatureF: number): SuggestionVote => ({ date, offsetMin, temperatureF });
 const votes = [vote('2026-10-24', 237, 78), vote('2026-10-26', 129, 65), vote('2026-10-27', 135, 76), vote('2026-10-31', 185, 77)];
@@ -12,15 +12,6 @@ rhythm.night.temperatures = { '02:00': 79, '03:00': 80, '04:00': 81 };
 const row = (over: Partial<Extract<SuggestionRow, { kind: 'step' }>> = {}): SuggestionRow => ({
   kind: 'step', key: 'k', direction: 'down', supporting: 4, firstNight: '2026-10-24', lastNight: '2026-10-31',
   supportingDates: votes.map(v => v.date), votes, time: '22:15', temperatureF: 77, plannedF: 79, ...over,
-});
-
-describe('unusualDates', () => {
-  it('marks the night far from the others', () => expect(unusualDates(votes)).toEqual(['2026-10-26']));
-  it('marks none without that night', () => expect(unusualDates(votes.filter(v => v.date !== '2026-10-26'))).toEqual([]));
-  it('needs three votes', () => expect(unusualDates(votes.slice(0, 2))).toEqual([]));
-  it('does not mark exactly 5°F off', () => {
-    expect(unusualDates([vote('a', 0, 80), vote('b', 0, 80), vote('c', 0, 75)])).toEqual([]);
-  });
 });
 
 describe('suggestionOverlay', () => {

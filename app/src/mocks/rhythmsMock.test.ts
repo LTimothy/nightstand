@@ -64,7 +64,7 @@ it('runs a side\'s firmware timer until its next scheduled turn-off', () => {
   expect(scheduledSecondsRemaining('left', MONDAY_NOON)).toBe((Date.parse('2026-09-29T14:00:00Z') - MONDAY_NOON.getTime()) / 1000);
 });
 
-it('serves a live "When I get up" sleep with its latest off, and nothing for other sleeps', () => {
+it('serves any running sleep as live, with a latest off only for "When I get up", and nothing when none runs', () => {
   const db = createDemoRhythms(new Date('2026-09-28T19:00:00Z'));
   db.left.rhythms.workday.smart = { ...db.left.rhythms.workday.smart, offWhenUp: true };
   resetMockRhythms(db, true);
@@ -74,6 +74,9 @@ it('serves a live "When I get up" sleep with its latest off, and nothing for oth
     expect(live?.date).toBe('2026-09-28');
     expect(live?.offWhenUp?.by).toBe('2026-09-29T16:45:00.000Z');
     expect(mockLive('right', new Date('2026-09-29T10:00:00Z'))).toBeNull();
+    db.left.rhythms.workday.smart = { ...db.left.rhythms.workday.smart, offWhenUp: false };
+    resetMockRhythms(db, true);
+    expect(mockLive('left', new Date('2026-09-29T10:00:00Z'))?.offWhenUp).toBeNull();
   } finally {
     resetMockRhythms();
   }

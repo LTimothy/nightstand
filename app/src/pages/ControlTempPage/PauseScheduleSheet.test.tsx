@@ -45,15 +45,16 @@ it('defaults to tonight only and shows when that ends', () => {
   render(<PauseScheduleSheet open onClose={ onClose }/>);
   expect(screen.getByRole('heading', { name: 'Pause Alex\'s schedule' })).toBeInTheDocument();
   expect(screen.getByRole('radio', { name: /^Tonight only/ })).toBeChecked();
-  expect(screen.getByText('until 7:00 AM tomorrow')).toBeInTheDocument();
-  expect(screen.getByText(/Your saved schedule is kept/)).toHaveTextContent('Your saved schedule is kept. Sam\'s side is not affected.');
+  expect(screen.getByText('Tonight only, until 7:00 AM tomorrow')).toBeInTheDocument();
+  expect(screen.getByText(/is not affected/)).toHaveTextContent('Sam\'s side is not affected. Skipped alarms stay skipped.');
 });
 
 it('does not promise the partner\'s side is unaffected while the partner is away', () => {
   // Away mode drives both sides from this side's schedule.
   fixture.partnerAway = true;
   render(<PauseScheduleSheet open onClose={ onClose }/>);
-  expect(screen.getByText(/Your saved schedule is kept/)).toHaveTextContent(/^Your saved schedule is kept\.$/);
+  expect(screen.getByText(/Skipped alarms stay skipped/)).toHaveTextContent(/^Skipped alarms stay skipped\./);
+  expect(screen.queryByText(/is not affected/)).not.toBeInTheDocument();
 });
 
 it('pauses until tonight\'s power off', async () => {
@@ -212,7 +213,7 @@ const rhythmSleep = {
 it('ends tonight only at the resolved sleep while Rhythms runs', () => {
   bed.value = { state: 'rhythms', sleeps: [rhythmSleep] };
   render(<PauseScheduleSheet open onClose={ onClose }/>);
-  expect(screen.getByText('until 9:15 AM tomorrow')).toBeInTheDocument();
+  expect(screen.getByText(/, until 9:15 AM tomorrow$/)).toBeInTheDocument();
 });
 
 it('lists what tonight only skips from the weekly schedule', () => {
@@ -259,6 +260,6 @@ it('says a running side keeps its own timer for a pause until resumed', () => {
 
 it('explains that the current night resumes without replaying alarms', () => {
   render(<PauseScheduleSheet open onClose={ onClose }/>);
-  const explanation = screen.getByText(/When the pause ends, an off side turns on if its night is in progress/);
+  const explanation = screen.getByText(/If the pause ends mid-sleep, the side turns on/);
   expect(explanation).toHaveTextContent('Skipped alarms stay skipped.');
 });

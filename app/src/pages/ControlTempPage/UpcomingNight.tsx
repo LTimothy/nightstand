@@ -17,7 +17,7 @@ import PauseScheduleSheet from './PauseScheduleSheet';
 import { MAX_PAUSE_DAYS, pauseResumeAt } from './pauseTimes';
 import SchedulePauseNotice from './SchedulePauseNotice';
 import SmartPhaseLine from './SmartPhaseLine';
-import { currentSleep, isEveningSleep, nextSleepEvent, preWarms, sleepAt, warmStartBedtime, withArticle } from './sleepEvents';
+import { currentSleep, isEveningSleep, nextSleepEvent, preWarms, sleepAt } from './sleepEvents';
 import { useBedSleeps } from './useBedSleeps';
 import { cardSx, headingSx, tonightLineSx } from './tonightStyles';
 import useTemperatureFormat from '@lib/useTemperatureFormat';
@@ -85,7 +85,6 @@ export default function UpcomingNight() {
   const override = settings[side].scheduleOverrides.temperatureSchedules;
   const paused = override.disabled && moment(override.expiresAt).isAfter(moment());
   const eventPaused = paused && !!event && moment(override.expiresAt).isAfter(event.at);
-  const bedtime = event && event.kind === 'on' ? warmStartBedtime(eventSleep, settings.timeZone) : undefined;
   const action =
     event &&
     (event.kind === 'off'
@@ -115,8 +114,7 @@ export default function UpcomingNight() {
   const backOnName = backOn ? nameOf(backOn) : undefined;
   const backOnText = backOn && `Back on schedule ${dayWord(backOn)} at ${backOn.format('h:mm A')}${backOnName ? ` (${backOnName})` : ''}`;
   const eventText = event && `${action} ${eventDay} at ${event.at.format('h:mm A')}`
-    + (bedtime ? ` for ${withArticle(bedtime.format('h:mm A'))} bedtime` : '')
-    + (event.kind === 'on' ? eventPaused ? ' and keeps your manual temperature' : `, set to ${temperature}` : '')
+    + (event.kind === 'on' ? eventPaused ? ' and keeps your manual temperature' : `, ${temperature}` : '')
     + (event.kind === 'temperature' && eventPaused ? ' (on hold)' : '')
     + (rhythmLabel ? ` (${rhythmLabel})` : '');
   return (

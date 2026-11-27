@@ -73,7 +73,6 @@ it('switches to Smart Schedule, hides temperature rows and keeps them for later'
   await user.click(await screen.findByRole('button', { name: 'Smart Schedule' }));
   expect(screen.getByRole('spinbutton', { name: 'Base temperature' })).toBeInTheDocument();
   expect(screen.getByLabelText('Bedtime', { selector: 'input' })).toHaveValue('23:30');
-  expect(screen.getByText('When you usually get into bed')).toBeInTheDocument();
   expect(screen.getByText('The bed starts warming at 11:00 PM.')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Gentle' }));
   expect(screen.getByText('The bed starts warming at 11:10 PM.')).toBeInTheDocument();

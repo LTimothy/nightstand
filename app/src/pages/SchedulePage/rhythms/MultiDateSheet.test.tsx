@@ -10,7 +10,7 @@ const left = createDemoRhythms(new Date('2026-09-28T19:00:00Z')).left;
 function renderSheet() {
   const onNext = vi.fn();
   const view = renderWithProviders(<MultiDateSheet sideData={ left } today="2026-09-28" onNext={ onNext } onClose={ vi.fn() }/>);
-  return { ...view, onNext, sheet: screen.getByRole('dialog', { name: 'Change several dates' }) };
+  return { ...view, onNext, sheet: screen.getByRole('dialog', { name: 'Change dates' }) };
 }
 
 const cell = (sheet: HTMLElement, name: string) => within(sheet).getByRole('button', { name });

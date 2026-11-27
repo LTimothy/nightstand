@@ -5,6 +5,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, S
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { palette, weight } from '@design/tokens';
 import { SCROLL_SHEET } from '@design/sheetStyles';
+import { PRESENCE_NOTE } from './presenceNote';
 
 type Source = { cite: string; title: string; href: string; tested: string };
 type Phase = { heading: string; does: string; why: string; sources: Source[] };
@@ -37,7 +38,7 @@ const PHASES: Phase[] = [
   {
     heading: 'Once you have settled in',
     does: 'The bed cools one step at a time to one or two steps below your base, then holds there through the night. With sleep '
-      + 'tracking on, the cool-down waits until you have settled in bed; otherwise it follows the clock from bedtime.',
+      + 'tracking on, the cool-down waits until you have settled in bed; otherwise it follows the clock from bedtime. ' + PRESENCE_NOTE,
     why: 'In one lab study, a mattress that drew heat away during sleep was linked with a little more deep sleep and a slightly lower '
       + 'heart rate. The Pod\'s curve has not been tested for this.',
     sources: [
