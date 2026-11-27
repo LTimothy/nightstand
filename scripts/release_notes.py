@@ -16,6 +16,25 @@ def section(changelog, version):
     return match.group(1).strip()
 
 
+# A line starting one of these begins a new block rather than continuing the last.
+BLOCK = re.compile(r"\s*([-*+] |\d+[.)] |#|>|\||```)")
+
+
+def unwrap(text):
+    """Joins hard-wrapped lines: GitHub release notes show every newline as a
+    line break. Code blocks are left as they are."""
+    out, fenced = [], False
+    for line in text.split("\n"):
+        fence = line.lstrip().startswith("```")
+        if out and out[-1].strip() and line.strip() and not fenced and not fence \
+                and not BLOCK.match(line) and not out[-1].lstrip().startswith(("#", "```")):
+            out[-1] += " " + line.strip()
+        else:
+            out.append(line)
+        fenced ^= fence
+    return "\n".join(out)
+
+
 def git(*args):
     result = subprocess.run(["git", *args], capture_output=True, text=True)
     return result.stdout.strip() if result.returncode == 0 else None
@@ -63,7 +82,7 @@ def main(argv):
         sys.exit("CHANGELOG %s does not credit: %s" % (version, ", ".join(missing)))
     with open(checked_path) as handle:
         checked = handle.read().strip()
-    sys.stdout.write("%s\n\n### Checked before release\n\n%s\n" % (body, checked))
+    sys.stdout.write(unwrap("%s\n\n### Checked before release\n\n%s\n" % (body, checked)))
 
 
 if __name__ == "__main__":

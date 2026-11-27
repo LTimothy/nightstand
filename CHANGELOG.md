@@ -8,7 +8,7 @@ is a hard fork; for the history of the projects it descends from, see
 
 ## [Unreleased]
 
-### Added
+### Features
 
 - Settings > Bed and sides > Swap sides moves names, schedules, rhythms,
   alarms, tap and button settings to the other side in one step, for
