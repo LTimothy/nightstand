@@ -2,6 +2,7 @@ import moment from 'moment-timezone';
 import SideControl from '@components/SideControl';
 import { useSleepRecords } from '@api/sleep';
 import type { SleepRecord } from '@api/sleepSchema';
+import { useAppStore } from '@state/appStore.tsx';
 import { formatSleepDuration, nightDuration, recordForNight, withoutFutureRecords } from './sleepContext';
 
 function nightCaption(record: SleepRecord | undefined) {
@@ -13,20 +14,23 @@ function nightCaption(record: SleepRecord | undefined) {
 export default function SleepSideControl({ selectedDate, timeZone, displayedRecord }: {
   selectedDate: string; timeZone: string; displayedRecord?: SleepRecord;
 }) {
+  // The shown night is the selected tab's; after a side swap its record may carry the other physical side.
+  const { side: selected } = useAppStore();
+  const shown = (side: 'left' | 'right') => (displayedRecord && selected === side ? displayedRecord : undefined);
   const start = moment.tz(selectedDate, timeZone).startOf('day');
   const range = { startTime: start.toISOString(), endTime: start.clone().add(1, 'day').toISOString() };
   const left = useSleepRecords({ side: 'left', ...range });
   const right = useSleepRecords({ side: 'right', ...range });
-  const nightFor = (side: 'left' | 'right', records: SleepRecord[] | undefined) =>
-    recordForNight(withoutFutureRecords((records ?? []).filter(record => record.side === side), moment().valueOf()), selectedDate, timeZone);
-  const leftCaption = nightCaption(displayedRecord?.side === 'left' ? displayedRecord : nightFor('left', left.data));
-  const rightCaption = nightCaption(displayedRecord?.side === 'right' ? displayedRecord : nightFor('right', right.data));
+  const nightFor = (records: SleepRecord[] | undefined) =>
+    recordForNight(withoutFutureRecords(records ?? [], moment().valueOf()), selectedDate, timeZone);
+  const leftCaption = nightCaption(shown('left') ?? nightFor(left.data));
+  const rightCaption = nightCaption(shown('right') ?? nightFor(right.data));
   return <SideControl
     mergeAwaySides={ false }
     captions={ {
-      left: displayedRecord?.side === 'left' ? leftCaption
+      left: shown('left') ? leftCaption
         : left.isError ? 'Recording unavailable' : left.isPending ? 'Loading recording' : leftCaption,
-      right: displayedRecord?.side === 'right' ? rightCaption
+      right: shown('right') ? rightCaption
         : right.isError ? 'Recording unavailable' : right.isPending ? 'Loading recording' : rightCaption,
     } }/>;
 }

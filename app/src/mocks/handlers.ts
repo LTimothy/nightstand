@@ -190,6 +190,13 @@ export const handlers = [
     await delay(120);
     return HttpResponse.json(deepClone(updated));
   }),
+  http.post('/api/settings/swap-sides', async () => {
+    const { left, right } = deepClone(getSettings());
+    const updated = updateSettings({ left: { ...right, name: right.name === 'Right' ? 'Left' : right.name },
+      right: { ...left, name: left.name === 'Left' ? 'Right' : left.name } });
+    await delay(120);
+    return HttpResponse.json(deepClone(updated));
+  }),
   http.get('/api/deviceStatus', async () => {
     if (demoReads() === 'hang') await delay('infinite');
     if (demoReads() === 'fail') {

@@ -16,12 +16,12 @@ const record = (side: string, hours: number): SleepRecord => ({
 afterEach(() => vi.restoreAllMocks());
 
 describe('Sleep side captions', () => {
-  it('ignores rows from another side when a side query returns them', async () => {
+  it('shows the night the server returns for a side, even one recorded on the other side', async () => {
     server.use(http.get('*/metrics/sleep', ({ request }) => HttpResponse.json(
-      new URL(request.url).searchParams.get('side') === 'left' ? [record('right', 1)] : [record('right', 1), record('left', 1)])));
+      new URL(request.url).searchParams.get('side') === 'left' ? [record('right', 1)] : [record('left', 2)])));
     renderWithProviders(<SleepSideControl selectedDate="2026-09-23" timeZone="America/Los_Angeles"/>);
-    expect(await screen.findByText('No recording')).toBeInTheDocument();
-    expect(screen.getAllByText(/1h/)).toHaveLength(1);
+    expect(await screen.findByText(/1h/)).toBeInTheDocument();
+    expect(await screen.findByText(/2h/)).toBeInTheDocument();
   });
 
   it('shows the length of the night without a bare score number', async () => {

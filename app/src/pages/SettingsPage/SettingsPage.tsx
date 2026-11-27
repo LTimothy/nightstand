@@ -7,6 +7,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { SETTINGS_CATEGORIES } from './settingsCategories';
 import SideSettings from './SideSettings.tsx';
+import SwapSidesButton from './SwapSidesButton.tsx';
 import { SubpageShell } from '../DataPage/Header.tsx';
 import { useServices } from '@api/services.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
@@ -142,6 +143,7 @@ export default function SettingsPage() {
                 Away mode pauses that side's schedules and mirrors the active side. If both sides are away, neither
                 schedule runs.
               </Typography>
+              <SwapSidesButton />
             </Section>
           </ErrorBoundary>
           <ErrorBoundary componentName="Cover buttons">

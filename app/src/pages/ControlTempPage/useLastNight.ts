@@ -31,7 +31,7 @@ export function useLastNight(): LastNight | undefined {
   // Same pick as the Sleep page: the longest record of the newest wake date.
   const last = useMemo(() => {
     if (!timeZone) return undefined;
-    const sideRecords = records?.filter(record => record.side === side) ?? [];
+    const sideRecords = records ?? [];
     const newest = [...sideRecords].sort((a, b) => Date.parse(b.left_bed_at) - Date.parse(a.left_bed_at))[0];
     return newest && recordForNight(sideRecords, moment.tz(newest.left_bed_at, timeZone).format('YYYY-MM-DD'), timeZone);
   }, [records, side, timeZone]);

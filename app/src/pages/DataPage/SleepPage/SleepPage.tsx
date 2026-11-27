@@ -134,8 +134,8 @@ function SleepContext({ side, timeZone, biometricsV2 }: { side: Side; timeZone: 
     } : {}),
   });
   const now = moment.tz(timeZone);
-  const sideRecords = isError ? [] : withoutFutureRecords(data?.filter(record => record.side === side) ?? [], now.valueOf());
-  const recentRecords = recentError ? [] : withoutFutureRecords(recentData?.filter(record => record.side === side) ?? [], now.valueOf());
+  const sideRecords = isError ? [] : withoutFutureRecords(data ?? [], now.valueOf());
+  const recentRecords = recentError ? [] : withoutFutureRecords(recentData ?? [], now.valueOf());
   const latestRecord = [...recentRecords].sort((left, right) => Date.parse(right.left_bed_at) - Date.parse(left.left_bed_at))[0];
   const newest = latestRecord && recordForNight(recentRecords, moment.tz(latestRecord.left_bed_at, timeZone).format('YYYY-MM-DD'), timeZone);
   const { data: services, isError: servicesError, refetch: refetchServices } = useServices();
