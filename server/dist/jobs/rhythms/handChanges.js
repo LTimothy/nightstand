@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { appendFile, readFile, rm } from 'node:fs/promises';
 import moment from 'moment-timezone';
 import config from '../../config.js';
+import { writeTextDurably } from '../../db/durableFile.js';
 import logger from '../../logger.js';
 import settingsDB from '../../db/settings.js';
 import { levelAt, levelToF, phaseAt } from '../../db/smartCurve.js';
@@ -47,6 +48,10 @@ export function forgetHandChanges() {
         await rm(changesPath(), { force: true });
         await rm(`${changesPath()}.tmp`, { force: true });
     });
+}
+// For a side swap: the whole file at once, in the same queue as every append.
+export function replaceChangesText(text) {
+    return enqueue(() => writeTextDurably(changesPath(), text));
 }
 export async function readChanges() {
     let text = '';

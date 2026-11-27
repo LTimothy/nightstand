@@ -1,3 +1,5 @@
+// Before this file is read, so a side swap a power cut interrupted is finished first.
+import './sideSwapReplay.js';
 // Stores Rhythms in /persistent/free-sleep-data/lowdb/rhythmsDB.json. The file
 // exists only once Rhythms has been turned on, and nothing here deletes it.
 import { Low } from 'lowdb';

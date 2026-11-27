@@ -4,6 +4,7 @@ import { SideSchema } from '../../db/schedulesSchema.js';
 import { loadSleepRecords } from '../../db/loadSleepRecords.js';
 import { prisma } from '../../db/prisma.js';
 import { parseMetricsQuery } from './metricsQuery.js';
+import { personWhere } from '../../db/sideSwaps.js';
 const router = express.Router();
 const DEFAULT_SLEEP_SECONDS = 90 * 24 * 3600;
 router.get('/sleep', async (req, res) => {
@@ -15,7 +16,7 @@ router.get('/sleep', async (req, res) => {
         range.start = range.end - DEFAULT_SLEEP_SECONDS;
     }
     const query = {
-        side: range.side,
+        ...personWhere(range.side, 'entered_bed_at'),
         left_bed_at: { gte: range.start },
         entered_bed_at: { lte: range.end },
     };

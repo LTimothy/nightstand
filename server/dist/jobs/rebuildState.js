@@ -13,4 +13,22 @@ export function setRebuilding(on) {
         settle();
     rebuilding = on;
 }
+let held = false;
+let release = async () => { };
+export const rebuildsHeld = () => held;
+export function setRebuildRelease(hook) {
+    release = hook;
+}
+// While several schedule files change, no rebuild sees some changed and some not; one runs after.
+export async function holdJobRebuilds(work) {
+    await settled;
+    held = true;
+    try {
+        return await work();
+    }
+    finally {
+        held = false;
+        await release();
+    }
+}
 //# sourceMappingURL=rebuildState.js.map

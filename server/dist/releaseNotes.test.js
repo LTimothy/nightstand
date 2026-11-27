@@ -15,6 +15,16 @@ it('prints the section and the checked block, and nothing from other versions', 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout, 'Summary.\n\n- One.\n\n### Checked before release\n\n- CI: link, all checks passed.\n');
 });
+it('joins wrapped lines, since GitHub shows each newline as a break, and leaves code blocks alone', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-notes-'));
+    const changelog = '# Changelog\n\n## [3.6.0] - 2026-10-08\n\n### Fixes\n\n- One wrapped\n  bullet.\n- Two.\n\n```\nkeep\nthese\n```\n';
+    writeFileSync(path.join(dir, 'CHANGELOG.md'), changelog);
+    writeFileSync(path.join(dir, 'checked.md'), '- CI: link,\n  all passed.\n');
+    const result = spawnSync('python3', [path.join(repoRoot, 'scripts/release_notes.py'), '3.6.0', path.join(dir, 'checked.md')], { cwd: dir, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, '### Fixes\n\n- One wrapped bullet.\n- Two.\n\n```\nkeep\nthese\n```\n\n'
+        + '### Checked before release\n\n- CI: link, all passed.\n');
+});
 it('fails for a version without a section', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'nightstand-notes-'));
     writeFileSync(path.join(dir, 'CHANGELOG.md'), '# Changelog\n');

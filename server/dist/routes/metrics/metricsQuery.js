@@ -1,4 +1,5 @@
 import moment from 'moment-timezone';
+import { physicalSide } from '../../db/sideSwaps.js';
 const unixTime = (value) => {
     if (value === undefined)
         return undefined;
@@ -46,6 +47,7 @@ export function parseNightQuery(query) {
         return null;
     if (range.end <= range.start || range.end - range.start > MAX_NIGHT_SECONDS)
         return null;
-    return { side: range.side, start: range.start, end: range.end };
+    // A night is read from the side it was recorded on.
+    return { side: physicalSide(range.side, range.start), start: range.start, end: range.end };
 }
 //# sourceMappingURL=metricsQuery.js.map
