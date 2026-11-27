@@ -1,3 +1,5 @@
+// First, so an interrupted side swap is finished before any database file is read.
+import './db/sideSwapReplay.js';
 import express from 'express';
 import schedule from 'node-schedule';
 import { Server } from 'http';

@@ -1,4 +1,4 @@
-import { open } from 'node:fs/promises';
+import { open, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { Adapter } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
@@ -22,6 +22,23 @@ export async function syncToFlash(file: string, sync: Sync = fsyncPath): Promise
     await sync(dirname(file));
   } catch (error) {
     logger.warn(`Could not sync ${file} to flash: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+// Whole-file replace through a temporary file, synced; null removes the file.
+export async function writeTextDurably(path: string, text: string | null, sync: Sync = fsyncPath): Promise<void> {
+  if (text === null) {
+    await rm(path, { force: true });
+  } else {
+    const temporary = `${path}.tmp`;
+    await writeFile(temporary, text, 'utf8');
+    await sync(temporary);
+    await rename(temporary, path);
+  }
+  try {
+    await sync(dirname(path));
+  } catch (error) {
+    logger.warn(`Could not sync ${dirname(path)} to flash: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
