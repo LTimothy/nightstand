@@ -86,6 +86,24 @@ describe('swapSides', () => {
   });
 });
 
+describe('swapSides after a failed step', () => {
+  it('still finishes from the journal, on disk and in memory', async () => {
+    await updateSettings(draft => { draft.left.name = 'Alex'; draft.right.name = 'Sam'; });
+    let failed = false;
+    await swapSides(800, async () => {
+      failed = true;
+      await updateSettings(draft => { draft.left.name = 'half'; });
+      throw new Error('disk full');
+    });
+    assert.equal(failed, true);
+    await settingsDB.read();
+    assert.equal(settingsDB.data.left.name, 'Sam');
+    assert.equal(JSON.parse(readFileSync(`${dataFolder}lowdb/settingsDB.json`, 'utf8')).right.name, 'Alex');
+    assert.deepEqual(sideSwaps().at(-1), 800);
+    assert.equal(existsSync(journalPath()), false);
+  });
+});
+
 describe('replayJournal', () => {
   it('writes every file from a leftover journal once', async () => {
     const folder = `${mkdtempSync(path.join(tmpdir(), 'nightstand-swap-replay-'))}/`;

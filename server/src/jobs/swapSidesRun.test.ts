@@ -14,11 +14,10 @@ const { default: settingsDB } = await import('../db/settings.js');
 const { holdJobRebuilds, setRebuildRelease } = await import('./rebuildState.js');
 import type { InUseReason } from './bedInUse.js';
 
-const NOW = new Date('2026-11-27T12:00:00Z');
-function fakes(reasons: InUseReason[] = [], pausedSide?: 'left' | 'right') {
+function fakes(reasons: InUseReason[] = [], pausedSide?: 'left' | 'right', expiresAt = '2099-01-01T00:00:00Z') {
   const calls: string[] = [];
   const settings = structuredClone(settingsDB.data);
-  if (pausedSide) settings[pausedSide].scheduleOverrides.pause = { active: true, expiresAt: '2026-11-28T00:00:00Z' };
+  if (pausedSide) settings[pausedSide].scheduleOverrides.pause = { active: true, expiresAt };
   return { calls, deps: {
     inUse: async () => reasons,
     settings: async () => settings,
@@ -32,8 +31,15 @@ function fakes(reasons: InUseReason[] = [], pausedSide?: 'left' | 'right') {
 describe('runSideSwap', () => {
   it('swaps under both holds, then resumes both sides', async () => {
     const t = fakes();
-    await runSideSwap(t.deps, NOW);
+    await runSideSwap(t.deps);
     assert.deepEqual(t.calls, ['hold', 'rebuilds held', 'swap', 'resume left', 'resume right']);
+  });
+
+  it('answers without waiting for a side to resume', async () => {
+    const t = fakes();
+    const swapped = runSideSwap({ ...t.deps, resume: () => new Promise<void>(() => {}) }).then(() => 'done');
+    const late = new Promise(resolve => setTimeout(() => resolve('waited'), 50));
+    assert.equal(await Promise.race([swapped, late]), 'done');
   });
 
   for (const [reasons, message] of [
@@ -43,14 +49,19 @@ describe('runSideSwap', () => {
   ] as Array<[InUseReason[], RegExp]>) {
     it(`refuses without swapping for ${reasons.join(', ')}`, async () => {
       const t = fakes(reasons);
-      await assert.rejects(runSideSwap(t.deps, NOW), error => error instanceof SwapRefused && message.test(error.message));
+      await assert.rejects(runSideSwap(t.deps), error => error instanceof SwapRefused && message.test(error.message));
       assert.deepEqual(t.calls, ['hold']);
     });
   }
 
+  it('refuses while a pause flag is still set after its end time', async () => {
+    const t = fakes([], 'left', '2000-01-01T00:00:00Z');
+    await assert.rejects(runSideSwap(t.deps), /End the pause/);
+  });
+
   it('refuses while a side is paused', async () => {
     const t = fakes([], 'right');
-    await assert.rejects(runSideSwap(t.deps, NOW), /End the pause/);
+    await assert.rejects(runSideSwap(t.deps), /End the pause/);
     assert.deepEqual(t.calls, ['hold']);
   });
 });

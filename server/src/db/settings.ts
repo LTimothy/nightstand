@@ -1,3 +1,5 @@
+// Before this file is read, so a side swap a power cut interrupted is finished first.
+import './sideSwapReplay.js';
 import { createSerializedUpdate } from './serializedUpdate.js';
 // LowDB, stores the schedules in /persistent/free-sleep-data/lowdb/settingsDB.json
 import _ from 'lodash';
