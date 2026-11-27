@@ -164,8 +164,8 @@ it('describes the channels in the channel drawer', async () => {
   const { user } = renderWithProviders(<VersionsPage />);
   await user.click(await screen.findByRole('button', { name: /Update channel Stable/ }));
   expect(await screen.findByText(
-    'Stable changes less often. A release moves to stable once the maintainer has used it for a while without problems. ' +
-    'Beta gets each release as soon as it is out, with less testing.'
+    'Stable gets a release after it has been used for a while without problems. ' +
+    'Beta gets each release right away, with less testing.'
   )).toBeInTheDocument();
 });
 

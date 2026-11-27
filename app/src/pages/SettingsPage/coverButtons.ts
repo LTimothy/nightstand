@@ -23,7 +23,7 @@ export type CoverButtonValues = {
   swapped: boolean;
   // Null when the logo does not set a temperature.
   logoF: number | null;
-  // True when the logo is set to an action other than a temperature or the default toggle.
+  // True when the logo is set to an action other than a temperature, Stop alarm or the default toggle.
   logoOther: boolean;
   // The middle button double press boost; zero minutes is off. Pod 5 hub only.
   boostF: number;
@@ -46,7 +46,8 @@ export function readCoverButtons(path: CoverButtonsPath, side: SideSettings): Co
     stepF: paired ? plus.amount : null,
     swapped: paired && plus.change === 'decrement',
     logoF: logo.type === 'set_temperature' ? logo.temperatureF : null,
-    logoOther: logo.type !== 'set_temperature' && !(logo.type === 'base_control' && logo.behavior === 'toggle_preset'),
+    logoOther: logo.type !== 'set_temperature' && !(logo.type === 'base_control' && logo.behavior === 'toggle_preset')
+      && !(logo.type === 'alarm' && logo.behavior === 'dismiss'),
     boostF: side.taps.logoDouble.temperatureF,
     boostMinutes: side.taps.logoDouble.minutes,
   };

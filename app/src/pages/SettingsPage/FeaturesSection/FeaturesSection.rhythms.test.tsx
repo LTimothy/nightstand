@@ -25,8 +25,7 @@ it('describes Rhythms and starts off', async () => {
   renderWithProviders(<FeaturesSection/>);
   expect(await screen.findByRole('switch', { name: 'Rhythms' })).not.toBeChecked();
   expect(screen.queryByText('Rhythms (beta)')).not.toBeInTheDocument();
-  expect(screen.getByText('Plan sleep by day and date, with an optional Smart Schedule temperature curve. '
-    + 'Your weekly schedule is kept.')).toBeInTheDocument();
+  expect(screen.getByText('Plan sleep by day and date. Your weekly schedule is kept.')).toBeInTheDocument();
 });
 
 it('turns Rhythms on and saves new names for the converted rhythms', async () => {

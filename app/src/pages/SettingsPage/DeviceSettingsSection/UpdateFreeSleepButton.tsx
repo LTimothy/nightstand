@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { Accordion, AccordionSummary, AccordionDetails, Alert, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import { Alert, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -104,14 +103,8 @@ export default function UpdateFreeSleepButton({ runningVersion, onProblem, onSta
                 Nightstand restarts to finish, and schedules and alarms pause for up to five minutes.
               </DialogContentText>
               <DialogContentText sx={ { mt: 2, mb: 2 } }>
-                If the checks fail, Nightstand tries to go back to v{ runningVersion } on its own.
+                If the checks fail, Nightstand tries to go back to v{ runningVersion } on its own. Recovery may require SSH.
               </DialogContentText>
-              <Accordion>
-                <AccordionSummary expandIcon={ <ExpandMoreIcon/> }>If it doesn't come back</AccordionSummary>
-                <AccordionDetails>
-                  <Typography variant="body2">Recovery may require SSH. Check the update logs and system status before trying again.</Typography>
-                </AccordionDetails>
-              </Accordion>
             </>
           ) }
           { phase === 'updating' && (

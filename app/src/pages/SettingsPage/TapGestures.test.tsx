@@ -31,9 +31,8 @@ describe('TapGestures', () => {
       settings={ { ...getSettings(), temperatureFormat: 'celsius' } }
       updateSettings={ vi.fn() }/>);
     expect(within(left()).getByRole('combobox', { name: 'Left Double tap' })).toHaveTextContent('Cooler');
-    await waitFor(() => expect(within(left()).getByRole('combobox', { name: 'Left Double tap step' })).toHaveTextContent('0.6°C'));
-    expect(within(left()).getByRole('combobox', { name: 'Left Quad tap' })).toHaveTextContent('Stop alarm');
-    expect(within(left()).getByText('Only while an alarm rings or is snoozed.')).toBeVisible();
+    await waitFor(() => expect(within(left()).getByRole('combobox', { name: 'Left Double tap Step' })).toHaveTextContent('0.6°C'));
+    expect(within(left()).getByRole('combobox', { name: 'Left Quad tap' })).toHaveTextContent('Switch base position');
     expect(screen.getByRole('group', { name: 'Right side taps' })).toBeVisible();
   });
 
@@ -79,7 +78,7 @@ describe('TapGestures', () => {
     settings.features = { ...settings.features, targetTemperatureLabels: true };
     renderWithProviders(<TapGestures settings={ settings } updateSettings={ vi.fn() }/>);
     await waitFor(() => expect(within(left()).getByText('50°F')).toBeVisible());
-    await userEvent.click(within(left()).getByRole('combobox', { name: 'Left Triple tap step' }));
+    await userEvent.click(within(left()).getByRole('combobox', { name: 'Left Triple tap Step' }));
     expect(screen.getByRole('option', { name: '1 step' })).toBeVisible();
   });
 
@@ -88,7 +87,7 @@ describe('TapGestures', () => {
     renderWithProviders(<TapGestures
       settings={ { ...getSettings(), temperatureFormat: 'fahrenheit' } }
       updateSettings={ updateSettings }/>);
-    await userEvent.click(within(left()).getByRole('combobox', { name: 'Left Triple tap step' }));
+    await userEvent.click(within(left()).getByRole('combobox', { name: 'Left Triple tap Step' }));
     await userEvent.click(screen.getByRole('option', { name: '3°F' }));
     expect(updateSettings).toHaveBeenCalledWith({
       left: { taps: { tripleTap: { type: 'temperature', change: 'increment', amount: 3 } } },
@@ -102,7 +101,7 @@ describe('TapGestures', () => {
     renderWithProviders(<TapGestures
       settings={ settings }
       updateSettings={ updateSettings }/>);
-    const snooze = within(left()).getByRole('combobox', { name: 'Left Quad tap snooze' });
+    const snooze = within(left()).getByRole('combobox', { name: 'Left Quad tap Snooze' });
     expect(snooze).toHaveTextContent('1.5 min');
     await userEvent.click(snooze);
     await userEvent.click(screen.getByRole('option', { name: '5 min' }));
@@ -141,9 +140,9 @@ describe('TapGestures', () => {
     renderWithProviders(<TapGestures
       settings={ settings }
       updateSettings={ vi.fn() }/>);
-    expect(screen.getByRole('combobox', { name: 'Right Quad tap snooze' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Right Quad tap Snooze' })).toBeVisible();
     expect(screen.getAllByRole('combobox', { name: 'Right Double tap' })).toHaveLength(1);
-    expect(screen.getAllByRole('combobox', { name: 'Left Double tap step' })).toHaveLength(1);
+    expect(screen.getAllByRole('combobox', { name: 'Left Double tap Step' })).toHaveLength(1);
   });
 
   it('offers the base when one is set up', async () => {

@@ -1,5 +1,5 @@
 import SectionHeading from '@components/SectionHeading';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useUpdateAttentionStore, type UpdateOutcome } from '@state/updateAttentionStore';
 import {
   Accordion, AccordionDetails, AccordionSummary,
@@ -24,7 +24,7 @@ import { useDeviceStatus } from '@api/deviceStatus.ts';
 import { useSettings, postSettings } from '@api/settings.ts';
 import { useLatestVersion } from '@api/useLatestVersion.ts';
 import { useReleases, releasesForChannel } from '@api/releases.ts';
-import { useChangelog, useRemoteChangelog, entriesNewerThan } from '@api/changelog.ts';
+import { useRemoteChangelog, entriesNewerThan } from '@api/changelog.ts';
 import { useRollbackInfo } from '@api/update.ts';
 import { useServerStatus } from '@api/serverStatus.ts';
 import { UPDATE_CHANNELS, UpdateChannelType } from '@api/settingsSchema.ts';
@@ -58,7 +58,6 @@ export default function VersionsPage() {
   const clearProblem = useCallback(() => setUpdateProblem(false), [setUpdateProblem]);
   const [channelError, setChannelError] = useState<string>();
   const [savingChannel, setSavingChannel] = useState(false);
-  const { data: localChangelog } = useChangelog();
   const { data: remoteChangelog } = useRemoteChangelog();
   const { data: rollbackInfo } = useRollbackInfo();
   // Only the running row acts on this: it offers a reinstall to finish
@@ -86,12 +85,6 @@ export default function VersionsPage() {
   const updateAvailable =
     !!latestVersion && !!running && !!semver.valid(running) && !!semver.valid(latestVersion) &&
     semver.gt(latestVersion, running);
-  const bodyByVersion = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const entry of remoteChangelog ?? []) map.set(entry.version, entry.body);
-    for (const entry of localChangelog ?? []) map.set(entry.version, entry.body);
-    return map;
-  }, [remoteChangelog, localChangelog]);
 
   return (
     <SubpageShell title="Software">
@@ -107,7 +100,7 @@ export default function VersionsPage() {
       { updateAvailable && (
         <Section title={ `Version ${latestVersion} is ready` }>
           <Typography variant="body2" sx={ { mb: 1 } }>
-            This Pod is running v{ running }. The latest build on your channel is v{ latestVersion }.
+            This Pod is running v{ running }.
           </Typography>
           { whatsNew.length > 0 && (
             <Accordion
@@ -181,8 +174,8 @@ export default function VersionsPage() {
           <DialogTitle id="update-channel-title">Update channel</DialogTitle>
           <DialogContent>
             <Typography variant="body2" color="text.secondary" sx={ { mb: 2 } }>
-            Stable changes less often. A release moves to stable once the maintainer has used it for a while
-            without problems. Beta gets each release as soon as it is out, with less testing.
+            Stable gets a release after it has been used for a while without problems. Beta gets each release
+            right away, with less testing.
             </Typography>
             <RadioGroup
               aria-label="Update channel"
@@ -231,16 +224,13 @@ export default function VersionsPage() {
               <Box>
                 <SectionHeading sx={ { mb: 1.5 } }>Install a specific version</SectionHeading>
                 <Typography variant="body2" color="text.secondary" sx={ { mb: 1 } }>
-            Downgrading keeps your data (databases aren't rewritten). Installing any version
-            replaces the instant-rollback slot above. Versions below v{ CAPABLE_FLOOR } can't be
-            installed from here.
+            Installing any version replaces the rollback slot above.
                 </Typography>
                 { (showAll ? eligibleReleases : eligibleReleases.slice(0, RECENT_RELEASES)).map(release => (
                   <ReleaseRow
                     key={ release.version }
                     release={ release }
                     runningVersion={ running }
-                    body={ bodyByVersion.get(release.version) }
                     offerReinstall={ offerReinstall }
                   />
                 )) }
@@ -250,12 +240,7 @@ export default function VersionsPage() {
               </Box>
             ) }
 
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={ { mb: 1 } }>
-          Replace Nightstand with the upstream free-sleep version this release pins.
-              </Typography>
-              <RevertToStockRow runningVersion={ running }/>
-            </Box>
+            <RevertToStockRow runningVersion={ running }/>
 
             <ListItem component="div" disableGutters sx={ { display: 'block', py: 0 } }>
               <ListItemText

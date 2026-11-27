@@ -7,8 +7,7 @@ import { getDeviceStatus, getServices, getSettings } from '../../../mocks/mockDa
 import FeaturesSection from './FeaturesSection';
 
 const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
-const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. '
-  + 'It changes the nightly sleep records and the heart rate and breathing estimates.';
+const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. Changes sleep records and vitals estimates.';
 const CAP_PRESENCE = 'Capacitance presence (beta)';
 const UNCHECKED_CAP_PRESENCE = 'Schedules, auto-off and the in-bed indicator follow capacitance presence once both sides are learned. '
   + 'Checked on one Pod 3.';
@@ -34,7 +33,7 @@ describe('FeaturesSection', () => {
     expect(switchNames(tracking)).toEqual(['Biometrics', 'Presence auto-off', 'New sleep tracking (beta)',
       'Capacitance presence (beta)', 'Cooling warning']);
     expect(within(tracking).getByRole('combobox', { name: 'Keep raw sensor recordings' })).toBeVisible();
-    expect(within(tracking).getByText('Sleep analysis reads these. About 0.4 GB a day. '
+    expect(within(tracking).getByText('About 0.4 GB a day. '
       + 'Oldest removed first if storage runs low.')).toBeVisible();
     expect(switchNames(storage)).toEqual([
       'Low-disk protection', 'Delete detail after 30 days', 'Keep the system log in memory', 'Write flash less often',
@@ -76,9 +75,9 @@ describe('FeaturesSection', () => {
     const age = screen.getByRole('switch', { name: 'Delete detail after 30 days' });
     expect(lowDisk).toBeChecked();
     expect(age).not.toBeChecked();
-    expect(screen.getByText('Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized. '
+    expect(screen.getByText('Below 150 MiB free, deletes the oldest detailed vitals and movement. '
       + 'Keeps 2 nights of detail and every nightly summary.')).toBeVisible();
-    expect(screen.getByText('Deletes detailed vitals older than 30 days. Summaries, scores and movement stay. '
+    expect(screen.getByText('Detailed vitals only. Summaries, scores and movement stay. '
       + 'Cannot be undone.')).toBeVisible();
     await user.click(age);
     await waitFor(() => expect(age).toBeEnabled());
@@ -97,8 +96,8 @@ describe('FeaturesSection', () => {
     const { user } = renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: 'Keep the system log in memory' });
     expect(toggle).not.toBeChecked();
-    expect(screen.getByText('Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
-      + 'Nightstand\'s logs are kept. Older system log files on flash are removed after that restart.')).toBeVisible();
+    expect(screen.getByText('Cuts flash writes. From the next Pod restart, the system log clears on every restart '
+      + 'and its older files on flash are removed. Nightstand\'s logs are kept.')).toBeVisible();
     await user.click(toggle);
     expect(posted).toEqual({ features: { journalInMemory: true } });
   });
@@ -112,7 +111,7 @@ describe('FeaturesSection', () => {
     const { user } = renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: 'Write flash less often' });
     expect(toggle).not.toBeChecked();
-    expect(screen.getByText('Fewer flash writes. A power cut can lose up to the last minute of sensor recordings and logs.')).toBeVisible();
+    expect(screen.getByText('A power cut can lose up to the last minute of sensor recordings and logs.')).toBeVisible();
     await user.click(toggle);
     expect(posted).toEqual({ features: { longFlashCommit: true } });
   });
@@ -139,7 +138,7 @@ describe('FeaturesSection', () => {
     const { user } = renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: 'Restart the cover service on its own' });
     expect(toggle).not.toBeChecked();
-    expect(screen.getByText('When one side of the cover sends no readings for 10 minutes, Nightstand restarts the Pod\'s cover service. '
+    expect(screen.getByText('After 10 minutes with no readings from one side of the cover. '
       + 'At most once an hour, never near an alarm.')).toBeVisible();
     await user.click(toggle);
     expect(posted).toEqual({ features: { coverAutoRestore: true } });
@@ -212,10 +211,9 @@ describe('FeaturesSection', () => {
     const everyday = await screen.findByRole('region', { name: 'Everyday' });
     expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm',
       'Ring alarms when the side is off', "Show the Pod's target temperatures", 'Restart the cover service on its own']);
-    expect(within(everyday).getByText('Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
-      + 'Schedules are unchanged. No effect in Level format.')).toBeVisible();
-    expect(within(everyday).getByText('Adds a one-time alarm to Schedule, separate from the daily wake-up. '
-      + 'Off, a set one-time alarm does not ring.')).toBeVisible();
+    expect(within(everyday).getByText('Shows the Pod 5 firmware\'s own target curve. Schedules are unchanged. '
+      + 'No effect in Level format.')).toBeVisible();
+    expect(within(everyday).getByText('Adds a one-time alarm to Schedule. When off, a set one-time alarm does not ring.')).toBeVisible();
   });
 
   it('posts the flag change when a feature toggle is switched', async () => {
@@ -246,7 +244,6 @@ describe('FeaturesSection', () => {
     const { user } = renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: 'Ring alarms when the side is off' });
     expect(toggle).not.toBeChecked();
-    expect(screen.getByText('Alarms vibrate even if the side is off.')).toBeVisible();
     await user.click(toggle);
     expect(posted).toEqual({ features: { alarmsWhenOff: true } });
   });
@@ -416,7 +413,7 @@ describe('Suggestions from your changes', () => {
     const { user } = renderWithProviders(<FeaturesSection />);
     const toggle = await screen.findByRole('switch', { name: 'Suggestions from your changes' });
     await waitFor(() => expect(toggle).toBeEnabled());
-    expect(screen.getByText(/suggests the ones you repeat/)).toBeInTheDocument();
+    expect(screen.getByText(/changes you repeat during a rhythm/)).toBeInTheDocument();
     await user.click(toggle);
     await waitFor(() => expect(posted).toEqual({ features: { rhythmSuggestions: true } }));
   });

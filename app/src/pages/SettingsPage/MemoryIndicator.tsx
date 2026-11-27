@@ -1,6 +1,5 @@
 import { Alert, Button } from '@mui/material';
 import { useMemory } from '@api/memory.ts';
-import { formatBytes } from '../../lib/formatBytes.ts';
 import UsageBar from './UsageBar.tsx';
 
 export default function MemoryIndicator() {
@@ -18,7 +17,6 @@ export default function MemoryIndicator() {
       usedBytes={ data.usedBytes }
       totalBytes={ data.totalBytes }
       usedPercent={ data.usedPercent }
-      caption={ `${formatBytes(data.availableBytes)} available` }
     />
   );
 }

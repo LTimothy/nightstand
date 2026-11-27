@@ -35,11 +35,11 @@ it('adds the line to the rollback and switch dialogs while Rhythms is on', async
 
 it('adds the line to a downgrade below 3.5.0 only', async () => {
   resetMockRhythms(createDemoRhythms(), true);
-  const older = renderWithProviders(<ReleaseRow release={ release('3.4.0') } runningVersion="3.5.1" body={ undefined }/>);
+  const older = renderWithProviders(<ReleaseRow release={ release('3.4.0') } runningVersion="3.5.1"/>);
   await older.user.click(screen.getByRole('button', { name: 'Install (downgrade)' }));
   expect(await screen.findByText(NOTE)).toBeInTheDocument();
   older.unmount();
-  const newer = renderWithProviders(<ReleaseRow release={ release('3.5.0') } runningVersion="3.5.1" body={ undefined }/>);
+  const newer = renderWithProviders(<ReleaseRow release={ release('3.5.0') } runningVersion="3.5.1"/>);
   await newer.user.click(screen.getByRole('button', { name: 'Install (downgrade)' }));
   await screen.findByRole('dialog');
   await waitFor(() => expect(newer.queryClient.getQueryData(['useSettings'])).toBeDefined());

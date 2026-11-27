@@ -51,8 +51,8 @@ function GestureRow({ gesture, side, sideId, tap, format, baseConfigured, disabl
         </Select>
       </FormControl>
       { tap.type === 'temperature' && <TemperatureChangeSelect
-        label={ `${label} step` }
-        labelPrefixId={ sideId }
+        label="Step"
+        labelPrefixId={ `${sideId} ${id}` }
         valueF={ tap.amount }
         format={ format }
         disabled={ disabled }
@@ -64,13 +64,13 @@ function GestureRow({ gesture, side, sideId, tap, format, baseConfigured, disabl
         disabled={ disabled }
         onChange={ temperatureF => save({ ...tap, temperatureF }) }/> }
       { tap.type === 'alarm' && tap.behavior === 'snooze' && <FormControl sx={ { minWidth: 140 } }>
-        <InputLabel id={ snoozeId }>{ `${label} snooze` }</InputLabel>
+        <InputLabel id={ snoozeId }>Snooze</InputLabel>
         <Select
           labelId={ snoozeId }
-          label={ `${label} snooze` }
+          label="Snooze"
           value={ tap.snoozeDuration }
           disabled={ disabled }
-          SelectDisplayProps={ { 'aria-labelledby': `${sideId} ${snoozeId}` } }
+          SelectDisplayProps={ { 'aria-labelledby': `${sideId} ${id} ${snoozeId}` } }
           onChange={ event => save({ ...tap, snoozeDuration: Number(event.target.value) }) }>
           { withCurrentValue(SNOOZE_SECONDS, tap.snoozeDuration).map(seconds => <MenuItem
             key={ seconds }

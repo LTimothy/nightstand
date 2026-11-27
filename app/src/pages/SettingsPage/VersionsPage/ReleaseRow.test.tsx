@@ -19,7 +19,7 @@ describe('ReleaseRow', () => {
     );
 
     const { user } = renderWithProviders(
-      <ReleaseRow release={ release } runningVersion="3.3.0" body={ undefined }/>,
+      <ReleaseRow release={ release } runningVersion="3.3.0"/>,
     );
 
     await user.click(screen.getByRole('button', { name: 'Install' }));
@@ -39,7 +39,7 @@ describe('ReleaseRow', () => {
     );
 
     const { user } = renderWithProviders(
-      <ReleaseRow release={ release } runningVersion="3.3.0" body={ undefined }/>,
+      <ReleaseRow release={ release } runningVersion="3.3.0"/>,
     );
 
     await user.click(screen.getByRole('button', { name: 'Install' }));
@@ -51,7 +51,7 @@ describe('ReleaseRow', () => {
   });
 
   it('offers nothing on the running version by default', () => {
-    renderWithProviders(<ReleaseRow release={ release } runningVersion="3.4.0" body={ undefined }/>);
+    renderWithProviders(<ReleaseRow release={ release } runningVersion="3.4.0"/>);
     expect(screen.queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
   });
 
@@ -68,7 +68,7 @@ describe('ReleaseRow', () => {
     );
 
     const { user } = renderWithProviders(
-      <ReleaseRow release={ release } runningVersion="3.4.0" body={ undefined } offerReinstall/>,
+      <ReleaseRow release={ release } runningVersion="3.4.0" offerReinstall/>,
     );
 
     await user.click(screen.getByRole('button', { name: 'Reinstall' }));
@@ -80,7 +80,7 @@ describe('ReleaseRow', () => {
 
   it('lays the downgrade warnings out as a compact list inside the alert', async () => {
     const { user } = renderWithProviders(
-      <ReleaseRow release={ { ...release, version: '3.2.0' } } runningVersion="3.5.0" body={ undefined }/>,
+      <ReleaseRow release={ { ...release, version: '3.2.0' } } runningVersion="3.5.0"/>,
     );
 
     await user.click(screen.getByRole('button', { name: 'Install (downgrade)' }));
@@ -92,7 +92,7 @@ describe('ReleaseRow', () => {
   });
 
   it('only changes the running row: other versions still say Install', () => {
-    renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0" body={ undefined } offerReinstall/>);
+    renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0" offerReinstall/>);
     expect(screen.getByRole('button', { name: 'Install' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reinstall' })).not.toBeInTheDocument();
   });
@@ -102,41 +102,28 @@ describe('ReleaseRow channel', () => {
   const beta = { kind: 'agent', version: '3.6.0', channel: 'beta', date: '2026-10-01' } as const;
 
   it('marks a release Stable or Beta', () => {
-    const { unmount } = renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0" body={ undefined }/>);
+    const { unmount } = renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0"/>);
     expect(screen.getByText('Stable')).toBeInTheDocument();
     unmount();
-    renderWithProviders(<ReleaseRow release={ beta } runningVersion="3.3.0" body={ undefined }/>);
+    renderWithProviders(<ReleaseRow release={ beta } runningVersion="3.3.0"/>);
     expect(screen.getByText('Beta')).toBeInTheDocument();
   });
 
   it('says so when installing a beta, and not for a stable release', async () => {
-    const view = renderWithProviders(<ReleaseRow release={ beta } runningVersion="3.3.0" body={ undefined }/>);
+    const view = renderWithProviders(<ReleaseRow release={ beta } runningVersion="3.3.0"/>);
     await view.user.click(screen.getByRole('button', { name: 'Install' }));
     expect(await screen.findByText('v3.6.0 is a beta release. It has had less testing than stable.')).toBeInTheDocument();
     view.unmount();
-    const stable = renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0" body={ undefined }/>);
+    const stable = renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0"/>);
     await stable.user.click(screen.getByRole('button', { name: 'Install' }));
     await screen.findByRole('dialog');
     expect(screen.queryByText(/is a beta release/)).not.toBeInTheDocument();
-  });
-
-  it('shows no summary line for notes that are only a heading', () => {
-    renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0" body="## Notes"/>);
-    expect(screen.queryByText('Release notes')).not.toBeInTheDocument();
-  });
-
-  it('summarises the release notes under the version', () => {
-    renderWithProviders(<ReleaseRow
-      release={ release }
-      runningVersion="3.3.0"
-      body={ 'Sleep data loads again. Updates are safer.\n\n- Detail.' }/>);
-    expect(screen.getByText('Sleep data loads again.')).toBeInTheDocument();
   });
 });
 
 describe('ReleaseRow when the bed may be in use', () => {
   const open = async () => {
-    const view = renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0" body={ undefined }/>);
+    const view = renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0"/>);
     await view.user.click(screen.getByRole('button', { name: 'Install' }));
     return view;
   };

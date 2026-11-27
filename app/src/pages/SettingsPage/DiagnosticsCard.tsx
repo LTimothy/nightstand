@@ -8,8 +8,8 @@ import ToggleRow from '@components/ToggleRow';
 import TurnOnFirst from './FeaturesSection/TurnOnFirst.tsx';
 
 const SWITCHES = [
-  ['Firmware health', 'firmwareHealth', 'Selected firmware health messages.'],
-  ['Firmware target', 'firmwareTargetReadout', 'The target the firmware reports.'],
+  ['Firmware health', 'firmwareHealth', null],
+  ['Firmware target', 'firmwareTargetReadout', null],
   ['Tap diagnostics', 'tapDiagnostics', 'Button and tap candidates, with export. Triggers nothing.'],
 ] as const;
 

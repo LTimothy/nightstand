@@ -53,8 +53,10 @@ describe('cover buttons', () => {
     unequal.taps.doubleTap = { type: 'temperature', change: 'decrement', amount: 3 };
     expect(readCoverButtons('taps', unequal)?.stepF).toBeNull();
     const logoOther = pod5HubSide();
-    logoOther.taps.quadTap = { type: 'alarm', behavior: 'dismiss', snoozeDuration: 300, inactiveAlarmBehavior: 'none' };
+    logoOther.taps.quadTap = { type: 'alarm', behavior: 'snooze', snoozeDuration: 300, inactiveAlarmBehavior: 'none' };
     expect(readCoverButtons('taps', logoOther)).toMatchObject({ logoF: null, logoOther: true });
+    logoOther.taps.quadTap = { type: 'alarm', behavior: 'dismiss', snoozeDuration: 300, inactiveAlarmBehavior: 'none' };
+    expect(readCoverButtons('taps', logoOther)).toMatchObject({ logoOther: false });
   });
 
   it('saves whole tap actions on a Pod 5 hub', () => {

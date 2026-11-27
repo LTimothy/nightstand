@@ -16,7 +16,7 @@ const cases = [
   { name: 'update', open: 'Update to v3.2.0', title: 'Update to v3.2.0?', confirm: 'Update now', log: 'update',
     render: (runningVersion: string) => <UpdateFreeSleepButton runningVersion={ runningVersion }/> },
   { name: 'release install', open: 'Install', title: 'Install v3.2.0?', confirm: 'Install now', log: 'update',
-    render: (runningVersion: string) => <ReleaseRow runningVersion={ runningVersion } release={ release } body={ undefined }/> },
+    render: (runningVersion: string) => <ReleaseRow runningVersion={ runningVersion } release={ release }/> },
   { name: 'rollback', open: 'Go back to v2.9.0 Instant, no download',
     title: 'Go back to v2.9.0?', confirm: 'Go back now', log: 'rollback',
     render: (runningVersion: string) => <RollbackRow runningVersion={ runningVersion } rollbackVersion="2.9.0"/> },

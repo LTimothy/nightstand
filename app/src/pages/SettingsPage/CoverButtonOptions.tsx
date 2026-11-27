@@ -56,7 +56,7 @@ function SideButtons({ title, side, path, format, disabled, save }: {
       { values.stepF === null ? <Typography
         variant="body2"
         color="text.secondary">
-        Plus and minus are not a matching warmer and cooler pair. Set them under Bed and sides &gt; Tap gestures.
+        Plus and minus are not a matching warmer and cooler pair. Set them under Tap gestures below.
       </Typography> : <>
         <TemperatureChangeSelect
           label="Step per click"
@@ -78,8 +78,7 @@ function SideButtons({ title, side, path, format, disabled, save }: {
         checked={ values.logoF !== null }
         disabled={ disabled }
         onChange={ on => change({ logoF: on ? DEFAULT_LOGO_F : null }) }
-        description={ values.logoOther && <>The quad tap is set to another action under Bed and sides &gt; Tap gestures,
-          so a single press only stops alarms.</> }>
+        description={ values.logoOther && 'Quad tap is set to another action below, so a single press only stops alarms.' }>
         { center }
       </ToggleRow> : center }
       { path === 'taps' && <ToggleRow

@@ -8,7 +8,6 @@ import semver from 'semver';
 import { postUpdate } from '@api/update.ts';
 import { migrationsApplied, useUpdateProgress } from '@api/useUpdateProgress.ts';
 import type { Release } from '@api/releases.ts';
-import { summary } from '@api/releaseSummary.ts';
 import { downgradeWarnings } from './downgradeWarnings';
 import InUseConfirm from '../../../components/InUseConfirm';
 import RhythmsLeaveNote from './RhythmsLeaveNote';
@@ -17,16 +16,14 @@ import { palette, weight } from '@design/tokens';
 type Props = {
   release: Release;
   runningVersion: string | undefined;
-  body: string | undefined;
   // The database has migrations this version ships but never applied. A
   // reinstall of the running version is the one thing that finishes them.
   offerReinstall?: boolean;
 };
 
-export default function ReleaseRow({ release, runningVersion, body, offerReinstall = false }: Props) {
+export default function ReleaseRow({ release, runningVersion, offerReinstall = false }: Props) {
   const [open, setOpen] = useState(false);
   const titleId = useId();
-  const notes = body ? summary(body) : undefined;
   const isRunning = release.version === runningVersion;
   const isReinstall = isRunning && offerReinstall;
   // A reinstall never changes the running version, so it is done when the
@@ -55,8 +52,6 @@ export default function ReleaseRow({ release, runningVersion, body, offerReinsta
           </Button>
         ) }
       </Box>
-      { notes && <Typography variant="body2" color="text.secondary" sx={ { overflowWrap: 'anywhere' } }>{ notes }</Typography> }
-
       <Dialog
         maxWidth="sm"
         aria-labelledby={ titleId }

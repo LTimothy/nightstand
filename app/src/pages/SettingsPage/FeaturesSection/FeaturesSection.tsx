@@ -17,12 +17,13 @@ import { useAppStore } from '@state/appStore.tsx';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
 import { useOtherSlotSupported } from '@api/otherSlot.ts';
 import { Version } from '@api/deviceStatusSchema.ts';
+import useTemperatureFormat from '@lib/useTemperatureFormat';
+import { unitOf } from '@lib/temperatureConversions';
 import { DeepPartial } from 'ts-essentials';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 const BIOMETRICS_ESTIMATES = 'Time in bed and heart rate estimated from the bed\'s sensors. Estimates, not medical measurements.';
-const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. '
-  + 'It changes the nightly sleep records and the heart rate and breathing estimates.';
+const NEW_SLEEP_TRACKING = 'Tells the two sides apart with the capacitance sensors. Changes sleep records and vitals estimates.';
 const UNCHECKED_CAP_PRESENCE = 'Schedules, auto-off and the in-bed indicator follow capacitance presence once both '
   + 'sides are learned. Checked on one Pod 3.';
 
@@ -32,6 +33,7 @@ export default function FeaturesSection() {
   const { data: services, refetch: refetchServices, isLoading: servicesLoading, isError: servicesError } = useServices();
   const { data: settings, refetch: refetchSettings, isLoading: settingsLoading, isError: settingsError } = useSettings();
   const { data: deviceStatus } = useDeviceStatus();
+  const format = useTemperatureFormat();
   // A Pod 5 always hears capacitance presence, so its switch would do nothing there.
   const showCapPresence = !!deviceStatus && deviceStatus.hubVersion !== Version.Pod5;
   const setIsUpdating = useAppStore((state) => state.setIsUpdating);
@@ -120,7 +122,7 @@ export default function FeaturesSection() {
               setRhythmsMessage(undefined);
               setRhythmsDialog(next ? 'enable' : 'disable');
             } }
-            description="Plan sleep by day and date, with an optional Smart Schedule temperature curve. Your weekly schedule is kept.">
+            description="Plan sleep by day and date. Your weekly schedule is kept.">
             <ToggleRow
               label={ FEATURE_TITLE }
               disabled={ isUpdating || features?.rhythmSuggestions === undefined || !features?.rhythms }
@@ -145,30 +147,28 @@ export default function FeaturesSection() {
             disabled={ isUpdating || features?.oneOffAlarms === undefined }
             checked={ features?.oneOffAlarms ?? false }
             onChange={ (next) => updateFeature({ oneOffAlarms: next }) }
-            description="Adds a one-time alarm to Schedule, separate from the daily wake-up. Off, a set one-time alarm does not ring."
+            description="Adds a one-time alarm to Schedule. When off, a set one-time alarm does not ring."
           />
           <ToggleRow
             label="Ring alarms when the side is off"
             disabled={ isUpdating || features?.alarmsWhenOff === undefined }
             checked={ features?.alarmsWhenOff ?? false }
             onChange={ (next) => updateFeature({ alarmsWhenOff: next }) }
-            description="Alarms vibrate even if the side is off."
           />
           { deviceStatus?.hubVersion === Version.Pod5 && <ToggleRow
             label="Show the Pod's target temperatures"
             disabled={ isUpdating || features?.targetTemperatureLabels === undefined }
             checked={ features?.targetTemperatureLabels ?? false }
             onChange={ (next) => updateFeature({ targetTemperatureLabels: next }) }
-            description={ 'Shows the Pod 5 firmware\'s own target curve instead of the usual straight-line scale. '
-              + 'Schedules are unchanged. No effect in Level format.' }
+            description={ `Shows the Pod 5 firmware's own target curve. Schedules are unchanged.${
+              unitOf(format) === 'level' ? ' No effect in Level format.' : '' }` }
           /> }
           { deviceStatus?.hubVersion === Version.Pod5 && <ToggleRow
             label="Restart the cover service on its own"
             disabled={ isUpdating || features?.coverAutoRestore === undefined }
             checked={ features?.coverAutoRestore ?? false }
             onChange={ (next) => updateFeature({ coverAutoRestore: next }) }
-            description={ 'When one side of the cover sends no readings for 10 minutes, Nightstand restarts the Pod\'s cover service. '
-              + 'At most once an hour, never near an alarm.' }
+            description="After 10 minutes with no readings from one side of the cover. At most once an hour, never near an alarm."
           /> }
         </Stack>
       </Section>
@@ -244,7 +244,7 @@ export default function FeaturesSection() {
             disabled={ isUpdating || features?.metricsLowDiskProtection === undefined }
             checked={ features?.metricsLowDiskProtection ?? true }
             onChange={ (next) => updateFeature({ metricsLowDiskProtection: next }) }
-            description={ 'Below 150 MiB free, deletes the oldest detailed vitals, then movement for nights already summarized. '
+            description={ 'Below 150 MiB free, deletes the oldest detailed vitals and movement. '
               + 'Keeps 2 nights of detail and every nightly summary.' }
           />
           <ToggleRow
@@ -252,22 +252,22 @@ export default function FeaturesSection() {
             disabled={ isUpdating || features?.metricsRetention === undefined }
             checked={ features?.metricsRetention ?? false }
             onChange={ (next) => updateFeature({ metricsRetention: next }) }
-            description="Deletes detailed vitals older than 30 days. Summaries, scores and movement stay. Cannot be undone."
+            description="Detailed vitals only. Summaries, scores and movement stay. Cannot be undone."
           />
           <ToggleRow
             label="Keep the system log in memory"
             disabled={ isUpdating || features?.journalInMemory === undefined }
             checked={ features?.journalInMemory ?? false }
             onChange={ (next) => updateFeature({ journalInMemory: next }) }
-            description={ 'Cuts flash writes. Starts at the next Pod restart; the system log then clears on each restart. '
-              + 'Nightstand\'s logs are kept. Older system log files on flash are removed after that restart.' }
+            description={ 'Cuts flash writes. From the next Pod restart, the system log clears on every restart '
+              + 'and its older files on flash are removed. Nightstand\'s logs are kept.' }
           />
           <ToggleRow
             label="Write flash less often"
             disabled={ isUpdating || features?.longFlashCommit === undefined }
             checked={ features?.longFlashCommit ?? false }
             onChange={ (next) => updateFeature({ longFlashCommit: next }) }
-            description="Fewer flash writes. A power cut can lose up to the last minute of sensor recordings and logs."
+            description="A power cut can lose up to the last minute of sensor recordings and logs."
           />
         </Stack>
       </Section>

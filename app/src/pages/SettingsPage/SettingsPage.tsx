@@ -140,23 +140,10 @@ export default function SettingsPage() {
               <Box sx={ { mb: 2, borderTop: 1, borderColor: 'divider' } } />
               <SideSettings side="right" settings={ settings } updateSettings={ updateSettings } />
               <Typography variant="body2" color="text.secondary" sx={ { mt: 2 } }>
-                Away mode pauses that side's schedules and mirrors the active side. If both sides are away, neither
-                schedule runs.
+                Away pauses that side's schedules and mirrors the other side. With both away, no schedule runs.
               </Typography>
               <Box sx={ { mt: 2, borderTop: 1, borderColor: 'divider' } } />
               <SwapSidesButton />
-            </Section>
-          </ErrorBoundary>
-          <ErrorBoundary componentName="Cover buttons">
-            <CoverButtonsCard
-              settings={ settings }
-              updateSettings={ updateSettings }/>
-          </ErrorBoundary>
-          <ErrorBoundary componentName="Tap gestures">
-            <Section title="Tap gestures">
-              <TapGestures
-                settings={ settings }
-                updateSettings={ updateSettings }/>
             </Section>
           </ErrorBoundary>
           <ErrorBoundary componentName="Bed preferences">
@@ -175,8 +162,20 @@ export default function SettingsPage() {
               <DailyPriming settings={ settings } updateSettings={ updateSettings } />
               <PrimeControl />
               <Typography variant="body2" color="text.secondary" sx={ { mt: 2 } }>
-                Prime while the bed is empty to help circulate water and clear air.
+                Prime while the bed is empty.
               </Typography>
+            </Section>
+          </ErrorBoundary>
+          <ErrorBoundary componentName="Cover buttons">
+            <CoverButtonsCard
+              settings={ settings }
+              updateSettings={ updateSettings }/>
+          </ErrorBoundary>
+          <ErrorBoundary componentName="Tap gestures">
+            <Section title="Tap gestures">
+              <TapGestures
+                settings={ settings }
+                updateSettings={ updateSettings }/>
             </Section>
           </ErrorBoundary>
         </>

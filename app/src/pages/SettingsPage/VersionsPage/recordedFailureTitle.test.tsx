@@ -29,7 +29,7 @@ describe('the dialog title after a recorded failure', () => {
   it('says the update did not finish', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     serve('update', '*/update');
-    const { user } = renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0" body={ undefined }/>);
+    const { user } = renderWithProviders(<ReleaseRow release={ release } runningVersion="3.3.0"/>);
     await user.click(screen.getByRole('button', { name: 'Install' }));
     await user.click(await screen.findByRole('button', { name: 'Install now' }));
     await afterPoll();

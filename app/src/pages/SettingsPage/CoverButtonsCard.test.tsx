@@ -25,7 +25,7 @@ function pod(hubVersion: string, coverVersion: string, settings = fahrenheit()) 
     updateSettings={ (patch: DeepPartial<Settings>) => { posted.push(patch); } }/>;
   return { posted, ui };
 }
-const NOT_PAIR = 'Plus and minus are not a matching warmer and cooler pair. Set them under Bed and sides > Tap gestures.';
+const NOT_PAIR = 'Plus and minus are not a matching warmer and cooler pair. Set them under Tap gestures below.';
 const leftButtons = () => screen.findByRole('group', { name: 'Left side buttons' });
 
 describe('Cover buttons options', () => {
@@ -37,7 +37,7 @@ describe('Cover buttons options', () => {
     expect(screen.getByText('Your Pod 4 hub ignores short clicks on the Pod 5 cover\'s plus, minus and center (logo) buttons. '
       + 'Nightstand reads them from the Pod\'s log, 15 to 25 s late.')).toBeVisible();
     expect(screen.queryByRole('group', { name: 'Left side buttons' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('switch', { name: 'Buzz when a center button press is applied' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Buzz on a center press' })).not.toBeInTheDocument();
     await userEvent.click(toggle);
     expect(posted).toEqual([{ features: { coverButtons: true } }]);
   });
@@ -67,8 +67,7 @@ describe('Cover buttons options', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Cover buttons' })).toBeVisible();
     expect(screen.queryByRole('switch', { name: /cover buttons/i })).not.toBeInTheDocument();
     expect(screen.getByText(
-      'Your Pod 5 hub turns plus into a triple tap and minus into a double tap. '
-      + 'Nightstand reads center (logo) button clicks from the Pod\'s log, 3 to 25 s late. Set what each click does here.',
+      'Plus arrives as a triple tap and minus as a double tap. Center presses are read from the Pod\'s log, 3 to 25 s late.',
     )).toBeVisible();
     const group = await leftButtons();
     await userEvent.click(within(group).getByRole('combobox', { name: 'Left Step per click' }));
@@ -116,19 +115,19 @@ describe('Cover buttons options', () => {
       .toEqual(Array.from({ length: 10 }, (_, i) => `${i + 1} min`));
     await userEvent.click(screen.getByRole('option', { name: '10 min' }));
     expect(second.posted).toEqual([{ left: { taps: { logoDouble: { temperatureF: 55, minutes: 10 } } } }]);
-    await userEvent.click(screen.getByRole('switch', { name: 'Buzz when a center button press is applied' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Buzz on a center press' }));
     expect(second.posted[1]).toEqual({ features: { logoClickBuzz: true } });
     await userEvent.click(within(shown).getByRole('switch', { name: 'Left double press for a boost' }));
     expect(second.posted[2]).toEqual({ left: { taps: { logoDouble: { temperatureF: 55, minutes: 0 } } } });
   });
 
-  it('says center (logo) button once and logo nowhere else on either hub', async () => {
+  it('says center (logo) button once on a Pod 4 hub and logo nowhere else', async () => {
     for (const hub of ['Pod 5', 'Pod 4']) {
       const { ui } = pod(hub, 'Pod 5', fahrenheit(settings => { settings.features.coverButtons = true; }));
       const { container, unmount } = renderWithProviders(ui);
       await leftButtons();
       const text = container.textContent ?? '';
-      expect(text.match(/center \(logo\) button/g)).toHaveLength(1);
+      expect(text.match(/center \(logo\) button/g) ?? []).toHaveLength(hub === 'Pod 4' ? 1 : 0);
       expect(text.replace('center (logo) button', '')).not.toMatch(/logo/i);
       unmount();
     }
@@ -166,12 +165,12 @@ describe('Cover buttons options', () => {
 
   it('on a Pod 5 hub, points to Tap gestures when the logo does something else and keeps the switch usable', async () => {
     const { posted, ui } = pod('Pod 5', 'Pod 5', fahrenheit(settings => {
-      settings.left.taps.quadTap = { type: 'alarm', behavior: 'dismiss', snoozeDuration: 300, inactiveAlarmBehavior: 'none' };
+      settings.left.taps.quadTap = { type: 'alarm', behavior: 'snooze', snoozeDuration: 300, inactiveAlarmBehavior: 'none' };
     }));
     renderWithProviders(ui);
     const group = await leftButtons();
     expect(within(group).getByText(
-      'The quad tap is set to another action under Bed and sides > Tap gestures, so a single press only stops alarms.',
+      'Quad tap is set to another action below, so a single press only stops alarms.',
     )).toBeVisible();
     await userEvent.click(within(group).getByRole('switch', { name: 'Left center button sets a temperature' }));
     expect(posted).toEqual([{ left: { taps: { quadTap: { type: 'set_temperature', temperatureF: 80 } } } }]);
@@ -218,14 +217,14 @@ describe('Cover buttons placement', () => {
 
   it('on a Pod 5 hub, precedes Tap gestures with the options and no switch', async () => {
     await bed('Pod 5', 'Pod 5');
-    expect(headings().slice(0, 3)).toEqual(['Cover buttons', 'Tap gestures', 'Priming']);
+    expect(headings().slice(0, 3)).toEqual(['Priming', 'Cover buttons', 'Tap gestures']);
     expect(screen.getByRole('group', { name: 'Left side buttons' })).toBeVisible();
     expect(screen.queryByRole('switch', { name: /cover buttons/i })).not.toBeInTheDocument();
   });
 
   it('on a Pod 4 hub with a Pod 5 cover, precedes Tap gestures with the switch', async () => {
     await bed('Pod 4', 'Pod 5');
-    expect(headings().slice(0, 2)).toEqual(['Cover buttons', 'Tap gestures']);
+    expect(headings().slice(-2)).toEqual(['Cover buttons', 'Tap gestures']);
     expect(screen.getByRole('switch', { name: 'Read cover buttons' })).toBeInTheDocument();
   });
 

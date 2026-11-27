@@ -13,7 +13,6 @@ export default function StorageIndicator() {
   if (isLoading || !data) return null;
 
   const caption = [
-    `${formatBytes(data.availableBytes)} free`,
     data.breakdown.biometricsArchiveBytes > 0 && `${formatBytes(data.breakdown.biometricsArchiveBytes)} biometrics archive`,
     `${formatBytes(data.breakdown.logsBytes)} logs`,
   ].filter(Boolean).join(' · ');

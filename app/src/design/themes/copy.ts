@@ -9,8 +9,8 @@ export const THEME_NAMES: Record<ThemeId, string> = {
 
 export const THEME_PICKER_COPY = {
   label: 'Theme',
-  helper: "Saved on this device. free-sleep classic and jmew follow the original free-sleep app by throwaway31265 and jmew's fork of it.",
+  helper: "free-sleep classic and jmew follow the original free-sleep app by throwaway31265 and jmew's fork of it.",
   apply: 'Use this theme',
-  applyNote: 'The page reloads to apply it.',
+  applyNote: 'Saved on this device. The page reloads to apply it.',
   saveFailed: 'This device did not save the theme, so the current one stays.',
 };
