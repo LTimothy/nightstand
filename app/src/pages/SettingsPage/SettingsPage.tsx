@@ -143,6 +143,7 @@ export default function SettingsPage() {
                 Away mode pauses that side's schedules and mirrors the active side. If both sides are away, neither
                 schedule runs.
               </Typography>
+              <Box sx={ { mt: 2, borderTop: 1, borderColor: 'divider' } } />
               <SwapSidesButton />
             </Section>
           </ErrorBoundary>
