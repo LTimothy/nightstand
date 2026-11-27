@@ -1427,4 +1427,26 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     rationale: 'Optional: it writes to the stock boot slot and copies this slot\'s SSH keys and rewt password hash there, '
       + 'so it waits for an explicit opt-in. Turning it off puts the saved files back.',
   },
+  {
+    id: 'swap-sides',
+    title: 'Swap sides',
+    description: 'Moves names, schedules, rhythms, alarms, tap and button settings to the other side in one step. '
+      + 'Past nights follow each person on the Sleep page; calibration stays with each side.',
+    category: 'platform',
+    version: '3.12.0',
+    flag: null,
+    default: true,
+    touchpoints: [
+      'server/src/db/swapSides.ts', 'server/src/db/sideSwapReplay.ts', 'server/src/db/sideSwaps.ts',
+      'server/src/jobs/swapSidesRun.ts', 'server/src/jobs/rebuildState.ts', 'server/src/routes/settings/settings.ts',
+      'server/src/routes/metrics/', 'app/src/pages/SettingsPage/SettingsPage.tsx',
+    ],
+    depends_on: [],
+    reversible: true,
+    tests: [
+      'server/src/db/swapSides.test.ts', 'server/src/db/sideSwaps.test.ts', 'server/src/jobs/swapSidesRun.test.ts',
+    ],
+    upstream_offer: false,
+    rationale: 'An action the user presses, with nothing to turn off. Swapping again moves everything back.',
+  },
 ];

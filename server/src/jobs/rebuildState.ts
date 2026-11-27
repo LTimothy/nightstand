@@ -14,3 +14,23 @@ export function setRebuilding(on: boolean): void {
   if (!on && rebuilding) settle();
   rebuilding = on;
 }
+
+let held = 0;
+let release: () => Promise<void> = async () => {};
+
+export const rebuildsHeld = (): boolean => held > 0;
+export function setRebuildRelease(hook: () => Promise<void>): void {
+  release = hook;
+}
+
+// While several schedule files change, no rebuild sees some changed and some not; one runs after.
+export async function holdJobRebuilds<T>(work: () => Promise<T>): Promise<T> {
+  await settled;
+  held += 1;
+  try {
+    return await work();
+  } finally {
+    held -= 1;
+    if (held === 0) await release();
+  }
+}

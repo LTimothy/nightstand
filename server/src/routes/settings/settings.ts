@@ -15,13 +15,32 @@ import { syncRawArchiveConf } from '../../jobs/rawArchiveConf.js';
 import { syncJournalStorage } from '../../jobs/journalStorage.js';
 import { syncFlashCommit } from '../../jobs/flashCommit.js';
 import { applyOtherSlot } from '../../jobs/otherSlot.js';
-import { OperationBusyError, privilegedErrorStatus } from '../../jobs/privilegedCommand.js';
+import { OperationBusyError, PrivilegedCommandError, privilegedErrorStatus } from '../../jobs/privilegedCommand.js';
 
 router.get('/settings', async (req: Request, res: Response) => {
   await settingsDB.read();
   res.json(settingsDB.data);
 });
 
+
+router.post('/settings/swap-sides', async (req: Request, res: Response) => {
+  // Loaded on use, so this router does not pull in the Rhythms engine.
+  const { runSideSwap, SwapRefused } = await import('../../jobs/swapSidesRun.js');
+  const { RhythmsStateError } = await import('../../db/rhythms.js');
+  try {
+    await runSideSwap();
+  } catch (error) {
+    if (error instanceof SwapRefused) return res.status(409).json({ error: error.message });
+    if (error instanceof PrivilegedCommandError) return res.status(privilegedErrorStatus(error)).json({ error: error.message });
+    if (error instanceof RhythmsStateError) {
+      return res.status(409).json({ error: 'Rhythms data cannot be read, so the sides were not swapped.' });
+    }
+    throw error;
+  }
+  await settingsDB.read();
+  logger.info('Swapped the two sides');
+  res.json(settingsDB.data);
+});
 
 router.post('/settings', async (req: Request, res: Response) => {
   const { body } = req;

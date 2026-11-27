@@ -20,7 +20,7 @@ import { schedulePauseResume } from './pauseResume.js';
 import eventBus from '../events/eventBus.js';
 import { emitJobEvent } from './jobEvents.js';
 import { isScheduleDbChange } from './isScheduleDbChange.js';
-import { setRebuilding } from './rebuildState.js';
+import { rebuildsHeld, setRebuildRelease, setRebuilding } from './rebuildState.js';
 import { loadRhythms, type RhythmsLoad } from '../db/rhythms.js';
 import type { Side } from '../db/schedulesSchema.js';
 import { activation, type Activation } from './rhythms/activation.js';
@@ -172,7 +172,7 @@ let clockReady = false;
 // Coalesce changes during a rebuild, then read the latest files in another
 // pass. A caller that awaits gets the pass that saw its change.
 export function setupJobs(): Promise<void> {
-  if (!clockReady) return Promise.resolve();
+  if (!clockReady || rebuildsHeld()) return Promise.resolve();
   setupRequested = true;
   if (setupRun) return setupRun;
   setupRun = (async () => {
@@ -272,6 +272,8 @@ chokidar.watch(config.lowDbFolder).on('change', (changedPath) => {
     waitForValidDateAndSetupJobs();
   }
 });
+
+setRebuildRelease(() => setupJobs());
 
 // A Smart Schedule start that moves rebuilds the in-memory jobs, never a file.
 setCurveRetime(() => { void setupJobs(); });
