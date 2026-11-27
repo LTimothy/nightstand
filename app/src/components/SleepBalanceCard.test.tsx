@@ -17,12 +17,12 @@ describe('Sleep balance coverage', () => {
       weekStart={ weekStart }
       timeZone={ timeZone }/>);
     expect(screen.getByText('1 of 7 nights recorded')).toBeInTheDocument();
-    expect(await screen.findByText('8h in bed on average')).toBeInTheDocument();
+    expect(await screen.findByText('8h average on recorded nights')).toBeInTheDocument();
   });
   it('keeps an observed zero duration distinct from no recording', async () => {
     renderWithProviders(<SleepBalanceCard records={ [{ ...base, sleep_period_seconds: 0 }] } weekStart={ weekStart } timeZone={ timeZone }/>);
     expect(screen.getByText('1 of 7 nights recorded')).toBeInTheDocument();
-    expect(await screen.findByText('0h in bed on average')).toBeInTheDocument();
+    expect(await screen.findByText('0h average on recorded nights')).toBeInTheDocument();
     expect(screen.queryByText(/7h to 9h range/)).not.toBeInTheDocument();
   });
   it('uses the same longest session as Night when a day has multiple sessions', async () => {
@@ -33,19 +33,18 @@ describe('Sleep balance coverage', () => {
       weekStart={ weekStart }
       timeZone={ timeZone }/>);
     expect(screen.getByText('1 of 7 nights recorded')).toBeInTheDocument();
-    expect(await screen.findByText('8h in bed on average')).toBeInTheDocument();
+    expect(await screen.findByText('8h average on recorded nights')).toBeInTheDocument();
   });
 });
 
 
 afterEach(() => vi.restoreAllMocks());
-it('does not call upcoming nights incomplete coverage', async () => {
+it('shows no coverage note for upcoming nights', async () => {
   vi.spyOn(moment, 'now').mockReturnValue(Date.parse('2026-09-21T20:00:00Z'));
   renderWithProviders(<SleepBalanceCard
     records={ [{ ...base, left_bed_at: '2026-09-21T14:00:00Z' }] }
     weekStart={ weekStart }
     timeZone={ timeZone }/>);
-  expect(await screen.findByText('8h in bed on average')).toBeInTheDocument();
-  expect(screen.queryByText(/Incomplete coverage/)).not.toBeInTheDocument();
-  expect(screen.getByText('All nights so far recorded. Upcoming nights are not counted.')).toBeInTheDocument();
+  expect(await screen.findByText('8h average on recorded nights')).toBeInTheDocument();
+  expect(screen.queryByText(/coverage|Upcoming nights/)).not.toBeInTheDocument();
 });

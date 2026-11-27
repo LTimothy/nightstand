@@ -20,7 +20,7 @@ export default function SleepFitnessCard({ sleepRecord, timeZone, title, timeZon
       <Typography sx={ typography.metricValue }>
         { formatSleepDuration(sleepRecord.sleep_period_seconds) }
       </Typography>
-      <Typography variant="body2" color="text.secondary">Detected time in bed</Typography>
+      <Typography variant="body2" color="text.secondary">In bed</Typography>
       <Typography variant="body2" color="text.secondary" sx={ { mt: 0.5 } }>
         <Box component="span">{ moment.tz(sleepRecord.entered_bed_at, zone).format('h:mm A') }</Box>
         { ' to ' }

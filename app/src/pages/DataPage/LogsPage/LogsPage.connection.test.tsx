@@ -26,7 +26,7 @@ it('shows a disconnect and recovers using native EventSource retry', async () =>
   await waitFor(() => expect(TestEventSource.latest).toBeDefined());
   const stream = TestEventSource.latest;
   act(() => stream.onopen?.());
-  expect(await screen.findByText('Live')).toBeVisible();
+  expect(screen.queryByText('Live')).not.toBeInTheDocument();
   act(() => stream.onmessage?.({ data: JSON.stringify({ message: 'First line\nSecond line' }) }));
   act(() => stream.onerror?.());
   expect(await screen.findByText(/Disconnected.*reconnecting/)).toBeVisible();
@@ -37,7 +37,7 @@ it('shows a disconnect and recovers using native EventSource retry', async () =>
   expect(await screen.findByText('Third line')).toBeVisible();
   expect(screen.getAllByText('First line', { exact: true })).toHaveLength(1);
   expect(screen.getAllByText('Second line', { exact: true })).toHaveLength(1);
-  expect(screen.getByText('Live')).toBeVisible();
+  expect(screen.queryByText('Disconnected', { exact: true })).not.toBeInTheDocument();
   unmount();
   expect(stream.close).toHaveBeenCalledOnce();
 });

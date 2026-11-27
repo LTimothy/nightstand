@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { baseURL } from '@api/api';
 import {
-  Paper, Typography, Box, MenuItem, Select, FormControl, InputLabel,
+  Paper, Typography, Box, MenuItem, Select, FormControl, FormHelperText, InputLabel,
   Alert, Button, Menu, TextField, IconButton, Tooltip, Chip,
 } from '@mui/material';
 import { palette, radius } from '@design/tokens';
@@ -211,6 +211,7 @@ export default function LogsPage() {
                 </MenuItem>
               )) }
             </Select>
+            { selectedLog && <FormHelperText>{ getLogDescription(selectedLog) }</FormHelperText> }
           </FormControl>
 
           <TextField
@@ -262,18 +263,11 @@ export default function LogsPage() {
           </Box>
         </Box>
 
-        { selectedLog && (
-          <Typography variant="body2" color="text.secondary" sx={ { mb: 1.5 } }>
-            { getLogDescription(selectedLog) }
-          </Typography>
-        ) }
-
-        <Chip
+        { (paused || connection !== 'live') && <Chip
           size="small"
           sx={ { alignSelf: 'flex-start', mb: 1 } }
-          label={ paused ? 'Paused' : connection === 'live' ? 'Live'
-            : connection === 'disconnected' ? 'Disconnected' : connection === 'connecting' ? 'Connecting' : 'Waiting' }
-        />
+          label={ paused ? 'Paused' : connection === 'disconnected' ? 'Disconnected' : connection === 'connecting' ? 'Connecting' : 'Waiting' }
+        /> }
 
         { paused && pendingLogs.length > 0 && (
           <Button onClick={ handleTogglePause } sx={ { ml: -1, mb: 1, alignSelf: 'flex-start' } }>

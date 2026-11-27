@@ -51,7 +51,7 @@ describe('Sleep records dated in the future', () => {
     await screen.findByText('8h');
     await user.click(screen.getByRole('tab', { name: 'Week' }));
     expect(await screen.findByText('2 of 7 nights recorded')).toBeInTheDocument();
-    expect(screen.getByText(/7h in bed on average/)).toBeInTheDocument();
+    expect(screen.getByText(/7h average on recorded nights/)).toBeInTheDocument();
   });
 
   it('keeps a record that ends within an hour of now, in case the phone clock runs behind the Pod', async () => {

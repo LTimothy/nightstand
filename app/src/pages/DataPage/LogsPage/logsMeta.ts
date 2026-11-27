@@ -3,23 +3,23 @@
 const LOG_DESCRIPTIONS: Array<{ pattern: RegExp; description: string }> = [
   {
     pattern: /^free-sleep-stream\d*\.log$/,
-    description: 'The biometrics stream process: reads live sensor data from both sides continuously. Usually the busiest log on the Pod.',
+    description: 'Live sensor stream, both sides',
   },
   {
     pattern: /^free-sleep-update\d*\.log$/,
-    description: 'Output from the in-app updater, written each time you run an update from Settings.',
+    description: 'In-app updater output',
   },
   {
     pattern: /^free-sleep\d*\.log$/,
-    description: 'The main server log: HTTP requests, job scheduling, and the hardware (Franken) connection.',
+    description: 'Main server: requests, jobs, hardware link (Franken)',
   },
   {
     pattern: /^sleep-analyzer\d*\.log$/,
-    description: 'The overnight sleep-analysis job: finds time in bed and movement in the previous night\'s raw sensor data.',
+    description: 'Nightly sleep analysis',
   },
   {
     pattern: /^calibrate-sensor\d*\.log$/,
-    description: 'The presence-detection calibration job: learns what an empty bed looks like to the capacitance sensors.',
+    description: 'Presence calibration',
   },
 ];
 

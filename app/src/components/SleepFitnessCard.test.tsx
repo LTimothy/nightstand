@@ -10,7 +10,7 @@ const record = {
 it('shows time in bed, the in and out times, and the trip count', () => {
   renderWithProviders(<SleepFitnessCard sleepRecord={ record } timeZone="UTC"/>);
   expect(screen.getByText('7h 30m')).toBeInTheDocument();
-  expect(screen.getByText('Detected time in bed')).toBeInTheDocument();
+  expect(screen.getByText('In bed')).toBeInTheDocument();
   expect(screen.getByText('Trips out of bed')).toBeInTheDocument();
   expect(screen.getByText('0')).toBeInTheDocument();
 });

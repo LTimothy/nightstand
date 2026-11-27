@@ -278,12 +278,7 @@ const createSettings = (): Settings => ({
         change: 'increment',
         amount: 1,
       },
-      quadTap: {
-        type: 'alarm',
-        behavior: 'dismiss',
-        snoozeDuration: 60,
-        inactiveAlarmBehavior: 'power',
-      },
+      quadTap: { type: 'base_control', behavior: 'toggle_preset' },
       logoDouble: { temperatureF: 55, minutes: 0 },
     },
     buttons: { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 },
@@ -315,12 +310,7 @@ const createSettings = (): Settings => ({
         change: 'increment',
         amount: 1,
       },
-      quadTap: {
-        type: 'alarm',
-        behavior: 'dismiss',
-        snoozeDuration: 60,
-        inactiveAlarmBehavior: 'power',
-      },
+      quadTap: { type: 'base_control', behavior: 'toggle_preset' },
       logoDouble: { temperatureF: 55, minutes: 0 },
     },
     buttons: { invertButtons: false, stepF: 1, favoriteTemperatureF: 80 },
@@ -801,10 +791,14 @@ export const appendLogEntry = (file: string, message: string) => {
   }
 };
 
+// After a demo swap, past nights follow each person, so the side filter reads the other side's records.
+let sidesSwapped = false;
+export const swapMockRecordSides = () => { sidesSwapped = !sidesSwapped; };
+
 export const filterByQuery = <T extends { side?: Side }>(records: T[], filters: QueryFilters, getTimestamp: (record: T) => number) => {
   const start = filters.startTime ? Date.parse(filters.startTime) : undefined;
   const end = filters.endTime ? Date.parse(filters.endTime) : undefined;
-  const side = filters.side;
+  const side = filters.side && sidesSwapped ? (filters.side === 'left' ? 'right' : 'left') : filters.side;
 
   return records.filter((record) => {
     if (side && record.side !== side) {
@@ -870,7 +864,7 @@ export const mockCalibration = {
     state: 'calibrated' as const,
     summary: 'Learned from a 22 min empty-bed window.',
     quality: 0.8,
-    calibratedAt: 1_700_001_400,
+    calibratedAt: Math.floor(Date.now() / 1000) - 2 * 86400,
     lastRunStatus: 'success',
     capFormat: null,
   },

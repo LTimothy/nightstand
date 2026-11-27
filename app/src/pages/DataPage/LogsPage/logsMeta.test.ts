@@ -3,8 +3,8 @@ import { getLogDescription, detectLogLevel } from './logsMeta.ts';
 
 describe('getLogDescription', () => {
   it('matches rotated log files by their base name', () => {
-    expect(getLogDescription('free-sleep-stream.log')).toContain('biometrics stream');
-    expect(getLogDescription('free-sleep-stream1.log')).toContain('biometrics stream');
+    expect(getLogDescription('free-sleep-stream.log')).toBe('Live sensor stream, both sides');
+    expect(getLogDescription('free-sleep-stream1.log')).toBe('Live sensor stream, both sides');
   });
 
   it('falls back to a generic description for unknown files', () => {

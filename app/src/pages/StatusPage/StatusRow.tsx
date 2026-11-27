@@ -76,11 +76,13 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
         <StatusChip info={ statusInfo } optional={ job === 'biometricsInstallation' && statusInfo.status === 'not_started' } />
       </Box>
 
-      <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary, mt: 0.5 } }>
-        { meta.blurb }
-      </Typography>
+      { (statusInfo.status !== 'healthy' || job === 'firmwareHealth') && (
+        <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary, mt: 0.5 } }>
+          { meta.blurb }
+        </Typography>
+      ) }
 
-      <Typography
+      { !(calibrationSide && calibration?.[calibrationSide] && statusInfo.status !== 'failed') && <Typography
         variant="caption"
         sx={ {
           display: 'block',
@@ -93,14 +95,13 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
         { statusInfo.status === 'failed' && statusInfo.message
           ? `Error: ${statusInfo.message}`
           : (statusInfo.status === 'healthy' || job === 'bootRescue') && statusInfo.message ? statusInfo.message : meaning }
-      </Typography>
+      </Typography> }
 
       { statusInfo.coverRestore?.note && (
         <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary, mt: 0.5 } }>
           { statusInfo.coverRestore.note }
         </Typography>
       ) }
-      { (job === 'franken' || job === 'express') && <Typography variant="caption" color="text.secondary">{ statusInfo.name }</Typography> }
       { job === 'biometricsInstallation' && statusInfo.status === 'not_started' && (
         <Button component={ Link } to="/settings/features">Set up in Features</Button>
       ) }
@@ -114,9 +115,9 @@ export default function StatusRow({ job, statusInfo, divider }: StatusRowProps) 
 
       { isRunnable && (
         <Box sx={ { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1.5, mt: 1 } }>
-          <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary } }>
+          { meta.runHint && <Typography variant="caption" sx={ { display: 'block', color: palette.text.secondary } }>
             { meta.runHint }
-          </Typography>
+          </Typography> }
           <Button
             onClick={ () => calibrationSide ? setConfirmationOpen(true) : void startJob() }
             variant="outlined"

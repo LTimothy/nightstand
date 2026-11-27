@@ -21,10 +21,6 @@ export default function FlashHealthPanel() {
   const worn = (flash.preEolInfo ?? 1) >= 2 || Math.max(flash.lifeTimeA ?? 0, flash.lifeTimeB ?? 0) >= 9;
   return <Paper variant="outlined" sx={ { p: 2 } }>
     <SectionHeading sx={ { mb: 1.5 } }>Flash memory</SectionHeading>
-    <Typography variant="body2" color="text.secondary" sx={ { mb: 1 } }>
-      The Pod keeps its software, settings and sensor history on built-in flash memory, which wears a little
-      with every write. The memory chip keeps its own estimate in 10% steps. This page only reads it.
-    </Typography>
     { worn && <Alert severity="warning" sx={ { mb: 1 } }>
       The flash memory is near the end of its rated life. Keep a copy of anything on the Pod you want to keep.
     </Alert> }

@@ -74,6 +74,18 @@ it('previews each release with its summary, or the first full sentence of its no
   expect(older).toHaveTextContent(/The Status page has a Water tank entry\.$/);
 });
 
+it('hides the summary preview while its release is expanded', async () => {
+  server.use(http.get('*/changelog', () => HttpResponse.json({ entries: [
+    { version: '3.4.0', date: '2026-09-29', body: 'Sleep data loads again.\n\n- Detail line.' },
+  ] })));
+  const { user } = renderWithProviders(<ChangelogPage />);
+  const row = await screen.findByRole('button', { name: /^v3.4.0/ });
+  const preview = row.querySelector('.release-summary') as HTMLElement;
+  expect(preview).toBeVisible();
+  await user.click(row);
+  expect(preview).not.toBeVisible();
+});
+
 it('keeps the heading outline to h1 then one h2 per release', async () => {
   renderWithProviders(<ChangelogPage />);
   await screen.findAllByRole('button', { name: /^v\d/ });

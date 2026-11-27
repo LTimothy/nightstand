@@ -15,25 +15,16 @@ export default function SleepBalanceCard({ records, weekStart, timeZone, onSelec
     records, weekStart.clone().add(index, 'days').format('YYYY-MM-DD'), timeZone,
   )).filter((record): record is SleepRecord => !!record);
   const summary = summarizeDurations(recorded.map(record => nightDuration(record.sleep_period_seconds)));
-  const today = moment.tz(timeZone).startOf('day');
-  const elapsedDays = Array.from({ length: 7 }, (_, index) => weekStart.clone().add(index, 'days'))
-    .filter(day => day.isSameOrBefore(today, 'day'));
-  const missingPastNight = elapsedDays.some(day => !recordForNight(recorded, day.format('YYYY-MM-DD'), timeZone));
   return (
     <GlassCard label="Weekly time in bed">
       <Typography>{ recorded.length } of 7 nights recorded</Typography>
       { summary && (
         <Box sx={ { my: 1 } }>
           <Typography sx={ typography.metricValue }>
-            { formatSleepDuration(summary.average) } in bed on average
+            { formatSleepDuration(summary.average) } average on recorded nights
           </Typography>
         </Box>
       ) }
-      <Typography variant="body2" color="text.secondary" sx={ { mt: 1, mb: 2 } }>
-        { missingPastNight ? 'Incomplete coverage. Missing nights are not counted as zero time in bed.'
-          : elapsedDays.length < 7 ? 'All nights so far recorded. Upcoming nights are not counted.'
-            : 'Full recorded-night coverage for this week.' }
-      </Typography>
       <WeeklyScheduleBars records={ recorded } weekStart={ weekStart } timeZone={ timeZone } onSelectDay={ onSelectDay }/>
     </GlassCard>
   );

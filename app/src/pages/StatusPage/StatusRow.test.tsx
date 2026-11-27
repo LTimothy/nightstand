@@ -110,3 +110,30 @@ describe('cover sensors', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Not while the Pod is priming.');
   });
 });
+
+it('shows the blurb only when the row is not healthy', () => {
+  const { unmount } = renderWithProviders(<StatusRow job="analyzeSleepLeft" statusInfo={ status } divider={ false }/>);
+  expect(screen.queryByText(/Finds last night's bed times/)).not.toBeInTheDocument();
+  unmount();
+  renderWithProviders(<StatusRow job="analyzeSleepLeft" statusInfo={ { ...status, status: 'failed' } } divider={ false }/>);
+  expect(screen.getByText(/Finds last night's bed times/)).toBeInTheDocument();
+});
+
+it('shows the firmware blurb even while healthy', () => {
+  renderWithProviders(<StatusRow job="firmwareHealth" statusInfo={ { ...status, name: 'Firmware' } } divider={ false }/>);
+  expect(screen.getByText(/Selected firmware messages/)).toBeVisible();
+});
+
+describe('calibration rows', () => {
+  const row = { ...status, name: 'Calibration left' };
+  it('shows no meaning line when healthy and calibrated', async () => {
+    renderWithProviders(<StatusRow job="biometricsCalibrationLeft" statusInfo={ row } divider={ false }/>);
+    await screen.findByText(/Learned from a 22 min empty-bed window/);
+    expect(screen.queryByText('Calibration finished successfully.')).not.toBeInTheDocument();
+  });
+  it('shows the error when failed', async () => {
+    const failed = { ...row, status: 'failed', message: 'No empty bed found.' } as const;
+    renderWithProviders(<StatusRow job="biometricsCalibrationLeft" statusInfo={ failed } divider={ false }/>);
+    expect(await screen.findByText('Error: No empty bed found.')).toBeVisible();
+  });
+});

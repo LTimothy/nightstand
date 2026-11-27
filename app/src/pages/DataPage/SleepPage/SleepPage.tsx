@@ -71,7 +71,7 @@ function NightVitals({ record, side, timeZone, biometricsV2 }: {
   return (
     <Box sx={ { minWidth: 0, display: 'grid', gap: 2 } }>
       <Typography variant="body2" color="text.secondary">
-        Estimates from bed sensors, not a medical measurement. In a shared bed, some readings can come from the other sleeper.
+        Bed sensor estimates, not medical measurements. In a shared bed, some can come from the other sleeper.
       </Typography>
       { metrics.map((item, index) => {
         const points = metricPoints[index];

@@ -29,6 +29,7 @@ import {
   getSleepStages,
   getSleepScore,
   filterByQuery,
+  swapMockRecordSides,
   listLogs,
   getLogFiles,
   getChangelog,
@@ -109,6 +110,13 @@ export const handlers = [
     await delay(120);
     return HttpResponse.json(deepClone(updated));
   }),
+  http.get('/api/services/firmware', () => HttpResponse.json({
+    availability: 'Monitoring active',
+    targets: { left: { state: 'unavailable' }, right: { state: 'unavailable' } },
+    water: { left: { state: 'unavailable' }, right: { state: 'unavailable' } },
+    cooling: { left: { state: 'unavailable' }, right: { state: 'unavailable' } },
+    taps: [], incidents: [], sensorFresh: false, interrupted: false, reported: { target: false, health: false },
+  })),
   http.get('/api/schedules', async () => {
     if (demoReads() === 'hang') await delay('infinite');
     await delay(120);
@@ -194,6 +202,7 @@ export const handlers = [
     const { left, right } = deepClone(getSettings());
     const updated = updateSettings({ left: { ...right, name: right.name === 'Right' ? 'Left' : right.name },
       right: { ...left, name: left.name === 'Left' ? 'Right' : left.name } });
+    swapMockRecordSides();
     await delay(120);
     return HttpResponse.json(deepClone(updated));
   }),

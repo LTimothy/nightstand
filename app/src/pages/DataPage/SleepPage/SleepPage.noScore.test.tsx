@@ -61,7 +61,7 @@ it('shows no range verdict or score request in the week view', async () => {
   await screen.findByText('5h');
   await user.click(screen.getByRole('tab', { name: 'Week' }));
   expect(await screen.findByText('Weekly time in bed')).toBeInTheDocument();
-  expect(await screen.findByText(/5h in bed on average/)).toBeInTheDocument();
+  expect(await screen.findByText(/5h average on recorded nights/)).toBeInTheDocument();
   expect(screen.queryByText(/7h to 9h|range/)).not.toBeInTheDocument();
   await waitFor(() => expect(requested).toEqual([]));
 });

@@ -147,7 +147,7 @@ describe('Sleep selection and period', () => {
     expect(screen.queryByText('Sleep balance')).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Week' }));
     expect(await screen.findByText('1 of 7 nights recorded')).toBeInTheDocument();
-    expect(screen.getByText(/Missing nights are not counted as zero time in bed/)).toBeInTheDocument();
+    expect(screen.queryByText(/Missing nights are not counted/)).not.toBeInTheDocument();
     expect(screen.queryByText(/-48h/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Average heart rate/ })).not.toBeInTheDocument();
   });

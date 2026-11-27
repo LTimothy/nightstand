@@ -15,7 +15,10 @@ export type StatusItemMeta = {
 };
 
 export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
-  firmwareHealth: { group: 'biometrics', blurb: 'Selected firmware messages. Requires Biometrics; silence does not establish recovery.' },
+  firmwareHealth: {
+    group: 'biometrics',
+    blurb: 'Selected firmware messages. Needs Biometrics. No new messages does not mean a fault has cleared.',
+  },
   alarmSchedule: {
     group: 'schedules',
     blurb: 'Wakes you up with vibration and temperature changes at your alarm time.',
@@ -64,7 +67,6 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
       healthy: 'Finished analyzing the most recent sleep session.',
       waiting_for_data: 'No full night to analyze yet. Runs automatically after your first night.',
     },
-    runHint: 'Analyzes the last 24 hours right now, instead of waiting for the overnight job.',
   },
   analyzeSleepRight: {
     runLabel: 'Analyze right-side sleep',
@@ -74,7 +76,6 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
       healthy: 'Finished analyzing the most recent sleep session.',
       waiting_for_data: 'No full night to analyze yet. Runs automatically after your first night.',
     },
-    runHint: 'Analyzes the last 24 hours right now, instead of waiting for the overnight job.',
   },
   biometricsCalibrationLeft: {
     runLabel: 'Calibrate left presence',
@@ -84,7 +85,6 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
       healthy: 'Calibration finished successfully.',
       waiting_for_data: 'Collecting data. Calibration runs automatically once the sensors record a stretch of empty bed.',
     },
-    runHint: 'Recalibrates presence detection. Get off this side first: it assumes the side is empty.',
   },
   biometricsCalibrationRight: {
     runLabel: 'Calibrate right presence',
@@ -94,7 +94,6 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
       healthy: 'Calibration finished successfully.',
       waiting_for_data: 'Collecting data. Calibration runs automatically once the sensors record a stretch of empty bed.',
     },
-    runHint: 'Recalibrates presence detection. Get off this side first: it assumes the side is empty.',
   },
   pumpHealthLeft: {
     group: 'core',
@@ -140,9 +139,7 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
   },
   buttonMonitor: {
     group: 'core',
-    blurb: 'For a Pod 4 hub with a Pod 5 cover. When Cover buttons is on, reads ignored cover clicks from RAW files '
-      + 'and acts on them 15 to 25 s later, because the firmware writes its log in batches. '
-      + 'A Pod 5 hub handles its buttons itself, so this does nothing there.',
+    blurb: 'Applies cover button clicks on a Pod 4 hub with a Pod 5 cover.',
     meaning: {
       healthy: 'Watching for ignored button clicks, or off in Settings.',
       failed: 'Cannot apply button clicks. The Pod is not writing RAW files, or a click could not be read or applied.',
@@ -167,7 +164,7 @@ export const STATUS_META: Record<ServerStatusKey, StatusItemMeta> = {
     blurb: 'Checks once a minute that both sides of the cover are sending readings. The cover\'s buttons and bed sensors depend on them.',
     meaning: { healthy: 'Both sides of the cover are reporting.', waiting_for_data: 'No cover readings in the last few minutes.' },
     runLabel: 'Restart the cover service',
-    runHint: 'Restarts the Pod\'s cover service. It runs at most once an hour and never near an alarm.',
+    runHint: 'Runs at most once an hour and never near an alarm.',
   },
   hardwareWatchdog: {
     group: 'core',

@@ -16,8 +16,7 @@ const COPY: Record<MissingNightState, { title: string; description: string }> = 
   zero: { title: 'No time in bed recorded', description: 'This night was analyzed, but no time in bed was found.' },
 };
 
-export const RHYTHMS_PENDING_DESCRIPTION = 'A Rhythms sleep is analyzed about 15 minutes after it ends, '
-  + 'and again 2 hours later; other nights are analyzed at noon.';
+export const RHYTHMS_PENDING_DESCRIPTION = 'Analyzed about 15 minutes after a Rhythms sleep ends.';
 
 type Props = { state: MissingNightState; canAnalyze: boolean; onAnalyze: () => void; pendingDescription?: string };
 export default function MissingNightCard({ state, canAnalyze, onAnalyze, pendingDescription }: Props) {

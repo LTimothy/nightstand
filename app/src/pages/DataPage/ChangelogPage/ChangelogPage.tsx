@@ -8,7 +8,6 @@ import MarkdownBody from '@components/MarkdownBody.tsx';
 import { useChangelog, useRemoteChangelog, entriesNewerThan } from '@api/changelog.ts';
 import type { ChangelogEntry } from '@api/changelogSchema';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
-import { useSettings } from '@api/settings';
 import { useReleases } from '@api/releases.ts';
 import { summary } from '@api/releaseSummary.ts';
 import { useLatestVersion } from '@api/useLatestVersion.ts';
@@ -19,7 +18,6 @@ export default function ChangelogPage() {
   const { data: remoteEntries } = useRemoteChangelog();
   const { data: deviceStatus } = useDeviceStatus();
   const latest = useLatestVersion();
-  const { data: settings } = useSettings();
   const { data: releases } = useReleases();
   const channelOf = new Map((releases?.releases ?? []).map(release => [release.version, release.channel]));
   const running = deviceStatus?.freeSleep?.version;
@@ -54,7 +52,7 @@ export default function ChangelogPage() {
             slotProps={ { transition: { unmountOnExit: true }, heading: { component: 'h2' } } }
             sx={ { backgroundColor: palette.bg.elevated, scrollMarginTop: 24 } }
           >
-            <AccordionSummary expandIcon={ <ExpandMoreIcon/> }>
+            <AccordionSummary expandIcon={ <ExpandMoreIcon/> } sx={ { '&.Mui-expanded .release-summary': { display: 'none' } } }>
               <Box sx={ { minWidth: 0 } }>
                 <Box sx={ { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 } }>
                   <Typography component="span" variant="subtitle1" sx={ { fontWeight: weight.heading } }>v{ entry.version }</Typography>
@@ -65,11 +63,12 @@ export default function ChangelogPage() {
                     variant="outlined"/> }
                   { entry.version === running && <Chip label="Running" size="small" variant="outlined"/> }
                   { entry.version === latest && <Chip
-                    label={ settings?.updateChannel === 'beta' ? 'Latest beta' : 'Latest stable' }
+                    label="Latest"
                     size="small"
                     variant="outlined"/> }
                 </Box>
                 <Typography
+                  className="release-summary"
                   variant="body2"
                   color="text.secondary"
                   sx={ { mt: 0.5, overflowWrap: 'anywhere', display: '-webkit-box',
