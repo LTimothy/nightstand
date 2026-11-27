@@ -225,6 +225,9 @@ scheduled off timer with a new 12-hour timer.
   10 minutes and then return it to the earlier temperature; it is off until
   minutes are set, and changing the temperature ends it. A switch, off by
   default, adds a 3 s vibration when a center button press is applied
+- Swap sides under Settings > Bed and sides moves each person's settings,
+  schedules and rhythms to the other side; the Sleep page keeps showing
+  each person their own earlier nights
 - Three themes under Settings > Bed and sides > Theme, saved on each device:
   lamp (the default), free-sleep classic and jmew. The last two
   follow the original free-sleep app by throwaway31265 and jmew's fork of it

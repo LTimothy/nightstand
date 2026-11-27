@@ -6,6 +6,18 @@ is a hard fork; for the history of the projects it descends from, see
 [jmew/free-sleep](https://github.com/jmew/free-sleep) and
 [throwaway31265/free-sleep](https://github.com/throwaway31265/free-sleep).
 
+## [Unreleased]
+
+### Added
+
+- Settings > Bed and sides > Swap sides moves names, schedules, rhythms,
+  alarms, tap and button settings to the other side in one step, for
+  sleepers who trade sides. The Sleep page keeps showing each person their
+  own earlier nights, and sensor calibration stays with each side. It waits
+  until both sides are off, no alarm is due within 15 minutes and no
+  schedule is paused. Going back to an older version keeps the swapped
+  settings but shows past nights by side again.
+
 ## [3.11.1] - 2026-11-24
 
 Evens out spacing across the app, keeps the running boot slot marked good after an install or update, and adds an optional way back in through the hub's other boot slot.
