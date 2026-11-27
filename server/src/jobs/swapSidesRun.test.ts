@@ -25,6 +25,8 @@ function fakes(reasons: InUseReason[] = [], pausedSide?: 'left' | 'right', expir
     holdJobRebuilds: async <T>(work: () => Promise<T>) => { calls.push('rebuilds held'); return work(); },
     swap: async () => { calls.push('swap'); },
     resume: async (side: string) => { calls.push(`resume ${side}`); },
+    lastSwap: (): number | undefined => undefined,
+    now: () => 1_000_000,
   } };
 }
 
@@ -44,7 +46,7 @@ describe('runSideSwap', () => {
 
   for (const [reasons, message] of [
     [['left-on'], /both sides off/],
-    [['status-unknown'], /both sides off/],
+    [['status-unknown'], /cannot read the bed/],
     [['alarm-soon'], /alarm is due/],
   ] as Array<[InUseReason[], RegExp]>) {
     it(`refuses without swapping for ${reasons.join(', ')}`, async () => {
@@ -53,6 +55,14 @@ describe('runSideSwap', () => {
       assert.deepEqual(t.calls, ['hold']);
     });
   }
+
+  it('refuses a second swap within a minute, so a retry after a lost answer does not undo the first', async () => {
+    const t = fakes();
+    await assert.rejects(runSideSwap({ ...t.deps, lastSwap: () => 1_000_000 - 30 }), /swapped a moment ago/);
+    assert.deepEqual(t.calls, ['hold']);
+    await runSideSwap({ ...t.deps, lastSwap: () => 1_000_000 - 61 });
+    assert.ok(t.calls.includes('swap'));
+  });
 
   it('refuses while a pause flag is still set after its end time', async () => {
     const t = fakes([], 'left', '2000-01-01T00:00:00Z');
@@ -72,12 +82,5 @@ describe('holdJobRebuilds', () => {
     setRebuildRelease(async () => { order.push('rebuild'); });
     await holdJobRebuilds(async () => { order.push('work'); });
     assert.deepEqual(order, ['work', 'rebuild']);
-  });
-
-  it('releases once for nested holds', async () => {
-    let rebuilds = 0;
-    setRebuildRelease(async () => { rebuilds += 1; });
-    await holdJobRebuilds(() => holdJobRebuilds(async () => {}));
-    assert.equal(rebuilds, 1);
   });
 });

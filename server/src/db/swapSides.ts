@@ -15,7 +15,7 @@ import { journalPath, writeSwapFiles, type SwapJournal } from './sideSwapReplay.
 import logger from '../logger.js';
 import { setSideSwaps, sideSwaps, sideSwapsPath } from './sideSwaps.js';
 
-export type SwapFiles = { settings: Settings; schedules: Schedules; rhythms: string | null; notes: string | null; swaps: number[] };
+export type SwapFiles = SwapJournal & { settings: Settings; schedules: Schedules };
 
 const flipNote = (line: string) => {
   try {
@@ -88,7 +88,7 @@ export async function swapSides(now = Math.floor(Date.now() / 1000), apply = app
     notes: await readText(changesPath()),
     swaps: sideSwaps(),
   }, now);
-  const journal: SwapJournal = next;
+  const journal = next;
   await writeTextDurably(journalPath(), JSON.stringify(journal));
   try {
     await apply(next);

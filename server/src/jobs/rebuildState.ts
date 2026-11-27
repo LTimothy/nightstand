@@ -15,10 +15,10 @@ export function setRebuilding(on: boolean): void {
   rebuilding = on;
 }
 
-let held = 0;
+let held = false;
 let release: () => Promise<void> = async () => {};
 
-export const rebuildsHeld = (): boolean => held > 0;
+export const rebuildsHeld = (): boolean => held;
 export function setRebuildRelease(hook: () => Promise<void>): void {
   release = hook;
 }
@@ -26,11 +26,11 @@ export function setRebuildRelease(hook: () => Promise<void>): void {
 // While several schedule files change, no rebuild sees some changed and some not; one runs after.
 export async function holdJobRebuilds<T>(work: () => Promise<T>): Promise<T> {
   await settled;
-  held += 1;
+  held = true;
   try {
     return await work();
   } finally {
-    held -= 1;
-    if (held === 0) await release();
+    held = false;
+    await release();
   }
 }

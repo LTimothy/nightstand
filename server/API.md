@@ -380,7 +380,6 @@ generic message; the details go to the server log.
 
 ---
 
-
 ## `/api/settings/swap-sides`
 
 ### POST
@@ -389,8 +388,14 @@ generic message; the details go to the server log.
 - Calibration and stored sleep data stay on the side that recorded them. After a swap, the `side` parameter of the
   `/api/metrics` routes means the person now on that side: their earlier rows come from the other side, each with
   its real `side`.
-- Takes no body. Answers 409 with an `error` while a side is on, an alarm is due within 15 minutes, a schedule is
-  paused, another operation is running, or the Rhythms data cannot be read. Otherwise returns the saved settings.
+- Takes no body. Answers 409 with an `error` while a side is on, the bed's state cannot be read, an alarm is due
+  within 15 minutes, a schedule is paused, the sides were swapped less than a minute ago, another operation is
+  running, or the Rhythms data cannot be read. Otherwise returns the saved settings.
+- Sends nothing to the hardware itself. Afterwards each side resumes its schedule, so a side whose scheduled night is
+  running turns back on with its new settings.
+
+---
+
 ## `/api/schedules`
 
 ### GET

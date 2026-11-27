@@ -1445,6 +1445,8 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     reversible: true,
     tests: [
       'server/src/db/swapSides.test.ts', 'server/src/db/sideSwaps.test.ts', 'server/src/jobs/swapSidesRun.test.ts',
+      'server/src/db/sideSwapReplayStartup.test.ts', 'server/src/routes/metrics/sideSwapMetrics.test.ts',
+      'app/src/pages/SettingsPage/SwapSidesButton.test.tsx',
     ],
     upstream_offer: false,
     rationale: 'An action the user presses, with nothing to turn off. Swapping again moves everything back.',

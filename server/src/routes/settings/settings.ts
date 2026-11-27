@@ -24,7 +24,7 @@ router.get('/settings', async (req: Request, res: Response) => {
 
 
 router.post('/settings/swap-sides', async (req: Request, res: Response) => {
-  // Loaded on use, so this router does not pull in the Rhythms engine.
+  // Loaded on use: settings route tests mock parts of the Rhythms engine that a static import would load.
   const { runSideSwap, SwapRefused } = await import('../../jobs/swapSidesRun.js');
   const { RhythmsStateError } = await import('../../db/rhythms.js');
   try {

@@ -13,10 +13,11 @@ is a hard fork; for the history of the projects it descends from, see
 - Settings > Bed and sides > Swap sides moves names, schedules, rhythms,
   alarms, tap and button settings to the other side in one step, for
   sleepers who trade sides. The Sleep page keeps showing each person their
-  own earlier nights, and sensor calibration stays with each side. It waits
-  until both sides are off, no alarm is due within 15 minutes and no
-  schedule is paused. Going back to an older version keeps the swapped
-  settings but shows past nights by side again.
+  own earlier nights, and sensor calibration stays with each side. It is
+  refused while a side is on, an alarm is due within 15 minutes or a
+  schedule is paused. If a schedule is running tonight, each side turns
+  back on with its new settings. Going back to an older version keeps the
+  swapped settings but shows past nights by side again.
 
 ## [3.11.1] - 2026-11-24
 

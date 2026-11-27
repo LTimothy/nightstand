@@ -1,5 +1,5 @@
-// Finishes a side swap that a crash or power cut interrupted. Imported first
-// by server.ts, before any database module reads its file.
+// Finishes a side swap that a crash or power cut interrupted. The settings,
+// schedules and rhythms modules import it first, before they read their files.
 import { readFile, rm } from 'node:fs/promises';
 import config from '../config.js';
 import logger from '../logger.js';

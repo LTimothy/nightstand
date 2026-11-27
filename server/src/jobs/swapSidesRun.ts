@@ -4,6 +4,7 @@ import type { Settings } from '../db/settingsSchema.js';
 import { SCHEDULE_SIDES } from '../db/scheduleKeys.js';
 import type { Side } from '../db/schedulesSchema.js';
 import { swapSides } from '../db/swapSides.js';
+import { sideSwaps } from '../db/sideSwaps.js';
 import { bedInUseReasons, type InUseReason } from './bedInUse.js';
 import { holdOperations } from './privilegedCommand.js';
 import { holdJobRebuilds } from './rebuildState.js';
@@ -18,12 +19,17 @@ const defaults = {
   holdJobRebuilds: <T>(work: () => Promise<T>) => holdJobRebuilds(work),
   swap: () => swapSides(),
   resume: (side: Side) => resumeSchedule(side),
+  lastSwap: (): number | undefined => sideSwaps().at(-1),
+  now: () => Math.floor(Date.now() / 1000),
 };
 
-// Nothing reaches the hardware: the bed is idle, and the schedule resumes on the new sides after.
+// Sends nothing to the hardware itself; afterwards each side resumes its schedule, which can turn a side on.
 export async function runSideSwap(deps = defaults): Promise<void> {
   await deps.holdOperations(async () => {
+    // A retry after an answer was lost would swap the sides back.
+    if (deps.now() - (deps.lastSwap() ?? 0) < 60) throw new SwapRefused('The sides were swapped a moment ago.');
     const reasons = await deps.inUse();
+    if (reasons.includes('status-unknown')) throw new SwapRefused("Nightstand cannot read the bed's state right now. Try again in a moment.");
     if (reasons.some(reason => reason !== 'alarm-soon')) throw new SwapRefused('Turn both sides off first.');
     if (reasons.includes('alarm-soon')) throw new SwapRefused('An alarm is due in the next 15 minutes. Try again after it.');
     const settings = await deps.settings();
