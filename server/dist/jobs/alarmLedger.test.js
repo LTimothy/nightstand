@@ -102,6 +102,15 @@ describe('alarms missed while the server was not running', () => {
         writeLedger({ aliveAt: T0.toISOString(), upcoming: [{ side: 'left', at: at(5).toISOString(), jobName: 'left-one-off-alarm' }] });
         assert.equal(ledger.startAlarmLedger(at(10)).length, 0);
     });
+    it('reports a missed one-time alarm on a paused side but not a weekly one', async () => {
+        settingsDB.data.left.scheduleOverrides.pause = { active: true, expiresAt: '' };
+        await settingsDB.write();
+        writeLedger({ aliveAt: T0.toISOString(), upcoming: [
+                { side: 'left', at: at(5).toISOString(), jobName: 'left-one-off-alarm' },
+                { side: 'left', at: at(6).toISOString(), jobName: 'left-monday-06:30-0-alarm' },
+            ] });
+        assert.deepEqual(ledger.startAlarmLedger(at(10)).map(m => m.at), [at(5).toISOString()]);
+    });
     it('starts clean from an unreadable file', () => {
         writeFileSync(LEDGER, '{not json');
         assert.deepEqual(ledger.startAlarmLedger(at(10)), []);
