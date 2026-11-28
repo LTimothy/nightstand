@@ -1337,8 +1337,8 @@ one side, each with a boolean `present`. Timestamps in the body are ignored.
 
 Returns the current state for both sides (`200`). A side left out keeps its
 state and timestamps. A body with no side, or a side without a boolean
-`present`, returns `400`. Presence has no WebSocket push; clients poll this
-route.
+`present`, returns `400`. A first observation, an entry or an exit is also
+sent on the `presence` WebSocket channel.
 
 ---
 
@@ -1941,8 +1941,11 @@ Every frame is a JSON envelope:
 { "channel": "device-status", "payload": { }, "ts": "2026-04-26T10:12:34.000Z" }
 ```
 
-On connect, the server first sends one `{ "channel": "hello", "payload": { "ts": "..." } }`
-frame; clients can ignore it.
+On connect, the server first sends one
+`{ "channel": "hello", "payload": { "ts": "...", "server": "nightstand", "version": "3.12.0" } }`
+frame. `server` and `version` were added in 3.12.0; a client can use them to
+check what it is talking to. No status snapshot follows, so read
+`GET /api/deviceStatus` once after connecting.
 
 ### Channels
 
@@ -1951,6 +1954,13 @@ frame; clients can ignore it.
 | `device-status`  | The gesture monitor reads the bed every 2 seconds and sends the status when anything in it changed (temperature, `isOn`, water level and so on) | The full status, the same shape as `GET /api/deviceStatus` plus each side's `taps` |
 | `service-health` | An entry in `/api/serverStatus` changes (Franken monitor health, job scheduler status, water tank) | Only the entries that changed |
 | `job-event`      | A scheduled job starts, succeeds or fails (alarms, temperature changes, prime, sleep analysis, calibration) | `{ jobName, status: "started" \| "ok" \| "fail", message? }` |
+| `presence`       | A side is first observed, or someone gets in or out. Heartbeats of the same state send nothing | `{ side, present }` |
+| `tap`            | A side's tap counter moves, once per press group, whether or not an action is set | `{ side, gesture: "doubleTap" \| "tripleTap" \| "quadTap" }` |
+| `button`         | A cover button press is read. `source: "record"` comes from the Pod's button records and needs Biometrics. `source: "log"` comes from the firmware log while Cover buttons or a center button action is on, and arrives 15 to 25 seconds late | `{ side, button: "top" \| "middle" \| "bottom", clicks, source }` |
+
+A Pod 5 hub also reports a cover press as a tap, so one press can send a
+`tap` frame and a `button` frame. Frames are sent as the Pod reports them and
+are not merged. A press older than 30 seconds is not sent.
 
 ### Heartbeat
 

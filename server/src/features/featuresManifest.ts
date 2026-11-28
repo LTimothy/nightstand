@@ -1451,4 +1451,29 @@ export const FEATURES_MANIFEST: ManifestEntry[] = [
     upstream_offer: false,
     rationale: 'An action the user presses, with nothing to turn off. Swapping again moves everything back.',
   },
+  {
+    id: 'event-stream-inputs',
+    title: 'Presence, tap and button events',
+    description: 'The event stream sends presence changes, tap gestures and cover button presses as they happen, '
+      + 'and its greeting names the server and version. Button presses read from RAW records need Biometrics.',
+    category: 'platform',
+    version: '3.12.0',
+    flag: null,
+    default: true,
+    touchpoints: [
+      'server/src/events/eventBus.ts', 'server/src/ws/wsServer.ts', 'server/src/routes/metrics/presence.ts',
+      'server/src/8sleep/frankenMonitor.ts', 'server/src/8sleep/buttonMonitor.ts',
+      'server/src/8sleep/buttonRecordEvents.ts', 'server/src/routes/services/firmware.ts', 'server/API.md',
+    ],
+    depends_on: [],
+    reversible: true,
+    tests: [
+      'server/src/ws/wsServer.test.ts', 'server/src/routes/metrics/presence.test.ts',
+      'server/src/8sleep/frankenMonitor.test.ts', 'server/src/8sleep/buttonMonitor.test.ts',
+      'server/src/8sleep/buttonRecordEvents.test.ts', 'server/src/routes/services/firmware.test.ts',
+      'server/src/routes/integrationsContract.test.ts',
+    ],
+    upstream_offer: true,
+    rationale: 'Always on: read-only frames on an existing socket. Nothing is sent to the bed.',
+  },
 ];
