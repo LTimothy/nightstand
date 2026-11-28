@@ -95,7 +95,8 @@ generic message; the details go to the server log.
   read fails. A reply can carry the previous reading. The WebSocket
   `device-status` payload repeats the last value and does not refresh it.
 - `sensorTemps` is `null` until the biometrics service has reported an
-  ambient temperature at least once. It is not available on every Pod.
+  ambient temperature, and again once its last reading is more than 5
+  minutes old. It is not available on every Pod.
 - Each side can also carry `taps`, the count of double, triple and quad taps
   the firmware has seen. It is read only by the gesture monitor, so it
   appears in the WebSocket `device-status` payload, not in this response.
