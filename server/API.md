@@ -939,6 +939,39 @@ in away mode does not start either.
 
 ---
 
+## `/api/alarm/snooze`
+
+### POST
+
+- Snoozes the alarm ringing on a side, the same as a snooze tap on the
+  cover: the alarm stops now and rings again with the same settings when
+  the snooze ends.
+
+#### Request body
+
+`side` (`left` or `right`). Any other key returns `400`.
+
+```json
+{ "side": "left" }
+```
+
+#### Response
+
+```json
+{ "snoozedUntil": "2026-10-07T13:35:00.000Z" }
+```
+
+The snooze lasts as long as the side's first double, triple or quad tap set
+to snooze, or 300 seconds if none is. Returns `409` with
+`{ "error": "No alarm is ringing on this side" }` when nothing is ringing,
+including when the alarm is already snoozed; that snooze is kept. Returns
+`503` with `{ "error": { "message": "..." } }` if the alarm did not stop;
+the snooze is still set. A snooze is held in memory, so a server restart
+drops it. Stop alarm (`POST /api/deviceStatus` with
+`{ "<side>": { "isAlarmVibrating": false } }`) also cancels a snoozed alarm.
+
+---
+
 ## `/api/alarms/missed`
 
 ### GET

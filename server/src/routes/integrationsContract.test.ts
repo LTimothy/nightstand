@@ -270,6 +270,22 @@ it('pins the next alarm read for each side', async () => {
   z.object({ left: next, right: next.unwrap() }).strict().parse(response.body);
 });
 
+it('pins the alarm snooze', async () => {
+  const { activeAlarms, forgetActiveAlarm } = await import('../jobs/activeAlarms.js');
+  const idle = await request('alarm/snooze', { side: 'left' });
+  assert.equal(idle.status, 409);
+  z.object({ error: z.literal('No alarm is ringing on this side') }).strict().parse(idle.body);
+  assert.equal((await request('alarm/snooze', { side: 'left', extra: 1 })).status, 400);
+  activeAlarms.set('left', { vibrationIntensity: 50, duration: 10, vibrationPattern: 'double' });
+  const sent = commands.length;
+  const snoozed = await request('alarm/snooze', { side: 'left' });
+  forgetActiveAlarm('left');
+  assert.equal(snoozed.status, 200, JSON.stringify(snoozed.body));
+  // The stop went to the local stub; drop it so the stub log pinned below stays exact.
+  assert.deepEqual(commands.splice(sent).map(([command]) => command), ['ALARM_LEFT']);
+  z.object({ snoozedUntil: z.string().datetime() }).strict().parse(snoozed.body);
+});
+
 it('pins the two Homebridge read-side incompatibilities without restoring dead fields', async () => {
   const services = (await request('services')).body;
   assert.equal(Object.hasOwn(services, 'sentryLogging'), false);
