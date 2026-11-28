@@ -197,7 +197,8 @@ Other controls can affect a scheduled night:
 
 - A manual temperature write can pause weekly temperature changes for
   12 hours when a scheduled change is within three hours, or hold the
-  Smart Schedule curve. Repeated writes can extend a hold.
+  Smart Schedule curve. Repeated writes can extend a hold. A write with
+  only `isOn` does not count.
 - With Biometrics enabled and a live stream, presence auto-off can turn a
   side off after 45 minutes without presence outside a scheduled sleep.
   A long preheat automation may therefore end before someone gets in.

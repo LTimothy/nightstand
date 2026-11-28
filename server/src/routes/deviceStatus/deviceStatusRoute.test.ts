@@ -80,6 +80,13 @@ describe('POST /deviceStatus', () => {
     assert.deepEqual(manualChanges, [['left', { targetF: 78.8, fromF: 82, on: true, setsOn: false, source: 'api' }]]);
   });
 
+  it('does not count turning a side on or off as a change by hand', async () => {
+    snapshot = { left: reading(82, false), right: reading(75, true) };
+    assert.equal(await post({ left: { isOn: true } }), 204);
+    assert.equal(await post({ right: { isOn: false } }), 204);
+    assert.deepEqual(manualChanges, []);
+  });
+
   it('marks a request that turns the side on with its temperature', async () => {
     snapshot = { left: reading(82, false), right: reading(75, false) };
     assert.equal(await post({ left: { isOn: true, targetTemperatureF: 80 } }), 204);
