@@ -989,8 +989,10 @@ to ring.
 ### GET
 
 - Gives each side's next scheduled alarm: weekly, replacement, one-time or
-  Rhythms. An alarm that a replacement alarm overrides is left out. A side in
-  away mode, paused at that time, or with no alarm scheduled is `null`.
+  Rhythms. An alarm that a replacement alarm overrides is left out, and so is
+  any alarm other than the one-time alarm while the side is paused, since the
+  pause does not affect the one-time alarm. A side in away mode or with no
+  alarm left is `null`.
 
 ```json
 { "left": { "at": "2026-10-07T13:30:00.000Z" }, "right": null }

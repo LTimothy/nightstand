@@ -188,6 +188,10 @@ function upcomingAlarms(now: Date, horizonMs = HORIZON_MS): Upcoming[] {
   });
 }
 
+// The one-time alarm rings through a pause (scheduleOneOffAlarm has no pause check).
+const pausedAlarm = (settings: typeof settingsDB.data, item: Upcoming, dueAt: Date) =>
+  !item.jobName.endsWith('-one-off-alarm') && isAlarmPaused(settings, item.side, dueAt);
+
 const recent = (missed: MissedAlarm[], now: Date) =>
   missed.filter(item => now.getTime() - Date.parse(item.recordedAt) < KEEP_MS).slice(-MAX_MISSED);
 
@@ -202,7 +206,8 @@ function add(found: MissedAlarm[], now: Date): void {
 
 // The saved alarms that came due and never started, or started in an
 // earlier run of the server that stopped before they finished, as missed
-// alarms. Away and paused sides are left out, as they do not ring.
+// alarms. Away sides are left out, and paused sides except their one-time
+// alarm, as those do not ring.
 function unstarted(items: Upcoming[], now: Date): MissedAlarm[] {
   const settings = settingsDB.data;
   const found = items.flatMap(item => {
@@ -210,7 +215,7 @@ function unstarted(items: Upcoming[], now: Date): MissedAlarm[] {
     const runs = ledger.started.filter(run => run.jobName === item.jobName && Math.abs(Date.parse(run.at) - due) <= STARTED_MATCH_MS);
     if (runs.some(run => run.done !== false || startedHere.has(run))) return [];
     if (settings[item.side].awayMode) return [];
-    if (isAlarmPaused(settings, item.side, new Date(due))) return [];
+    if (pausedAlarm(settings, item, new Date(due))) return [];
     return [entry(item.side, new Date(item.at), runs.length > 0 ? 'unconfirmed' : 'not-running', now)];
   });
   add(found, now);
@@ -351,14 +356,14 @@ export function listMissedAlarms(now = new Date()): MissedAlarm[] {
   });
 }
 
-// Each side's earliest live alarm, with no horizon. Away and paused sides
+// Each side's earliest live alarm, with no horizon. Away and paused alarms
 // are left out as in unstarted, since they do not ring.
 export function nextAlarms(now = new Date()): Record<Side, { at: string } | null> {
   return guard('next', { left: null, right: null }, () => {
     const settings = settingsDB.data;
     const next: Record<Side, { at: string } | null> = { left: null, right: null };
     for (const item of upcomingAlarms(now, Infinity)) {
-      if (settings[item.side].awayMode || isAlarmPaused(settings, item.side, new Date(item.at))) continue;
+      if (settings[item.side].awayMode || pausedAlarm(settings, item, new Date(item.at))) continue;
       const current = next[item.side];
       if (!current || Date.parse(item.at) < Date.parse(current.at)) next[item.side] = { at: item.at };
     }

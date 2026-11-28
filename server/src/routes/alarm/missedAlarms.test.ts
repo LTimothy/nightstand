@@ -83,13 +83,23 @@ describe('next alarm route', () => {
     const response = await request('GET', '/api/alarms/next');
     assert.deepEqual(response.body, { left: { at: soon.toISOString() }, right: null });
   });
-  it('answers null for an away side and a paused side', async () => {
+  it('answers null for an away side, and for a paused side with only weekly alarms', async () => {
     await reset();
     nodeSchedule.scheduleJob('left-one-off-alarm', inHours(2), () => undefined);
-    nodeSchedule.scheduleJob('right-one-off-alarm', inHours(2), () => undefined);
+    nodeSchedule.scheduleJob('right-monday-06:30-0-alarm', inHours(2), () => undefined);
+    nodeSchedule.scheduleJob('rhythm-right-2026-10-05-alarm-0630-0', inHours(3), () => undefined);
     settingsDB.data.left.awayMode = true;
     settingsDB.data.right.scheduleOverrides.pause = { active: true, expiresAt: '' };
     const response = await request('GET', '/api/alarms/next');
     assert.deepEqual(response.body, { left: null, right: null });
+  });
+  it('gives the one-time alarm of a paused side, since the pause does not stop it', async () => {
+    await reset();
+    const oneOff = inHours(5);
+    nodeSchedule.scheduleJob('right-monday-06:30-0-alarm', inHours(2), () => undefined);
+    nodeSchedule.scheduleJob('right-one-off-alarm', oneOff, () => undefined);
+    settingsDB.data.right.scheduleOverrides.pause = { active: true, expiresAt: '' };
+    const response = await request('GET', '/api/alarms/next');
+    assert.deepEqual(response.body, { left: null, right: { at: oneOff.toISOString() } });
   });
 });
