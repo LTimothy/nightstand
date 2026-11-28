@@ -10,6 +10,7 @@ mkdirSync(path.join(folder, 'lowdb'));
 process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
 const ledger = await import('../../jobs/alarmLedger.js');
+const { setRebuilding } = await import('../../jobs/rebuildState.js');
 const { default: settingsDB } = await import('../../db/settings.js');
 const { default: router } = await import('./missedAlarms.js');
 const app = express();
@@ -93,6 +94,38 @@ describe('next alarm route', () => {
         settingsDB.data.right.scheduleOverrides.pause = { active: true, expiresAt: '' };
         const response = await request('GET', '/api/alarms/next');
         assert.deepEqual(response.body, { left: null, right: { at: oneOff.toISOString() } });
+    });
+    it('gives the first run of a weekly alarm after a timed pause ends, and still null when away', async () => {
+        await reset();
+        const due = inHours(2);
+        due.setSeconds(0, 0);
+        const weekly = () => {
+            const rule = new nodeSchedule.RecurrenceRule();
+            rule.dayOfWeek = due.getDay();
+            rule.hour = due.getHours();
+            rule.minute = due.getMinutes();
+            return rule;
+        };
+        nodeSchedule.scheduleJob('left-monday-06:30-0-alarm', weekly(), () => undefined);
+        nodeSchedule.scheduleJob('right-monday-06:30-0-alarm', weekly(), () => undefined);
+        settingsDB.data.left.awayMode = true;
+        settingsDB.data.right.scheduleOverrides.pause = { active: true, expiresAt: inHours(3).toISOString() };
+        const nextWeek = new Date(due);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        const response = await request('GET', '/api/alarms/next');
+        assert.deepEqual(response.body, { left: null, right: { at: nextWeek.toISOString() } });
+    });
+    it('waits for a job rebuild in progress before answering', async () => {
+        await reset();
+        const soon = inHours(2);
+        setRebuilding(true);
+        let answered = false;
+        const pending = request('GET', '/api/alarms/next').then(response => { answered = true; return response; });
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert.equal(answered, false);
+        nodeSchedule.scheduleJob('left-monday-06:30-0-alarm', soon, () => undefined);
+        setRebuilding(false);
+        assert.deepEqual((await pending).body, { left: { at: soon.toISOString() }, right: null });
     });
 });
 //# sourceMappingURL=missedAlarms.test.js.map

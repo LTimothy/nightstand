@@ -47,17 +47,19 @@ router.post('/alarm/snooze', async (req, res) => {
     const gesture = [taps.doubleTap, taps.tripleTap, taps.quadTap]
         .find((tap) => tap.type === 'alarm' && tap.behavior === 'snooze');
     const snoozeDuration = gesture?.snoozeDuration ?? DEFAULT_SNOOZE_SECONDS;
-    const snoozedUntil = new Date(Date.now() + snoozeDuration * 1_000).toISOString();
+    // The snooze timer starts after the stop, so the time is read after it too.
+    const until = () => new Date(Date.now() + snoozeDuration * 1_000).toISOString();
     try {
         await handleAlarmTap(side, { type: 'alarm', behavior: 'snooze', snoozeDuration, inactiveAlarmBehavior: 'none' });
     }
     catch (error) {
         // handleAlarmTap arms the snooze even when the stop fails.
         logger.error(error);
+        const snoozedUntil = until();
         res.status(503).json({ error: { message: `The alarm did not stop, but it is snoozed until ${snoozedUntil}.` } });
         return;
     }
-    res.status(200).json({ snoozedUntil });
+    res.status(200).json({ snoozedUntil: until() });
 });
 export default router;
 //# sourceMappingURL=alarm.js.map
