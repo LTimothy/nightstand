@@ -380,6 +380,15 @@ generic message; the details go to the server log.
 
 ---
 
+## `/api/settings/swap-count`
+
+### GET
+
+- Returns `{ "count": N }`, the number of side swaps so far. The app keeps its selected side per browser and flips it
+  when this number has moved by an odd amount since it last looked, so each phone stays on the same person.
+
+---
+
 ## `/api/settings/swap-sides`
 
 ### POST
