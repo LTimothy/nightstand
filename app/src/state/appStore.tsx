@@ -42,9 +42,14 @@ function useFollowSideSwaps() {
   const count = data?.count;
   useEffect(() => {
     if (count === undefined) return;
-    const seen = Number(localStorage.getItem(SWAPS_SEEN_KEY));
+    let seen: number;
     // Without a saved count every poll would flip again, so flip only once it is stored.
-    try { localStorage.setItem(SWAPS_SEEN_KEY, String(count)); } catch { return; }
+    try {
+      seen = Number(localStorage.getItem(SWAPS_SEEN_KEY));
+      localStorage.setItem(SWAPS_SEEN_KEY, String(count));
+    } catch {
+      return;
+    }
     if (swapFlipsSide(seen, count)) {
       const { side, setSide } = useAppStore.getState();
       setSide(side === 'left' ? 'right' : 'left');
