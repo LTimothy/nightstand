@@ -108,11 +108,13 @@ let activeAlarms: typeof import('../jobs/activeAlarms.js')['activeAlarms'];
 let setSnooze: typeof import('../jobs/activeAlarms.js')['setSnooze'];
 let cancelSnooze: typeof import('../jobs/activeAlarms.js')['cancelSnooze'];
 let forgetActiveAlarm: typeof import('../jobs/activeAlarms.js')['forgetActiveAlarm'];
+let eventBus: typeof import('../events/eventBus.js')['default'];
 before(async () => {
   ({ ButtonMonitor } = await import('./buttonMonitor.js'));
   ({ activeAlarms, setSnooze, cancelSnooze, forgetActiveAlarm } = await import('../jobs/activeAlarms.js'));
   ({ default: settingsDB } = await import('../db/settings.js'));
   ({ default: serverStatus } = await import('../serverStatus.js'));
+  ({ default: eventBus } = await import('../events/eventBus.js'));
 });
 
 const logRecord = (msg: string, seq = 1, ts = Date.now() / 1000): Buffer =>
@@ -719,6 +721,45 @@ describe('ButtonMonitor', () => {
     appendRaw(full, click('R', 99, 2), Date.now() / 1000);
     await restarted.poll();
     assert.deepEqual(rightTargets(), [81]);
+  });
+
+  describe('button frames', () => {
+    const buttonFrames = async (run: () => Promise<unknown>) => {
+      const seen: unknown[] = [];
+      const stop = eventBus.subscribe('button', env => seen.push(env.payload));
+      try {
+        await run();
+      } finally {
+        stop();
+      }
+      return seen;
+    };
+
+    it('sends an ignored top click', async () => {
+      writeRaw('001.RAW', click('L', 97), Date.now() / 1000);
+      assert.deepEqual(await buttonFrames(() => monitor.poll()), [{ side: 'left', button: 'top', clicks: 1, source: 'log' }]);
+    });
+
+    it('sends a hub logo click with its count', async () => {
+      writeRaw('001.RAW', logRecord('[TTC] right middle button clicked 2 times'), Date.now() / 1000);
+      assert.deepEqual(await buttonFrames(() => monitor.poll()), [{ side: 'right', button: 'middle', clicks: 2, source: 'log' }]);
+    });
+
+    it('sends an ignored bottom click with Cover buttons off and writes no temperature', async () => {
+      settingsDB.data.features.coverButtons = false;
+      settingsDB.data.left.taps.quadTap = { type: 'set_temperature', temperatureF: 78 };
+      await settingsDB.write();
+      monitor = new ButtonMonitor() as unknown as Internals;
+      await monitor.poll();
+      writeRaw('001.RAW', click('L', 99), Date.now() / 1000);
+      assert.deepEqual(await buttonFrames(() => monitor.poll()), [{ side: 'left', button: 'bottom', clicks: 1, source: 'log' }]);
+      assert.deepEqual(updates, []);
+    });
+
+    it('sends nothing for a press older than 30 seconds', async () => {
+      const seen = await buttonFrames(() => monitor.dispatch({ side: 'left', button: 'top', kind: 'click', at: Date.now() - 30_001 }));
+      assert.deepEqual(seen, []);
+    });
   });
 
   it('ignores a press older than 30 seconds', async () => {
