@@ -4,6 +4,7 @@ import logger from '../logger.js';
 import eventBus, { EventEnvelope } from '../events/eventBus.js';
 import metrics from '../metrics/metrics.js';
 import { isAllowedOrigin } from '../setup/middleware.js';
+import serverInfo from '../serverInfo.json' with { type: 'json' };
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const WS_PATH = '/ws/events';
@@ -69,7 +70,8 @@ export class WsServer {
       // Greet the new client with a snapshot so they don't have to wait for the
       // next event tick to render something.
       try {
-        ws.send(JSON.stringify({ channel: 'hello', payload: { ts: new Date().toISOString() } }));
+        const payload = { ts: new Date().toISOString(), server: 'nightstand', version: serverInfo.version };
+        ws.send(JSON.stringify({ channel: 'hello', payload }));
       } catch {
         // ignored
       }

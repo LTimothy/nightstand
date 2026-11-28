@@ -1,6 +1,8 @@
 import { EventEmitter } from 'events';
 import type { DeviceStatus } from '../routes/deviceStatus/deviceStatusSchema.js';
 import type { ServerStatus } from '../routes/serverStatus/serverStatusSchema.js';
+import type { Side } from '../db/schedulesSchema.js';
+import type { Gesture } from '../db/settingsSchema.js';
 
 // One in-process pub/sub bus. Channels are typed so emit/subscribe stay
 // honest. The bus does not retain history: late subscribers do not see past
@@ -13,10 +15,30 @@ export interface JobEventPayload {
   message?: string;
 }
 
+export interface PresenceEventPayload {
+  side: Side;
+  present: boolean;
+}
+
+export interface TapEventPayload {
+  side: Side;
+  gesture: Gesture;
+}
+
+export interface ButtonEventPayload {
+  side: Side;
+  button: 'top' | 'middle' | 'bottom';
+  clicks: number;
+  source: 'record' | 'log';
+}
+
 export interface EventChannels {
   'device-status': DeviceStatus;
   'job-event': JobEventPayload;
   'service-health': Partial<ServerStatus>;
+  presence: PresenceEventPayload;
+  tap: TapEventPayload;
+  button: ButtonEventPayload;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-type-alias
