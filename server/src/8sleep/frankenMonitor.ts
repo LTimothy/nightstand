@@ -293,6 +293,7 @@ export class FrankenMonitor {
         if (typeof current !== 'number') continue;
         this.lastTaps[side][gesture] = current;
         if (previous === undefined || current <= previous) continue;
+        eventBus.emit('tap', { side, gesture });
         // Counters are the time of the last tap, not a count, so a jump is one press group.
         let clicks = 1;
         if (settingsDB.data[side]?.taps?.[gesture]?.type === 'temperature') {

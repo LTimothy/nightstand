@@ -56,12 +56,16 @@ let noteSentTarget: typeof import('./sentTargets.js')['noteSentTarget'];
 let FrankenMonitor: typeof import('./frankenMonitor.js')['FrankenMonitor'];
 let settingsDB: typeof import('../db/settings.js')['default'];
 let serverStatus: typeof import('../serverStatus.js')['default'];
+let eventBus: typeof import('../events/eventBus.js')['default'];
+let clickCounts: typeof import('./clickCounts.js');
 
 before(async () => {
   ({ FrankenMonitor } = await import('./frankenMonitor.js'));
   ({ default: settingsDB } = await import('../db/settings.js'));
   ({ default: serverStatus } = await import('../serverStatus.js'));
   ({ noteSentTarget } = await import('./sentTargets.js'));
+  ({ default: eventBus } = await import('../events/eventBus.js'));
+  clickCounts = await import('./clickCounts.js');
 });
 
 const side = (taps: SideStatus['taps']): SideStatus => ({
@@ -334,6 +338,62 @@ describe('FrankenMonitor gesture handling', () => {
     assert.equal(updateCalls, 0);
     assert.deepEqual(seen, []);
     assert.equal(serverStatus.status.frankenMonitor.status, 'healthy');
+  });
+
+  const tapFrames = async (run: () => Promise<unknown>) => {
+    const seen: unknown[] = [];
+    const stop = eventBus.subscribe('tap', env => seen.push(env.payload));
+    try {
+      await run();
+    } finally {
+      stop();
+    }
+    return seen;
+  };
+
+  it('sends one tap frame when a counter increases', async () => {
+    const seen = await tapFrames(() => runGestureTick(
+      deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 }),
+      deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 }),
+    ));
+    assert.deepEqual(seen, [{ side: 'left', gesture: 'doubleTap' }]);
+  });
+
+  it('sends a tap frame for a gesture with no action set', async () => {
+    delete (settingsDB.data.left.taps as Record<string, unknown>).doubleTap;
+    await settingsDB.write();
+    const seen = await tapFrames(() => runGestureTick(
+      deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 }),
+      deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 }),
+    ));
+    assert.deepEqual(seen, [{ side: 'left', gesture: 'doubleTap' }]);
+    assert.equal(updateCalls, 0);
+  });
+
+  it('sends no tap frame for a first, missing, unchanged or decreasing counter', async () => {
+    const seen = await tapFrames(async () => {
+      await runGestureTick(deviceStatus(undefined), deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 }));
+      await runGestureTick(deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 }), deviceStatus(undefined));
+      await runGestureTick(deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 }),
+        deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 }));
+      await runGestureTick(deviceStatus({ doubleTap: 5, tripleTap: 0, quadTap: 0 }),
+        deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 }));
+    });
+    assert.deepEqual(seen, []);
+  });
+
+  it('sends one tap frame for a press group counted as three clicks', async () => {
+    clickCounts.resetClickCounts();
+    clickCounts.noteButtonTap({ side: 'left', control: 'bottom', count: 3, timestamp: 2 }, Date.now() / 1000);
+    const seen = await tapFrames(async () => {
+      await runGestureTick(
+        deviceStatus({ doubleTap: 1, tripleTap: 0, quadTap: 0 }),
+        deviceStatus({ doubleTap: 2, tripleTap: 0, quadTap: 0 }),
+      );
+      await writesFinished(3);
+    });
+    assert.deepEqual(seen, [{ side: 'left', gesture: 'doubleTap' }]);
+    assert.equal(updateCalls, 3);
   });
 });
 
