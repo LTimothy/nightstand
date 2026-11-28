@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import { dismissMissedAlarms, listMissedAlarms, nextAlarms } from '../../jobs/alarmLedger.js';
+import { rebuildSettled } from '../../jobs/rebuildState.js';
 
 const router = express.Router();
 const DismissSchema = z.object({ ids: z.array(z.string().max(120)).max(50) }).strict();
@@ -9,7 +10,9 @@ router.get('/alarms/missed', (_req: Request, res: Response) => {
   res.json({ missed: listMissedAlarms() });
 });
 
-router.get('/alarms/next', (_req: Request, res: Response) => {
+// A rebuild cancels every job before planning, so the job list is empty until it settles.
+router.get('/alarms/next', async (_req: Request, res: Response) => {
+  await rebuildSettled();
   res.json(nextAlarms());
 });
 

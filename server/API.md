@@ -1024,8 +1024,10 @@ to ring.
 - Gives each side's next scheduled alarm: weekly, replacement, one-time or
   Rhythms. An alarm that a replacement alarm overrides is left out, and so is
   any alarm other than the one-time alarm while the side is paused, since the
-  pause does not affect the one-time alarm. A side in away mode or with no
-  alarm left is `null`.
+  pause does not affect the one-time alarm. A weekly alarm that falls in a
+  pause with an end time is given at its first run after the pause ends. A
+  side in away mode or with no alarm left is `null`. While jobs are being
+  re-planned, the answer waits until they are planned.
 
 ```json
 { "left": { "at": "2026-10-07T13:30:00.000Z" }, "right": null }

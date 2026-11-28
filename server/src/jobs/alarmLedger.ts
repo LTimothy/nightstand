@@ -8,7 +8,7 @@ import settingsDB from '../db/settings.js';
 import { wasCommandWritten } from '../8sleep/frankenErrors.js';
 import { isRebuilding } from './rebuildState.js';
 import type { Side } from '../db/schedulesSchema.js';
-import { isAlarmPaused } from './schedulePause.js';
+import { isAlarmPaused, pauseEndsAt } from './schedulePause.js';
 
 // Remembers which alarms were due and when this server was last alive, so an
 // alarm that could not ring is reported in the app instead of passing silently.
@@ -356,6 +356,16 @@ export function listMissedAlarms(now = new Date()): MissedAlarm[] {
   });
 }
 
+// A recurring alarm whose next run is paused rings on its first run after the
+// pause ends. One-time jobs, a pause until resumed and an overridden run give null.
+function firstRunAfterPause(settings: typeof settingsDB.data, item: Upcoming): string | null {
+  const end = pauseEndsAt(settings, item.side);
+  const rule = schedule.scheduledJobs[item.jobName]?.pendingInvocations[0]?.recurrenceRule;
+  const at = end && rule?.nextInvocationDate(end);
+  if (!at || suppressions.get(item.jobName)?.(at) === true) return null;
+  return at.toISOString();
+}
+
 // Each side's earliest live alarm, with no horizon. Away and paused alarms
 // are left out as in unstarted, since they do not ring.
 export function nextAlarms(now = new Date()): Record<Side, { at: string } | null> {
@@ -363,9 +373,11 @@ export function nextAlarms(now = new Date()): Record<Side, { at: string } | null
     const settings = settingsDB.data;
     const next: Record<Side, { at: string } | null> = { left: null, right: null };
     for (const item of upcomingAlarms(now, Infinity)) {
-      if (settings[item.side].awayMode || pausedAlarm(settings, item, new Date(item.at))) continue;
+      if (settings[item.side].awayMode) continue;
+      const at = pausedAlarm(settings, item, new Date(item.at)) ? firstRunAfterPause(settings, item) : item.at;
+      if (!at) continue;
       const current = next[item.side];
-      if (!current || Date.parse(item.at) < Date.parse(current.at)) next[item.side] = { at: item.at };
+      if (!current || Date.parse(at) < Date.parse(current.at)) next[item.side] = { at };
     }
     return next;
   });
