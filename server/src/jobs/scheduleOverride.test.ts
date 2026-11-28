@@ -159,7 +159,7 @@ describe('power-on temperature override', () => {
 });
 
 describe('markManualTempChange on a Smart Schedule night', () => {
-  it('holds the curve instead of pausing the schedule for 12 hours', async () => {
+  const startSmartNight = async () => {
     const { startCurveController, stopCurveController, smartCurveStatus } = await import('./rhythms/curveController.js');
     const { applySmartCurve } = await import('./rhythms/smartSleep.js');
     await setNextScheduledChange(1);
@@ -195,6 +195,11 @@ describe('markManualTempChange on a Smart Schedule night', () => {
       retime: () => {},
       recordHistory: async () => {},
     });
+    return { stopCurveController, smartCurveStatus };
+  };
+
+  it('holds the curve instead of pausing the schedule for 12 hours', async () => {
+    const { stopCurveController, smartCurveStatus } = await startSmartNight();
     try {
       await markManualTempChange('left');
       await settingsDB.read();
@@ -207,5 +212,15 @@ describe('markManualTempChange on a Smart Schedule night', () => {
     await markManualTempChange('left');
     await settingsDB.read();
     assert.equal(settingsDB.data.left.scheduleOverrides.temperatureSchedules.disabled, true);
+  });
+
+  it('does not hold the curve for Turn on at the scheduled temperature', async () => {
+    const { stopCurveController, smartCurveStatus } = await startSmartNight();
+    try {
+      await markManualTempChange('left', { targetF: 75, fromF: null, on: true, setsOn: true, source: 'api' });
+      assert.equal(smartCurveStatus('left')?.holdUntil ?? null, null);
+    } finally {
+      stopCurveController();
+    }
   });
 });
