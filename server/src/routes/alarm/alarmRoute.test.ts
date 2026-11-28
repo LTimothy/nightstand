@@ -29,10 +29,12 @@ mock.module(new URL('../../jobs/alarmScheduler.js', import.meta.url).href, {
 
 const dismissed: string[] = [];
 let dismissFails = false;
+let onDismiss: (() => void) | undefined;
 mock.module(new URL('../../8sleep/dismissAlarm.js', import.meta.url).href, {
   namedExports: {
     dismissAlarm: async (side: string) => {
       dismissed.push(side);
+      onDismiss?.();
       if (dismissFails) throw new Error('no connection');
     },
   },
@@ -172,6 +174,21 @@ describe('POST /alarm/snooze', () => {
     assert.match(body.error.message, /did not stop/);
     assert.equal(activeAlarms.hasSnooze('left'), true);
   });
+
+  for (const fails of [false, true]) {
+    it(`times the snooze from when the stop ${fails ? 'failed' : 'finished'}`, async t => {
+      noAlarmTaps();
+      dismissFails = fails;
+      t.mock.timers.enable({ apis: ['Date'], now: 1_800_000_000_000 });
+      onDismiss = () => t.mock.timers.tick(5_000);
+      t.after(() => { onDismiss = undefined; });
+      activeAlarms.activeAlarms.set('left', { ...ringing });
+      const response = await snooze({ side: 'left' });
+      const until = new Date(1_800_000_305_000).toISOString();
+      if (fails) assert.match((await response.json() as { error: { message: string } }).error.message, new RegExp(until));
+      else assert.deepEqual(await response.json(), { snoozedUntil: until });
+    });
+  }
 
   it('rejects a bad body', async () => {
     for (const body of [{}, { side: 'middle' }, { side: 'left', minutes: 5 }]) {
