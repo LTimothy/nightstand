@@ -45,6 +45,13 @@ describe('a phone that did not press Swap', () => {
     await waitFor(() => expect(settingsReads).toBeGreaterThanOrEqual(2));
   });
 
+  it('follows a side change saved by another tab in this browser', async () => {
+    server.use(http.get('*/settings/swap-count', () => HttpResponse.json({ count: 2 })));
+    renderWithProviders(<div/>);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'side', newValue: 'right' }));
+    await waitFor(() => expect(useAppStore.getState().side).toBe('right'));
+  });
+
   it('stays put after an even number of swaps', async () => {
     server.use(http.get('*/settings/swap-count', () => HttpResponse.json({ count: 4 })));
     renderWithProviders(<div/>);

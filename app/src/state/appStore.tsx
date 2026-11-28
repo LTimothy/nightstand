@@ -57,6 +57,17 @@ function useFollowSideSwaps() {
       void queryClient.invalidateQueries();
     }
   }, [count, queryClient]);
+  // Another tab that flipped already stored the count, so this one follows its saved side.
+  useEffect(() => {
+    const follow = (event: StorageEvent) => {
+      if (event.key !== SIDE_KEY || (event.newValue !== 'left' && event.newValue !== 'right')) return;
+      if (useAppStore.getState().side === event.newValue) return;
+      useAppStore.setState({ side: event.newValue });
+      void queryClient.invalidateQueries();
+    };
+    window.addEventListener('storage', follow);
+    return () => window.removeEventListener('storage', follow);
+  }, [queryClient]);
 }
 
 // Menu options live in a portal and unmount when the menu closes. The control
