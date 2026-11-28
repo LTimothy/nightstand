@@ -67,8 +67,6 @@ export class WsServer {
         logger.warn(`WS client error: ${err.message}`);
       });
 
-      // Greet the new client with a snapshot so they don't have to wait for the
-      // next event tick to render something.
       try {
         const payload = { ts: new Date().toISOString(), server: 'nightstand', version: serverInfo.version };
         ws.send(JSON.stringify({ channel: 'hello', payload }));
