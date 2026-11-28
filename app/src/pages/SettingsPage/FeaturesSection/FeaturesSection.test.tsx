@@ -209,6 +209,8 @@ describe('FeaturesSection', () => {
   it('lists the target temperatures switch after One-time alarm on a Pod 5 and no Level switch', async () => {
     renderWithProviders(<FeaturesSection />);
     const everyday = await screen.findByRole('region', { name: 'Everyday' });
+    // Pod 5 switches appear once the device status has loaded.
+    await within(everyday).findByRole('switch', { name: "Show the Pod's target temperatures" });
     expect(switchNames(everyday)).toEqual(['Rhythms', 'Suggestions from your changes', 'One-time alarm',
       'Ring alarms when the side is off', "Show the Pod's target temperatures", 'Restart the cover service on its own']);
     expect(within(everyday).getByText('Shows the Pod 5 firmware\'s own target curve. Schedules are unchanged. '

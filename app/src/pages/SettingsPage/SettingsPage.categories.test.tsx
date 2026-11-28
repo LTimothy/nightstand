@@ -57,6 +57,8 @@ it('keeps optional toggles together and bed maintenance with the sides', async (
 it('counts every visible feature switch', async () => {
   const features = renderWithProviders(<SettingsPage/>, { initialRoute: '/settings/features' });
   await screen.findByRole('switch', { name: 'Biometrics' });
+  // Pod 5 switches appear once the device status has loaded.
+  await screen.findByRole('switch', { name: "Show the Pod's target temperatures" });
   const total = screen.getAllByRole('switch').filter(control => !control.closest('[role="group"][aria-label$=" side buttons"]')).length;
   features.unmount();
   renderWithProviders(<SettingsPage/>, { initialRoute: '/settings' });
