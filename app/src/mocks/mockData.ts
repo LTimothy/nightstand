@@ -793,7 +793,9 @@ export const appendLogEntry = (file: string, message: string) => {
 
 // After a demo swap, past nights follow each person, so the side filter reads the other side's records.
 let sidesSwapped = false;
-export const swapMockRecordSides = () => { sidesSwapped = !sidesSwapped; };
+let swapCount = 0;
+export const swapMockRecordSides = () => { sidesSwapped = !sidesSwapped; swapCount += 1; };
+export const mockSwapCount = () => swapCount;
 
 export const filterByQuery = <T extends { side?: Side }>(records: T[], filters: QueryFilters, getTimestamp: (record: T) => number) => {
   const start = filters.startTime ? Date.parse(filters.startTime) : undefined;

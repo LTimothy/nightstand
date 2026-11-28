@@ -30,6 +30,7 @@ import {
   getSleepScore,
   filterByQuery,
   swapMockRecordSides,
+  mockSwapCount,
   listLogs,
   getLogFiles,
   getChangelog,
@@ -198,6 +199,7 @@ export const handlers = [
     await delay(120);
     return HttpResponse.json(deepClone(updated));
   }),
+  http.get('/api/settings/swap-count', () => HttpResponse.json({ count: mockSwapCount() })),
   http.post('/api/settings/swap-sides', async () => {
     const { left, right } = deepClone(getSettings());
     const updated = updateSettings({ left: { ...right, name: right.name === 'Right' ? 'Left' : right.name },

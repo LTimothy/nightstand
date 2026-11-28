@@ -7,20 +7,26 @@ import { useAppStore } from '@state/appStore.tsx';
 import { getSettings } from '../../mocks/mockData';
 import SwapSidesButton from './SwapSidesButton';
 
-beforeEach(() => useAppStore.getState().setSide('left'));
+beforeEach(() => {
+  useAppStore.getState().setSide('left');
+  localStorage.removeItem('sideSwapsSeen');
+});
 
 describe('Swap sides', () => {
   it('asks first, swaps once, and keeps this device on the same person', async () => {
     let posts = 0;
-    server.use(http.post('*/settings/swap-sides', () => { posts += 1; return HttpResponse.json({}); }));
+    server.use(
+      http.post('*/settings/swap-sides', () => { posts += 1; return HttpResponse.json({}); }),
+      http.get('*/settings/swap-count', () => HttpResponse.json({ count: posts })),
+    );
     const { user } = renderWithProviders(<SwapSidesButton/>);
+    await waitFor(() => expect(localStorage.getItem('sideSwapsSeen')).toBe('0'));
     await user.click(screen.getByRole('button', { name: /Swap sides/ }));
     expect(screen.getByText('Swap sides?')).toBeInTheDocument();
     const copy = 'Names, schedules, rhythms, alarms, tap and button settings move to the other side. '
       + 'Past nights follow each person on the Sleep page. Sensor calibration stays with each side.';
     expect(screen.getByRole('dialog')).toHaveTextContent(copy);
-    const second = 'Other phones keep their selected side, so pick your name there again. '
-      + "Swap before getting into bed, so tonight's night is filed under the right name. "
+    const second = "Swap before getting into bed, so tonight's night is filed under the right name. "
       + 'If a schedule is running tonight, each side turns back on with its new settings.';
     expect(screen.getByRole('dialog')).toHaveTextContent(second);
     const { left, right } = getSettings();
@@ -30,7 +36,7 @@ describe('Swap sides', () => {
     await user.click(screen.getByRole('button', { name: 'Swap' }));
     await screen.findByRole('button', { name: /Swap sides/ });
     expect(posts).toBe(1);
-    expect(useAppStore.getState().side).toBe('right');
+    await waitFor(() => expect(useAppStore.getState().side).toBe('right'));
   });
 
   it('shows why the server refused, and changes nothing here', async () => {

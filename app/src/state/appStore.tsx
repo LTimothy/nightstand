@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef } from 'react';
 import { create } from 'zustand';
 import moment from 'moment-timezone';
 
 import { useSettings } from '@api/settings.ts';
 import { useEventStream } from '@api/eventStream.ts';
+import { useSwapCount } from '@api/swapSides.ts';
 
 export type Side = 'left' | 'right';
 
@@ -15,6 +17,12 @@ type AppState = {
 };
 
 const SIDE_KEY = 'side';
+const SWAPS_SEEN_KEY = 'sideSwapsSeen';
+
+// A phone that last saw a different swap count by an odd number now holds the other person's side.
+// No stored count reads as 0: every recorded swap happened after a phone first chose its side.
+export const swapFlipsSide = (seen: number, count: number) => Math.abs(count - seen) % 2 === 1;
+
 
 // Create Zustand store
 export const useAppStore = create<AppState>((set) => ({
@@ -23,9 +31,28 @@ export const useAppStore = create<AppState>((set) => ({
   side: localStorage.getItem(SIDE_KEY) as Side || 'left',
   setSide: (side: Side) => {
     set({ side });
-    localStorage.setItem(SIDE_KEY, side);
+    try { localStorage.setItem(SIDE_KEY, side); } catch { /* storage off: the side holds until reload */ }
   },
 }));
+
+// Keeps this phone on the same person when the two sides swap, wherever the swap was pressed.
+function useFollowSideSwaps() {
+  const queryClient = useQueryClient();
+  const { data } = useSwapCount();
+  const count = data?.count;
+  useEffect(() => {
+    if (count === undefined) return;
+    const seen = Number(localStorage.getItem(SWAPS_SEEN_KEY));
+    // Without a saved count every poll would flip again, so flip only once it is stored.
+    try { localStorage.setItem(SWAPS_SEEN_KEY, String(count)); } catch { return; }
+    if (swapFlipsSide(seen, count)) {
+      const { side, setSide } = useAppStore.getState();
+      setSide(side === 'left' ? 'right' : 'left');
+      // Names and schedules in the cache are from before the swap.
+      void queryClient.invalidateQueries();
+    }
+  }, [count, queryClient]);
+}
 
 // Menu options live in a portal and unmount when the menu closes. The control
 // worth returning to is the one that opened the menu.
@@ -95,6 +122,7 @@ export function AppStoreProvider({ children }: React.PropsWithChildren) {
   // updates straight into the React Query cache. Mounted at the tree root so
   // there's no per-page connection churn.
   useEventStream();
+  useFollowSideSwaps();
   useRestoreFocusAfterSave();
   const { data: settings } = useSettings();
 

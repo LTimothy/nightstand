@@ -7,7 +7,6 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { swapSides } from '@api/swapSides';
 import { useSettings } from '@api/settings.ts';
 import { isConflict, serverMessage } from '@lib/requestError';
-import { useAppStore } from '@state/appStore.tsx';
 
 type Side = 'left' | 'right';
 const DEFAULT_NAME: Record<Side, string> = { left: 'Left', right: 'Right' };
@@ -22,7 +21,6 @@ const moveLine = (name: string | undefined, from: Side, to: Side) => name && (
 export default function SwapSidesButton() {
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
-  const { side, setSide } = useAppStore();
   const titleId = useId();
   const [open, setOpen] = useState(false);
   const [working, setWorking] = useState(false);
@@ -37,8 +35,6 @@ export default function SwapSidesButton() {
     setError(undefined);
     try {
       await swapSides(queryClient);
-      // This device keeps showing the same person.
-      setSide(side === 'left' ? 'right' : 'left');
       close();
     } catch (caught) {
       // A refusal is "not now"; anything else may have gone through, so refetch and ask for a check.
@@ -81,9 +77,8 @@ export default function SwapSidesButton() {
             person on the Sleep page. Sensor calibration stays with each side.
           </DialogContentText>
           <DialogContentText sx={ { mt: 1 } }>
-            Other phones keep their selected side, so pick your name there again. Swap before getting into bed, so
-            tonight's night is filed under the right name. If a schedule is running tonight, each side turns back on
-            with its new settings.
+            Swap before getting into bed, so tonight's night is filed under the right name. If a schedule is running
+            tonight, each side turns back on with its new settings.
           </DialogContentText>
           { error && <Alert severity={ error.refused ? 'warning' : 'error' } sx={ { mt: 2 } }>{ error.text }</Alert> }
         </DialogContent>
