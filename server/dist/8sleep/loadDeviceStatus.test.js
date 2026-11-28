@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import cbor from 'cbor';
@@ -114,6 +114,26 @@ describe('hubVersionFromRevision', () => {
         for (const revision of ['G4', 'g43', 'G430', 'zzz']) {
             assert.equal(mod.hubVersionFromRevision(revision), undefined, revision);
         }
+    });
+    describe('room and bed temperatures', () => {
+        const servicesFile = path.join(dataFolder, 'lowdb', 'servicesDB.json');
+        const withTemps = (lastUpdated) => {
+            const services = JSON.parse(readFileSync(servicesFile, 'utf8'));
+            services.biometrics.sensorTemps = { ambient: 2250, heatsink: 3120, left: 2410, right: 2380, lastUpdated };
+            writeFileSync(servicesFile, JSON.stringify(services));
+        };
+        it('reports a fresh reading', async () => {
+            withTemps(new Date(Date.now() - 60_000).toISOString());
+            const status = await mod.loadDeviceStatus(reply(), false);
+            assert.equal(status.sensorTemps?.ambientC, 22.5);
+            assert.equal(status.sensorTemps?.leftC, 24.1);
+        });
+        it('reports none once nothing has been read for five minutes', async () => {
+            withTemps(new Date(Date.now() - 6 * 60_000).toISOString());
+            assert.equal((await mod.loadDeviceStatus(reply(), false)).sensorTemps, null);
+            withTemps('not a time');
+            assert.equal((await mod.loadDeviceStatus(reply(), false)).sensorTemps, null);
+        });
     });
 });
 //# sourceMappingURL=loadDeviceStatus.test.js.map

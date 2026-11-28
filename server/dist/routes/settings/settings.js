@@ -6,6 +6,7 @@ import express from 'express';
 import logger from '../../logger.js';
 const router = express.Router();
 import settingsDB, { updateSettings } from '../../db/settings.js';
+import { sideSwaps } from '../../db/sideSwaps.js';
 import { GestureSchema, SettingsSchema } from '../../db/settingsSchema.js';
 import { changesRhythmsFlag, pauseRejection } from './settingsGuards.js';
 import { syncRawArchiveConf } from '../../jobs/rawArchiveConf.js';
@@ -16,6 +17,10 @@ import { OperationBusyError, PrivilegedCommandError, privilegedErrorStatus } fro
 router.get('/settings', async (req, res) => {
     await settingsDB.read();
     res.json(settingsDB.data);
+});
+// Each phone keeps its own selected side; it flips it when this count moves by an odd number.
+router.get('/settings/swap-count', (req, res) => {
+    res.json({ count: sideSwaps().length });
 });
 router.post('/settings/swap-sides', async (req, res) => {
     // Loaded on use: settings route tests mock parts of the Rhythms engine that a static import would load.

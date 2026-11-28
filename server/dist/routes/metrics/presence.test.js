@@ -10,6 +10,7 @@ mkdirSync(path.join(folder, 'lowdb'));
 process.env.DATA_FOLDER = `${folder}/`;
 process.env.ENV = 'local';
 const { default: router } = await import('./presence.js');
+const { default: eventBus } = await import('../../events/eventBus.js');
 const app = express();
 app.use(express.json(), router);
 const server = app.listen(0, '127.0.0.1');
@@ -41,5 +42,20 @@ test('presence updates require a boolean observation instead of accepting an emp
     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ left: {} }) });
     assert.equal(response.status, 400);
+});
+test('pushes presence on first observation and on change, not on a heartbeat', async () => {
+    const seen = [];
+    const stop = eventBus.subscribe('presence', env => seen.push(env.payload));
+    const post = (present) => fetch(url, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ right: { present } }) });
+    await post(false);
+    await post(false);
+    await post(true);
+    await post(true);
+    await post(false);
+    stop();
+    assert.deepEqual(seen, [
+        { side: 'right', present: false }, { side: 'right', present: true }, { side: 'right', present: false },
+    ]);
 });
 //# sourceMappingURL=presence.test.js.map

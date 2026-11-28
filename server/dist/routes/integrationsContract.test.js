@@ -58,6 +58,7 @@ mock.module(new URL('../jobs/reboot.js', import.meta.url).href, { defaultExport:
 const update = async () => { jobs.push('update'); };
 mock.module(new URL('../jobs/update.js', import.meta.url).href, { defaultExport: update, namedExports: { triggerUpdateService: update } });
 const { prisma } = await import('../db/prisma.js');
+const { default: eventBus } = await import('../events/eventBus.js');
 const { setInUseCheck } = await import('./update/update.js');
 setInUseCheck(async () => []);
 const app = express();
@@ -70,6 +71,7 @@ for (const name of ['presence', 'vitals', 'sleep', 'movement']) {
     const { default: router } = await import(`./metrics/${name}.js`);
     app.use('/api/metrics', router);
 }
+app.use('/api', (await import('./alarm/missedAlarms.js')).default);
 app.use('/api/serverStatus', (await import('./serverStatus/serverStatus.js')).default);
 const listener = app.listen(0, '127.0.0.1');
 await new Promise(resolve => listener.once('listening', resolve));
@@ -251,6 +253,15 @@ for (const client of clients) {
         }
     });
 }
+it('pins the next alarm read for each side', async () => {
+    const next = z.object({ at: z.string().datetime({ offset: true }) }).nullable();
+    const { default: nodeSchedule } = await import('node-schedule');
+    const job = nodeSchedule.scheduleJob('right-one-off-alarm', new Date(Date.now() + 3_600_000), () => undefined);
+    const response = await request('alarms/next');
+    job?.cancel();
+    assert.equal(response.status, 200);
+    z.object({ left: next, right: next.unwrap() }).strict().parse(response.body);
+});
 it('pins the two Homebridge read-side incompatibilities without restoring dead fields', async () => {
     const services = (await request('services')).body;
     assert.equal(Object.hasOwn(services, 'sentryLogging'), false);
@@ -272,6 +283,15 @@ it('keeps level display separate from writable Fahrenheit targets', async () => 
     assert.equal((await request('deviceStatus', { left: { currentTemperatureLevel: 0 } })).status, 204);
     assert.deepEqual(deviceWrites.at(-1), { left: { currentTemperatureLevel: 0 } });
     assert.equal((await request('settings', { features: { levelTemps: false } })).status, 200);
+});
+it('pushes a presence change to event stream subscribers', async () => {
+    const frames = [];
+    const stop = eventBus.subscribeAll(env => { if (env.channel === 'presence')
+        frames.push(env.payload); });
+    await request('metrics/presence', { left: { present: true } });
+    await request('metrics/presence', { left: { present: true } });
+    stop();
+    assert.deepEqual(frames, [{ side: 'left', present: true }]);
 });
 it('pins update refusal and verifies that side effects used only local stubs', async () => {
     setInUseCheck(async () => ['left-on']);

@@ -1,2 +1,0 @@
-import{N as s,H as a}from"./index.js";const u=t=>s({queryKey:["useStorage"],queryFn:async({signal:r})=>(await a.get("/storage",{signal:r})).data,refetchInterval:t});function i(t){if(t<1024)return`${t} B`;const r=["KB","MB","GB","TB"];let e=t/1024,n=0;for(;e>=1024&&n<r.length-1;)e/=1024,n+=1;return`${e<10?e.toFixed(1):Math.round(e)} ${r[n]}`}export{i as f,u};
-//# sourceMappingURL=formatBytes-jBT4urRK.js.map

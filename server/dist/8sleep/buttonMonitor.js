@@ -249,7 +249,10 @@ export class ButtonMonitor {
             await settingsDB.read();
             // A Pod 5 hub's logo click follows the side's quad tap, as Cover buttons sets it there.
             const logoTap = event.hub ? settingsDB.data[event.side].taps.quadTap : null;
-            if ((!settingsDB.data.features.coverButtons && !event.hub) || Date.now() - event.at > MAX_PRESS_AGE_MS)
+            if (Date.now() - event.at > MAX_PRESS_AGE_MS)
+                return;
+            eventBus.emit('button', { side: event.side, button: event.button, clicks: event.clicks ?? 1, source: 'log' });
+            if (!settingsDB.data.features.coverButtons && !event.hub)
                 return;
             const side = event.side;
             const buttons = settingsDB.data[side].buttons ?? defaultSideSettings.buttons;

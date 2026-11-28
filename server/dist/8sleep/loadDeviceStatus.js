@@ -12,6 +12,7 @@ import { WIFI_SIGNAL_STRENGTH } from './wifiSignalStrength.js';
 import { GestureSchema } from '../db/settingsSchema.js';
 import { observeFirmwareDevice } from '../firmware/firmwareRuntime.js';
 import { FirmwareAlarmDismiss } from './firmwareAlarmDismiss.js';
+import { PRESENCE_STALE_MS } from './presenceStale.js';
 const firmwareAlarmDismiss = new FirmwareAlarmDismiss();
 const RawDeviceData = z.object({
     tgHeatLevelR: z.string().regex(/^-?\d+$/, { message: 'tgHeatLevelR must be a numeric value in a string' }),
@@ -202,7 +203,10 @@ export async function loadDeviceStatus(response, getGestures, dismissalObserver 
     try {
         await servicesDB.read();
         const rawTemps = servicesDB.data?.biometrics?.sensorTemps;
-        if (rawTemps?.ambient !== null && rawTemps?.ambient !== undefined) {
+        const readAt = Date.parse(rawTemps?.lastUpdated ?? '');
+        // Memory keeps the last reading after Biometrics stops, so an old one means nothing is reporting.
+        const fresh = Date.now() - readAt <= PRESENCE_STALE_MS;
+        if (rawTemps?.ambient !== null && rawTemps?.ambient !== undefined && fresh) {
             // Convert from raw units (centi-degrees C) to C and F
             const toC = (raw) => raw !== null ? Math.round((raw / 100) * 10) / 10 : null;
             const toF = (c) => c !== null ? Math.round(c * 9 / 5 + 32) : null;

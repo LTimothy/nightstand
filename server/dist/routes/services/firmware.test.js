@@ -56,4 +56,18 @@ it('feeds button click counts to the registry even with tapDiagnostics off', asy
     assert.equal((await post({ session: 'a'.repeat(32), records: [record] })).status, 204);
     assert.equal(claimClicks('right', 'tripleTap', now, now), 3);
 });
+it('pushes a button record on the event stream once', async () => {
+    const { default: eventBus } = await import('../../events/eventBus.js');
+    const { resetButtonRecordEvents } = await import('../../8sleep/buttonRecordEvents.js');
+    resetButtonRecordEvents();
+    const seen = [];
+    const stop = eventBus.subscribe('button', env => seen.push(env.payload));
+    const now = Math.floor(Date.now() / 1000);
+    const record = { kind: 'tap', origin: 'buttonEvent', side: 'left', control: 'bottom', count: 1,
+        timestamp: now, receivedAt: now, source: 'RAW', sequence: null, index: 0 };
+    await post({ session: 'a'.repeat(32), records: [record] });
+    await post({ session: 'a'.repeat(32), records: [record] });
+    stop();
+    assert.deepEqual(seen, [{ side: 'left', button: 'bottom', clicks: 1, source: 'record' }]);
+});
 //# sourceMappingURL=firmware.test.js.map

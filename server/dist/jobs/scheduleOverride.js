@@ -8,7 +8,7 @@ import moment from 'moment-timezone';
 import settingsDB, { updateSettings } from '../db/settings.js';
 import schedulesDB from '../db/schedules.js';
 import logger from '../logger.js';
-import { nextScheduledChange } from './scheduleQueries.js';
+import { nextScheduledChange, scheduledTemperatureNow } from './scheduleQueries.js';
 import { smartManualChange } from './rhythms/curveController.js';
 import { recordHandChange } from './rhythms/handChanges.js';
 export const OVERRIDE_WINDOW_HOURS = 3;
@@ -25,10 +25,13 @@ export const markManualTempChange = async (side, change) => {
     // Noted first, so the note sees the hold or override from before this change.
     if (change)
         recordHandChange(side, change);
+    await schedulesDB.read();
+    // The app's Turn on sends the schedule's own temperature, which changes nothing the schedule planned.
+    if (change?.setsOn && Math.round(change.targetF) === scheduledTemperatureNow(side, new Date()))
+        return;
     // Smart Schedule nights hold the curve until its next phase instead.
     if (smartManualChange(side) !== 'not-smart')
         return;
-    await schedulesDB.read();
     await updateSettings(draft => {
         const timeZone = draft.timeZone || 'UTC';
         const now = moment.tz(timeZone);

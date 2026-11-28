@@ -57,6 +57,18 @@ describe('markManualTempChange', () => {
         assert.equal(settingsDB.data.left.scheduleOverrides.temperatureSchedules.disabled, true);
         assert.equal(isTempScheduleOverridden('left'), true);
     });
+    it('does not pause for turning on at the temperature the schedule has now', async () => {
+        await setNextScheduledChange(1);
+        await markManualTempChange('left', { targetF: 75, fromF: null, on: true, setsOn: true, source: 'api' });
+        await settingsDB.read();
+        assert.equal(settingsDB.data.left.scheduleOverrides.temperatureSchedules.disabled, false);
+    });
+    it('still pauses for turning on at a different temperature', async () => {
+        await setNextScheduledChange(1);
+        await markManualTempChange('left', { targetF: 70, fromF: null, on: true, setsOn: true, source: 'api' });
+        await settingsDB.read();
+        assert.equal(settingsDB.data.left.scheduleOverrides.temperatureSchedules.disabled, true);
+    });
     it('does not pause the schedule when the next change is outside the window', async () => {
         await setNextScheduledChange(5); // 5h away, outside the 3h window
         await markManualTempChange('left');

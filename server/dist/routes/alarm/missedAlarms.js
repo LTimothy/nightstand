@@ -1,10 +1,13 @@
 import express from 'express';
 import { z } from 'zod';
-import { dismissMissedAlarms, listMissedAlarms } from '../../jobs/alarmLedger.js';
+import { dismissMissedAlarms, listMissedAlarms, nextAlarms } from '../../jobs/alarmLedger.js';
 const router = express.Router();
 const DismissSchema = z.object({ ids: z.array(z.string().max(120)).max(50) }).strict();
 router.get('/alarms/missed', (_req, res) => {
     res.json({ missed: listMissedAlarms() });
+});
+router.get('/alarms/next', (_req, res) => {
+    res.json(nextAlarms());
 });
 router.post('/alarms/missed/dismiss', (req, res) => {
     const parsed = DismissSchema.safeParse(req.body ?? {});

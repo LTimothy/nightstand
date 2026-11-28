@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { WebSocket } from 'ws';
 import { WsServer } from './wsServer.js';
 import eventBus from '../events/eventBus.js';
+import serverInfo from '../serverInfo.json' with { type: 'json' };
 async function startHttp() {
     const server = createServer((_req, res) => res.end('ok'));
     await new Promise((resolve) => server.listen(0, resolve));
@@ -83,7 +84,13 @@ describe('wsServer', () => {
         });
         const hello = await reader.next();
         assert.match(hello, /"channel":"hello"/);
+        const greeting = JSON.parse(hello);
+        assert.equal(greeting.payload.server, 'nightstand');
+        assert.equal(greeting.payload.version, serverInfo.version);
+        assert.equal(typeof greeting.payload.ts, 'string');
         assert.equal(eventBus.clientCount, clientBefore + 1);
+        eventBus.emit('tap', { side: 'left', gesture: 'doubleTap' });
+        assert.deepEqual(JSON.parse(await reader.next()).payload, { side: 'left', gesture: 'doubleTap' });
         eventBus.emit('job-event', { jobName: 'wstest', status: 'ok' });
         const body = await reader.next();
         const parsed = JSON.parse(body);
