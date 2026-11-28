@@ -351,6 +351,21 @@ export function listMissedAlarms(now = new Date()): MissedAlarm[] {
   });
 }
 
+// Each side's earliest live alarm, with no horizon. Away and paused sides
+// are left out as in unstarted, since they do not ring.
+export function nextAlarms(now = new Date()): Record<Side, { at: string } | null> {
+  return guard('next', { left: null, right: null }, () => {
+    const settings = settingsDB.data;
+    const next: Record<Side, { at: string } | null> = { left: null, right: null };
+    for (const item of upcomingAlarms(now, Infinity)) {
+      if (settings[item.side].awayMode || isAlarmPaused(settings, item.side, new Date(item.at))) continue;
+      const current = next[item.side];
+      if (!current || Date.parse(item.at) < Date.parse(current.at)) next[item.side] = { at: item.at };
+    }
+    return next;
+  });
+}
+
 export function dismissMissedAlarms(ids: string[]): void {
   guard('dismiss', undefined, () => {
     ensureLoaded();

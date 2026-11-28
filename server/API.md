@@ -983,6 +983,24 @@ to ring.
 
 ---
 
+## `/api/alarms/next`
+
+### GET
+
+- Gives each side's next scheduled alarm: weekly, replacement, one-time or
+  Rhythms. An alarm that a replacement alarm overrides is left out. A side in
+  away mode, paused at that time, or with no alarm scheduled is `null`.
+
+```json
+{ "left": { "at": "2026-10-07T13:30:00.000Z" }, "right": null }
+```
+
+It lists the alarm as scheduled. A side that is off at that time does not
+ring unless `features.alarmsWhenOff` is on. A snoozed alarm ringing again is
+not included.
+
+---
+
 ## `/api/base-control`
 
 Adjustable base control over Bluetooth. It has not been tested with a base.

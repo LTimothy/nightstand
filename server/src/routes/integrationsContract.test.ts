@@ -74,6 +74,7 @@ for (const name of ['presence', 'vitals', 'sleep', 'movement']) {
   const { default: router } = await import(`./metrics/${name}.js`) as { default: express.Router };
   app.use('/api/metrics', router);
 }
+app.use('/api', (await import('./alarm/missedAlarms.js')).default);
 app.use('/api/serverStatus', (await import('./serverStatus/serverStatus.js')).default);
 const listener = app.listen(0, '127.0.0.1');
 await new Promise<void>(resolve => listener.once('listening', resolve));
@@ -258,6 +259,16 @@ for (const client of clients) {
     }
   });
 }
+
+it('pins the next alarm read for each side', async () => {
+  const next = z.object({ at: z.string().datetime({ offset: true }) }).nullable();
+  const { default: nodeSchedule } = await import('node-schedule');
+  const job = nodeSchedule.scheduleJob('right-one-off-alarm', new Date(Date.now() + 3_600_000), () => undefined);
+  const response = await request<{ left: unknown; right: unknown }>('alarms/next');
+  job?.cancel();
+  assert.equal(response.status, 200);
+  z.object({ left: next, right: next.unwrap() }).strict().parse(response.body);
+});
 
 it('pins the two Homebridge read-side incompatibilities without restoring dead fields', async () => {
   const services = (await request('services')).body;

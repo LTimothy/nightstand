@@ -1,12 +1,16 @@
 import express, { Request, Response } from 'express';
 import { z } from 'zod';
-import { dismissMissedAlarms, listMissedAlarms } from '../../jobs/alarmLedger.js';
+import { dismissMissedAlarms, listMissedAlarms, nextAlarms } from '../../jobs/alarmLedger.js';
 
 const router = express.Router();
 const DismissSchema = z.object({ ids: z.array(z.string().max(120)).max(50) }).strict();
 
 router.get('/alarms/missed', (_req: Request, res: Response) => {
   res.json({ missed: listMissedAlarms() });
+});
+
+router.get('/alarms/next', (_req: Request, res: Response) => {
+  res.json(nextAlarms());
 });
 
 router.post('/alarms/missed/dismiss', (req: Request, res: Response) => {
