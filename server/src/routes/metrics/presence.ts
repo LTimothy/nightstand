@@ -3,6 +3,7 @@ import moment from 'moment-timezone';
 import { z } from 'zod';
 import logger from '../../logger.js';
 import settingsDB from '../../db/settings.js';
+import eventBus from '../../events/eventBus.js';
 
 const router: Router = express.Router();
 
@@ -75,10 +76,10 @@ router.post('/presence', async (req: Request, res: Response) => {
       const update = updates[side];
       if (!update) continue;
       const wasPresent = presenceData[side].present;
-      if (!presenceData[side].stateChangedAt || wasPresent !== update.present) {
-        presenceData[side].stateChangedAt = currentTime;
-      }
+      const changed = !presenceData[side].stateChangedAt || wasPresent !== update.present;
+      if (changed) presenceData[side].stateChangedAt = currentTime;
       presenceData[side].present = update.present;
+      if (changed) eventBus.emit('presence', { side, present: update.present });
       presenceData[side].lastUpdatedAt = currentTime;
       // lastPresenceAt = the most recent moment the system believed someone
       // was on this side. Update on entry (update.present == true), on the

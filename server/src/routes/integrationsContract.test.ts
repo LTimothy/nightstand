@@ -61,6 +61,7 @@ const update = async () => { jobs.push('update'); };
 mock.module(new URL('../jobs/update.js', import.meta.url).href, { defaultExport: update, namedExports: { triggerUpdateService: update } });
 
 const { prisma } = await import('../db/prisma.js');
+const { default: eventBus } = await import('../events/eventBus.js');
 const { setInUseCheck } = await import('./update/update.js');
 setInUseCheck(async () => []);
 const app = express();
@@ -281,6 +282,15 @@ it('keeps level display separate from writable Fahrenheit targets', async () => 
   assert.equal((await request('deviceStatus', { left: { currentTemperatureLevel: 0 } })).status, 204);
   assert.deepEqual(deviceWrites.at(-1), { left: { currentTemperatureLevel: 0 } });
   assert.equal((await request('settings', { features: { levelTemps: false } })).status, 200);
+});
+
+it('pushes a presence change to event stream subscribers', async () => {
+  const frames: unknown[] = [];
+  const stop = eventBus.subscribeAll(env => { if (env.channel === 'presence') frames.push(env.payload); });
+  await request('metrics/presence', { left: { present: true } });
+  await request('metrics/presence', { left: { present: true } });
+  stop();
+  assert.deepEqual(frames, [{ side: 'left', present: true }]);
 });
 
 it('pins update refusal and verifies that side effects used only local stubs', async () => {
